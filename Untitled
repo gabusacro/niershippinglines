@@ -1,0 +1,12 @@
+# Supabase (get from Project Settings > API)
+NEXT_PUBLIC_SUPABASE_URL=https://gohrllugnblfzsypapee.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_kd-Q8CnBJLQ_-Zlv-pe-vw_APP2Lbtl
+
+# OpenWeather (Siargao) - optional for weather widget
+NEXT_PUBLIC_OPENWEATHER_API_KEY=your-openweather-api-key
+
+# Email (Gmail SMTP - for notifications later)
+# SMTP_HOST=smtp.gmail.com
+# SMTP_PORT=587
+# SMTP_USER=your-email@gmail.com
+# SMTP_PASS=your-app-password
