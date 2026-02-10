@@ -10,7 +10,7 @@ export const metadata = {
 
 export default function WeatherPage() {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 mb-8">
         <div className="rounded-full bg-[#0c7b93]/10 p-3 w-fit">
           <Sun size={28} className="text-[#f59e0b]" />

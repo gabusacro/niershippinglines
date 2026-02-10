@@ -24,9 +24,9 @@ npm install
    Copy-paste the contents of `supabase/migrations/001_initial_schema.sql` and run it.
 3. In **Storage**, create a bucket named `payment-proofs` (private). Add a policy so authenticated users can upload and admins can read (see migration comments).
 4. In **Project Settings → API**, copy the **Project URL** and **anon public** key.
-5. (Optional) To show **tide** on the weather page, add today’s times in SQL:  
+5. (Optional) **Tide:** For automatic Siargao tide, add `WORLD_TIDES_API_KEY` (get key at [worldtides.info](https://www.worldtides.info)). If not set, add today’s times in SQL:  
    `INSERT INTO public.tide_entries (entry_date, high_tide_time, low_tide_time) VALUES (CURRENT_DATE, '06:00', '12:00');`  
-   Adjust times for your area. Admin can manage tide later.
+   Admin can manage tide in the dashboard.
 
 ### 3. Environment variables
 
@@ -36,6 +36,8 @@ Copy `.env.example` to `.env.local` and fill in:
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key   # same as "publishable" / anon key in Dashboard
 NEXT_PUBLIC_OPENWEATHER_API_KEY=your-key      # for Siargao weather widget (home + /weather)
+# Optional: automatic tide for Siargao (Mindanao). Get key at https://www.worldtides.info. If not set, tide uses admin-entered times.
+# WORLD_TIDES_API_KEY=your-worldtides-key
 ```
 
 ### 4. Run locally
@@ -70,6 +72,16 @@ Replace `YOUR-AUTH-USER-UUID` with the user's ID from **Authentication → Users
 ## Project summary
 
 See [PROJECT_SUMMARY.md](./PROJECT_SUMMARY.md) for full scope: boats, routes, schedule, booking, GCash proof upload, crew/captain/admin roles, attractions, weather, tide, legal pages, footer (© 2026 Gabriel Sacro).
+
+## Git remotes
+
+- **Push to GitHub (default):** `origin` is the client repo — **jniervg/niershippinglines**. Push here from here on:
+  ```bash
+  git push -u origin main
+  ```
+  If the repo was created with a README and you need to overwrite it: `git push -u origin main --force`
+- **Push to gabusacro (only when asked):** When you're told to push to gabusacro, run: `git push gabusacro main`
+- **Client setup:** Clone from `https://github.com/jniervg/niershippinglines`, then create their own Supabase project and Vercel project, and set env vars there (their `NEXT_PUBLIC_SUPABASE_*`, optional `NEXT_PUBLIC_OPENWEATHER_API_KEY`, optional `WORLD_TIDES_API_KEY`). No secrets are in the repo; each deployment uses its own env in Vercel.
 
 ## Deploy (Vercel)
 

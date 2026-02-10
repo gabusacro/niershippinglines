@@ -24,6 +24,15 @@ interface TideData {
   entry_date: string;
 }
 
+/** Response from GET /api/tide when WorldTides API is configured */
+interface TideApiData {
+  source: "worldtides";
+  highTideTime: string | null;
+  lowTideTime: string | null;
+  nextLowTideTime: string | null;
+  tideNow: "high" | "low" | null;
+}
+
 function parseTimeToMinutes(t: string | null): number | null {
   if (!t) return null;
   const [h, m] = t.split(":").map(Number);
@@ -57,6 +66,7 @@ function getWaveLabel(windMs: number): string {
 export function WeatherWidget() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [tide, setTide] = useState<TideData | null>(null);
+  const [tideApi, setTideApi] = useState<TideApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,8 +80,9 @@ export function WeatherWidget() {
         return;
       }
       try {
-        const [weatherRes, supabase] = await Promise.all([
+        const [weatherRes, tideRes, supabase] = await Promise.all([
           fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${SIARGAO_LAT}&lon=${SIARGAO_LON}&appid=${key}&units=metric`),
+          fetch("/api/tide").then((r) => (r.ok ? r.json() : null)).catch(() => null),
           (async () => {
             try {
               return createClient();
@@ -94,7 +105,9 @@ export function WeatherWidget() {
           pop: w.pop,
         });
 
-        if (supabase) {
+        if (tideRes?.source === "worldtides") {
+          setTideApi(tideRes);
+        } else if (supabase) {
           const { data } = await supabase.from("tide_entries").select("entry_date, high_tide_time, low_tide_time").eq("entry_date", today).maybeSingle();
           if (data) setTide(data);
         }
@@ -125,11 +138,15 @@ export function WeatherWidget() {
 
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
+  const useApi = tideApi != null;
+  const highTime = useApi ? tideApi.highTideTime : formatTime(tide?.high_tide_time ?? null);
+  const lowTime = useApi ? tideApi.lowTideTime : formatTime(tide?.low_tide_time ?? null);
+  const tideNow = useApi ? tideApi.tideNow : getTideNow(parseTimeToMinutes(tide?.low_tide_time ?? null) ?? 0, parseTimeToMinutes(tide?.high_tide_time ?? null) ?? 0, nowMin);
+  const nextLowFormatted = useApi ? (tideApi.nextLowTideTime ?? lowTime) : formatTime(tide?.low_tide_time ?? null);
   const lowMin = parseTimeToMinutes(tide?.low_tide_time ?? null);
-  const highMin = parseTimeToMinutes(tide?.high_tide_time ?? null);
-  const tideNow = getTideNow(lowMin ?? 0, highMin ?? 0, nowMin);
-  const nextLowFormatted = formatTime(tide?.low_tide_time ?? null);
-  const goodMagpupungko = tideNow === "low" || (lowMin != null && Math.abs(nowMin - lowMin) <= 90);
+  const goodMagpupungko = tideNow === "low" || (!useApi && lowMin != null && Math.abs(nowMin - lowMin) <= 90) || (useApi && tideNow === "low");
+
+  const hasTide = useApi || tide != null;
 
   return (
     <div className="rounded-2xl border border-teal-200 bg-white/80 shadow-sm overflow-hidden">
@@ -138,77 +155,87 @@ export function WeatherWidget() {
         <span className="text-sm font-semibold text-[#134e4a]">Siargao weather & forecast</span>
       </div>
 
-      <div className="p-4 sm:p-5 space-y-4">
-        {/* Current weather */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <img src={iconUrl} alt="" className="w-12 h-12 sm:w-14 sm:h-14" />
-            <div>
-              <p className="text-2xl sm:text-3xl font-bold text-[#134e4a]">{weather.temp}°C</p>
-              <p className="text-sm text-[#0f766e] capitalize">{weather.description}</p>
-              <p className="text-xs text-[#0f766e]/80">Feels like {weather.feels_like}°C · Humidity {weather.humidity}%</p>
+      <div className="p-4 sm:p-5">
+        {/* Landscape on md+: two columns. Mobile: single column. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {/* Left: current weather, Rain, Waves */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <img src={iconUrl} alt="" className="w-12 h-12 sm:w-14 sm:h-14" />
+                <div>
+                  <p className="text-2xl sm:text-3xl font-bold text-[#134e4a]">{weather.temp}°C</p>
+                  <p className="text-sm text-[#0f766e] capitalize">{weather.description}</p>
+                  <p className="text-xs text-[#0f766e]/80">Feels like {weather.feels_like}°C · Humidity {weather.humidity}%</p>
+                </div>
+              </div>
+              <div className="text-right text-xs text-[#0f766e]">
+                <p className="font-medium text-[#134e4a]">Wind {weather.wind_speed} m/s</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-[#fef9e7] border border-teal-100 p-3">
+              <p className="text-sm font-semibold text-[#134e4a]">Rain</p>
+              <p className="text-sm text-[#0f766e]">{isRain ? "Yes — expect rain." : "No rain expected."}</p>
+            </div>
+
+            <div className="rounded-xl bg-[#fef9e7] border border-teal-100 p-3 flex items-center gap-2">
+              <Wave size={20} className="text-[#0c7b93] shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-[#134e4a]">Waves</p>
+                <p className="text-sm text-[#0f766e]">{waveLabel}</p>
+              </div>
             </div>
           </div>
-          <div className="text-right text-xs text-[#0f766e]">
-            <p className="font-medium text-[#134e4a]">Wind {weather.wind_speed} m/s</p>
-          </div>
-        </div>
 
-        {/* Rain */}
-        <div className="rounded-xl bg-[#fef9e7] border border-teal-100 p-3">
-          <p className="text-sm font-semibold text-[#134e4a]">Rain</p>
-          <p className="text-sm text-[#0f766e]">{isRain ? "Yes — expect rain." : "No rain expected."}</p>
-        </div>
-
-        {/* Waves (wind proxy) */}
-        <div className="rounded-xl bg-[#fef9e7] border border-teal-100 p-3 flex items-center gap-2">
-          <Wave size={20} className="text-[#0c7b93] shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-[#134e4a]">Waves</p>
-            <p className="text-sm text-[#0f766e]">{waveLabel}</p>
-          </div>
-        </div>
-
-        {/* Tide */}
-        <div className="rounded-xl bg-[#fef9e7] border border-teal-100 p-3">
-          <p className="text-sm font-semibold text-[#134e4a]">Tide today</p>
-          {tide ? (
-            <>
-              <p className="text-sm text-[#0f766e]">
-                High tide {formatTime(tide.high_tide_time)} · Low tide {formatTime(tide.low_tide_time)}
-              </p>
-              <p className="text-sm font-medium text-[#134e4a] mt-1">
-                Now: {tideNow === "high" ? "High tide" : tideNow === "low" ? "Low tide" : "—"}
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-[#0f766e]">Tide times not set for today. Admin can add them in the dashboard.</p>
-          )}
-        </div>
-
-        {/* Good time to surf? */}
-        <div className="rounded-xl bg-[#0c7b93]/10 border border-teal-200 p-3">
-          <p className="text-sm font-semibold text-[#134e4a]">Good time to surf?</p>
-          <p className="text-sm text-[#0f766e]">
-            {goodSurf ? "Yes — conditions are reasonable for surfing." : isRain ? "Rain expected — less ideal." : weather.wind_speed < 2 ? "Very light wind — waves may be small." : "Strong wind — choppy. Check local break."}
-          </p>
-        </div>
-
-        {/* Magpupungko tidal pool */}
-        <div className="rounded-xl bg-[#0d9488]/10 border border-teal-200 p-3">
-          <p className="text-sm font-semibold text-[#134e4a]">Magpupungko rock pools</p>
-          <p className="text-sm text-[#0f766e]">
-            Best at low tide so you can see the pools and rocks. {tide ? (
-              goodMagpupungko ? (
-                <span className="font-medium text-[#0f766e]">Good time to go now.</span>
+          {/* Right: Tide, Surf, Magpupungko */}
+          <div className="space-y-4">
+            <div className="rounded-xl bg-[#fef9e7] border border-teal-100 p-3">
+              <p className="text-sm font-semibold text-[#134e4a]">Tide today</p>
+              {hasTide ? (
+                <>
+                  <p className="text-sm text-[#0f766e]">
+                    High tide {highTime !== "—" ? highTime : "—"} · Low tide {lowTime !== "—" ? lowTime : "—"}
+                  </p>
+                  <p className="text-sm font-medium text-[#134e4a] mt-1">
+                    Now: {tideNow === "high" ? "High tide" : tideNow === "low" ? "Low tide" : "—"}
+                  </p>
+                  {useApi && (
+                    <p className="text-xs text-[#0f766e]/80 mt-1">Automatic for Siargao (Mindanao), Philippines.</p>
+                  )}
+                </>
               ) : (
-                <>Next low tide: {nextLowFormatted}. Plan your visit around then.</>
-              )
-            ) : (
-              "Add tide times in admin to see when low tide is."
-            )}
-          </p>
+                <p className="text-sm text-[#0f766e]">Tide times not set for today. Add WORLD_TIDES_API_KEY or add times in admin.</p>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-[#0c7b93]/10 border border-teal-200 p-3">
+              <p className="text-sm font-semibold text-[#134e4a]">Good time to surf?</p>
+              <p className="text-sm text-[#0f766e]">
+                {goodSurf ? "Yes — conditions are reasonable for surfing." : isRain ? "Rain expected — less ideal." : weather.wind_speed < 2 ? "Very light wind — waves may be small." : "Strong wind — choppy. Check local break."}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-[#0d9488]/10 border border-teal-200 p-3">
+              <p className="text-sm font-semibold text-[#134e4a]">Magpupungko rock pools</p>
+              <p className="text-sm text-[#0f766e]">
+                Best at low tide so you can see the pools and rocks. {hasTide ? (
+                  goodMagpupungko ? (
+                    <span className="font-medium text-[#0f766e]">Good time to visit today — around low tide.</span>
+                  ) : (
+                    <>Best time today: around {nextLowFormatted} (next low tide).</>
+                  )
+                ) : (
+                  "Add tide times (or WorldTides API key) to see the best time to visit today."
+                )}
+              </p>
+            </div>
+          </div>
         </div>
+
+        <p className="mt-4 text-xs text-[#0f766e]/80">
+          Rain, waves, and surf time are automatic. Tide is automatic for Siargao when WORLD_TIDES_API_KEY is set; otherwise add times in admin.
+        </p>
       </div>
     </div>
   );

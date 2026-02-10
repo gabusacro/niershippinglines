@@ -52,7 +52,7 @@ export default function HomePage() {
       {/* Weather (Siargao) - uses NEXT_PUBLIC_OPENWEATHER_API_KEY */}
       <section className="border-t border-teal-200/50 bg-[#fef9e7]/50 py-8 sm:py-10">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <div className="max-w-sm mx-auto">
+          <div className="max-w-sm md:max-w-4xl mx-auto">
             <WeatherWidget />
           </div>
           <p className="mt-3 text-center text-sm text-[#0f766e]">
