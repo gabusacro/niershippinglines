@@ -1,0 +1,203 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/get-user";
+import { ROUTES } from "@/lib/constants";
+import { passengerTypeLabel } from "@/lib/dashboard/format";
+
+export const metadata = {
+  title: "Booking details",
+  description: "View booking — Nier Shipping Lines Admin",
+};
+
+const statusLabel: Record<string, string> = {
+  pending_payment: "Pending payment",
+  confirmed: "Confirmed",
+  checked_in: "Checked in",
+  boarded: "Boarded",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  changed: "Changed",
+  refunded: "Refunded",
+};
+
+function formatTime(t: string | null | undefined) {
+  if (!t) return "—";
+  const [h, m] = String(t).split(":");
+  const hh = parseInt(h, 10);
+  const am = hh < 12;
+  const h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+  return `${h12}:${m || "00"} ${am ? "AM" : "PM"}`;
+}
+
+function formatDate(d: string | null | undefined) {
+  if (!d) return "—";
+  try {
+    return new Date(d + "Z").toLocaleDateString("en-PH", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return String(d);
+  }
+}
+
+type PassengerDetail = { fare_type?: string; full_name?: string };
+
+export default async function AdminBookingDetailPage({
+  params,
+}: {
+  params: Promise<{ reference: string }>;
+}) {
+  const user = await getAuthUser();
+  if (!user || user.role !== "admin") {
+    notFound();
+  }
+
+  const { reference } = await params;
+  const refNormalized = reference.trim().toUpperCase();
+  if (!refNormalized) notFound();
+
+  const supabase = await createClient();
+  const { data: booking, error } = await supabase
+    .from("bookings")
+    .select(
+      "id, reference, customer_full_name, customer_email, customer_mobile, notify_also_email, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, created_at, trip_id, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, passenger_details, passenger_names"
+    )
+    .eq("reference", refNormalized)
+    .maybeSingle();
+
+  if (error || !booking) {
+    console.error("[AdminBookingDetail]", error?.message, { reference: refNormalized });
+    notFound();
+  }
+
+  const b = booking as {
+    passenger_details?: PassengerDetail[] | null;
+    passenger_names?: string[] | null;
+    trip_snapshot_route_name?: string | null;
+    trip_snapshot_vessel_name?: string | null;
+    trip_snapshot_departure_date?: string | null;
+    trip_snapshot_departure_time?: string | null;
+    notify_also_email?: string | null;
+  };
+  const routeName = b.trip_snapshot_route_name ?? "—";
+  const vesselName = b.trip_snapshot_vessel_name;
+  const departureDate = b.trip_snapshot_departure_date;
+  const departureTime = b.trip_snapshot_departure_time;
+
+  const passengerDetails = (b.passenger_details ?? []) as PassengerDetail[];
+  const passengerNames = Array.isArray(b.passenger_names) ? b.passenger_names : [];
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href={ROUTES.adminBookings}
+          className="text-sm font-semibold text-[#0c7b93] hover:underline"
+        >
+          ← Booking history
+        </Link>
+        {booking.status === "pending_payment" && (
+          <Link
+            href={ROUTES.adminPendingPayments}
+            className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+          >
+            Confirm payment
+          </Link>
+        )}
+      </div>
+
+      <div className="rounded-2xl border-2 border-teal-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="font-mono text-xl font-bold text-[#0c7b93]">{booking.reference}</h1>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              booking.status === "pending_payment"
+                ? "bg-amber-100 text-amber-800"
+                : booking.status === "confirmed" || booking.status === "checked_in" || booking.status === "boarded"
+                  ? "bg-teal-100 text-teal-800"
+                  : booking.status === "refunded"
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            {statusLabel[booking.status] ?? booking.status}
+          </span>
+        </div>
+
+        <p className="mt-2 text-[#134e4a]">
+          {routeName}
+          {vesselName ? ` · ${vesselName}` : ""}
+        </p>
+        <p className="mt-0.5 text-sm text-[#0f766e]">
+          {formatDate(departureDate)} · {formatTime(departureTime)}
+        </p>
+
+        <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50/50 p-4">
+          <h3 className="text-sm font-semibold text-[#134e4a]">Customer</h3>
+          <p className="mt-1 text-sm text-[#0f766e]">
+            <strong>Name:</strong> {booking.customer_full_name ?? "—"}
+          </p>
+          <p className="mt-0.5 text-sm text-[#0f766e]">
+            <strong>Email:</strong> {booking.customer_email ?? "—"}
+          </p>
+          {booking.customer_mobile && (
+            <p className="mt-0.5 text-sm text-[#0f766e]">
+              <strong>Mobile:</strong> {booking.customer_mobile}
+            </p>
+          )}
+          {b.notify_also_email && (
+            <p className="mt-0.5 text-sm text-[#0f766e]">
+              <strong>Also notify:</strong> {b.notify_also_email}
+            </p>
+          )}
+        </div>
+
+        <div className="mt-4 rounded-lg border border-teal-100 bg-white p-4">
+          <h3 className="text-sm font-semibold text-[#134e4a]">Passengers ({booking.passenger_count})</h3>
+          {passengerDetails.length > 0 ? (
+            <ul className="mt-2 space-y-1.5 text-sm text-[#134e4a]">
+              {passengerDetails.map((p, i) => (
+                <li key={i} className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-medium">{p.full_name ?? "—"}</span>
+                  <span className="text-[#0f766e]">({passengerTypeLabel(p.fare_type)})</span>
+                </li>
+              ))}
+            </ul>
+          ) : passengerNames.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-sm text-[#134e4a]">
+              {passengerNames.map((name, i) => (
+                <li key={i}>{name}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-[#0f766e]">
+              {booking.customer_full_name ?? "—"} · {passengerTypeLabel(booking.fare_type)} ({booking.passenger_count} passenger{booking.passenger_count !== 1 ? "s" : ""})
+            </p>
+          )}
+        </div>
+
+        <p className="mt-4 text-sm text-[#134e4a]">
+          <strong>Total:</strong> ₱{(booking.total_amount_cents / 100).toLocaleString()}
+        </p>
+        <p className="mt-0.5 text-xs text-[#0f766e]">
+          Created {booking.created_at ? new Date(booking.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+        </p>
+
+        {booking.trip_id && (
+          <div className="mt-6">
+            <Link
+              href={`/admin/reports/trip/${booking.trip_id}`}
+              className="inline-flex rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f766e]"
+            >
+              View trip manifest
+            </Link>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

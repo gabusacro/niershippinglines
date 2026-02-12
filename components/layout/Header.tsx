@@ -1,24 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { APP_NAME, ROUTES } from "@/lib/constants";
+import { useToast } from "@/components/ui/ActionToast";
 import { Boat } from "@/components/icons";
+import { OfficialTime } from "@/components/ui/OfficialTime";
+import { createClient } from "@/lib/supabase/client";
 
-const NAV_LINKS = [
+const BASE_NAV_LINKS = [
   { href: ROUTES.home, label: "Home" },
   { href: ROUTES.schedule, label: "Schedule" },
   { href: ROUTES.book, label: "Book" },
   { href: ROUTES.attractions, label: "Attractions" },
   { href: ROUTES.weather, label: "Weather" },
-  { href: ROUTES.signup, label: "Sign up" },
-  { href: ROUTES.login, label: "Log in" },
 ];
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [user, setUser] = useState<{ id: string } | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
+  const toast = useToast();
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setMenuOpen(false);
+    toast.showSuccess("Signed out successfully");
+    router.refresh();
+    router.push(ROUTES.home);
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0c7b93] shadow-sm safe-area-pad md:bg-[#0c7b93]/95 md:backdrop-blur-md">
@@ -34,9 +56,14 @@ export function Header() {
           </span>
         </Link>
 
+        {/* Official time (Philippines) — reference for boarding */}
+        <div className="hidden sm:block shrink-0">
+          <OfficialTime />
+        </div>
+
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1 lg:gap-2 text-sm font-medium">
-          {NAV_LINKS.slice(0, -1).map(({ href, label }) => (
+          {BASE_NAV_LINKS.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
@@ -47,15 +74,40 @@ export function Header() {
               {label}
             </Link>
           ))}
-          <Link
-            href={ROUTES.login}
-            className="min-h-[44px] flex items-center rounded-xl bg-white/20 px-4 py-2 text-white hover:bg-white/30 active:scale-[0.98] transition-all duration-200 touch-target"
-          >
-            Log in
-          </Link>
+          {user ? (
+            <>
+              <Link
+                href={ROUTES.dashboard}
+                className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+                  pathname === ROUTES.dashboard ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+                }`}
+              >
+                Dashboard
+              </Link>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="min-h-[44px] flex items-center px-3 py-2 rounded-xl text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98] transition-all duration-200 touch-target"
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <Link
+              href={ROUTES.login}
+              className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+                pathname === ROUTES.login ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+              }`}
+            >
+              Login / Sign up
+            </Link>
+          )}
         </nav>
 
-        {/* Mobile: hamburger */}
+        {/* Mobile: time + hamburger */}
+        <div className="flex sm:hidden shrink-0 items-center gap-2">
+          <OfficialTime />
+        </div>
         <button
           type="button"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
@@ -84,7 +136,7 @@ export function Header() {
       >
         <nav className="border-t border-white/15 bg-[#0f766e]/98 backdrop-blur-md px-4 py-3">
           <ul className="flex flex-col gap-0.5">
-            {NAV_LINKS.map(({ href, label }) => (
+            {BASE_NAV_LINKS.map(({ href, label }) => (
               <li key={href}>
                 <Link
                   href={href}
@@ -97,6 +149,42 @@ export function Header() {
                 </Link>
               </li>
             ))}
+            {user ? (
+              <>
+                <li>
+                  <Link
+                    href={ROUTES.dashboard}
+                    onClick={() => setMenuOpen(false)}
+                    className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                      pathname === ROUTES.dashboard ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                    }`}
+                  >
+                    Dashboard
+                  </Link>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => { handleSignOut(); }}
+                    className="flex min-h-[48px] w-full items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] hover:bg-white/10 active:bg-white/15 text-left"
+                  >
+                    Sign out
+                  </button>
+                </li>
+              </>
+            ) : (
+              <li>
+                <Link
+                  href={ROUTES.login}
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                    pathname === ROUTES.login ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                  }`}
+                >
+                  Login / Sign up
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
       </div>

@@ -11,7 +11,7 @@ Use this to see what’s done, what’s missing, and what to do when you deploy.
 |------|--------|--------|
 | **Supabase Auth** | ✅ In use | Email/password sign up and sign in. |
 | **profiles table** | ✅ In schema | `id` = `auth.users.id`, `role`, `full_name`, `email`, `approved_at`. RLS: users read/update own; admin manages all; users can insert own (migration 003). |
-| **Roles** | ✅ In schema | `app_role`: admin, captain, crew, ticket_booth. |
+| **Roles** | ✅ In schema | `app_role`: admin, captain, crew, ticket_booth, **passenger**. New signups = passenger; crew/captain assigned by admin only. |
 | **First admin** | ⚠️ Manual | After first signup, run in SQL Editor: `UPDATE public.profiles SET role = 'admin', approved_at = NOW() WHERE id = 'USER-UUID';` |
 | **Auth callback** | ✅ Added | `app/auth/callback/route.ts` exchanges `code` for session (email confirm / magic link). |
 | **Redirect URLs** | ✅ Env-ready | App uses relative paths (`/dashboard`, `/login`). No hardcoded site URL. After deploy, set Supabase **Site URL** and **Redirect URLs** (see §5). |
@@ -40,7 +40,7 @@ Use this to see what’s done, what’s missing, and what to do when you deploy.
 
 | Feature | Status | Notes |
 |---------|--------|--------|
-| Sign up page | ✅ | Email, password, full name. Creates Auth user + `profiles` row (role = crew). |
+| Sign up page | ✅ | Email, password, full name. Creates Auth user + `profiles` row (role = **passenger**). Crew/captain assigned by admin only. |
 | Login page | ✅ | Email/password → redirect to `/dashboard`. |
 | Auth callback | ✅ | `/auth/callback` exchanges code for session (email confirm / magic link). |
 | Dashboard | ✅ | Shows role; links to Admin / Crew / Captain by role. |
@@ -69,6 +69,8 @@ Use this to see what’s done, what’s missing, and what to do when you deploy.
 | Admin page | ⚠️ Placeholder | No boats/routes/schedule/crew UI yet. |
 | Crew page | ⚠️ Placeholder | No check-in, walk-in, today’s trips. |
 | Captain page | ⚠️ Placeholder | No boarded count. |
+
+**Roadmap (Captain & reports):** Captain portal: assign captain to boat; see crew on vessel; passenger count; trip revenue; later fuel costs and profit. Reports for admin (full) and captain (their trips); trend/analytics by month. Admin can assign roles (Captain, Ticket booth, Crew) and boat assignments.
 
 ---
 

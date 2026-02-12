@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/ActionToast";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ROUTES } from "@/lib/constants";
 
 export function SignupForm() {
   const router = useRouter();
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [salutation, setSalutation] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -23,7 +26,7 @@ export function SignupForm() {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName } },
+        options: { data: { full_name: fullName.trim(), salutation: salutation || null } },
       });
       if (signUpError) {
         setError(signUpError.message);
@@ -32,12 +35,14 @@ export function SignupForm() {
       if (data.user) {
         await supabase.from("profiles").upsert({
           id: data.user.id,
-          full_name: fullName || null,
+          full_name: fullName.trim() || null,
+          salutation: salutation || null,
           email: data.user.email ?? null,
           role: "crew",
         });
       }
       setSuccess(true);
+      toast.showSuccess("Account created. Check your email to confirm, then log in.");
       router.refresh();
       router.push(ROUTES.login);
     } catch {
@@ -63,8 +68,24 @@ export function SignupForm() {
         </p>
       )}
       <div>
+        <label htmlFor="salutation" className="block text-sm font-medium text-[#134e4a]">
+          Salutation
+        </label>
+        <select
+          id="salutation"
+          value={salutation}
+          onChange={(e) => setSalutation(e.target.value)}
+          className="mt-1 block w-full rounded-lg border-2 border-teal-200 bg-white px-3 py-2 text-[#134e4a] shadow-sm focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
+        >
+          <option value="">Select (optional)</option>
+          <option value="Mr">Mr.</option>
+          <option value="Mrs">Mrs.</option>
+          <option value="Ms">Ms.</option>
+        </select>
+      </div>
+      <div>
         <label htmlFor="fullName" className="block text-sm font-medium text-[#134e4a]">
-          Full name
+          Full name <span className="text-red-600">*</span>
         </label>
         <input
           id="fullName"
@@ -72,6 +93,7 @@ export function SignupForm() {
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           autoComplete="name"
+          required
           className="mt-1 block w-full rounded-lg border-2 border-teal-200 bg-white px-3 py-2 text-[#134e4a] shadow-sm focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
         />
       </div>

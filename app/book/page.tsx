@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { APP_NAME, ROUTES } from "@/lib/constants";
 import { Boat, Sun, Wave } from "@/components/icons";
+import BookingForm from "./BookingForm";
+import { getAuthUser } from "@/lib/auth/get-user";
+import { getActiveAnnouncements } from "@/lib/announcements/get-announcements";
+import { AnnouncementsBlock } from "@/components/announcements/AnnouncementsBlock";
 
 export const metadata = {
   title: "Book a Trip",
@@ -15,7 +19,13 @@ const STEPS = [
   { step: 5, title: "Get your e-ticket", desc: "Receive your e-ticket with QR code and reference number. Show it at the pier." },
 ];
 
-export default function BookPage() {
+export default async function BookPage() {
+  const [announcements, user] = await Promise.all([
+    getActiveAnnouncements(),
+    getAuthUser(),
+  ]);
+  const loggedInEmail = (user?.email ?? "").trim();
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 mb-8 sm:mb-10">
@@ -27,6 +37,12 @@ export default function BookPage() {
           <p className="text-sm text-[#0f766e] sm:text-base">Reserve your seat in a few steps. Booking will connect to live inventory soon.</p>
         </div>
       </div>
+
+      {announcements.length > 0 && (
+        <div className="mb-8 sm:mb-10">
+          <AnnouncementsBlock announcements={announcements} />
+        </div>
+      )}
 
       {/* How to book */}
       <section className="rounded-2xl border border-teal-200 bg-white/80 shadow-sm overflow-hidden mb-8 sm:mb-10">
@@ -74,11 +90,13 @@ export default function BookPage() {
         </p>
       </section>
 
-      {/* CTA — will become the actual booking form */}
+      {/* Booking form — connected to Supabase. Pre-fill email when logged in so booking appears in My bookings. */}
+      <section className="mb-8 sm:mb-10">
+        <BookingForm loggedInEmail={loggedInEmail} />
+      </section>
       <div className="text-center rounded-xl bg-[#0c7b93]/10 border border-teal-200 p-6 sm:p-8">
-        <p className="text-[#134e4a] font-medium text-sm sm:text-base">Online booking form will appear here once connected to the system.</p>
-        <p className="mt-2 text-xs sm:text-sm text-[#0f766e]">For now, check the Schedule and Attractions to plan your trip.</p>
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
+        <p className="text-xs sm:text-sm text-[#0f766e]">Check the Schedule and Attractions to plan your trip.</p>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
           <Link href={ROUTES.schedule} className="min-h-[48px] flex items-center justify-center rounded-xl border-2 border-[#0c7b93] px-6 py-3 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10 transition-colors touch-target sm:min-h-0">
             View schedule
           </Link>

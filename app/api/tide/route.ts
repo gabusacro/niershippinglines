@@ -49,8 +49,9 @@ export async function GET() {
       return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
     };
 
-    const todayHigh = extremes.find((e) => e.type === "High" && e.dt * 1000 >= todayStart && e.dt * 1000 < todayEnd);
-    const todayLow = extremes.find((e) => e.type === "Low" && e.dt * 1000 >= todayStart && e.dt * 1000 < todayEnd);
+    const todayExtremes = extremes.filter((e) => e.dt * 1000 >= todayStart && e.dt * 1000 < todayEnd);
+    const todayHigh = todayExtremes.find((e) => e.type === "High");
+    const todayLow = todayExtremes.find((e) => e.type === "Low");
     const allLows = extremes.filter((e) => e.type === "Low");
     const nextLow = allLows.find((e) => e.dt * 1000 > nowMs) ?? allLows[0];
     const tideNow = (() => {
@@ -62,12 +63,18 @@ export async function GET() {
       return prev.type === "High" ? "high" : "low";
     })();
 
+    const extremesToday: { type: "High" | "Low"; time: string }[] = todayExtremes.map((e) => ({
+      type: e.type as "High" | "Low",
+      time: formatTime(e.dt),
+    }));
+
     return NextResponse.json({
       source: "worldtides",
       highTideTime: todayHigh ? formatTime(todayHigh.dt) : null,
       lowTideTime: todayLow ? formatTime(todayLow.dt) : null,
       nextLowTideTime: nextLow ? formatTime(nextLow.dt) : null,
       tideNow: tideNow ?? (todayLow && nowMs < todayLow.dt * 1000 ? "high" : "low"),
+      extremesToday,
       copyright: data.copyright ?? "Tidal data from WorldTides",
     });
   } catch (e) {

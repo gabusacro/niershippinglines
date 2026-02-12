@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { APP_NAME, ROUTES } from "@/lib/constants";
-import { PalmTree, Wave, Sun, Boat, Surfboard } from "@/components/icons";
+import { PalmTree, Wave, Sun, Boat } from "@/components/icons";
 import { WeatherWidget } from "@/components/weather/WeatherWidget";
 
 export default function HomePage() {
@@ -37,13 +37,6 @@ export default function HomePage() {
             >
               <Sun size={20} />
               View Schedule
-            </Link>
-            <Link
-              href={ROUTES.attractions}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl border-2 border-[#0c7b93] bg-white/80 px-6 py-4 text-base font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10 transition-all duration-200 touch-target active:scale-[0.98] sm:min-h-0"
-            >
-              <Surfboard size={20} />
-              Explore Siargao
             </Link>
           </div>
         </div>

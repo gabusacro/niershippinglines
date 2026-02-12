@@ -19,6 +19,8 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  /* Form controls and UI consistency across Chrome, Brave, Firefox */
+  color-scheme: light;
 }
 
 body {
@@ -45,9 +47,49 @@ body {
   }
 }
 
+/* Gentle float for weather icon (sun, cloud, rain, etc.) */
+@keyframes weather-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.animate-weather-icon {
+  animation: weather-float 3s ease-in-out infinite;
+}
+
+/* Toast slide-in from bottom-right */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-toast-in {
+  animation: toast-in 0.3s ease-out forwards;
+}
+
+/* Hide scrollbar but keep scroll (carousel) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Soft wave divider (optional use) */
 .wave-divider {
   height: 24px;
   background: linear-gradient(90deg, var(--ocean) 0%, var(--ocean-light) 50%, var(--wave) 100%);
   opacity: 0.15;
+}
+
+/* Passenger manifest print: hide nav/actions, white background */
+@media print {
+  body { background: white !important; }
+  .print\:hidden { display: none !important; }
+  #manifest-document { box-shadow: none; }
 }

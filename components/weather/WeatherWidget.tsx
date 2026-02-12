@@ -31,6 +31,7 @@ interface TideApiData {
   lowTideTime: string | null;
   nextLowTideTime: string | null;
   tideNow: "high" | "low" | null;
+  extremesToday?: { type: "High" | "Low"; time: string }[];
 }
 
 function parseTimeToMinutes(t: string | null): number | null {
@@ -150,9 +151,9 @@ export function WeatherWidget() {
 
   return (
     <div className="rounded-2xl border border-teal-200 bg-white/80 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 bg-[#0c7b93]/10 px-4 py-2 border-b border-teal-100">
+      <div className="flex items-center justify-center gap-2 bg-[#0c7b93]/10 px-4 py-2 border-b border-teal-100">
         <Sun size={18} className="text-[#f59e0b] shrink-0" />
-        <span className="text-sm font-semibold text-[#134e4a]">Siargao weather & forecast</span>
+        <span className="text-sm font-semibold text-[#134e4a]">Siargao Weather & Forecast</span>
       </div>
 
       <div className="p-4 sm:p-5">
@@ -162,7 +163,7 @@ export function WeatherWidget() {
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <img src={iconUrl} alt="" className="w-12 h-12 sm:w-14 sm:h-14" />
+                <img src={iconUrl} alt="" className="w-12 h-12 sm:w-14 sm:h-14 animate-weather-icon" />
                 <div>
                   <p className="text-2xl sm:text-3xl font-bold text-[#134e4a]">{weather.temp}°C</p>
                   <p className="text-sm text-[#0f766e] capitalize">{weather.description}</p>
@@ -194,18 +195,25 @@ export function WeatherWidget() {
               <p className="text-sm font-semibold text-[#134e4a]">Tide today</p>
               {hasTide ? (
                 <>
-                  <p className="text-sm text-[#0f766e]">
-                    High tide {highTime !== "—" ? highTime : "—"} · Low tide {lowTime !== "—" ? lowTime : "—"}
-                  </p>
+                  {useApi && tideApi.extremesToday && tideApi.extremesToday.length > 0 ? (
+                    <div className="text-sm text-[#0f766e] space-y-1">
+                      {tideApi.extremesToday.map((ex, i) => (
+                        <p key={i}>
+                          {ex.type === "High" ? "High" : "Low"} tide — {ex.time}
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[#0f766e]">
+                      High tide {highTime !== "—" ? highTime : "—"} · Low tide {lowTime !== "—" ? lowTime : "—"}
+                    </p>
+                  )}
                   <p className="text-sm font-medium text-[#134e4a] mt-1">
                     Now: {tideNow === "high" ? "High tide" : tideNow === "low" ? "Low tide" : "—"}
                   </p>
-                  {useApi && (
-                    <p className="text-xs text-[#0f766e]/80 mt-1">Automatic for Siargao (Mindanao), Philippines.</p>
-                  )}
                 </>
               ) : (
-                <p className="text-sm text-[#0f766e]">Tide times not set for today. Add WORLD_TIDES_API_KEY or add times in admin.</p>
+                <p className="text-sm text-[#0f766e]">Tide times not set for today. Add times in admin.</p>
               )}
             </div>
 
@@ -233,9 +241,6 @@ export function WeatherWidget() {
           </div>
         </div>
 
-        <p className="mt-4 text-xs text-[#0f766e]/80">
-          Rain, waves, and surf time are automatic. Tide is automatic for Siargao when WORLD_TIDES_API_KEY is set; otherwise add times in admin.
-        </p>
       </div>
     </div>
   );

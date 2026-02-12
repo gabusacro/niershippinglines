@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { ROUTES } from "@/lib/constants";
+import { useToast } from "@/components/ui/ActionToast";
 
 export function LoginForm() {
   const router = useRouter();
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +26,7 @@ export function LoginForm() {
         setError(signInError.message);
         return;
       }
+      toast.showSuccess("Signed in successfully");
       router.push(ROUTES.dashboard);
       router.refresh();
     } catch {

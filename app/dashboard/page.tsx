@@ -1,12 +1,29 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
-import { APP_NAME, ROUTES } from "@/lib/constants";
+import { getUpcomingTrips } from "@/lib/dashboard/get-upcoming-trips";
+import { getPendingPaymentBookings } from "@/lib/dashboard/get-pending-payment-bookings";
+import { getRecentlyConfirmedBookings } from "@/lib/dashboard/get-recently-confirmed-bookings";
+import { getRefundedBookings } from "@/lib/dashboard/get-refunded-bookings";
+import { TripCalendar } from "@/app/dashboard/TripCalendar";
+import { PrintTicketsTrigger } from "@/components/tickets/PrintTicketsTrigger";
+import { ConfirmationToast } from "@/components/dashboard/ConfirmationToast";
+import { FindBookingByReference } from "@/components/dashboard/FindBookingByReference";
+import { SetDisplayNameForm } from "@/app/dashboard/SetDisplayNameForm";
+import { APP_NAME, ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
 
 export const metadata = {
   title: "Dashboard",
   description: `Dashboard — ${APP_NAME}`,
 };
+
+/** Always fetch fresh user so "Set your name" disappears after save. */
+export const dynamic = "force-dynamic";
+
+async function TripCalendarWrapper() {
+  const trips = await getUpcomingTrips();
+  return <TripCalendar trips={trips} />;
+}
 
 export default async function DashboardPage() {
   const user = await getAuthUser();
@@ -14,38 +31,253 @@ export default async function DashboardPage() {
     redirect(ROUTES.login);
   }
 
+  if (user.role === "admin") {
+    redirect(ROUTES.admin);
+  }
+
+  const roleLabel: Record<string, string> = {
+    admin: "Admin",
+    captain: "Captain",
+    ticket_booth: "Ticket booth",
+    crew: "Deck crew",
+    passenger: "Passenger",
+  };
+  const yourRoleLabel = roleLabel[user.role] ?? user.role;
+  const isPassenger = user.role === "passenger";
+  const isAdmin = user.role === "admin";
+
+  const displayName = user.fullName?.trim() || null;
+  const salutation = user.salutation?.trim() || null;
+  const welcomeName = displayName
+    ? (salutation ? `${salutation}. ${displayName}` : displayName)
+    : null;
+  const showWelcomeName = welcomeName ?? (user.email ? null : "User");
+  const pendingBookings = isPassenger ? await getPendingPaymentBookings(user.email ?? "") : [];
+  const recentlyConfirmed = isPassenger ? await getRecentlyConfirmedBookings(user.email ?? "") : [];
+  const refundedBookings = isPassenger ? await getRefundedBookings(user.email ?? "") : [];
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
-      <p className="mt-2 text-[#0f766e]">
-        Welcome, {user.fullName || user.email || "User"}. Role: <strong>{user.role}</strong>.
-      </p>
-      <div className="mt-6 flex flex-wrap gap-4">
-        {user.role === "admin" && (
+      {isPassenger ? (
+        <div className="mt-2 text-[#0f766e]">
+          <p>
+            Welcome{showWelcomeName ? <>, <strong>{showWelcomeName}</strong></> : null}. Passenger Account.
+          </p>
+          {!displayName && (
+            <p className="mt-1 text-sm text-[#0f766e]/80">
+              Set your name so we can greet you properly:
+            </p>
+          )}
+          {!displayName && <SetDisplayNameForm />}
+        </div>
+      ) : (
+        <p className="mt-2 text-[#0f766e]">
+          Welcome, {welcomeName || user.email || "User"}. Your role: <strong>{yourRoleLabel}</strong>.
+        </p>
+     )}
+
+      {isPassenger ? (
+        <>
+          {/* Find by reference — so passenger can open any booking (e.g. pending L7HHU7NCHR) even if list missed it */}
+          <FindBookingByReference />
+
+          {/* Pending payment — show first so passenger sees bookings needing attention (not yet confirmed) */}
+          {pendingBookings.length > 0 && (
+            <div className="mt-6 rounded-2xl border-2 border-amber-400 bg-amber-50 p-6 shadow-sm sm:p-8">
+              <h2 className="text-lg font-bold text-amber-900">
+                Awaiting payment — needs your attention
+              </h2>
+              <p className="mt-1 text-sm text-amber-800">
+                You have {pendingBookings.length} booking{pendingBookings.length !== 1 ? "s" : ""} that need payment. Pay via GCash or at the ticket booth to confirm your trip.
+              </p>
+              <ul className="mt-4 space-y-3">
+                {pendingBookings.map((b) => {
+                  const routeName = b.trip?.route?.display_name ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
+                  return (
+                    <li key={b.id}>
+                      <Link
+                        href={`/dashboard/bookings/${b.reference}`}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-4 py-3 transition-colors hover:border-amber-400 hover:bg-amber-50/50"
+                      >
+                        <span className="font-mono font-semibold text-[#0c7b93]">{b.reference}</span>
+                        <span className="text-sm text-[#134e4a]">{routeName}</span>
+                        <span className="font-semibold text-[#134e4a]">
+                          ₱{(b.total_amount_cents / 100).toLocaleString()}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              {GCASH_NUMBER && (
+                <p className="mt-3 text-sm text-amber-800">
+                  <strong>GCash:</strong> Send amount to {GCASH_NUMBER} ({GCASH_ACCOUNT_NAME}). Put the reference in the message.
+                </p>
+              )}
+              <Link
+                href={ROUTES.myBookings}
+                className="mt-4 inline-block rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 transition-colors"
+              >
+                View all my bookings →
+              </Link>
+            </div>
+          )}
+
+          {/* Lower-right toast when payment was recently confirmed (Facebook-style notification) */}
+          {recentlyConfirmed.length > 0 && (
+            <ConfirmationToast items={recentlyConfirmed.map((b) => ({ reference: b.reference }))} />
+          )}
+          {/* Payment confirmed — show so passenger sees ticket is ready */}
+          {recentlyConfirmed.length > 0 && (
+            <div className="mt-6 rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-6 shadow-sm sm:p-8">
+              <h2 className="text-lg font-bold text-emerald-900">
+                Payment confirmed — tickets ready
+              </h2>
+              <p className="mt-1 text-sm text-emerald-800">
+                Your payment was confirmed. You can print or view your tickets now.
+              </p>
+              <ul className="mt-4 space-y-2">
+                {recentlyConfirmed.map((b) => (
+                  <li key={b.id} className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono font-semibold text-[#0c7b93]">{b.reference}</span>
+                    <PrintTicketsTrigger reference={b.reference} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Refunded — notify passenger their ticket was refunded */}
+          {refundedBookings.length > 0 && (
+            <div className="mt-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 shadow-sm sm:p-8">
+              <h2 className="text-lg font-bold text-amber-900">
+                Refund notice ({refundedBookings.length} ticket{refundedBookings.length !== 1 ? "s" : ""})
+              </h2>
+              <p className="mt-1 text-sm text-amber-800">
+                {APP_NAME} has refunded your ticket(s). The amount has been processed. We apologize for any inconvenience.
+              </p>
+              <ul className="mt-4 space-y-2">
+                {refundedBookings.map((b) => {
+                  const routeName = b.trip_snapshot_route_name ?? b.trip?.route?.display_name ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
+                  const passengerNames = Array.isArray(b.passenger_names) && b.passenger_names.length > 0
+                    ? b.passenger_names.join(", ")
+                    : b.customer_full_name ?? `${b.passenger_count} passenger${b.passenger_count !== 1 ? "s" : ""}`;
+                  return (
+                    <li key={b.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-3">
+                      <span className="font-mono font-semibold text-[#0c7b93]">{b.reference}</span>
+                      <span className="text-sm text-amber-800">
+                        ₱{(b.total_amount_cents / 100).toLocaleString()} · {routeName}
+                      </span>
+                      <span className="text-sm text-amber-700">· {passengerNames}</span>
+                      <Link
+                        href={`/dashboard/bookings/${b.reference}`}
+                        className="ml-auto rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+                      >
+                        View details
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {/* Week calendar: click a day to see times and seats */}
+          <TripCalendarWrapper />
+
+          {/* Quick actions */}
+          <h2 className="mt-10 text-lg font-semibold text-[#134e4a]">Quick actions</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              href={ROUTES.book}
+              className="group flex flex-col rounded-2xl border-2 border-[#0c7b93] bg-[#0c7b93] p-6 text-white shadow-lg shadow-[#0c7b93]/20 transition-all hover:border-[#0f766e] hover:bg-[#0f766e] hover:shadow-xl hover:shadow-[#0c7b93]/25"
+            >
+              <span className="text-2xl font-bold">Book a trip</span>
+              <span className="mt-2 text-sm opacity-90">Siargao ↔ Surigao · Dinagat ↔ Surigao</span>
+            </Link>
+            <Link
+              href={ROUTES.schedule}
+              className="group flex flex-col rounded-2xl border-2 border-[#0c7b93] bg-white p-6 text-[#134e4a] transition-all hover:border-[#0f766e] hover:bg-[#0c7b93]/5"
+            >
+              <span className="text-xl font-bold">View schedule</span>
+              <span className="mt-2 text-sm text-[#0f766e]">Departure times and routes</span>
+            </Link>
+            <Link
+              href={ROUTES.myBookings}
+              className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-6 text-[#134e4a] transition-all hover:border-[#0c7b93] hover:bg-[#0c7b93]/5"
+            >
+              <span className="text-xl font-bold">My bookings</span>
+              <span className="mt-2 text-sm text-[#0f766e]">Your reservations and references</span>
+            </Link>
+          </div>
+        </>
+      ) : isAdmin ? (
+        <>
+          <p className="mt-1 text-sm text-[#0f766e]/80">
+            Manage reports, vessels, and assign crew. No first-admin link — admin is already set up.
+          </p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              href={ROUTES.admin}
+              className="rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93]/5 p-5 text-left transition-colors hover:bg-[#0c7b93]/10"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Dashboard</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Today&apos;s totals: passengers boarded, vessels active, revenue, fuel.</p>
+            </Link>
+            <Link
+              href={ROUTES.adminReports}
+              className="rounded-xl border-2 border-[#0c7b93] px-5 py-5 text-left transition-colors hover:bg-[#0c7b93]/10"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Reports</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Per-vessel today: passenger board, revenue, fuel, net revenue.</p>
+            </Link>
+            <Link
+              href={ROUTES.adminVessels}
+              className="rounded-xl border-2 border-[#0c7b93] px-5 py-5 text-left transition-colors hover:bg-[#0c7b93]/10"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Vessels</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Edit vessel name, capacity, fuel per trip, rate; assign captain, crew, ticket booth.</p>
+            </Link>
+          </div>
+        </>
+      ) : user.role === "ticket_booth" ? (
+        <div className="mt-6 space-y-4">
+          <p className="mt-1 text-sm text-[#0f766e]/80">
+            Add walk-in bookings when you collect payment. Open Reports to view passenger manifests (Coast Guard) and enter walk-in passenger count per trip.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={ROUTES.adminReports}
+              className="inline-flex min-h-[44px] items-center rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
+            >
+              Reports → Manifests & walk-in count
+            </Link>
+            <Link
+              href={ROUTES.adminManualBooking}
+              className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50"
+            >
+              Add manual booking (walk-in) →
+            </Link>
+          </div>
+        </div>
+      ) : user.role === "captain" ? (
+        <div className="mt-6">
+          <p className="mt-1 text-sm text-[#0f766e]/80">
+            Post schedule or trip updates for passengers. They will see announcements on the Schedule and Book pages.
+          </p>
           <Link
-            href={ROUTES.admin}
-            className="rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
+            href={ROUTES.adminVessels}
+            className="mt-4 inline-flex min-h-[44px] items-center rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
           >
-            Admin
+            Your vessels → Post announcements
           </Link>
-        )}
-        {(user.role === "admin" || user.role === "ticket_booth" || user.role === "crew") && (
-          <Link
-            href={ROUTES.crew}
-            className="rounded-xl border-2 border-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10 transition-colors"
-          >
-            Crew
-          </Link>
-        )}
-        {(user.role === "admin" || user.role === "captain") && (
-          <Link
-            href={ROUTES.captain}
-            className="rounded-xl border-2 border-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10 transition-colors"
-          >
-            Captain
-          </Link>
-        )}
-      </div>
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-[#0f766e]/80">
+          Crew and captain access are assigned per vessel by admin. You only see the areas you have access to.
+        </p>
+      )}
     </div>
   );
 }

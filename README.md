@@ -42,32 +42,22 @@ NEXT_PUBLIC_OPENWEATHER_API_KEY=your-key      # for Siargao weather widget (home
 
 ### 4. Run locally
 
+**In a terminal** (so you see the server and any errors):
+
 ```bash
+cd d:\shippinglines
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+When you see `▲ Next.js ... - Local: http://localhost:3000`, open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### 5. First admin (one-time)
+### 5. First admin (one-time) — no env, no special URL
 
-**Option A — API (easiest):**
-
-1. Sign up at [http://localhost:3000/signup](http://localhost:3000/signup) with your email and password.
-2. In **Supabase Dashboard → Project Settings → API**, copy the **service_role** key (secret).
-3. Add to `.env.local`: `SUPABASE_SERVICE_ROLE_KEY=your-service-role-key`
-4. Restart the dev server, then open in your browser:  
-   `http://localhost:3000/api/setup-admin?email=YOUR_EMAIL`  
-   (e.g. `?email=gabu.sacro@gmail.com`)
-5. You should see `{ "ok": true, "message": "User is now admin..." }`. Then **remove** `SUPABASE_SERVICE_ROLE_KEY` from `.env.local` and restart.
-
-**Option B — SQL:**  
-After signing up, in **SQL Editor** run:
-
-```sql
-UPDATE public.profiles SET role = 'admin', full_name = 'Admin', approved_at = NOW() WHERE id = 'YOUR-AUTH-USER-UUID';
-```
-
-Replace `YOUR-AUTH-USER-UUID` with the user's ID from **Authentication → Users**.
+1. Sign up and log in at the site.
+2. On your **Dashboard** click **“Make this account the first admin (one-time Supabase step)”** (or go to `/first-admin-setup`).
+3. The page shows the exact SQL with your email. Copy it.
+4. Open **Supabase Dashboard → SQL Editor → New query**, paste the SQL, click **Run**.
+5. Log in again. You’ll see Admin, Crew, Captain.
 
 ## Project summary
 

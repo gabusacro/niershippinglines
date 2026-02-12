@@ -1,6 +1,6 @@
 // Types aligned with Supabase schema (001_initial_schema.sql)
 
-export type AppRole = "admin" | "captain" | "crew" | "ticket_booth";
+export type AppRole = "admin" | "captain" | "crew" | "ticket_booth" | "passenger";
 export type BoatStatus = "running" | "maintenance";
 export type TripStatus = "scheduled" | "boarding" | "departed" | "arrived" | "cancelled";
 export type BookingStatus =
@@ -12,12 +12,13 @@ export type BookingStatus =
   | "cancelled"
   | "changed"
   | "refunded";
-export type FareType = "adult" | "senior" | "pwd" | "child";
+export type FareType = "adult" | "senior" | "pwd" | "child" | "infant";
 
 export interface Profile {
   id: string;
   role: AppRole;
   full_name: string | null;
+  salutation: string | null;
   email: string | null;
   approved_at: string | null;
   created_at: string;
@@ -30,6 +31,7 @@ export interface Boat {
   capacity: number;
   online_quota: number;
   status: BoatStatus;
+  image_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -81,15 +83,19 @@ export interface Trip {
   route?: Route;
 }
 
+export type PassengerDetail = { fare_type: FareType; full_name: string };
+
 export interface Booking {
   id: string;
   trip_id: string;
   reference: string;
   customer_full_name: string;
   customer_email: string;
+  customer_mobile: string | null;
   passenger_count: number;
   fare_type: FareType;
   total_amount_cents: number;
+  passenger_details: PassengerDetail[] | null;
   status: BookingStatus;
   is_walk_in: boolean;
   payment_proof_path: string | null;
@@ -121,4 +127,13 @@ export interface TideEntry {
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface VesselAnnouncement {
+  id: string;
+  vessel_id: string | null;
+  created_by: string;
+  message: string;
+  created_at: string;
+  active_until: string | null;
 }
