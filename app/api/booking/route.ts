@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(booking);
 }
 
-type PassengerDetail = { fare_type: string; full_name: string };
+type PassengerDetail = { fare_type: string; full_name: string; address?: string };
 
 function isValidPassengerDetail(x: unknown): x is PassengerDetail {
   return (
@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
   const tripId = b.trip_id;
   const customerEmail = b.customer_email;
   const customerMobile = b.customer_mobile;
+  const customerAddressRaw = b.customer_address;
   const notifyAlsoEmailRaw = b.notify_also_email;
   const passengerDetailsRaw = b.passenger_details;
 
@@ -77,7 +78,11 @@ export async function POST(request: NextRequest) {
   if (!customerMobile || typeof customerMobile !== "string" || !customerMobile.trim()) {
     return NextResponse.json({ error: "Missing or invalid: customer_mobile" }, { status: 400 });
   }
+  if (!customerAddressRaw || typeof customerAddressRaw !== "string" || !customerAddressRaw.trim()) {
+    return NextResponse.json({ error: "Missing or invalid: customer_address (required for tickets and manifest)" }, { status: 400 });
+  }
   const mobile = customerMobile.trim();
+  const customerAddress = customerAddressRaw.trim();
 
   let passengerCount: number;
   let customerFullName: string;
@@ -205,6 +210,7 @@ export async function POST(request: NextRequest) {
     customer_full_name: customerFullName,
     customer_email: customerEmail.trim(),
     customer_mobile: mobile,
+    customer_address: customerAddress,
     passenger_count: passengerCount,
     fare_type: fareType,
     total_amount_cents: totalCents,
@@ -214,10 +220,10 @@ export async function POST(request: NextRequest) {
   };
   if (notifyAlsoEmail) insertPayload.notify_also_email = notifyAlsoEmail;
   if (passengerDetails && passengerDetails.length > 0) {
-    insertPayload.passenger_details = passengerDetails.map((p) => ({
-      fare_type: p.fare_type,
-      full_name: p.full_name.trim(),
-    }));
+    insertPayload.passenger_details = passengerDetails.map((p) => {
+      const addr = typeof p.address === "string" && p.address.trim() ? p.address.trim() : customerAddress;
+      return { fare_type: p.fare_type, full_name: p.full_name.trim(), address: addr };
+    });
   }
 
   const { data: booking, error: insertError } = await supabase

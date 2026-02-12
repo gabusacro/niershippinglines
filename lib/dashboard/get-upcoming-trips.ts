@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getTodayInManila } from "@/lib/admin/ph-time";
 
 export type UpcomingTripRow = {
   id: string;
@@ -10,13 +11,13 @@ export type UpcomingTripRow = {
   route: { id: string; display_name: string; origin: string; destination: string } | null;
 };
 
-/** Trips for today through today+6 (7 days), scheduled only, ordered by date then time. */
+/** Trips for today through ~60 days ahead (covers next month/March), scheduled only. Uses Philippines time. */
 export async function getUpcomingTrips(): Promise<UpcomingTripRow[]> {
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
-  const end = new Date();
-  end.setDate(end.getDate() + 6);
-  const lastDate = end.toISOString().slice(0, 10);
+  const today = getTodayInManila();
+  const [y, m, d] = today.split("-").map(Number);
+  const lastDay = new Date(y, m - 1, d + 60);
+  const lastDate = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
 
   const { data, error } = await supabase
     .from("trips")

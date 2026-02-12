@@ -5,6 +5,8 @@ import { getAuthUser } from "@/lib/auth/get-user";
 import { ROUTES } from "@/lib/constants";
 import { ConfirmPaymentButton } from "./ConfirmPaymentButton";
 import { formatTime } from "@/lib/dashboard/format";
+import { getPaymentProofSignedUrl } from "@/lib/admin/payment-proof-url";
+import { PaymentProofViewer } from "@/components/admin/PaymentProofViewer";
 
 export const metadata = {
   title: "Pending payments",
@@ -20,6 +22,7 @@ type Row = {
   passenger_count: number;
   total_amount_cents: number;
   created_at: string;
+  payment_proof_path: string | null;
   trip: {
     departure_date?: string;
     departure_time?: string;
@@ -37,7 +40,7 @@ export default async function AdminPendingPaymentsPage() {
   const { data: bookings, error } = await supabase
     .from("bookings")
     .select(
-      "id, reference, customer_full_name, customer_email, customer_mobile, passenger_count, total_amount_cents, created_at, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
+      "id, reference, customer_full_name, customer_email, customer_mobile, passenger_count, total_amount_cents, created_at, payment_proof_path, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
     )
     .eq("status", "pending_payment")
     .order("created_at", { ascending: false })
@@ -55,6 +58,14 @@ export default async function AdminPendingPaymentsPage() {
   }
 
   const list = (bookings ?? []) as Row[];
+  const listWithProofUrls = await Promise.all(
+    list.map(async (b) => ({
+      ...b,
+      proofUrl: b.payment_proof_path
+        ? await getPaymentProofSignedUrl(b.payment_proof_path)
+        : null,
+    }))
+  );
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
@@ -70,7 +81,7 @@ export default async function AdminPendingPaymentsPage() {
             <p className="mt-1 text-sm text-[#0f766e]">New bookings will appear here until payment is confirmed.</p>
           </div>
         ) : (
-          list.map((b) => {
+          listWithProofUrls.map((b) => {
             const routeName =
               b.trip?.route?.display_name ??
               [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ??
@@ -101,7 +112,12 @@ export default async function AdminPendingPaymentsPage() {
                 className="flex flex-col gap-4 rounded-xl border-2 border-amber-200 bg-amber-50/50 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <p className="font-mono font-bold text-[#0c7b93]">{b.reference}</p>
+                  <Link
+                    href={`/admin/bookings/${encodeURIComponent(b.reference)}`}
+                    className="font-mono font-bold text-[#0c7b93] hover:underline"
+                  >
+                    {b.reference}
+                  </Link>
                   <p className="mt-1 text-sm font-medium text-[#134e4a]">{b.customer_full_name}</p>
                   <p className="text-xs text-[#0f766e]">{b.customer_email}</p>
                   {b.customer_mobile ? (
@@ -117,6 +133,21 @@ export default async function AdminPendingPaymentsPage() {
                     {b.passenger_count} passenger{b.passenger_count !== 1 ? "s" : ""} ·{" "}
                     <strong>₱{(b.total_amount_cents / 100).toLocaleString()}</strong>
                   </p>
+                  {b.proofUrl ? (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold text-amber-900">Payment proof</p>
+                      <PaymentProofViewer
+                        proofUrl={b.proofUrl}
+                        isPdf={b.payment_proof_path?.toLowerCase().endsWith(".pdf")}
+                        thumbnailClassName="h-24 w-auto max-w-[160px] rounded object-contain"
+                      />
+                      <p className="mt-0.5 text-xs text-amber-800">
+                        Click to view full size. Verify amount and GCash transaction reference.
+                      </p>
+                    </div>
+                  ) : b.payment_proof_path ? (
+                    <p className="mt-2 text-xs text-amber-700">Proof uploaded (preview unavailable)</p>
+                  ) : null}
                 </div>
                 <ConfirmPaymentButton reference={b.reference} />
               </div>

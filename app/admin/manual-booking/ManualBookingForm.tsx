@@ -29,16 +29,22 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
   const [tripId, setTripId] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerMobile, setCustomerMobile] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
   const [countAdult, setCountAdult] = useState(0);
   const [countSenior, setCountSenior] = useState(0);
   const [countPwd, setCountPwd] = useState(0);
   const [countChild, setCountChild] = useState(0);
   const [countInfant, setCountInfant] = useState(0);
   const [adultNames, setAdultNames] = useState<string[]>([""]);
+  const [adultAddresses, setAdultAddresses] = useState<string[]>([]);
   const [seniorNames, setSeniorNames] = useState<string[]>([""]);
+  const [seniorAddresses, setSeniorAddresses] = useState<string[]>([]);
   const [pwdNames, setPwdNames] = useState<string[]>([""]);
+  const [pwdAddresses, setPwdAddresses] = useState<string[]>([]);
   const [childNames, setChildNames] = useState<string[]>([""]);
+  const [childAddresses, setChildAddresses] = useState<string[]>([]);
   const [infantNames, setInfantNames] = useState<string[]>([""]);
+  const [infantAddresses, setInfantAddresses] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<{ reference: string; total: number } | null>(null);
@@ -47,21 +53,27 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
 
   useEffect(() => {
     setAdultNames((prev) => ensureLength(prev, countAdult || 1));
+    setAdultAddresses((prev) => ensureLength(prev, countAdult));
     setSeniorNames((prev) => ensureLength(prev, countSenior));
+    setSeniorAddresses((prev) => ensureLength(prev, countSenior));
     setPwdNames((prev) => ensureLength(prev, countPwd));
+    setPwdAddresses((prev) => ensureLength(prev, countPwd));
     setChildNames((prev) => ensureLength(prev, countChild));
+    setChildAddresses((prev) => ensureLength(prev, countChild));
     setInfantNames((prev) => ensureLength(prev, countInfant));
+    setInfantAddresses((prev) => ensureLength(prev, countInfant));
   }, [countAdult, countSenior, countPwd, countChild, countInfant]);
 
+  const mainAddr = customerAddress.trim();
   const passengerDetails = useMemo(() => {
-    const list: { fare_type: string; full_name: string }[] = [];
-    for (let i = 0; i < countAdult; i++) list.push({ fare_type: "adult", full_name: adultNames[i]?.trim() ?? "" });
-    for (let i = 0; i < countSenior; i++) list.push({ fare_type: "senior", full_name: seniorNames[i]?.trim() ?? "" });
-    for (let i = 0; i < countPwd; i++) list.push({ fare_type: "pwd", full_name: pwdNames[i]?.trim() ?? "" });
-    for (let i = 0; i < countChild; i++) list.push({ fare_type: "child", full_name: childNames[i]?.trim() ?? "" });
-    for (let i = 0; i < countInfant; i++) list.push({ fare_type: "infant", full_name: infantNames[i]?.trim() ?? "" });
+    const list: { fare_type: string; full_name: string; address: string }[] = [];
+    for (let i = 0; i < countAdult; i++) list.push({ fare_type: "adult", full_name: adultNames[i]?.trim() ?? "", address: adultAddresses[i]?.trim() || mainAddr });
+    for (let i = 0; i < countSenior; i++) list.push({ fare_type: "senior", full_name: seniorNames[i]?.trim() ?? "", address: seniorAddresses[i]?.trim() || mainAddr });
+    for (let i = 0; i < countPwd; i++) list.push({ fare_type: "pwd", full_name: pwdNames[i]?.trim() ?? "", address: pwdAddresses[i]?.trim() || mainAddr });
+    for (let i = 0; i < countChild; i++) list.push({ fare_type: "child", full_name: childNames[i]?.trim() ?? "", address: childAddresses[i]?.trim() || mainAddr });
+    for (let i = 0; i < countInfant; i++) list.push({ fare_type: "infant", full_name: infantNames[i]?.trim() ?? "", address: infantAddresses[i]?.trim() || mainAddr });
     return list.filter((p) => p.full_name.length > 0);
-  }, [countAdult, countSenior, countPwd, countChild, countInfant, adultNames, seniorNames, pwdNames, childNames, infantNames]);
+  }, [countAdult, countSenior, countPwd, countChild, countInfant, adultNames, seniorNames, pwdNames, childNames, infantNames, adultAddresses, seniorAddresses, pwdAddresses, childAddresses, infantAddresses, mainAddr]);
 
   const tripsWithSpace = trips.filter(
     (t) => (t.walk_in_quota ?? 0) - (t.walk_in_booked ?? 0) > 0
@@ -83,6 +95,10 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
       setError("Fill in the full name for every passenger.");
       return;
     }
+    if (!customerAddress.trim()) {
+      setError("Address is required (for tickets and Coast Guard manifest).");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/admin/manual-booking", {
@@ -92,7 +108,8 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           trip_id: tripId,
           customer_email: customerEmail.trim(),
           customer_mobile: customerMobile.trim() || null,
-          passenger_details: passengerDetails,
+          customer_address: customerAddress.trim(),
+          passenger_details: passengerDetails.map((p) => ({ fare_type: p.fare_type, full_name: p.full_name, address: p.address })),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -108,16 +125,22 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
       setTripId("");
       setCustomerEmail("");
       setCustomerMobile("");
+      setCustomerAddress("");
       setCountAdult(0);
       setCountSenior(0);
       setCountPwd(0);
       setCountChild(0);
       setCountInfant(0);
       setAdultNames([""]);
+      setAdultAddresses([]);
       setSeniorNames([]);
+      setSeniorAddresses([]);
       setPwdNames([]);
+      setPwdAddresses([]);
       setChildNames([]);
+      setChildAddresses([]);
       setInfantNames([]);
+      setInfantAddresses([]);
       router.refresh();
     } finally {
       setLoading(false);
@@ -209,15 +232,23 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           <p className="text-sm font-medium text-[#134e4a] mb-2">Adult — full name</p>
           <div className="space-y-2">
             {Array.from({ length: countAdult }, (_, i) => (
-              <input
-                key={i}
-                type="text"
-                required
-                value={adultNames[i] ?? ""}
-                onChange={(e) => { const n = [...adultNames]; n[i] = e.target.value; setAdultNames(n); }}
-                placeholder={`Adult ${i + 1}`}
-                className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-              />
+              <div key={i} className="space-y-1">
+                <input
+                  type="text"
+                  required
+                  value={adultNames[i] ?? ""}
+                  onChange={(e) => { const n = [...adultNames]; n[i] = e.target.value; setAdultNames(n); }}
+                  placeholder={`Adult ${i + 1}`}
+                  className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+                <input
+                  type="text"
+                  value={adultAddresses[i] ?? ""}
+                  onChange={(e) => { const n = [...adultAddresses]; n[i] = e.target.value; setAdultAddresses(n); }}
+                  placeholder="Different address (optional)"
+                  className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -227,15 +258,23 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           <p className="text-sm font-medium text-[#134e4a] mb-2">Senior — full name</p>
           <div className="space-y-2">
             {Array.from({ length: countSenior }, (_, i) => (
-              <input
-                key={i}
-                type="text"
-                required
-                value={seniorNames[i] ?? ""}
-                onChange={(e) => { const n = [...seniorNames]; n[i] = e.target.value; setSeniorNames(n); }}
-                placeholder={`Senior ${i + 1}`}
-                className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-              />
+              <div key={i} className="space-y-1">
+                <input
+                  type="text"
+                  required
+                  value={seniorNames[i] ?? ""}
+                  onChange={(e) => { const n = [...seniorNames]; n[i] = e.target.value; setSeniorNames(n); }}
+                  placeholder={`Senior ${i + 1}`}
+                  className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+                <input
+                  type="text"
+                  value={seniorAddresses[i] ?? ""}
+                  onChange={(e) => { const n = [...seniorAddresses]; n[i] = e.target.value; setSeniorAddresses(n); }}
+                  placeholder="Different address (optional)"
+                  className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -245,15 +284,23 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           <p className="text-sm font-medium text-[#134e4a] mb-2">PWD — full name</p>
           <div className="space-y-2">
             {Array.from({ length: countPwd }, (_, i) => (
-              <input
-                key={i}
-                type="text"
-                required
-                value={pwdNames[i] ?? ""}
-                onChange={(e) => { const n = [...pwdNames]; n[i] = e.target.value; setPwdNames(n); }}
-                placeholder={`PWD ${i + 1}`}
-                className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-              />
+              <div key={i} className="space-y-1">
+                <input
+                  type="text"
+                  required
+                  value={pwdNames[i] ?? ""}
+                  onChange={(e) => { const n = [...pwdNames]; n[i] = e.target.value; setPwdNames(n); }}
+                  placeholder={`PWD ${i + 1}`}
+                  className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+                <input
+                  type="text"
+                  value={pwdAddresses[i] ?? ""}
+                  onChange={(e) => { const n = [...pwdAddresses]; n[i] = e.target.value; setPwdAddresses(n); }}
+                  placeholder="Different address (optional)"
+                  className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -263,15 +310,23 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           <p className="text-sm font-medium text-[#134e4a] mb-2">Child — full name</p>
           <div className="space-y-2">
             {Array.from({ length: countChild }, (_, i) => (
-              <input
-                key={i}
-                type="text"
-                required
-                value={childNames[i] ?? ""}
-                onChange={(e) => { const n = [...childNames]; n[i] = e.target.value; setChildNames(n); }}
-                placeholder={`Child ${i + 1}`}
-                className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-              />
+              <div key={i} className="space-y-1">
+                <input
+                  type="text"
+                  required
+                  value={childNames[i] ?? ""}
+                  onChange={(e) => { const n = [...childNames]; n[i] = e.target.value; setChildNames(n); }}
+                  placeholder={`Child ${i + 1}`}
+                  className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+                <input
+                  type="text"
+                  value={childAddresses[i] ?? ""}
+                  onChange={(e) => { const n = [...childAddresses]; n[i] = e.target.value; setChildAddresses(n); }}
+                  placeholder="Different address (optional)"
+                  className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -281,21 +336,41 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           <p className="text-sm font-medium text-[#134e4a] mb-2">Infant (&lt;7) — full name</p>
           <div className="space-y-2">
             {Array.from({ length: countInfant }, (_, i) => (
-              <input
-                key={i}
-                type="text"
-                required
-                value={infantNames[i] ?? ""}
-                onChange={(e) => { const n = [...infantNames]; n[i] = e.target.value; setInfantNames(n); }}
-                placeholder={`Infant ${i + 1}`}
-                className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-              />
+              <div key={i} className="space-y-1">
+                <input
+                  type="text"
+                  required
+                  value={infantNames[i] ?? ""}
+                  onChange={(e) => { const n = [...infantNames]; n[i] = e.target.value; setInfantNames(n); }}
+                  placeholder={`Infant ${i + 1}`}
+                  className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+                <input
+                  type="text"
+                  value={infantAddresses[i] ?? ""}
+                  onChange={(e) => { const n = [...infantAddresses]; n[i] = e.target.value; setInfantAddresses(n); }}
+                  placeholder="Different address (optional)"
+                  className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+              </div>
             ))}
           </div>
         </div>
       )}
 
       <div className="border-t border-teal-200 pt-4">
+        <p className="text-sm font-medium text-[#134e4a] mb-2">Address (for tickets & Coast Guard manifest)</p>
+        <div className="mb-4">
+          <label className="block text-xs text-[#0f766e] mb-1">Address (required)</label>
+          <input
+            type="text"
+            required
+            value={customerAddress}
+            onChange={(e) => setCustomerAddress(e.target.value)}
+            placeholder="Full address (street, barangay, city, province)"
+            className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+          />
+        </div>
         <p className="text-sm font-medium text-[#134e4a] mb-2">Contact (for this booking)</p>
         <div className="space-y-3">
           <div>
@@ -326,7 +401,7 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
-          disabled={loading || tripsWithSpace.length === 0 || totalPassengers < 1}
+          disabled={loading || tripsWithSpace.length === 0 || totalPassengers < 1 || !customerAddress.trim()}
           className="rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50"
         >
           {loading ? "Creating…" : "Create walk-in booking"}

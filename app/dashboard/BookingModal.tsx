@@ -31,9 +31,15 @@ function ensureLength(arr: string[], len: number): string[] {
 export function BookingModal({
   trip,
   onClose,
+  loggedInEmail = "",
+  passengerName,
+  loggedInAddress = "",
 }: {
   trip: UpcomingTripRow;
   onClose: () => void;
+  loggedInEmail?: string;
+  passengerName?: string;
+  loggedInAddress?: string;
 }) {
   const routeName =
     trip.route?.display_name ??
@@ -48,13 +54,22 @@ export function BookingModal({
   const [countPwd, setCountPwd] = useState(0);
   const [countChild, setCountChild] = useState(0);
   const [countInfant, setCountInfant] = useState(0);
-  const [adultNames, setAdultNames] = useState<string[]>([""]);
+  const [adultNames, setAdultNames] = useState<string[]>([
+    passengerName ?? "",
+  ]);
   const [seniorNames, setSeniorNames] = useState<string[]>([]);
   const [pwdNames, setPwdNames] = useState<string[]>([]);
   const [childNames, setChildNames] = useState<string[]>([]);
   const [infantNames, setInfantNames] = useState<string[]>([]);
-  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerEmail, setCustomerEmail] = useState(loggedInEmail);
   const [customerMobile, setCustomerMobile] = useState("");
+  const [customerAddress, setCustomerAddress] = useState(loggedInAddress);
+  const [notifyAlsoEmail, setNotifyAlsoEmail] = useState("");
+  const [adultAddresses, setAdultAddresses] = useState<string[]>([]);
+  const [seniorAddresses, setSeniorAddresses] = useState<string[]>([]);
+  const [pwdAddresses, setPwdAddresses] = useState<string[]>([]);
+  const [childAddresses, setChildAddresses] = useState<string[]>([]);
+  const [infantAddresses, setInfantAddresses] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<{
@@ -86,32 +101,38 @@ export function BookingModal({
 
   useEffect(() => {
     setAdultNames((prev) => ensureLength(prev, countAdult));
+    setAdultAddresses((prev) => ensureLength(prev, countAdult));
   }, [countAdult]);
   useEffect(() => {
     setSeniorNames((prev) => ensureLength(prev, countSenior));
+    setSeniorAddresses((prev) => ensureLength(prev, countSenior));
   }, [countSenior]);
   useEffect(() => {
     setPwdNames((prev) => ensureLength(prev, countPwd));
+    setPwdAddresses((prev) => ensureLength(prev, countPwd));
   }, [countPwd]);
   useEffect(() => {
     setChildNames((prev) => ensureLength(prev, countChild));
+    setChildAddresses((prev) => ensureLength(prev, countChild));
   }, [countChild]);
   useEffect(() => {
     setInfantNames((prev) => ensureLength(prev, countInfant));
+    setInfantAddresses((prev) => ensureLength(prev, countInfant));
   }, [countInfant]);
 
   const baseFare = fare?.base_fare_cents ?? 55000;
   const discount = fare?.discount_percent ?? 20;
 
   const passengerDetails = useMemo(() => {
-    const list: { fare_type: string; full_name: string }[] = [];
-    for (let i = 0; i < countAdult; i++) list.push({ fare_type: "adult", full_name: adultNames[i]?.trim() ?? "" });
-    for (let i = 0; i < countSenior; i++) list.push({ fare_type: "senior", full_name: seniorNames[i]?.trim() ?? "" });
-    for (let i = 0; i < countPwd; i++) list.push({ fare_type: "pwd", full_name: pwdNames[i]?.trim() ?? "" });
-    for (let i = 0; i < countChild; i++) list.push({ fare_type: "child", full_name: childNames[i]?.trim() ?? "" });
-    for (let i = 0; i < countInfant; i++) list.push({ fare_type: "infant", full_name: infantNames[i]?.trim() ?? "" });
+    const list: { fare_type: string; full_name: string; address: string }[] = [];
+    const mainAddr = customerAddress.trim();
+    for (let i = 0; i < countAdult; i++) list.push({ fare_type: "adult", full_name: adultNames[i]?.trim() ?? "", address: adultAddresses[i]?.trim() || mainAddr });
+    for (let i = 0; i < countSenior; i++) list.push({ fare_type: "senior", full_name: seniorNames[i]?.trim() ?? "", address: seniorAddresses[i]?.trim() || mainAddr });
+    for (let i = 0; i < countPwd; i++) list.push({ fare_type: "pwd", full_name: pwdNames[i]?.trim() ?? "", address: pwdAddresses[i]?.trim() || mainAddr });
+    for (let i = 0; i < countChild; i++) list.push({ fare_type: "child", full_name: childNames[i]?.trim() ?? "", address: childAddresses[i]?.trim() || mainAddr });
+    for (let i = 0; i < countInfant; i++) list.push({ fare_type: "infant", full_name: infantNames[i]?.trim() ?? "", address: infantAddresses[i]?.trim() || mainAddr });
     return list;
-  }, [countAdult, countSenior, countPwd, countChild, countInfant, adultNames, seniorNames, pwdNames, childNames, infantNames]);
+  }, [countAdult, countSenior, countPwd, countChild, countInfant, adultNames, seniorNames, pwdNames, childNames, infantNames, adultAddresses, seniorAddresses, pwdAddresses, childAddresses, infantAddresses, customerAddress]);
 
   const totalCents = useMemo(
     () => passengerDetails.reduce((sum, p) => sum + fareCents(baseFare, discount, p.fare_type), 0),
@@ -135,6 +156,10 @@ export function BookingModal({
       setError("Please enter contact email and mobile number.");
       return;
     }
+    if (!customerAddress.trim()) {
+      setError("Please enter address (required for tickets and manifest).");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/booking", {
@@ -144,7 +169,9 @@ export function BookingModal({
           trip_id: trip.id,
           customer_email: customerEmail.trim(),
           customer_mobile: customerMobile.trim(),
-          passenger_details: passengerDetails.map((p) => ({ fare_type: p.fare_type, full_name: p.full_name })),
+          customer_address: customerAddress.trim(),
+          notify_also_email: notifyAlsoEmail.trim() || undefined,
+          passenger_details: passengerDetails.map((p) => ({ fare_type: p.fare_type, full_name: p.full_name, address: p.address })),
         }),
       });
       const data = await res.json();
@@ -303,25 +330,51 @@ export function BookingModal({
                 </p>
               )}
 
+              {/* Address */}
+              <div>
+                <p className="text-sm font-medium text-[#134e4a] mb-1">Address (for tickets and manifest)</p>
+                <input
+                  type="text"
+                  required
+                  value={customerAddress}
+                  onChange={(e) => setCustomerAddress(e.target.value)}
+                  placeholder="e.g. Brgy. Dapa, General Luna, Siargao"
+                  className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                />
+                {loggedInAddress && <p className="mt-0.5 text-xs text-[#0f766e]">Pre-filled from your account.</p>}
+              </div>
+
               {/* Names per type */}
               {countAdult > 0 && (
                 <div>
                   <p className="text-sm font-medium text-[#134e4a] mb-2">Adult — full name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countAdult }, (_, i) => (
-                      <input
-                        key={i}
-                        type="text"
-                        required
-                        value={adultNames[i] ?? ""}
-                        onChange={(e) => {
-                          const next = [...adultNames];
-                          next[i] = e.target.value;
-                          setAdultNames(next);
-                        }}
-                        placeholder={`Adult ${i + 1} name`}
-                        className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-                      />
+                      <div key={i} className="space-y-1">
+                        <input
+                          type="text"
+                          required
+                          value={adultNames[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...adultNames];
+                            next[i] = e.target.value;
+                            setAdultNames(next);
+                          }}
+                          placeholder={`Adult ${i + 1} name`}
+                          className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                        <input
+                          type="text"
+                          value={adultAddresses[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...adultAddresses];
+                            next[i] = e.target.value;
+                            setAdultAddresses(next);
+                          }}
+                          placeholder="Different address (optional)"
+                          className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -331,19 +384,31 @@ export function BookingModal({
                   <p className="text-sm font-medium text-[#134e4a] mb-2">Senior — full name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countSenior }, (_, i) => (
-                      <input
-                        key={i}
-                        type="text"
-                        required
-                        value={seniorNames[i] ?? ""}
-                        onChange={(e) => {
-                          const next = [...seniorNames];
-                          next[i] = e.target.value;
-                          setSeniorNames(next);
-                        }}
-                        placeholder={`Senior ${i + 1} name`}
-                        className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-                      />
+                      <div key={i} className="space-y-1">
+                        <input
+                          type="text"
+                          required
+                          value={seniorNames[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...seniorNames];
+                            next[i] = e.target.value;
+                            setSeniorNames(next);
+                          }}
+                          placeholder={`Senior ${i + 1} name`}
+                          className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                        <input
+                          type="text"
+                          value={seniorAddresses[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...seniorAddresses];
+                            next[i] = e.target.value;
+                            setSeniorAddresses(next);
+                          }}
+                          placeholder="Different address (optional)"
+                          className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -353,19 +418,31 @@ export function BookingModal({
                   <p className="text-sm font-medium text-[#134e4a] mb-2">PWD — full name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countPwd }, (_, i) => (
-                      <input
-                        key={i}
-                        type="text"
-                        required
-                        value={pwdNames[i] ?? ""}
-                        onChange={(e) => {
-                          const next = [...pwdNames];
-                          next[i] = e.target.value;
-                          setPwdNames(next);
-                        }}
-                        placeholder={`PWD ${i + 1} name`}
-                        className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-                      />
+                      <div key={i} className="space-y-1">
+                        <input
+                          type="text"
+                          required
+                          value={pwdNames[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...pwdNames];
+                            next[i] = e.target.value;
+                            setPwdNames(next);
+                          }}
+                          placeholder={`PWD ${i + 1} name`}
+                          className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                        <input
+                          type="text"
+                          value={pwdAddresses[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...pwdAddresses];
+                            next[i] = e.target.value;
+                            setPwdAddresses(next);
+                          }}
+                          placeholder="Different address (optional)"
+                          className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -375,19 +452,31 @@ export function BookingModal({
                   <p className="text-sm font-medium text-[#134e4a] mb-2">Child — full name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countChild }, (_, i) => (
-                      <input
-                        key={i}
-                        type="text"
-                        required
-                        value={childNames[i] ?? ""}
-                        onChange={(e) => {
-                          const next = [...childNames];
-                          next[i] = e.target.value;
-                          setChildNames(next);
-                        }}
-                        placeholder={`Child ${i + 1} name`}
-                        className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-                      />
+                      <div key={i} className="space-y-1">
+                        <input
+                          type="text"
+                          required
+                          value={childNames[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...childNames];
+                            next[i] = e.target.value;
+                            setChildNames(next);
+                          }}
+                          placeholder={`Child ${i + 1} name`}
+                          className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                        <input
+                          type="text"
+                          value={childAddresses[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...childAddresses];
+                            next[i] = e.target.value;
+                            setChildAddresses(next);
+                          }}
+                          placeholder="Different address (optional)"
+                          className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -397,19 +486,31 @@ export function BookingModal({
                   <p className="text-sm font-medium text-[#134e4a] mb-2">Infant (&lt;7) — full name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countInfant }, (_, i) => (
-                      <input
-                        key={i}
-                        type="text"
-                        required
-                        value={infantNames[i] ?? ""}
-                        onChange={(e) => {
-                          const next = [...infantNames];
-                          next[i] = e.target.value;
-                          setInfantNames(next);
-                        }}
-                        placeholder={`Infant ${i + 1} name`}
-                        className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-                      />
+                      <div key={i} className="space-y-1">
+                        <input
+                          type="text"
+                          required
+                          value={infantNames[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...infantNames];
+                            next[i] = e.target.value;
+                            setInfantNames(next);
+                          }}
+                          placeholder={`Infant ${i + 1} name`}
+                          className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                        <input
+                          type="text"
+                          value={infantAddresses[i] ?? ""}
+                          onChange={(e) => {
+                            const next = [...infantAddresses];
+                            next[i] = e.target.value;
+                            setInfantAddresses(next);
+                          }}
+                          placeholder="Different address (optional)"
+                          className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -428,6 +529,11 @@ export function BookingModal({
                       placeholder="email@example.com"
                       className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
                     />
+                    {loggedInEmail && (
+                      <p className="mt-1 text-xs text-[#0f766e]">
+                        Using your account email — this booking will appear in My bookings.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs text-[#0f766e] mb-1">Mobile number</label>
@@ -439,6 +545,20 @@ export function BookingModal({
                       placeholder="e.g. 09XX XXX XXXX"
                       className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[#0f766e] mb-1">Also notify (optional)</label>
+                    <input
+                      type="email"
+                      value={notifyAlsoEmail}
+                      onChange={(e) => setNotifyAlsoEmail(e.target.value)}
+                      placeholder="Another email to receive the same notification"
+                      className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                      aria-label="Optional second email for notifications"
+                    />
+                    <p className="mt-0.5 text-xs text-[#0f766e]/80">
+                      e.g. travel partner or family — they&apos;ll get the payment required email too.
+                    </p>
                   </div>
                 </div>
               </div>

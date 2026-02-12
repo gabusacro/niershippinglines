@@ -8,6 +8,7 @@ export interface AuthUser {
   role: AppRole;
   fullName: string | null;
   salutation: string | null;
+  address: string | null;
   approvedAt: string | null;
 }
 
@@ -19,7 +20,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role, full_name, salutation, approved_at")
+    .select("role, full_name, salutation, address, approved_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -33,6 +34,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     role: (profile?.role as AppRole) ?? "passenger",
     fullName: profile?.full_name ?? null,
     salutation: profile?.salutation ?? null,
+    address: profile?.address ?? null,
     approvedAt: profile?.approved_at ?? null,
   };
 }

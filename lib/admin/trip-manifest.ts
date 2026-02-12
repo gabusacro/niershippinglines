@@ -9,6 +9,8 @@ export interface ManifestPassengerRow {
   passengerName: string;
   /** Passenger type: adult, senior, pwd, child, infant. */
   fareType: string;
+  /** Address for Coast Guard (from passenger_details.address or customer_address). */
+  address: string | null;
   /** Contact number from booking (customer_mobile). */
   contact: string | null;
   source: string;
@@ -60,7 +62,7 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
 
   const { data: bookings, error: bookError } = await supabase
     .from("bookings")
-    .select("id, reference, customer_full_name, customer_mobile, fare_type, passenger_count, passenger_details, is_walk_in, created_by")
+    .select("id, reference, customer_full_name, customer_mobile, customer_address, fare_type, passenger_count, passenger_details, is_walk_in, created_by")
     .eq("trip_id", tripId)
     .in("status", [...MANIFEST_STATUSES])
     .order("created_at", { ascending: true });
@@ -78,8 +80,9 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
   const passengers: ManifestPassengerRow[] = [];
   const fareTypeLabels: Record<string, string> = { adult: "Adult", senior: "Senior", pwd: "PWD", child: "Child", infant: "Infant" };
   for (const b of bookings ?? []) {
-    const pd = (b.passenger_details ?? []) as { fare_type?: string; full_name?: string }[];
+    const pd = (b.passenger_details ?? []) as { fare_type?: string; full_name?: string; address?: string }[];
     const bookingFareType = (b as { fare_type?: string }).fare_type ?? "adult";
+    const bookingAddress = (b as { customer_address?: string | null }).customer_address?.trim() || null;
     const role = b.created_by ? creators.get(b.created_by) : null;
     let source = "Online";
     if (b.is_walk_in) source = role === "ticket_booth" ? "Walk-in (ticket booth)" : role === "admin" ? "Walk-in (admin)" : "Walk-in";
@@ -89,14 +92,15 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
       for (const p of pd) {
         const name = (p.full_name ?? "—").trim() || "—";
         const fareType = fareTypeLabels[p.fare_type ?? ""] ?? (p.fare_type ?? bookingFareType);
+        const address = (p.address && p.address.trim()) ? p.address.trim() : bookingAddress;
         seq += 1;
-        passengers.push({ seq, reference: ref, passengerName: name, fareType, contact, source });
+        passengers.push({ seq, reference: ref, passengerName: name, fareType, address, contact, source });
       }
     } else {
       const name = b.customer_full_name ?? "—";
       const fareType = fareTypeLabels[bookingFareType] ?? bookingFareType;
       seq += 1;
-      passengers.push({ seq, reference: ref, passengerName: name, fareType, contact, source });
+      passengers.push({ seq, reference: ref, passengerName: name, fareType, address: bookingAddress, contact, source });
     }
   }
 

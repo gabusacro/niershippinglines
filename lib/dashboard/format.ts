@@ -21,12 +21,11 @@ export function passengerTypeLabel(fareType: string | null | undefined): string 
   return labels[fareType.toLowerCase()] ?? fareType.charAt(0).toUpperCase() + fareType.slice(1).toLowerCase();
 }
 
-/** Day label: Today, Tomorrow, or "Wed, Feb 12" */
+/** Day label: Today, Tomorrow, or "Wed, Feb 12". Uses Philippines time for consistency with PHILIPPINES TIME display. */
 export function getDayLabel(dateStr: string): string {
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const tomorrowStr = tomorrow.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
   if (dateStr === today) return "Today";
   if (dateStr === tomorrowStr) return "Tomorrow";
   try {

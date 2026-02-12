@@ -10,6 +10,7 @@ import { PrintTicketsTrigger } from "@/components/tickets/PrintTicketsTrigger";
 import { ConfirmationToast } from "@/components/dashboard/ConfirmationToast";
 import { FindBookingByReference } from "@/components/dashboard/FindBookingByReference";
 import { SetDisplayNameForm } from "@/app/dashboard/SetDisplayNameForm";
+import { SetAddressForm } from "@/app/dashboard/SetAddressForm";
 import { APP_NAME, ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
 
 export const metadata = {
@@ -20,9 +21,24 @@ export const metadata = {
 /** Always fetch fresh user so "Set your name" disappears after save. */
 export const dynamic = "force-dynamic";
 
-async function TripCalendarWrapper() {
+async function TripCalendarWrapper({
+  loggedInEmail,
+  passengerName,
+  loggedInAddress,
+}: {
+  loggedInEmail: string;
+  passengerName?: string;
+  loggedInAddress?: string;
+}) {
   const trips = await getUpcomingTrips();
-  return <TripCalendar trips={trips} />;
+  return (
+    <TripCalendar
+      trips={trips}
+      loggedInEmail={loggedInEmail}
+      passengerName={passengerName}
+      loggedInAddress={loggedInAddress ?? ""}
+    />
+  );
 }
 
 export default async function DashboardPage() {
@@ -70,6 +86,15 @@ export default async function DashboardPage() {
             </p>
           )}
           {!displayName && <SetDisplayNameForm />}
+          {displayName && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-[#134e4a]">Your address (for tickets and Coast Guard manifest)</p>
+              <p className="mt-0.5 text-xs text-[#0f766e]/80">
+                Used on tickets and manifest. Group/family bookings use this by default.
+              </p>
+              <SetAddressForm initialAddress={user.address ?? ""} />
+            </div>
+          )}
         </div>
       ) : (
         <p className="mt-2 text-[#0f766e]">
@@ -184,7 +209,11 @@ export default async function DashboardPage() {
           )}
 
           {/* Week calendar: click a day to see times and seats */}
-          <TripCalendarWrapper />
+          <TripCalendarWrapper
+            loggedInEmail={user.email ?? ""}
+            passengerName={welcomeName ?? undefined}
+            loggedInAddress={user.address ?? ""}
+          />
 
           {/* Quick actions */}
           <h2 className="mt-10 text-lg font-semibold text-[#134e4a]">Quick actions</h2>

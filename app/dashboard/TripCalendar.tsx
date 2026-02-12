@@ -5,19 +5,25 @@ import type { UpcomingTripRow } from "@/lib/dashboard/get-upcoming-trips";
 import { getDayLabel, formatTime } from "@/lib/dashboard/format";
 import { BookingModal } from "@/app/dashboard/BookingModal";
 
-function getWeekDates(): string[] {
-  const dates: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().slice(0, 10));
-  }
-  return dates;
+/** Unique dates from trips (sorted). Shows all dates that have scheduled vessels. */
+function getTripDates(trips: UpcomingTripRow[]): string[] {
+  const dates = [...new Set(trips.map((t) => t.departure_date))];
+  return dates.sort();
 }
 
-export function TripCalendar({ trips }: { trips: UpcomingTripRow[] }) {
-  const weekDates = useMemo(() => getWeekDates(), []);
-  const today = new Date().toISOString().slice(0, 10);
+export function TripCalendar({
+  trips,
+  loggedInEmail = "",
+  passengerName,
+  loggedInAddress = "",
+}: {
+  trips: UpcomingTripRow[];
+  loggedInEmail?: string;
+  passengerName?: string;
+  loggedInAddress?: string;
+}) {
+  const tripDates = useMemo(() => getTripDates(trips), [trips]);
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [bookingTrip, setBookingTrip] = useState<UpcomingTripRow | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -29,11 +35,8 @@ export function TripCalendar({ trips }: { trips: UpcomingTripRow[] }) {
       if (!map.has(d)) map.set(d, []);
       map.get(d)!.push(t);
     }
-    for (const d of weekDates) {
-      if (!map.has(d)) map.set(d, []);
-    }
     return map;
-  }, [trips, weekDates]);
+  }, [trips]);
 
   const selectedTrips = selectedDate ? (byDate.get(selectedDate) ?? []) : [];
   const selectedLabel = selectedDate ? getDayLabel(selectedDate) : null;
@@ -44,10 +47,10 @@ export function TripCalendar({ trips }: { trips: UpcomingTripRow[] }) {
     (el.children[index] as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
   };
 
-  const currentIndex = weekDates.findIndex((d) => d === selectedDate || d === today);
+  const currentIndex = tripDates.findIndex((d) => d === selectedDate || d === today);
   const safeIndex = currentIndex >= 0 ? currentIndex : 0;
   const canGoPrev = safeIndex > 0;
-  const canGoNext = safeIndex < weekDates.length - 1;
+  const canGoNext = safeIndex < tripDates.length - 1;
 
   return (
     <section className="mt-8">
@@ -82,7 +85,7 @@ export function TripCalendar({ trips }: { trips: UpcomingTripRow[] }) {
           role="region"
           aria-label="Date selection"
         >
-          {weekDates.map((dateStr) => {
+          {tripDates.map((dateStr) => {
             const dayTrips = byDate.get(dateStr) ?? [];
             const label = getDayLabel(dateStr);
             const isSelected = dateStr === selectedDate;
@@ -117,10 +120,15 @@ export function TripCalendar({ trips }: { trips: UpcomingTripRow[] }) {
       </div>
 
       {/* Selected day — times and seats (only after a date is clicked) */}
-      {selectedDate === null ? (
+      {tripDates.length === 0 ? (
+        <div className="mt-6 rounded-2xl border-2 border-dashed border-teal-200 bg-teal-50/30 p-8 text-center">
+          <p className="text-sm font-medium text-[#134e4a]">No scheduled trips in the next 60 days</p>
+          <p className="mt-1 text-xs text-[#0f766e]">Trips will appear here once vessels are scheduled.</p>
+        </div>
+      ) : selectedDate === null ? (
         <div className="mt-6 rounded-2xl border-2 border-dashed border-teal-200 bg-teal-50/30 p-8 text-center">
           <p className="text-sm font-medium text-[#134e4a]">Click a date above to see trips for that day</p>
-          <p className="mt-1 text-xs text-[#0f766e]">Today, Tomorrow, or any day this week</p>
+          <p className="mt-1 text-xs text-[#0f766e]">Browse dates with scheduled trips</p>
         </div>
       ) : (
         <div className="mt-6 rounded-2xl border-2 border-teal-200 bg-white p-4 shadow-sm sm:p-5">
@@ -176,7 +184,13 @@ export function TripCalendar({ trips }: { trips: UpcomingTripRow[] }) {
       )}
 
       {bookingTrip && (
-        <BookingModal trip={bookingTrip} onClose={() => setBookingTrip(null)} />
+        <BookingModal
+          trip={bookingTrip}
+          onClose={() => setBookingTrip(null)}
+          loggedInEmail={loggedInEmail}
+          passengerName={passengerName}
+          loggedInAddress={loggedInAddress}
+        />
       )}
     </section>
   );

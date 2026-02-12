@@ -6,7 +6,7 @@ import { formatTime, passengerTypeLabel } from "@/lib/dashboard/format";
 import { PrintTicketsButton } from "./PrintTicketsButton";
 import { TicketQRCode } from "@/components/tickets/TicketQRCode";
 
-type PassengerForTicket = { full_name: string; fare_type: string };
+type PassengerForTicket = { full_name: string; fare_type: string; address: string };
 
 export default async function BookingTicketsPage({
   params,
@@ -23,7 +23,7 @@ export default async function BookingTicketsPage({
   const { data: booking, error } = await supabase
     .from("bookings")
     .select(
-      "id, reference, customer_full_name, customer_email, passenger_count, fare_type, total_amount_cents, passenger_details, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route_id, boat:boats(name), route:routes(display_name, origin, destination))"
+      "id, reference, customer_full_name, customer_email, customer_address, passenger_count, fare_type, total_amount_cents, passenger_details, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route_id, boat:boats(name), route:routes(display_name, origin, destination))"
     )
     .eq("reference", reference)
     .maybeSingle();
@@ -88,18 +88,21 @@ export default async function BookingTicketsPage({
     : "—";
   const timeLabel = formatTime(depTime);
 
+  const bookingAddress = (booking as { customer_address?: string | null }).customer_address?.trim() || "—";
   let passengers: PassengerForTicket[];
-  const details = booking.passenger_details as { full_name?: string; fare_type?: string }[] | null;
+  const details = booking.passenger_details as { full_name?: string; fare_type?: string; address?: string }[] | null;
   if (Array.isArray(details) && details.length > 0) {
     passengers = details.map((p) => ({
       full_name: p.full_name?.trim() ?? "",
       fare_type: (p.fare_type ?? "adult") as string,
+      address: (p.address && p.address.trim()) ? p.address.trim() : bookingAddress,
     }));
   } else {
     passengers = [
       {
         full_name: (booking.customer_full_name ?? "").trim(),
         fare_type: (booking.fare_type ?? "adult") as string,
+        address: bookingAddress,
       },
     ];
   }
@@ -137,6 +140,10 @@ export default async function BookingTicketsPage({
               <p>
                 <span className="text-xs font-semibold uppercase text-[#0f766e]">Fare type</span>
                 <span className="ml-2 text-[#134e4a]">{passengerTypeLabel(p.fare_type)}</span>
+              </p>
+              <p>
+                <span className="text-xs font-semibold uppercase text-[#0f766e]">Address</span>
+                <span className="ml-2 text-[#134e4a]">{p.address || "—"}</span>
               </p>
               <p>
                 <span className="text-xs font-semibold uppercase text-[#0f766e]">Trip</span>

@@ -25,6 +25,7 @@ export default async function BookPage() {
     getAuthUser(),
   ]);
   const loggedInEmail = (user?.email ?? "").trim();
+  const loggedInAddress = (user?.address ?? "").trim();
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
@@ -92,7 +93,7 @@ export default async function BookPage() {
 
       {/* Booking form — connected to Supabase. Pre-fill email when logged in so booking appears in My bookings. */}
       <section className="mb-8 sm:mb-10">
-        <BookingForm loggedInEmail={loggedInEmail} />
+        <BookingForm loggedInEmail={loggedInEmail} loggedInAddress={loggedInAddress} />
       </section>
       <div className="text-center rounded-xl bg-[#0c7b93]/10 border border-teal-200 p-6 sm:p-8">
         <p className="text-xs sm:text-sm text-[#0f766e]">Check the Schedule and Attractions to plan your trip.</p>

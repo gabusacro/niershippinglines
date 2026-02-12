@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 const BUCKET = "payment-proofs";
@@ -68,7 +69,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: uploadErr.message }, { status: 500 });
   }
 
-  const { error: updateErr } = await supabase
+  // Use admin client: RLS only allows admin/crew to UPDATE bookings. We've verified
+  // customer_email matches; admin client bypasses RLS for this authorized update.
+  // Requires SUPABASE_SERVICE_ROLE_KEY. Fallback to supabase for created_by match (RLS policy).
+  const updateClient = createAdminClient() ?? supabase;
+  const { error: updateErr } = await updateClient
     .from("bookings")
     .update({ payment_proof_path: path, updated_at: new Date().toISOString() })
     .eq("id", booking.id);

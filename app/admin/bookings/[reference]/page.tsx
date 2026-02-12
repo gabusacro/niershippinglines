@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { ROUTES } from "@/lib/constants";
 import { passengerTypeLabel } from "@/lib/dashboard/format";
+import { getPaymentProofSignedUrl } from "@/lib/admin/payment-proof-url";
+import { PaymentProofViewer } from "@/components/admin/PaymentProofViewer";
 
 export const metadata = {
   title: "Booking details",
@@ -90,6 +92,9 @@ export default async function AdminBookingDetailPage({
 
   const passengerDetails = (b.passenger_details ?? []) as PassengerDetail[];
   const passengerNames = Array.isArray(b.passenger_names) ? b.passenger_names : [];
+  const proofUrl = booking.payment_proof_path
+    ? await getPaymentProofSignedUrl(booking.payment_proof_path)
+    : null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
@@ -186,6 +191,22 @@ export default async function AdminBookingDetailPage({
         <p className="mt-0.5 text-xs text-[#0f766e]">
           Created {booking.created_at ? new Date(booking.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "—"}
         </p>
+
+        {booking.status === "pending_payment" && proofUrl && (
+          <div className="mt-6 rounded-lg border-2 border-amber-200 bg-amber-50/50 p-4">
+            <h3 className="text-sm font-semibold text-amber-900">Payment proof</h3>
+            <p className="mt-0.5 text-xs text-amber-800">
+              Click to view full size. Verify amount and GCash transaction reference before confirming.
+            </p>
+            <div className="mt-3">
+              <PaymentProofViewer
+                proofUrl={proofUrl}
+                isPdf={booking.payment_proof_path?.toLowerCase().endsWith(".pdf")}
+                thumbnailClassName="max-h-64 w-auto max-w-full rounded object-contain"
+              />
+            </div>
+          </div>
+        )}
 
         {booking.trip_id && (
           <div className="mt-6">

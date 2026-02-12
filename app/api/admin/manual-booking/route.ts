@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const FARE_TYPES = ["adult", "senior", "pwd", "child", "infant"] as const;
 
-type PassengerDetail = { fare_type: string; full_name: string };
+type PassengerDetail = { fare_type: string; full_name: string; address?: string };
 
 /** Infant (below 7) is free; adult = base; senior/pwd/child = discounted. Used for revenue. */
 function fareCents(
@@ -25,7 +25,8 @@ function isValidPassengerDetail(x: unknown): x is PassengerDetail {
     "full_name" in x &&
     typeof (x as PassengerDetail).full_name === "string" &&
     (x as PassengerDetail).full_name.trim().length > 0 &&
-    FARE_TYPES.includes((x as PassengerDetail).fare_type as (typeof FARE_TYPES)[number])
+    FARE_TYPES.includes((x as PassengerDetail).fare_type as (typeof FARE_TYPES)[number]) &&
+    ((x as PassengerDetail).address === undefined || typeof (x as PassengerDetail).address === "string")
   );
 }
 
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
   const tripId = b.trip_id;
   const customerEmail = b.customer_email;
   const customerMobile = b.customer_mobile;
+  const customerAddress = b.customer_address;
   const passengerDetailsRaw = b.passenger_details;
 
   if (!tripId || typeof tripId !== "string") {
@@ -55,6 +57,9 @@ export async function POST(request: NextRequest) {
   }
   if (!customerEmail || typeof customerEmail !== "string" || !customerEmail.trim()) {
     return NextResponse.json({ error: "Missing or invalid customer_email" }, { status: 400 });
+  }
+  if (!customerAddress || typeof customerAddress !== "string" || !customerAddress.trim()) {
+    return NextResponse.json({ error: "Missing or invalid customer_address (required for tickets and Coast Guard manifest)" }, { status: 400 });
   }
 
   let passengerCount: number;
@@ -155,12 +160,14 @@ export async function POST(request: NextRequest) {
   }
 
   const t = trip as { departure_date?: string; departure_time?: string; boat?: { name?: string } | null; route?: { display_name?: string } | null };
+  const bookingAddress = (customerAddress && typeof customerAddress === "string") ? customerAddress.trim() : null;
   const insertPayload: Record<string, unknown> = {
     trip_id: tripId,
     reference: ref,
     customer_full_name: customerFullName,
     customer_email: customerEmail.trim(),
     customer_mobile: (customerMobile && typeof customerMobile === "string") ? customerMobile.trim() : null,
+    customer_address: bookingAddress,
     passenger_count: passengerCount,
     fare_type: fareType,
     total_amount_cents: totalCents,
@@ -173,9 +180,11 @@ export async function POST(request: NextRequest) {
     trip_snapshot_departure_time: t.departure_time ?? null,
   };
   if (passengerDetails && passengerDetails.length > 0) {
+    const addr = bookingAddress ?? "";
     insertPayload.passenger_details = passengerDetails.map((p) => ({
       fare_type: p.fare_type,
       full_name: p.full_name.trim(),
+      address: (p.address && p.address.trim()) ? p.address.trim() : addr,
     }));
   }
 

@@ -8,7 +8,7 @@ export async function PATCH(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { full_name?: string; salutation?: string };
+  let body: { full_name?: string; salutation?: string; address?: string };
   try {
     body = await request.json();
   } catch {
@@ -19,17 +19,29 @@ export async function PATCH(request: NextRequest) {
   const salutation = typeof body.salutation === "string"
     ? (["Mr", "Mrs", "Ms"].includes(body.salutation) ? body.salutation : null)
     : undefined;
+  const address = typeof body.address === "string" ? body.address.trim() || null : undefined;
 
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const updatedAt = new Date().toISOString();
+  const updates: Record<string, unknown> = { updated_at: updatedAt };
   if (fullName !== undefined) updates.full_name = fullName;
   if (salutation !== undefined) updates.salutation = salutation;
+  if (address !== undefined) updates.address = address;
 
+  // Upsert: handles missing profile (e.g. OAuth/magic-link users) and ensures persistence
   const { error } = await supabase
     .from("profiles")
-    .update(updates)
-    .eq("id", user.id);
+    .upsert(
+      {
+        id: user.id,
+        full_name: fullName ?? null,
+        salutation: salutation ?? null,
+        address: address ?? null,
+        updated_at: updatedAt,
+      },
+      { onConflict: "id" }
+    );
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   revalidatePath("/dashboard", "layout");
-  return NextResponse.json({ ok: true, full_name: fullName ?? null, salutation: salutation ?? null });
+  return NextResponse.json({ ok: true, full_name: fullName ?? null, salutation: salutation ?? null, address: address ?? null });
 }
