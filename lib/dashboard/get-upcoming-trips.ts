@@ -33,7 +33,7 @@ export async function getUpcomingTrips(): Promise<UpcomingTripRow[]> {
     .order("departure_time");
 
   if (error) return [];
-  const rows = (data ?? []) as (UpcomingTripRow & { boat: { status?: string } | null })[];
+  const rows = (data ?? []) as unknown as (UpcomingTripRow & { boat: { status?: string } | null })[];
   return rows.filter(
     (row) =>
       row.boat?.status === "running" &&

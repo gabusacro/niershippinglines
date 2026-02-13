@@ -76,7 +76,7 @@ export default async function DashboardPage({
   };
   const yourRoleLabel = roleLabel[user.role] ?? user.role;
   const isPassenger = user.role === "passenger";
-  const isAdmin = user.role === "admin";
+  const isAdmin = false; // admin is redirected above
 
   const displayName = user.fullName?.trim() || null;
   const salutation = user.salutation?.trim() || null;

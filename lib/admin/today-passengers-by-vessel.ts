@@ -39,7 +39,8 @@ export async function getTodayPassengersByVessel(): Promise<VesselPassengerRow[]
   const byBoat = new Map<string, { name: string; count: number; trips: number }>();
   for (const t of trips ?? []) {
     const boatId = t.boat_id;
-    const boatName = (t.boat as { id: string; name: string } | null)?.name ?? "Unknown";
+    const boatObj = Array.isArray(t.boat) ? (t.boat as { id: string; name: string }[])[0] : (t.boat as { id: string; name: string } | null);
+    const boatName = boatObj?.name ?? "Unknown";
     const count = passengersByTrip.get(t.id) ?? 0;
     const existing = byBoat.get(boatId);
     if (existing) {

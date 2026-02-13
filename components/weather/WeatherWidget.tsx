@@ -145,7 +145,7 @@ export function WeatherWidget() {
   const tideNow = useApi ? tideApi.tideNow : getTideNow(parseTimeToMinutes(tide?.low_tide_time ?? null) ?? 0, parseTimeToMinutes(tide?.high_tide_time ?? null) ?? 0, nowMin);
   const nextLowFormatted = useApi ? (tideApi.nextLowTideTime ?? lowTime) : formatTime(tide?.low_tide_time ?? null);
   const lowMin = parseTimeToMinutes(tide?.low_tide_time ?? null);
-  const goodMagpupungko = tideNow === "low" || (!useApi && lowMin != null && Math.abs(nowMin - lowMin) <= 90) || (useApi && tideNow === "low");
+  const goodMagpupungko = (tideNow as string | null) === "low" || (!useApi && lowMin != null && Math.abs(nowMin - lowMin) <= 90);
 
   const hasTide = useApi || tide != null;
 

@@ -68,8 +68,7 @@ export default async function BookingDetailPage({
   const email = (user.email ?? "").trim().toLowerCase();
   if (!email) notFound();
 
-  // Try full select first (requires migrations 016 + 017). Fallback to minimal if columns missing.
-  let booking: {
+  type BookingRow = {
     id: string;
     reference: string;
     customer_full_name: string;
@@ -92,7 +91,8 @@ export default async function BookingDetailPage({
     refund_requested_at?: string | null;
     refund_request_reason?: string | null;
     refund_request_notes?: string | null;
-  } | null = null;
+  };
+  let booking: BookingRow | null = null;
 
   const fullRes = await supabase
     .from("bookings")
@@ -117,13 +117,13 @@ export default async function BookingDetailPage({
         console.error("[BookingDetail] Supabase error:", fullRes.error.message, { reference });
         notFound();
       }
-      booking = minimalRes.data as typeof booking;
+      booking = minimalRes.data as BookingRow;
     } else {
       console.error("[BookingDetail] Supabase error:", fullRes.error.message, fullRes.error.code, { reference });
       notFound();
     }
   } else {
-    booking = fullRes.data as typeof booking;
+    booking = fullRes.data as BookingRow;
   }
 
   if (!booking) notFound();

@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
 
   const items = (trips ?? [])
     .map((t) => {
-      const booked = (t as Record<string, number>)[col] ?? 0;
-      const quota = (t as Record<string, number>)[quotaCol] ?? 0;
+      const booked = Number((t as Record<string, unknown>)[col]) || 0;
+      const quota = Number((t as Record<string, unknown>)[quotaCol]) || 0;
       const avail = quota - booked;
       return { trip: t, avail };
     })
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         departure_time: String(trip.departure_time ?? "").slice(0, 5),
         boat_name: boat?.name ?? "—",
         route_label: route?.display_name ?? `${route?.origin ?? ""} → ${route?.destination ?? ""}`,
-        seats_available: Math.max(0, ((trip as Record<string, number>)[quotaCol] ?? 0) - ((trip as Record<string, number>)[col] ?? 0)),
+        seats_available: Math.max(0, (Number((trip as Record<string, unknown>)[quotaCol]) || 0) - (Number((trip as Record<string, unknown>)[col]) || 0)),
       };
     });
 

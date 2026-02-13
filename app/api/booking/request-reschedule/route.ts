@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
 
   const col = (booking as { is_walk_in?: boolean }).is_walk_in ? "walk_in_booked" : "online_booked";
   const quotaCol = (booking as { is_walk_in?: boolean }).is_walk_in ? "walk_in_quota" : "online_quota";
-  const currentBooked = (newTrip as Record<string, number>)[col] ?? 0;
-  const quota = (newTrip as Record<string, number>)[quotaCol] ?? 0;
+  const currentBooked = Number((newTrip as Record<string, unknown>)[col]) || 0;
+  const quota = Number((newTrip as Record<string, unknown>)[quotaCol]) || 0;
   if (currentBooked + booking.passenger_count > quota) {
     return NextResponse.json(
       { error: `Trip has no room: ${quota - currentBooked} seats left, need ${booking.passenger_count}` },
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
   const oldBooked =
-    (oldTrip as Record<string, number>)?.[(booking as { is_walk_in?: boolean }).is_walk_in ? "walk_in_booked" : "online_booked"] ?? 0;
+    Number((oldTrip as Record<string, unknown>)?.[(booking as { is_walk_in?: boolean }).is_walk_in ? "walk_in_booked" : "online_booked"]) || 0;
 
   await adminClient
     .from("trips")

@@ -103,7 +103,7 @@ export async function PATCH(
     .eq("id", id);
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
-  const oldBooked = (oldTrip as Record<string, number>)?.[booking.is_walk_in ? "walk_in_booked" : "online_booked"] ?? 0;
+  const oldBooked = Number((oldTrip as Record<string, unknown>)?.[booking.is_walk_in ? "walk_in_booked" : "online_booked"]) || 0;
 
   await supabase
     .from("trips")

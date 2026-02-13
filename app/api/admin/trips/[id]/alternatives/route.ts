@@ -50,8 +50,8 @@ export async function GET(
 
   const items = (trips ?? [])
     .map((t) => {
-      const booked = (t as Record<string, number>)[col] ?? 0;
-      const quota = (t as Record<string, number>)[quotaCol] ?? 0;
+      const booked = Number((t as Record<string, unknown>)[col]) || 0;
+      const quota = Number((t as Record<string, unknown>)[quotaCol]) || 0;
       const avail = quota - booked;
       return { trip: t, avail };
     })

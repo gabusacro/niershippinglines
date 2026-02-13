@@ -53,8 +53,8 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
 
   if (tripError || !trip) return null;
 
-  const boat = trip.boat as { id: string; name: string; capacity: number } | null;
-  const route = trip.route as { display_name?: string; origin?: string; destination?: string } | null;
+  const boat = (Array.isArray(trip.boat) ? trip.boat[0] : trip.boat) as { id: string; name: string; capacity: number } | null;
+  const route = (Array.isArray(trip.route) ? trip.route[0] : trip.route) as { display_name?: string; origin?: string; destination?: string } | null;
   const capacity = boat?.capacity ?? (trip.online_quota ?? 0) + (trip.walk_in_quota ?? 0);
   const oq = trip.online_quota ?? 0;
   const ob = trip.online_booked ?? 0;

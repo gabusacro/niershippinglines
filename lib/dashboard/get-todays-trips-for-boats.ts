@@ -30,7 +30,7 @@ export async function getTodaysTripsForBoats(boatIds: string[]): Promise<TodayTr
     .order("departure_time");
 
   if (error) return [];
-  const rows = (data ?? []) as (Omit<TodayTripForCrew, "departed"> & { departure_date: string; departure_time: string })[];
+  const rows = (data ?? []) as unknown as (Omit<TodayTripForCrew, "departed"> & { departure_date: string; departure_time: string })[];
   return rows.map((t) => ({
     id: t.id,
     departure_date: t.departure_date,

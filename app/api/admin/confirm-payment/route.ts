@@ -51,10 +51,10 @@ export async function POST(request: NextRequest) {
     const t = trip as { departure_date?: string; departure_time?: string; boat?: { name?: string } | null; route?: { display_name?: string } | null } | null;
     if (t) {
       snapshot = {
-        trip_snapshot_vessel_name: t.boat?.name ?? null,
-        trip_snapshot_route_name: t.route?.display_name ?? null,
-        trip_snapshot_departure_date: t.departure_date ?? null,
-        trip_snapshot_departure_time: t.departure_time ?? null,
+        trip_snapshot_vessel_name: t.boat?.name ?? undefined,
+        trip_snapshot_route_name: t.route?.display_name ?? undefined,
+        trip_snapshot_departure_date: t.departure_date ?? undefined,
+        trip_snapshot_departure_time: t.departure_time ?? undefined,
       };
     }
   }
