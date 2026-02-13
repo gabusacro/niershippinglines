@@ -61,8 +61,8 @@ export async function PATCH(
 
   const col = booking.is_walk_in ? "walk_in_booked" : "online_booked";
   const quotaCol = booking.is_walk_in ? "walk_in_quota" : "online_quota";
-  const currentBooked = (newTrip as Record<string, number>)[col] ?? 0;
-  const quota = (newTrip as Record<string, number>)[quotaCol] ?? 0;
+  const currentBooked = Number((newTrip as Record<string, unknown>)[col]) || 0;
+  const quota = Number((newTrip as Record<string, unknown>)[quotaCol]) || 0;
   if (currentBooked + booking.passenger_count > quota) {
     return NextResponse.json({ error: `Target trip has no room: ${quota - currentBooked} seats left, need ${booking.passenger_count}` }, { status: 400 });
   }
