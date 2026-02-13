@@ -13,6 +13,7 @@ import { ManualReferenceField } from "./ManualReferenceField";
 import { AcknowledgeRefundButton } from "./AcknowledgeRefundButton";
 import { RequestRefundButton } from "./RequestRefundButton";
 import { RequestRescheduleButton } from "./RequestRescheduleButton";
+import { ClaimGuestBookingButton } from "./ClaimGuestBookingButton";
 
 export async function generateMetadata() {
   const branding = await getSiteBranding();
@@ -67,12 +68,11 @@ export default async function BookingDetailPage({
   if (!refNormalized) notFound();
   const branding = await getSiteBranding();
   const supabase = await createClient();
-  const email = (user.email ?? "").trim().toLowerCase();
-  if (!email) notFound();
 
   type BookingRow = {
     id: string;
     reference: string;
+    created_by: string | null;
     customer_full_name: string;
     customer_email: string;
     customer_mobile?: string | null;
@@ -99,10 +99,10 @@ export default async function BookingDetailPage({
   const fullRes = await supabase
     .from("bookings")
     .select(
-      "id, reference, customer_full_name, customer_email, customer_mobile, passenger_names, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, proof_resend_requested_at, gcash_transaction_reference, created_at, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_acknowledged_at, refund_requested_at, refund_request_reason, refund_request_notes"
+      "id, reference, created_by, customer_full_name, customer_email, customer_mobile, passenger_names, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, proof_resend_requested_at, gcash_transaction_reference, created_at, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_acknowledged_at, refund_requested_at, refund_request_reason, refund_request_notes"
     )
     .eq("reference", refNormalized)
-    .ilike("customer_email", email)
+    .eq("created_by", user.id)
     .maybeSingle();
 
   if (fullRes.error) {
@@ -111,9 +111,9 @@ export default async function BookingDetailPage({
     if (missingColumn) {
       const minimalRes = await supabase
         .from("bookings")
-        .select("id, reference, customer_full_name, customer_email, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, proof_resend_requested_at, gcash_transaction_reference, created_at, refund_acknowledged_at")
+        .select("id, reference, created_by, customer_full_name, customer_email, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, proof_resend_requested_at, gcash_transaction_reference, created_at, refund_acknowledged_at")
         .eq("reference", refNormalized)
-        .ilike("customer_email", email)
+        .eq("created_by", user.id)
         .maybeSingle();
       if (minimalRes.error || !minimalRes.data) {
         console.error("[BookingDetail] Supabase error:", fullRes.error.message, { reference });
@@ -128,7 +128,51 @@ export default async function BookingDetailPage({
     booking = fullRes.data as BookingRow;
   }
 
-  if (!booking) notFound();
+  // Not in account: maybe a guest booking with same email — allow claim
+  if (!booking) {
+    const guestRes = await supabase
+      .from("bookings")
+      .select("id, reference, created_by, customer_email")
+      .eq("reference", refNormalized)
+      .maybeSingle();
+    const guest = guestRes.data as { created_by: string | null; customer_email?: string | null } | null;
+    if (guest && guest.created_by == null) {
+      const userEmail = (user.email ?? "").trim().toLowerCase();
+      const bookingEmail = (guest.customer_email ?? "").trim().toLowerCase();
+      if (userEmail && bookingEmail === userEmail) {
+        return (
+          <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
+            <h1 className="text-2xl font-bold text-[#134e4a]">Link booking to your account</h1>
+            <p className="mt-2 text-[#0f766e]">
+              This booking (<strong className="font-mono">{refNormalized}</strong>) was made as a guest using your email. Link it to your account to upload payment proof and manage it.
+            </p>
+            <ClaimGuestBookingButton reference={refNormalized} />
+            <Link href={ROUTES.dashboard} className="mt-6 inline-block text-[#0c7b93] font-medium hover:underline">
+              ← Back to dashboard
+            </Link>
+          </div>
+        );
+      }
+      return (
+        <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
+          <h1 className="text-2xl font-bold text-[#134e4a]">Booking not in your account</h1>
+          <p className="mt-2 text-[#0f766e]">
+            This booking was made with a different email. Create an account with the email used when booking to manage it.
+          </p>
+          <Link
+            href={`${ROUTES.login}?mode=signup&ref=${encodeURIComponent(refNormalized)}`}
+            className="mt-4 inline-block rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e]"
+          >
+            Create account
+          </Link>
+          <Link href={ROUTES.dashboard} className="mt-6 ml-4 inline-block text-[#0c7b93] font-medium hover:underline">
+            ← Dashboard
+          </Link>
+        </div>
+      );
+    }
+    notFound();
+  }
 
   const b = booking as { trip_snapshot_route_name?: string | null; trip_snapshot_vessel_name?: string | null; trip_snapshot_departure_date?: string | null; trip_snapshot_departure_time?: string | null; refund_acknowledged_at?: string | null; customer_full_name?: string; customer_email?: string; customer_mobile?: string | null; passenger_names?: string[] };
   const routeName = b.trip_snapshot_route_name ?? "—";

@@ -5,8 +5,10 @@ export interface ScheduleRow {
   routeOrigin: string;
   routeDestination: string;
   times: string[];
-  /** Vessel photo for passenger reference (one representative boat per route) */
+  /** Vessel photo for thumbnail (one representative boat per route) */
   vesselImageUrl?: string | null;
+  /** All images for gallery modal: main image first, then boat_images by sort_order */
+  vesselImageUrls?: string[];
   vesselName?: string;
 }
 
@@ -21,11 +23,11 @@ function formatTimeForDisplay(t: string): string {
   return `${h12}:${m} ${am ? "AM" : "PM"}`;
 }
 
-type VesselInfo = { name: string; image_url: string | null };
+type VesselInfo = { boatId: string; name: string; image_url: string | null };
 
 /**
  * Returns route IDs that have at least one upcoming trip with a boat in "running" status,
- * and one representative vessel (name, image_url) per route for display.
+ * and one representative vessel (id, name, image_url) per route for display.
  */
 async function getRouteIdsWithAvailableVessels(
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -41,12 +43,13 @@ async function getRouteIdsWithAvailableVessels(
   if (!trips?.length) return { routeIds, vesselByRouteId };
 
   for (const t of trips) {
-    const row = t as { route_id: string; boat?: { name?: string; status?: string; image_url?: string | null } | null };
+    const row = t as { route_id: string; boat?: { id?: string; name?: string; status?: string; image_url?: string | null } | null };
     const boat = row.boat;
-    if (boat?.status === "running") {
+    if (boat?.status === "running" && boat?.id) {
       routeIds.add(row.route_id);
       if (!vesselByRouteId.has(row.route_id) && boat.name) {
         vesselByRouteId.set(row.route_id, {
+          boatId: boat.id,
           name: boat.name,
           image_url: boat.image_url ?? null,
         });
@@ -80,6 +83,22 @@ export async function getScheduleFromSupabase(): Promise<ScheduleRow[]> {
   const routeIds = [...new Set(slots.map((s) => s.route_id))].filter((id) => routeIdsWithVessels.has(id));
   if (routeIds.length === 0) return [];
 
+  const boatIds = [...new Set([...vesselByRouteId.values()].map((v) => v.boatId))];
+  const { data: boatImagesRows } = boatIds.length > 0
+    ? await supabase
+        .from("boat_images")
+        .select("boat_id, image_url, sort_order")
+        .in("boat_id", boatIds)
+        .order("sort_order")
+    : { data: [] };
+  const imagesByBoatId = new Map<string, string[]>();
+  for (const row of boatImagesRows ?? []) {
+    const r = row as { boat_id: string; image_url: string; sort_order: number };
+    const arr = imagesByBoatId.get(r.boat_id) ?? [];
+    arr.push(r.image_url);
+    imagesByBoatId.set(r.boat_id, arr);
+  }
+
   const { data: routes, error: routesError } = await supabase
     .from("routes")
     .select("id, origin, destination, display_name")
@@ -103,12 +122,16 @@ export async function getScheduleFromSupabase(): Promise<ScheduleRow[]> {
 
   return routes.map((r) => {
     const vessel = vesselByRouteId.get(r.id);
+    const mainUrl = vessel?.image_url ?? null;
+    const extraUrls = vessel ? (imagesByBoatId.get(vessel.boatId) ?? []) : [];
+    const vesselImageUrls = mainUrl ? [mainUrl, ...extraUrls] : extraUrls;
     return {
       routeDisplayName: r.display_name,
       routeOrigin: r.origin,
       routeDestination: r.destination,
       times: timesByRouteId.get(r.id) ?? [],
-      vesselImageUrl: vessel?.image_url ?? null,
+      vesselImageUrl: mainUrl,
+      vesselImageUrls: vesselImageUrls.length > 0 ? vesselImageUrls : undefined,
       vesselName: vessel?.name,
     };
   }).filter((row) => row.times.length > 0);

@@ -1,0 +1,13 @@
+-- 1) Set as Captain
+UPDATE public.profiles
+SET role = 'captain', approved_at = COALESCE(approved_at, NOW())
+WHERE id IN (SELECT id FROM auth.users WHERE email = 'jniervg@gmail.com');
+
+-- 2) Assign to Vince Gabriel 3 (and optionally Vince Gabriel 1)
+INSERT INTO public.boat_assignments (boat_id, profile_id, assignment_role)
+SELECT b.id, p.id, 'captain'
+FROM public.boats b
+CROSS JOIN public.profiles p
+WHERE p.id IN (SELECT id FROM auth.users WHERE email = 'jniervg@gmail.com')
+  AND b.name = 'Vince Gabriel 3'
+ON CONFLICT (boat_id, profile_id, assignment_role) DO NOTHING;

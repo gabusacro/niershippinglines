@@ -9,21 +9,21 @@ export type RecentlyConfirmedRow = {
   trip_snapshot_departure_time?: string | null;
 };
 
-/** Bookings for this customer with status confirmed, shown in "Payment confirmed — tickets ready" until
+/** Bookings owned by this profile (created_by) with status confirmed, shown in "Payment confirmed — tickets ready" until
  *  6 hours after the scheduled departure has passed. After that they disappear from the banner
  *  (ticket assumed consumed) and stay in My Bookings / ticket history. */
 const HOURS_AFTER_DEPARTURE = 6;
 
 export async function getRecentlyConfirmedBookings(
-  customerEmail: string
+  profileId: string
 ): Promise<RecentlyConfirmedRow[]> {
-  if (!customerEmail?.trim()) return [];
+  if (!profileId?.trim()) return [];
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("bookings")
     .select("id, reference, updated_at, trip_snapshot_departure_date, trip_snapshot_departure_time")
-    .eq("customer_email", customerEmail.trim())
+    .eq("created_by", profileId)
     .eq("status", "confirmed")
     .order("updated_at", { ascending: false })
     .limit(20);

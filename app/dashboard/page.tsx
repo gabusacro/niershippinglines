@@ -10,6 +10,7 @@ import { TripCalendar } from "@/app/dashboard/TripCalendar";
 import { PrintTicketsTrigger } from "@/components/tickets/PrintTicketsTrigger";
 import { ConfirmationToast } from "@/components/dashboard/ConfirmationToast";
 import { FindBookingByReference } from "@/components/dashboard/FindBookingByReference";
+import { ClaimBookingFromRef } from "@/components/dashboard/ClaimBookingFromRef";
 import { SetDisplayNameForm } from "@/app/dashboard/SetDisplayNameForm";
 import { SetAddressForm } from "@/app/dashboard/SetAddressForm";
 import { DashboardAutoRefresh } from "@/components/dashboard/DashboardAutoRefresh";
@@ -52,7 +53,7 @@ async function TripCalendarWrapper({
   );
 }
 
-type DashboardSearchParams = Promise<{ tripId?: string }>;
+type DashboardSearchParams = Promise<{ tripId?: string; ref?: string }>;
 
 export default async function DashboardPage({
   searchParams,
@@ -89,9 +90,9 @@ export default async function DashboardPage({
   const [branding, passengerRestriction, allPending, recentlyConfirmed, refundedBookings, pendingPreviewBooth] = await Promise.all([
     getSiteBranding(),
     isPassenger ? getPassengerRestrictions(user.id) : Promise.resolve(null),
-    isPassenger ? getPendingPaymentBookings(user.email ?? "") : Promise.resolve([]),
-    isPassenger ? getRecentlyConfirmedBookings(user.email ?? "") : Promise.resolve([]),
-    isPassenger ? getRefundedBookings(user.email ?? "") : Promise.resolve([]),
+    isPassenger ? getPendingPaymentBookings(user.id) : Promise.resolve([]),
+    isPassenger ? getRecentlyConfirmedBookings(user.id) : Promise.resolve([]),
+    isPassenger ? getRefundedBookings(user.id) : Promise.resolve([]),
     user.role === "ticket_booth" ? getPendingPaymentsPreview() : Promise.resolve({ count: 0, items: [] }),
   ]);
   const awaitingPayment = allPending.filter((b) => !b.payment_proof_path);
@@ -146,6 +147,7 @@ export default async function DashboardPage({
         </p>
      )}
 
+      {isPassenger && params.ref ? <ClaimBookingFromRef refParam={params.ref} /> : null}
       {isPassenger ? (
         <>
           {/* Warning notice (orange) — passenger has received a warning */}

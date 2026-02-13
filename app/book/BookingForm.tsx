@@ -322,6 +322,12 @@ export default function BookingForm({ loggedInEmail = "", loggedInAddress = "" }
         setError(data.error ?? "Booking failed");
         return;
       }
+      // Guest: redirect to sign up so they can create an account and upload proof / get notifications
+      if (!loggedInEmail?.trim()) {
+        const params = new URLSearchParams({ mode: "signup", email: customerEmail.trim(), ref: data.reference });
+        router.push(`${ROUTES.login}?${params.toString()}`);
+        return;
+      }
       setResult({
         reference: data.reference,
         total_amount_cents: data.total_amount_cents,

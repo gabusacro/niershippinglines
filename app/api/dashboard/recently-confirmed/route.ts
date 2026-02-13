@@ -8,11 +8,11 @@ export async function GET() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email) {
+  if (!user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const items = await getRecentlyConfirmedBookings(user.email);
+  const items = await getRecentlyConfirmedBookings(user.id);
   return NextResponse.json({
     items: items.map((b) => ({ reference: b.reference })),
   });

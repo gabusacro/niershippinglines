@@ -15,18 +15,18 @@ export type RefundedBookingRow = {
   } | null;
 };
 
-/** Fetches refunded bookings where passenger has NOT yet acknowledged. Notice disappears after acknowledge. */
+/** Fetches refunded bookings owned by this profile (created_by) where passenger has NOT yet acknowledged. Notice disappears after acknowledge. */
 export async function getRefundedBookings(
-  customerEmail: string
+  profileId: string
 ): Promise<RefundedBookingRow[]> {
-  if (!customerEmail?.trim()) return [];
+  if (!profileId?.trim()) return [];
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("bookings")
     .select(
       "id, reference, total_amount_cents, passenger_count, customer_full_name, passenger_names, trip_snapshot_route_name, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
     )
-    .ilike("customer_email", customerEmail.trim())
+    .eq("created_by", profileId)
     .eq("status", "refunded")
     .is("refund_acknowledged_at", null)
     .order("created_at", { ascending: false })

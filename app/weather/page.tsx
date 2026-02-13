@@ -16,7 +16,7 @@ export default function WeatherPage() {
           <Sun size={28} className="text-[#f59e0b]" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-[#134e4a] sm:text-2xl">Siargao weather</h1>
+          <h1 className="text-xl font-bold text-[#134e4a] sm:text-2xl">Siargao Weather</h1>
           <p className="text-sm text-[#0f766e] sm:text-base">Live conditions for the island. Data from OpenWeather.</p>
         </div>
       </div>

@@ -4,10 +4,11 @@ import { Boat, Sun, Wave } from "@/components/icons";
 import { getScheduleFromSupabase } from "@/lib/schedule/get-schedule";
 import { getActiveAnnouncements } from "@/lib/announcements/get-announcements";
 import { AnnouncementsBlock } from "@/components/announcements/AnnouncementsBlock";
+import { VesselThumbnail } from "./VesselThumbnail";
 
 export const metadata = {
   title: "Schedule",
-  description: `Ferry schedule — ${APP_NAME}`,
+  description: `Ferry Schedule — ${APP_NAME}`,
 };
 
 export default async function SchedulePage() {
@@ -23,7 +24,7 @@ export default async function SchedulePage() {
           <Boat size={28} className="text-[#0c7b93]" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-[#134e4a] sm:text-2xl">Ferry schedule</h1>
+          <h1 className="text-xl font-bold text-[#134e4a] sm:text-2xl">Ferry Schedule</h1>
           <p className="text-sm text-[#0f766e] sm:text-base">Plan your trip. Times may change—check before you go.</p>
         </div>
       </div>
@@ -32,7 +33,7 @@ export default async function SchedulePage() {
         <div className="bg-[#0c7b93]/10 px-4 py-3 sm:px-6 sm:py-4 border-b border-teal-200">
           <h2 className="font-semibold text-[#134e4a] flex items-center gap-2 text-sm sm:text-base">
             <Sun size={20} className="text-[#f59e0b] shrink-0" />
-            <span>Departure times by route</span>
+            <span>Departure times by Route</span>
           </h2>
           <p className="mt-1 text-xs text-[#0f766e] sm:text-sm">
             Times from live schedule. Book in advance for busy seasons.
@@ -48,12 +49,10 @@ export default async function SchedulePage() {
               <li key={i} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 px-4 py-4 sm:px-6 hover:bg-[#fef9e7]/50">
                 <div className="flex items-start gap-3 min-w-0">
                   {row.vesselImageUrl ? (
-                    <img
-                      src={row.vesselImageUrl}
-                      alt={row.vesselName ? `Vessel ${row.vesselName}` : "Vessel"}
-                      className="shrink-0 w-[108px] h-[72px] sm:w-[144px] sm:h-[96px] rounded-lg object-cover border border-teal-200"
-                      width={144}
-                      height={96}
+                    <VesselThumbnail
+                      vesselImageUrl={row.vesselImageUrl}
+                      vesselName={row.vesselName}
+                      vesselImageUrls={row.vesselImageUrls}
                     />
                   ) : (
                     <Wave size={20} className="text-[#0c7b93] shrink-0 mt-0.5" />

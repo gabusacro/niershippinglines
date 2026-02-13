@@ -62,12 +62,23 @@ export default async function AdminPendingPaymentsPage() {
   }
 
   const list = (bookings ?? []) as Row[];
+  // Resolve profile by email for guest bookings so Warning/Spam can target the account that owns that email
+  const guestEmailsSet = new Set(list.filter((b) => !b.created_by && b.customer_email?.trim()).map((b) => b.customer_email!.trim().toLowerCase()));
+  const { data: passengerProfiles } = guestEmailsSet.size > 0
+    ? await supabase.from("profiles").select("id, email").eq("role", "passenger").not("email", "is", null)
+    : { data: [] };
+  const profileIdByEmail = new Map<string, string>();
+  for (const p of passengerProfiles ?? []) {
+    const e = (p as { email?: string | null }).email;
+    if (e && guestEmailsSet.has(e.trim().toLowerCase())) profileIdByEmail.set(e.trim().toLowerCase(), p.id);
+  }
   const listWithProofUrls = await Promise.all(
     list.map(async (b) => ({
       ...b,
       proofUrl: b.payment_proof_path
         ? await getPaymentProofSignedUrl(b.payment_proof_path)
         : null,
+      profileId: b.created_by ?? (b.customer_email ? profileIdByEmail.get(b.customer_email.trim().toLowerCase()) ?? null : null),
     }))
   );
 
@@ -163,7 +174,7 @@ export default async function AdminPendingPaymentsPage() {
                   <PendingPaymentActions
                     bookingId={b.id}
                     reference={b.reference}
-                    profileId={b.created_by}
+                    profileId={(b as { profileId?: string | null }).profileId ?? b.created_by}
                   />
                   <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
                     {b.payment_proof_path && <ResendProofButton reference={b.reference} />}

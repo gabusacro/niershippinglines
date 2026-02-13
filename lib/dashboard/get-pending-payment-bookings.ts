@@ -13,18 +13,18 @@ export type PendingBookingRow = {
   } | null;
 };
 
-/** Fetches bookings for the given customer email with status pending_payment, newest first. */
+/** Fetches bookings owned by this profile (created_by) with status pending_payment, newest first. */
 export async function getPendingPaymentBookings(
-  customerEmail: string
+  profileId: string
 ): Promise<PendingBookingRow[]> {
-  if (!customerEmail?.trim()) return [];
+  if (!profileId?.trim()) return [];
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("bookings")
     .select(
       "id, reference, total_amount_cents, created_at, payment_proof_path, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
     )
-    .ilike("customer_email", customerEmail.trim())
+    .eq("created_by", profileId)
     .eq("status", "pending_payment")
     .order("created_at", { ascending: false })
     .limit(10);

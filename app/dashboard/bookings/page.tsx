@@ -76,7 +76,7 @@ export default async function MyBookingsPage() {
     .select(
       "id, reference, passenger_count, fare_type, total_amount_cents, status, created_at, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
     )
-    .ilike("customer_email", (user.email ?? "").trim())
+    .eq("created_by", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -90,7 +90,7 @@ export default async function MyBookingsPage() {
         .select(
           "id, reference, passenger_count, fare_type, total_amount_cents, status, created_at, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
         )
-        .ilike("customer_email", (user.email ?? "").trim())
+        .eq("created_by", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
       if (minRes.error) {
