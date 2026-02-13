@@ -2,11 +2,16 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
+import { isDepartureAtLeast24HoursFromNow } from "@/lib/admin/ph-time";
 import { APP_NAME, ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { TranslatableNotices } from "@/components/booking/TranslatableNotices";
 import { passengerTypeLabel } from "@/lib/dashboard/format";
 import { PrintTicketsTrigger } from "@/components/tickets/PrintTicketsTrigger";
 import { PaymentProofUpload } from "./PaymentProofUpload";
+import { ManualReferenceField } from "./ManualReferenceField";
 import { AcknowledgeRefundButton } from "./AcknowledgeRefundButton";
+import { RequestRefundButton } from "./RequestRefundButton";
+import { RequestRescheduleButton } from "./RequestRescheduleButton";
 
 export const metadata = {
   title: "Booking details",
@@ -76,18 +81,23 @@ export default async function BookingDetailPage({
     total_amount_cents: number;
     status: string;
     payment_proof_path: string | null;
+    proof_resend_requested_at?: string | null;
+    gcash_transaction_reference?: string | null;
     created_at: string;
     trip_snapshot_vessel_name?: string | null;
     trip_snapshot_route_name?: string | null;
     trip_snapshot_departure_date?: string | null;
     trip_snapshot_departure_time?: string | null;
     refund_acknowledged_at?: string | null;
+    refund_requested_at?: string | null;
+    refund_request_reason?: string | null;
+    refund_request_notes?: string | null;
   } | null = null;
 
   const fullRes = await supabase
     .from("bookings")
     .select(
-      "id, reference, customer_full_name, customer_email, customer_mobile, passenger_names, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, created_at, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_acknowledged_at"
+      "id, reference, customer_full_name, customer_email, customer_mobile, passenger_names, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, proof_resend_requested_at, gcash_transaction_reference, created_at, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_acknowledged_at, refund_requested_at, refund_request_reason, refund_request_notes"
     )
     .eq("reference", refNormalized)
     .ilike("customer_email", email)
@@ -99,7 +109,7 @@ export default async function BookingDetailPage({
     if (missingColumn) {
       const minimalRes = await supabase
         .from("bookings")
-        .select("id, reference, customer_full_name, customer_email, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, created_at, refund_acknowledged_at")
+        .select("id, reference, customer_full_name, customer_email, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, proof_resend_requested_at, gcash_transaction_reference, created_at, refund_acknowledged_at")
         .eq("reference", refNormalized)
         .ilike("customer_email", email)
         .maybeSingle();
@@ -140,6 +150,10 @@ export default async function BookingDetailPage({
     booking.status === "checked_in" ||
     booking.status === "boarded" ||
     booking.status === "completed";
+
+  const canReschedule =
+    ["confirmed", "checked_in", "boarded", "pending_payment"].includes(booking.status) &&
+    isDepartureAtLeast24HoursFromNow(b.trip_snapshot_departure_date ?? "", b.trip_snapshot_departure_time ?? "");
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
@@ -202,8 +216,19 @@ export default async function BookingDetailPage({
           <strong>₱{(booking.total_amount_cents / 100).toLocaleString()}</strong>
         </p>
 
+        <div className="mt-4 rounded-lg border-2 border-amber-200 bg-amber-50/50 p-4">
+          <TranslatableNotices sliceFrom={2} listClassName="mt-1 list-disc list-outside space-y-0.5 pl-5 ml-1 text-xs text-amber-900" />
+        </div>
+
         {booking.status === "pending_payment" && (
           <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            {(b as { proof_resend_requested_at?: string | null }).proof_resend_requested_at && (
+              <div className="mb-4 rounded-lg border-2 border-amber-400 bg-amber-100 p-3">
+                <p className="text-sm font-semibold text-amber-900">
+                  Screenshot Error or No reference number. Kindly resend the photo or enter reference number manually.
+                </p>
+              </div>
+            )}
             <h2 className="text-sm font-semibold text-amber-900">Where to send payment</h2>
             <p className="mt-1 text-sm text-amber-800">
               Send <strong>₱{(booking.total_amount_cents / 100).toLocaleString()}</strong> via GCash to confirm this booking.
@@ -219,6 +244,12 @@ export default async function BookingDetailPage({
             <div className="mt-4">
               <PaymentProofUpload reference={booking.reference} hasProof={!!booking.payment_proof_path} />
             </div>
+            <div className="mt-4">
+              <ManualReferenceField
+                reference={booking.reference}
+                initialValue={(b as { gcash_transaction_reference?: string | null }).gcash_transaction_reference ?? ""}
+              />
+            </div>
           </div>
         )}
 
@@ -230,6 +261,22 @@ export default async function BookingDetailPage({
               className="inline-flex min-h-[44px] items-center rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
             />
           </div>
+        )}
+
+        {["confirmed", "checked_in", "boarded", "pending_payment"].includes(booking.status) && (
+          <RequestRescheduleButton
+            reference={booking.reference}
+            totalAmountCents={booking.total_amount_cents}
+            passengerCount={booking.passenger_count}
+            canReschedule={canReschedule}
+          />
+        )}
+
+        {["confirmed", "checked_in", "boarded", "pending_payment", "completed"].includes(booking.status) && (
+          <RequestRefundButton
+            reference={booking.reference}
+            refundRequestedAt={(booking as { refund_requested_at?: string | null }).refund_requested_at ?? null}
+          />
         )}
 
         {booking.status === "refunded" && (

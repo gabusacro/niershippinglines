@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ROUTES } from "@/lib/constants";
+import { ROUTES, ADMIN_FEE_CENTS_PER_PASSENGER, BOOKING_NOTICES } from "@/lib/constants";
 import { useToast } from "@/components/ui/ActionToast";
 import type { TripForManualBooking } from "@/lib/admin/get-trips-for-manual-booking";
 import { formatTime } from "@/lib/dashboard/format";
@@ -30,6 +30,8 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerMobile, setCustomerMobile] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
+  const [notifyAlsoEmail, setNotifyAlsoEmail] = useState("");
+  const [addressPrefilledFromAccount, setAddressPrefilledFromAccount] = useState(false);
   const [countAdult, setCountAdult] = useState(0);
   const [countSenior, setCountSenior] = useState(0);
   const [countPwd, setCountPwd] = useState(0);
@@ -65,6 +67,7 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
   }, [countAdult, countSenior, countPwd, countChild, countInfant]);
 
   const mainAddr = customerAddress.trim();
+  const adminFeeCents = totalPassengers * ADMIN_FEE_CENTS_PER_PASSENGER;
   const passengerDetails = useMemo(() => {
     const list: { fare_type: string; full_name: string; address: string }[] = [];
     for (let i = 0; i < countAdult; i++) list.push({ fare_type: "adult", full_name: adultNames[i]?.trim() ?? "", address: adultAddresses[i]?.trim() || mainAddr });
@@ -75,9 +78,36 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
     return list.filter((p) => p.full_name.length > 0);
   }, [countAdult, countSenior, countPwd, countChild, countInfant, adultNames, seniorNames, pwdNames, childNames, infantNames, adultAddresses, seniorAddresses, pwdAddresses, childAddresses, infantAddresses, mainAddr]);
 
-  const tripsWithSpace = trips.filter(
-    (t) => (t.walk_in_quota ?? 0) - (t.walk_in_booked ?? 0) > 0
-  );
+  const tripsWithSpace = trips.filter((t) => {
+    const ob = t.online_booked ?? 0;
+    const wb = t.walk_in_booked ?? 0;
+    const capacity = (t.boat as { capacity?: number })?.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
+    return Math.max(0, capacity - ob - wb) > 0;
+  });
+
+  const lookupPassenger = useCallback((email: string) => {
+    const e = email.trim().toLowerCase();
+    if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return;
+    fetch(`/api/admin/lookup-passenger?email=${encodeURIComponent(e)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.found && data.address) {
+          setCustomerAddress(data.address);
+          setAddressPrefilledFromAccount(true);
+          if (data.full_name) {
+            setAdultNames((prev) => {
+              if (countAdult > 0 && (!prev[0] || !prev[0].trim())) {
+                return [data.full_name, ...prev.slice(1)];
+              }
+              return prev;
+            });
+          }
+        }
+      })
+      .catch(() => {});
+  }, [countAdult]);
+
+  const handleEmailBlur = () => lookupPassenger(customerEmail);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -109,6 +139,7 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           customer_email: customerEmail.trim(),
           customer_mobile: customerMobile.trim() || null,
           customer_address: customerAddress.trim(),
+          notify_also_email: notifyAlsoEmail.trim() || undefined,
           passenger_details: passengerDetails.map((p) => ({ fare_type: p.fare_type, full_name: p.full_name, address: p.address })),
         }),
       });
@@ -126,6 +157,8 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
       setCustomerEmail("");
       setCustomerMobile("");
       setCustomerAddress("");
+      setNotifyAlsoEmail("");
+      setAddressPrefilledFromAccount(false);
       setCountAdult(0);
       setCountSenior(0);
       setCountPwd(0);
@@ -187,11 +220,14 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
         >
           <option value="">Select a trip</option>
           {tripsWithSpace.map((t) => {
-            const avail = (t.walk_in_quota ?? 0) - (t.walk_in_booked ?? 0);
+            const ob = t.online_booked ?? 0;
+            const wb = t.walk_in_booked ?? 0;
+            const capacity = (t.boat as { capacity?: number })?.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
+            const available = Math.max(0, capacity - ob - wb);
             const routeName = t.route?.display_name ?? [t.route?.origin, t.route?.destination].filter(Boolean).join(" → ") ?? "—";
             return (
               <option key={t.id} value={t.id}>
-                {getDayLabel(t.departure_date)} {formatTime(t.departure_time)} — {routeName} — {t.boat?.name ?? "—"} (walk-in: {avail} seats)
+                {getDayLabel(t.departure_date)} {formatTime(t.departure_time)} — {routeName} — {t.boat?.name ?? "—"} ({available} seats available, {ob + wb} booked)
               </option>
             );
           })}
@@ -223,7 +259,36 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           })}
         </div>
         {totalPassengers > 0 && (
-          <p className="mt-2 text-sm text-[#0f766e]">{totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""}</p>
+          <p className="mt-2 text-sm text-[#0f766e]">
+            {totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""} · Admin fee (₱15/pax): ₱{(adminFeeCents / 100).toLocaleString()}. No GCash fee for walk-in.
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+        <p className="text-xs font-semibold uppercase text-amber-800 mb-1">Important notices</p>
+        <ul className="text-sm text-amber-900 space-y-1 list-disc list-outside pl-5 ml-1">
+          {BOOKING_NOTICES.map((notice, i) => (
+            <li key={i}>{notice}</li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-[#134e4a] mb-1">Address (for tickets & Coast Guard manifest)</p>
+        <input
+          type="text"
+          required
+          value={customerAddress}
+          onChange={(e) => {
+            setCustomerAddress(e.target.value);
+            setAddressPrefilledFromAccount(false);
+          }}
+          placeholder="e.g. Brgy. Dapa, General Luna, Siargao"
+          className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+        />
+        {addressPrefilledFromAccount && (
+          <p className="mt-0.5 text-xs text-[#0f766e]">Pre-filled from passenger account.</p>
         )}
       </div>
 
@@ -359,18 +424,6 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
       )}
 
       <div className="border-t border-teal-200 pt-4">
-        <p className="text-sm font-medium text-[#134e4a] mb-2">Address (for tickets & Coast Guard manifest)</p>
-        <div className="mb-4">
-          <label className="block text-xs text-[#0f766e] mb-1">Address (required)</label>
-          <input
-            type="text"
-            required
-            value={customerAddress}
-            onChange={(e) => setCustomerAddress(e.target.value)}
-            placeholder="Full address (street, barangay, city, province)"
-            className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
-          />
-        </div>
         <p className="text-sm font-medium text-[#134e4a] mb-2">Contact (for this booking)</p>
         <div className="space-y-3">
           <div>
@@ -380,9 +433,13 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
               required
               value={customerEmail}
               onChange={(e) => setCustomerEmail(e.target.value)}
-              placeholder="email@example.com"
+              onBlur={handleEmailBlur}
+              placeholder="Passenger email (enter account email to pre-fill address)"
               className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
             />
+            <p className="mt-0.5 text-xs text-[#0f766e]">
+              If passenger has an account, address and name can be pre-filled when you leave this field.
+            </p>
           </div>
           <div>
             <label className="block text-xs text-[#0f766e] mb-1">Mobile (optional)</label>
@@ -390,8 +447,19 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
               type="tel"
               value={customerMobile}
               onChange={(e) => setCustomerMobile(e.target.value)}
-              placeholder="09XX XXX XXXX"
+              placeholder="e.g. 09XX XXX XXXX"
               className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-[#0f766e] mb-1">Also notify (optional)</label>
+            <input
+              type="email"
+              value={notifyAlsoEmail}
+              onChange={(e) => setNotifyAlsoEmail(e.target.value)}
+              placeholder="Another email to receive confirmation (e.g. family or travel partner)"
+              className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+              aria-label="Optional second email for notifications"
             />
           </div>
         </div>

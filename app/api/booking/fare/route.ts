@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { GCASH_FEE_CENTS, ADMIN_FEE_CENTS_PER_PASSENGER } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -22,5 +23,9 @@ export async function GET(request: NextRequest) {
   const rule = data
     ? { base_fare_cents: data.base_fare_cents, discount_percent: data.discount_percent }
     : { base_fare_cents: 55000, discount_percent: 20 };
-  return NextResponse.json(rule);
+  return NextResponse.json({
+    ...rule,
+    gcash_fee_cents: GCASH_FEE_CENTS,
+    admin_fee_cents_per_passenger: ADMIN_FEE_CENTS_PER_PASSENGER,
+  });
 }

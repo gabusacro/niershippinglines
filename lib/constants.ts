@@ -39,5 +39,21 @@ export const DEVELOPER_COPYRIGHT = "© 2026 Gabriel Sacro. All rights reserved."
 export const GCASH_NUMBER = process.env.NEXT_PUBLIC_GCASH_NUMBER ?? "09463657331";
 export const GCASH_ACCOUNT_NAME = process.env.NEXT_PUBLIC_GCASH_ACCOUNT_NAME ?? "Gabriel Sacro";
 
+/** Fees added to booking total. */
+export const GCASH_FEE_CENTS = 1500; // ₱15 per transaction (online/GCash only)
+export const ADMIN_FEE_CENTS_PER_PASSENGER = 1500; // ₱15 per passenger
+
+/** Passenger-initiated reschedule (MARINA: P10–10% before departure). */
+export const RESCHEDULE_FEE_PERCENT = 10;
+export const RESCHEDULE_GCASH_FEE_CENTS = 1500; // ₱15 GCash transaction fee
+
+/** Important notices shown on booking forms and tickets. */
+export const BOOKING_NOTICES = [
+  "Port or terminal fees are not included in the fare.",
+  "Excess baggage (over 30 kg) may be subject to crew assessment. Hand carry is limited to 30 kg and below.",
+  "For a smooth experience, please arrive 30–60 minutes before boarding so you don't miss your trip.",
+  "Once the vessel has departed, we’re unable to offer refunds or rebooking. Arriving early helps ensure you don’t miss your sailing.",
+] as const;
+
 /** Fuel price per liter (PHP). Used for net revenue: fuel cost = liters × this; e.g. 100 L = ₱6,140. */
 export const FUEL_PESOS_PER_LITER = 61.4;

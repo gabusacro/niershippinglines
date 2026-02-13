@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { ROUTES } from "@/lib/constants";
 import { ConfirmPaymentButton } from "./ConfirmPaymentButton";
+import { ResendProofButton } from "@/components/admin/ResendProofButton";
 import { formatTime } from "@/lib/dashboard/format";
 import { getPaymentProofSignedUrl } from "@/lib/admin/payment-proof-url";
 import { PaymentProofViewer } from "@/components/admin/PaymentProofViewer";
@@ -23,6 +24,7 @@ type Row = {
   total_amount_cents: number;
   created_at: string;
   payment_proof_path: string | null;
+  gcash_transaction_reference: string | null;
   trip: {
     departure_date?: string;
     departure_time?: string;
@@ -32,7 +34,7 @@ type Row = {
 
 export default async function AdminPendingPaymentsPage() {
   const user = await getAuthUser();
-  if (!user || user.role !== "admin") {
+  if (!user || (user.role !== "admin" && user.role !== "ticket_booth")) {
     redirect(ROUTES.dashboard);
   }
 
@@ -40,7 +42,7 @@ export default async function AdminPendingPaymentsPage() {
   const { data: bookings, error } = await supabase
     .from("bookings")
     .select(
-      "id, reference, customer_full_name, customer_email, customer_mobile, passenger_count, total_amount_cents, created_at, payment_proof_path, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
+      "id, reference, customer_full_name, customer_email, customer_mobile, passenger_count, total_amount_cents, created_at, payment_proof_path, gcash_transaction_reference, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
     )
     .eq("status", "pending_payment")
     .order("created_at", { ascending: false })
@@ -50,8 +52,8 @@ export default async function AdminPendingPaymentsPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         <p className="text-red-600">Unable to load pending payments. {error.message}</p>
-        <Link href={ROUTES.admin} className="mt-4 inline-block text-[#0c7b93] font-medium hover:underline">
-          ← Admin dashboard
+        <Link href={user.role === "ticket_booth" ? ROUTES.dashboard : ROUTES.admin} className="mt-4 inline-block text-[#0c7b93] font-medium hover:underline">
+          {user.role === "ticket_booth" ? "← Dashboard" : "← Admin dashboard"}
         </Link>
       </div>
     );
@@ -71,7 +73,7 @@ export default async function AdminPendingPaymentsPage() {
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-[#134e4a]">Pending payments</h1>
       <p className="mt-1 text-sm text-[#0f766e]">
-        Bookings waiting for payment. Verify payment (e.g. GCash) then confirm to mark as paid. Data from Supabase.
+        Bookings waiting for payment. When a walk-in shows their reference (or phone), find them here and confirm to mark as paid (cash or GCash).
       </p>
 
       <div className="mt-6 space-y-4">
@@ -133,6 +135,12 @@ export default async function AdminPendingPaymentsPage() {
                     {b.passenger_count} passenger{b.passenger_count !== 1 ? "s" : ""} ·{" "}
                     <strong>₱{(b.total_amount_cents / 100).toLocaleString()}</strong>
                   </p>
+                  {b.gcash_transaction_reference && (
+                    <p className="mt-2 text-sm font-medium text-amber-900">
+                      <strong>Manual reference:</strong>{" "}
+                      <span className="font-mono">{b.gcash_transaction_reference}</span>
+                    </p>
+                  )}
                   {b.proofUrl ? (
                     <div className="mt-3">
                       <p className="text-xs font-semibold text-amber-900">Payment proof</p>
@@ -149,7 +157,10 @@ export default async function AdminPendingPaymentsPage() {
                     <p className="mt-2 text-xs text-amber-700">Proof uploaded (preview unavailable)</p>
                   ) : null}
                 </div>
-                <ConfirmPaymentButton reference={b.reference} />
+                <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+                  {b.payment_proof_path && <ResendProofButton reference={b.reference} />}
+                  <ConfirmPaymentButton reference={b.reference} />
+                </div>
               </div>
             );
           })
@@ -158,20 +169,27 @@ export default async function AdminPendingPaymentsPage() {
 
       <div className="mt-8 flex flex-wrap gap-4">
         <Link
-          href={ROUTES.admin}
+          href={user.role === "ticket_booth" ? ROUTES.dashboard : ROUTES.admin}
           className="rounded-xl border-2 border-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10"
         >
-          ← Admin dashboard
+          {user.role === "ticket_booth" ? "← Dashboard" : "← Admin dashboard"}
+        </Link>
+        <Link href={ROUTES.adminBookings} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
+          Booking history
         </Link>
         <Link href={ROUTES.adminReports} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
           Reports
         </Link>
-        <Link href={ROUTES.adminVessels} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-          Vessels
-        </Link>
-        <Link href={ROUTES.adminSchedule} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-          Schedule
-        </Link>
+        {user.role === "admin" && (
+          <>
+            <Link href={ROUTES.adminVessels} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
+              Vessels
+            </Link>
+            <Link href={ROUTES.adminSchedule} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
+              Schedule
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );

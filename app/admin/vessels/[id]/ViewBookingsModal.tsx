@@ -63,6 +63,7 @@ export function ViewBookingsModal({
   const [refundingId, setRefundingId] = useState<string | null>(null);
   const [showReassignFor, setShowReassignFor] = useState<string | null>(null);
   const [showRefundFor, setShowRefundFor] = useState<string | null>(null);
+  const [refundReason, setRefundReason] = useState<"weather_disturbance" | "vessel_cancellation">("weather_disturbance");
   const [gcashRef, setGcashRef] = useState("");
   const [alternatives, setAlternatives] = useState<AlternativeTrip[]>([]);
   const [selectedTripId, setSelectedTripId] = useState("");
@@ -94,10 +95,15 @@ export function ViewBookingsModal({
         `/api/admin/trips/${tripId}/alternatives?passenger_count=${booking.passenger_count}&is_walk_in=${booking.is_walk_in === true}`
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load alternatives");
+      if (!res.ok) {
+        toast.showError(data.error ?? "Failed to load alternatives");
+        setAlternatives([]);
+        return;
+      }
       setAlternatives(data.alternatives ?? []);
     } catch (e) {
       toast.showError(e instanceof Error ? e.message : "Could not load alternative trips.");
+      setAlternatives([]);
     }
   };
 
@@ -126,6 +132,7 @@ export function ViewBookingsModal({
 
   const openRefund = (bookingId: string) => {
     setShowRefundFor(bookingId);
+    setRefundReason("weather_disturbance");
     setGcashRef("");
   };
 
@@ -139,12 +146,13 @@ export function ViewBookingsModal({
       const res = await fetch(`/api/admin/bookings/${bookingId}/refund`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "Admin refund", gcash_reference: gcashRef.trim() || undefined }),
+        body: JSON.stringify({ reason: refundReason, gcash_reference: gcashRef.trim() || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Refund failed");
       toast.showSuccess("Refund processed successfully");
       setShowRefundFor(null);
+      setRefundReason("weather_disturbance");
       setGcashRef("");
       fetchBookings();
       router.refresh();
@@ -245,6 +253,18 @@ export function ViewBookingsModal({
 
                   {showRefundFor === b.id && (
                     <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                      <p className="text-xs text-amber-800 mb-2">
+                        Per policy: Refunds only for weather disturbance or vessel cancellation.
+                      </p>
+                      <label className="block text-xs font-semibold text-amber-900 mb-1">Reason (required):</label>
+                      <select
+                        value={refundReason}
+                        onChange={(e) => setRefundReason(e.target.value as "weather_disturbance" | "vessel_cancellation")}
+                        className="w-full rounded-lg border border-amber-300 px-3 py-2 text-sm mb-2"
+                      >
+                        <option value="weather_disturbance">Weather disturbance</option>
+                        <option value="vessel_cancellation">Vessel cancellation by operator</option>
+                      </select>
                       <label className="block text-xs font-semibold text-amber-900 mb-1">
                         GCash transaction reference (for traceability):
                       </label>
@@ -266,7 +286,7 @@ export function ViewBookingsModal({
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setShowRefundFor(null); setGcashRef(""); }}
+                          onClick={() => { setShowRefundFor(null); setRefundReason("weather_disturbance"); setGcashRef(""); }}
                           className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50"
                         >
                           Cancel
@@ -277,6 +297,9 @@ export function ViewBookingsModal({
 
                   {showReassignFor === b.id && (
                     <div className="mt-3 rounded-lg border border-teal-200 bg-white p-3">
+                      <p className="text-xs text-amber-700 mb-2">
+                        Per policy: Reschedule only 24+ hours before departure. 10% + ₱15 fee applies.
+                      </p>
                       <label className="block text-xs font-semibold text-[#134e4a] mb-1">
                         Assign to another trip (same route):
                       </label>

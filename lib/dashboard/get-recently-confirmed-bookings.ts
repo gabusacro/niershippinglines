@@ -1,30 +1,39 @@
 import { createClient } from "@/lib/supabase/server";
+import { isDeparturePlusHoursInPast } from "@/lib/admin/ph-time";
 
 export type RecentlyConfirmedRow = {
   id: string;
   reference: string;
   updated_at: string;
+  trip_snapshot_departure_date?: string | null;
+  trip_snapshot_departure_time?: string | null;
 };
 
-/** Bookings for this customer that were confirmed in the last 4 hours (for in-app "payment confirmed" notice).
- *  After 4 hours they disappear from the banner and stay in My Bookings / ticket history. */
+/** Bookings for this customer with status confirmed, shown in "Payment confirmed — tickets ready" until
+ *  6 hours after the scheduled departure has passed. After that they disappear from the banner
+ *  (ticket assumed consumed) and stay in My Bookings / ticket history. */
+const HOURS_AFTER_DEPARTURE = 6;
+
 export async function getRecentlyConfirmedBookings(
   customerEmail: string
 ): Promise<RecentlyConfirmedRow[]> {
   if (!customerEmail?.trim()) return [];
   const supabase = await createClient();
-  const since = new Date();
-  since.setHours(since.getHours() - 4);
-  const sinceIso = since.toISOString();
 
   const { data, error } = await supabase
     .from("bookings")
-    .select("id, reference, updated_at")
+    .select("id, reference, updated_at, trip_snapshot_departure_date, trip_snapshot_departure_time")
     .eq("customer_email", customerEmail.trim())
     .eq("status", "confirmed")
-    .gte("updated_at", sinceIso)
     .order("updated_at", { ascending: false })
-    .limit(10);
+    .limit(20);
   if (error) return [];
-  return (data ?? []) as RecentlyConfirmedRow[];
+
+  const rows = (data ?? []) as RecentlyConfirmedRow[];
+  return rows.filter((b) => {
+    const depDate = b.trip_snapshot_departure_date ?? "";
+    const depTime = b.trip_snapshot_departure_time ?? "";
+    if (!depDate || !depTime) return true;
+    return !isDeparturePlusHoursInPast(depDate, depTime, HOURS_AFTER_DEPARTURE);
+  }).slice(0, 10);
 }

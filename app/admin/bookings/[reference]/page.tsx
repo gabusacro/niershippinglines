@@ -6,6 +6,8 @@ import { ROUTES } from "@/lib/constants";
 import { passengerTypeLabel } from "@/lib/dashboard/format";
 import { getPaymentProofSignedUrl } from "@/lib/admin/payment-proof-url";
 import { PaymentProofViewer } from "@/components/admin/PaymentProofViewer";
+import { ResendProofButton } from "@/components/admin/ResendProofButton";
+import { RefundBookingButton } from "@/components/admin/RefundBookingButton";
 
 export const metadata = {
   title: "Booking details",
@@ -54,7 +56,7 @@ export default async function AdminBookingDetailPage({
   params: Promise<{ reference: string }>;
 }) {
   const user = await getAuthUser();
-  if (!user || user.role !== "admin") {
+  if (!user || (user.role !== "admin" && user.role !== "ticket_booth")) {
     notFound();
   }
 
@@ -66,7 +68,7 @@ export default async function AdminBookingDetailPage({
   const { data: booking, error } = await supabase
     .from("bookings")
     .select(
-      "id, reference, customer_full_name, customer_email, customer_mobile, notify_also_email, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, created_at, trip_id, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, passenger_details, passenger_names"
+      "id, reference, customer_full_name, customer_email, customer_mobile, notify_also_email, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, gcash_transaction_reference, created_at, trip_id, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, passenger_details, passenger_names, refund_requested_at, refund_request_reason, refund_request_notes"
     )
     .eq("reference", refNormalized)
     .maybeSingle();
@@ -84,6 +86,9 @@ export default async function AdminBookingDetailPage({
     trip_snapshot_departure_date?: string | null;
     trip_snapshot_departure_time?: string | null;
     notify_also_email?: string | null;
+    refund_requested_at?: string | null;
+    refund_request_reason?: string | null;
+    refund_request_notes?: string | null;
   };
   const routeName = b.trip_snapshot_route_name ?? "—";
   const vesselName = b.trip_snapshot_vessel_name;
@@ -192,32 +197,77 @@ export default async function AdminBookingDetailPage({
           Created {booking.created_at ? new Date(booking.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "—"}
         </p>
 
-        {booking.status === "pending_payment" && proofUrl && (
-          <div className="mt-6 rounded-lg border-2 border-amber-200 bg-amber-50/50 p-4">
-            <h3 className="text-sm font-semibold text-amber-900">Payment proof</h3>
-            <p className="mt-0.5 text-xs text-amber-800">
-              Click to view full size. Verify amount and GCash transaction reference before confirming.
+        {b.refund_requested_at && booking.status !== "refunded" && (
+          <div className="mt-6 rounded-lg border-2 border-amber-400 bg-amber-100 p-4">
+            <h3 className="text-sm font-bold text-amber-900">Passenger requested refund</h3>
+            <p className="mt-1 text-sm text-amber-800">
+              <strong>Reason:</strong>{" "}
+              {b.refund_request_reason === "weather_disturbance" ? "Weather disturbance" : b.refund_request_reason === "vessel_cancellation" ? "Vessel cancellation" : b.refund_request_reason ?? "—"}
             </p>
-            <div className="mt-3">
-              <PaymentProofViewer
-                proofUrl={proofUrl}
-                isPdf={booking.payment_proof_path?.toLowerCase().endsWith(".pdf")}
-                thumbnailClassName="max-h-64 w-auto max-w-full rounded object-contain"
-              />
-            </div>
+            {b.refund_request_notes && (
+              <p className="mt-1 text-sm text-amber-800">
+                <strong>Notes:</strong> {b.refund_request_notes}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-amber-700">
+              Requested {b.refund_requested_at ? new Date(b.refund_requested_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "—"}
+            </p>
+            <p className="mt-2 text-xs text-amber-800">
+              Process via the Refund button below when validated.
+            </p>
           </div>
         )}
 
-        {booking.trip_id && (
-          <div className="mt-6">
+        {booking.status === "pending_payment" && ((booking as { gcash_transaction_reference?: string | null }).gcash_transaction_reference || proofUrl || booking.payment_proof_path) && (
+          <div className="mt-6 rounded-lg border-2 border-amber-200 bg-amber-50/50 p-4">
+            {(booking as { gcash_transaction_reference?: string | null }).gcash_transaction_reference && (
+              <p className="mb-3 text-sm font-medium text-amber-900">
+                <strong>Manual reference (from passenger):</strong>{" "}
+                <span className="font-mono">{(booking as { gcash_transaction_reference?: string | null }).gcash_transaction_reference}</span>
+              </p>
+            )}
+            {proofUrl && (
+              <>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-amber-900">Payment proof</h3>
+                    <p className="mt-0.5 text-xs text-amber-800">
+                      Click to view full size. Verify amount and GCash transaction reference before confirming.
+                    </p>
+                  </div>
+                  <ResendProofButton reference={booking.reference} />
+                </div>
+                <div className="mt-3">
+                  <PaymentProofViewer
+                    proofUrl={proofUrl}
+                    isPdf={booking.payment_proof_path?.toLowerCase().endsWith(".pdf")}
+                    thumbnailClassName="max-h-64 w-auto max-w-full rounded object-contain"
+                  />
+                </div>
+              </>
+            )}
+            {booking.payment_proof_path && !proofUrl && (
+              <p className="text-xs text-amber-700">Proof uploaded (preview unavailable)</p>
+            )}
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          {booking.trip_id && (
             <Link
               href={`/admin/reports/trip/${booking.trip_id}`}
               className="inline-flex rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f766e]"
             >
               View trip manifest
             </Link>
-          </div>
-        )}
+          )}
+          {["confirmed", "checked_in", "boarded", "pending_payment", "completed"].includes(booking.status) && (
+            <RefundBookingButton
+              bookingId={booking.id}
+              totalAmountCents={booking.total_amount_cents ?? 0}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

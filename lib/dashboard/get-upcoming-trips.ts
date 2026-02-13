@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getTodayInManila } from "@/lib/admin/ph-time";
+import { getTodayInManila, isTripDeparted } from "@/lib/admin/ph-time";
 
 export type UpcomingTripRow = {
   id: string;
@@ -7,7 +7,9 @@ export type UpcomingTripRow = {
   departure_time: string;
   online_quota: number;
   online_booked: number;
-  boat: { id: string; name: string } | null;
+  walk_in_quota: number;
+  walk_in_booked: number;
+  boat: { id: string; name: string; capacity: number } | null;
   route: { id: string; display_name: string; origin: string; destination: string } | null;
 };
 
@@ -22,7 +24,7 @@ export async function getUpcomingTrips(): Promise<UpcomingTripRow[]> {
   const { data, error } = await supabase
     .from("trips")
     .select(
-      "id, departure_date, departure_time, online_quota, online_booked, boat:boats(id, name, status), route:routes(id, display_name, origin, destination)"
+      "id, departure_date, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, boat:boats(id, name, capacity, status), route:routes(id, display_name, origin, destination)"
     )
     .eq("status", "scheduled")
     .gte("departure_date", today)
@@ -32,7 +34,11 @@ export async function getUpcomingTrips(): Promise<UpcomingTripRow[]> {
 
   if (error) return [];
   const rows = (data ?? []) as (UpcomingTripRow & { boat: { status?: string } | null })[];
-  return rows.filter((row) => row.boat?.status === "running");
+  return rows.filter(
+    (row) =>
+      row.boat?.status === "running" &&
+      !isTripDeparted(row.departure_date, row.departure_time ?? "")
+  );
 }
 
 export { formatTime, getDayLabel } from "./format";

@@ -15,9 +15,9 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const todayManila = getTodayInManila();
   const selectWithPort =
-    "id, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, status, boat:boats(id, name, status), route:routes(id, display_name, origin, destination), port:ports(id, name)";
+    "id, departure_time, departure_date, online_quota, online_booked, walk_in_quota, walk_in_booked, status, boat:boats(id, name, capacity, status), route:routes(id, display_name, origin, destination), port:ports(id, name)";
   const selectWithoutPort =
-    "id, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, status, boat:boats(id, name, status), route:routes(id, display_name, origin, destination)";
+    "id, departure_time, departure_date, online_quota, online_booked, walk_in_quota, walk_in_booked, status, boat:boats(id, name, capacity, status), route:routes(id, display_name, origin, destination)";
 
   let data: unknown[] | null = null;
   let error: { message: string } | null = null;

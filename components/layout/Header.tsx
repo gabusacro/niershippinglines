@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 const BASE_NAV_LINKS = [
   { href: ROUTES.home, label: "Home" },
   { href: ROUTES.schedule, label: "Schedule" },
-  { href: ROUTES.book, label: "Book" },
+  { href: ROUTES.book, label: "Book A Trip" },
   { href: ROUTES.attractions, label: "Attractions" },
   { href: ROUTES.weather, label: "Weather" },
 ];

@@ -57,7 +57,7 @@ export default async function AdminVesselEditPage({
 
   const { data: upcomingTrips } = await supabase
     .from("trips")
-    .select("id, departure_date, departure_time, status, online_quota, online_booked, walk_in_booked, route:routes(id, display_name, origin, destination)")
+    .select("id, departure_date, departure_time, status, online_quota, online_booked, walk_in_quota, walk_in_booked, route:routes(id, display_name, origin, destination)")
     .eq("boat_id", id)
     .gte("departure_date", today)
     .order("departure_date")
@@ -66,7 +66,7 @@ export default async function AdminVesselEditPage({
 
   const { data: pastTrips } = await supabase
     .from("trips")
-    .select("id, departure_date, departure_time, status, online_quota, online_booked, walk_in_booked, route:routes(id, display_name, origin, destination)")
+    .select("id, departure_date, departure_time, status, online_quota, online_booked, walk_in_quota, walk_in_booked, route:routes(id, display_name, origin, destination)")
     .eq("boat_id", id)
     .lt("departure_date", today)
     .order("departure_date", { ascending: false })
@@ -152,7 +152,10 @@ export default async function AdminVesselEditPage({
             boatId={boat.id}
             trips={upcomingTrips.map((t) => {
               const route = t.route as { display_name?: string } | null;
-              const avail = (t.online_quota ?? 0) - (t.online_booked ?? 0);
+              const ob = t.online_booked ?? 0;
+              const wb = t.walk_in_booked ?? 0;
+              const capacity = boat.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
+              const avail = Math.max(0, capacity - ob - wb);
               const confirmedCount = confirmedByTrip.get(t.id) ?? 0;
               return {
                 id: t.id,
@@ -161,6 +164,8 @@ export default async function AdminVesselEditPage({
                 departureTime: formatTime(t.departure_time),
                 status: t.status,
                 avail,
+                totalBooked: ob + wb,
+                capacity,
                 onlineQuota: t.online_quota ?? 0,
                 confirmedCount,
               };

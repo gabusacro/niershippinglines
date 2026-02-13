@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { isDepartureAtLeast24HoursFromNow } from "@/lib/admin/ph-time";
 
-/** GET: List alternative trips for reassignment (same route, upcoming, with available seats). Admin only. */
+/** GET: List alternative trips for reschedule (same route, upcoming, with available seats). Admin only. 24h rule applies. */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -11,7 +12,7 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (profile?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!["admin", "ticket_booth"].includes(profile?.role ?? "")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const today = new Date().toISOString().slice(0, 10);
   const { searchParams } = new URL(request.url);
@@ -20,10 +21,17 @@ export async function GET(
 
   const { data: currentTrip, error: tripErr } = await supabase
     .from("trips")
-    .select("id, route_id, boat_id")
+    .select("id, route_id, boat_id, departure_date, departure_time")
     .eq("id", tripId)
     .single();
   if (tripErr || !currentTrip) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+
+  if (!isDepartureAtLeast24HoursFromNow(currentTrip.departure_date ?? "", currentTrip.departure_time ?? "")) {
+    return NextResponse.json(
+      { error: "Reschedule only allowed at least 24 hours before departure.", alternatives: [] },
+      { status: 400 }
+    );
+  }
 
   const col = isWalkIn ? "walk_in_booked" : "online_booked";
   const quotaCol = isWalkIn ? "walk_in_quota" : "online_quota";

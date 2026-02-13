@@ -38,7 +38,7 @@ type Row = {
 
 export default async function AdminBookingsPage() {
   const user = await getAuthUser();
-  if (!user || user.role !== "admin") {
+  if (!user || (user.role !== "admin" && user.role !== "ticket_booth")) {
     redirect(ROUTES.dashboard);
   }
 
@@ -55,8 +55,8 @@ export default async function AdminBookingsPage() {
     return (
       <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
         <p className="text-red-600">Unable to load bookings. {error.message}</p>
-        <Link href={ROUTES.admin} className="mt-4 inline-block text-[#0c7b93] font-medium hover:underline">
-          ← Admin dashboard
+        <Link href={user.role === "ticket_booth" ? ROUTES.dashboard : ROUTES.admin} className="mt-4 inline-block text-[#0c7b93] font-medium hover:underline">
+          {user.role === "ticket_booth" ? "← Dashboard" : "← Admin dashboard"}
         </Link>
       </div>
     );
@@ -73,10 +73,10 @@ export default async function AdminBookingsPage() {
 
       <div className="mt-4 flex flex-wrap gap-3">
         <Link
-          href={ROUTES.admin}
+          href={user.role === "ticket_booth" ? ROUTES.dashboard : ROUTES.admin}
           className="rounded-xl border-2 border-teal-200 px-4 py-2 text-sm font-semibold text-[#134e4a] hover:bg-teal-50"
         >
-          ← Admin dashboard
+          {user.role === "ticket_booth" ? "← Dashboard" : "← Admin dashboard"}
         </Link>
         <Link
           href={ROUTES.adminPendingPayments}

@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { APP_NAME } from "@/lib/constants";
+import { TranslatableNotices } from "@/components/booking/TranslatableNotices";
 import { formatTime, passengerTypeLabel } from "@/lib/dashboard/format";
 import { PrintTicketsButton } from "./PrintTicketsButton";
 import { TicketQRCode } from "@/components/tickets/TicketQRCode";
@@ -23,7 +24,7 @@ export default async function BookingTicketsPage({
   const { data: booking, error } = await supabase
     .from("bookings")
     .select(
-      "id, reference, customer_full_name, customer_email, customer_address, passenger_count, fare_type, total_amount_cents, passenger_details, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route_id, boat:boats(name), route:routes(display_name, origin, destination))"
+      "id, reference, customer_full_name, customer_email, customer_address, passenger_count, fare_type, total_amount_cents, gcash_fee_cents, admin_fee_cents, passenger_details, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route_id, boat:boats(name), route:routes(display_name, origin, destination))"
     )
     .eq("reference", reference)
     .maybeSingle();
@@ -157,9 +158,19 @@ export default async function BookingTicketsPage({
                 <span className="text-xs font-semibold uppercase text-[#0f766e]">Amount (this passenger)</span>
                 <span className="ml-2 font-bold text-[#134e4a]">₱{(fareCentsPerPassenger(p.fare_type) / 100).toLocaleString()}</span>
               </p>
+              {i === 0 && (
+                <p>
+                  <span className="text-xs font-semibold uppercase text-[#0f766e]">Total paid (booking)</span>
+                  <span className="ml-2 font-bold text-[#134e4a]">₱{(((booking as { total_amount_cents?: number }).total_amount_cents ?? 0) / 100).toLocaleString()}</span>
+                  <span className="ml-2 text-xs text-[#0f766e]">(includes admin fee ₱15/pax{((booking as { gcash_fee_cents?: number }).gcash_fee_cents ?? 0) > 0 ? ", GCash fee ₱15" : ""})</span>
+                </p>
+              )}
             </div>
             <TicketQRCode reference={reference} passengerIndex={i} />
-            <p className="mt-6 text-xs text-[#0f766e]/80">
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+              <TranslatableNotices listClassName="text-xs text-amber-900 space-y-0.5 list-disc list-outside pl-5 ml-1" compact showSelector={i === 0} />
+            </div>
+            <p className="mt-4 text-xs text-[#0f766e]/80">
               Present this ticket at the ticket booth. Valid for the passenger named above. Bring 1 any valid identification card.
             </p>
           </div>

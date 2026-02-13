@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { ADMIN_FEE_CENTS_PER_PASSENGER } from "@/lib/constants";
 import { NextRequest, NextResponse } from "next/server";
 
 const FARE_TYPES = ["adult", "senior", "pwd", "child", "infant"] as const;
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
   const customerEmail = b.customer_email;
   const customerMobile = b.customer_mobile;
   const customerAddress = b.customer_address;
+  const notifyAlsoEmail = b.notify_also_email;
   const passengerDetailsRaw = b.passenger_details;
 
   if (!tripId || typeof tripId !== "string") {
@@ -142,6 +144,10 @@ export async function POST(request: NextRequest) {
   } else {
     totalCents = passengerCount * fareCents(base, discount, fareType);
   }
+  const fareSubtotalCents = totalCents;
+  const gcashFeeCents = 0; // Walk-in pays at booth; no GCash fee
+  const adminFeeCents = passengerCount * ADMIN_FEE_CENTS_PER_PASSENGER;
+  totalCents = fareSubtotalCents + gcashFeeCents + adminFeeCents;
 
   const { data: ref, error: refError } = await supabase.rpc("generate_booking_reference");
   if (refError || !ref) {
@@ -161,6 +167,11 @@ export async function POST(request: NextRequest) {
 
   const t = trip as { departure_date?: string; departure_time?: string; boat?: { name?: string } | null; route?: { display_name?: string } | null };
   const bookingAddress = (customerAddress && typeof customerAddress === "string") ? customerAddress.trim() : null;
+  const notifyAlso =
+    typeof notifyAlsoEmail === "string" && notifyAlsoEmail.trim().length > 0
+      ? notifyAlsoEmail.trim()
+      : null;
+
   const insertPayload: Record<string, unknown> = {
     trip_id: tripId,
     reference: ref,
@@ -171,6 +182,8 @@ export async function POST(request: NextRequest) {
     passenger_count: passengerCount,
     fare_type: fareType,
     total_amount_cents: totalCents,
+    gcash_fee_cents: gcashFeeCents,
+    admin_fee_cents: adminFeeCents,
     status: "confirmed",
     is_walk_in: true,
     created_by: createdBy,
@@ -179,6 +192,7 @@ export async function POST(request: NextRequest) {
     trip_snapshot_departure_date: t.departure_date ?? null,
     trip_snapshot_departure_time: t.departure_time ?? null,
   };
+  if (notifyAlso) (insertPayload as Record<string, unknown>).notify_also_email = notifyAlso;
   if (passengerDetails && passengerDetails.length > 0) {
     const addr = bookingAddress ?? "";
     insertPayload.passenger_details = passengerDetails.map((p) => ({

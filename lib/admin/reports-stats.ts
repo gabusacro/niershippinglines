@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getTodayInManila, getMonthStartEndInManila } from "./ph-time";
+import { getTodayInManila, getMonthStartEndInManila, getWeekStartEndInManila } from "./ph-time";
 import { FUEL_PESOS_PER_LITER } from "@/lib/constants";
 
 const PAYMENT_STATUSES = ["confirmed", "checked_in", "boarded", "completed"] as const;
@@ -70,12 +70,16 @@ export async function getReportsTodayPerTrip(): Promise<TripReportRow[]> {
   const { data: trips, error: tripsError } = await supabase
     .from("trips")
     .select(
-      "id, departure_time, fuel_liters_used, online_quota, online_booked, walk_in_quota, walk_in_booked, boarded_count, boat:boats(name, default_fuel_liters_per_trip), route:routes(display_name, origin, destination)"
+      "id, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, boarded_count, boat:boats(name), route:routes(display_name, origin, destination)"
     )
     .eq("departure_date", today)
     .order("departure_time");
 
-  if (tripsError || !trips?.length) return [];
+  if (tripsError) {
+    console.error("[getReportsTodayPerTrip]", tripsError.message, { today });
+    return [];
+  }
+  if (!trips?.length) return [];
 
   const tripIds = (trips ?? []).map((t) => t.id);
   const { data: bookings } = await supabase
@@ -100,15 +104,9 @@ export async function getReportsTodayPerTrip(): Promise<TripReportRow[]> {
     const route = t.route as { display_name?: string; origin?: string; destination?: string } | null;
     const routeName =
       route?.display_name ?? [route?.origin, route?.destination].filter(Boolean).join(" → ") ?? "—";
-    const boat = t.boat as { name?: string; default_fuel_liters_per_trip?: number } | null;
+    const boat = t.boat as { name?: string } | null;
     const boatName = boat?.name ?? "—";
-    const tripFuel = (t as { fuel_liters_used?: number | null }).fuel_liters_used;
-    const fuelL =
-      typeof tripFuel === "number" && tripFuel >= 0
-        ? tripFuel
-        : (typeof boat?.default_fuel_liters_per_trip === "number" && boat.default_fuel_liters_per_trip >= 0
-          ? boat.default_fuel_liters_per_trip
-          : fuelSettings.defaultFuelLitersPerTrip);
+    const fuelL = fuelSettings.defaultFuelLitersPerTrip;
     const revenue = revenueByTrip.get(t.id) ?? 0;
     const fuelCost = fuelCostCentsFromLiters(fuelL, fuelSettings.fuelPesosPerLiter);
     return {
@@ -166,6 +164,135 @@ export async function getMonthlySummary(): Promise<MonthlySummary> {
     totalFuelCostCents,
     netRevenueCents: totalRevenueCents - totalFuelCostCents,
   };
+}
+
+/** Weekly summary (same shape as MonthlySummary) for current week (Mon–Sun) in Philippines. */
+export async function getWeeklySummary(): Promise<MonthlySummary> {
+  const { start, end } = getWeekStartEndInManila();
+  const supabase = await createClient();
+  const fuelSettings = await getFuelSettings(supabase);
+
+  const { data: trips } = await supabase
+    .from("trips")
+    .select("id")
+    .gte("departure_date", start)
+    .lte("departure_date", end);
+
+  const tripIds = (trips ?? []).map((t) => t.id);
+  if (tripIds.length === 0) {
+    return { totalPassengers: 0, totalRevenueCents: 0, totalFuelLiters: 0, totalFuelCostCents: 0, netRevenueCents: 0 };
+  }
+
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("trip_id, passenger_count, total_amount_cents")
+    .in("trip_id", tripIds)
+    .in("status", PAYMENT_STATUSES);
+
+  let totalPassengers = 0;
+  let totalRevenueCents = 0;
+  for (const b of bookings ?? []) {
+    totalPassengers += b.passenger_count ?? 0;
+    totalRevenueCents += b.total_amount_cents ?? 0;
+  }
+
+  const totalFuelLiters = tripIds.length * fuelSettings.defaultFuelLitersPerTrip;
+  const totalFuelCostCents = fuelCostCentsFromLiters(totalFuelLiters, fuelSettings.fuelPesosPerLiter);
+
+  return {
+    totalPassengers,
+    totalRevenueCents,
+    totalFuelLiters,
+    totalFuelCostCents,
+    netRevenueCents: totalRevenueCents - totalFuelCostCents,
+  };
+}
+
+export interface VesselPeriodRow {
+  vesselName: string;
+  passengers: number;
+  revenueCents: number;
+}
+
+/** Per-vessel totals for the current week (Mon–Sun), Philippines. */
+export async function getWeeklySummaryByVessel(): Promise<VesselPeriodRow[]> {
+  const { start, end } = getWeekStartEndInManila();
+  const supabase = await createClient();
+  const fuelSettings = await getFuelSettings(supabase);
+
+  const { data: trips } = await supabase
+    .from("trips")
+    .select("id, boat_id, boat:boats(name)")
+    .gte("departure_date", start)
+    .lte("departure_date", end);
+
+  if (!trips?.length) return [];
+
+  const tripIds = trips.map((t) => t.id);
+  const tripToVessel = new Map<string, string>();
+  for (const t of trips) {
+    const boat = (t as { boat?: { name?: string } | null }).boat;
+    tripToVessel.set(t.id, boat?.name?.trim() ?? "—");
+  }
+
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("trip_id, passenger_count, total_amount_cents")
+    .in("trip_id", tripIds)
+    .in("status", PAYMENT_STATUSES);
+
+  const byVessel = new Map<string, { passengers: number; revenueCents: number }>();
+  for (const b of bookings ?? []) {
+    const vessel = tripToVessel.get(b.trip_id) ?? "—";
+    const cur = byVessel.get(vessel) ?? { passengers: 0, revenueCents: 0 };
+    cur.passengers += b.passenger_count ?? 0;
+    cur.revenueCents += b.total_amount_cents ?? 0;
+    byVessel.set(vessel, cur);
+  }
+
+  return [...byVessel.entries()]
+    .map(([vesselName, v]) => ({ vesselName, passengers: v.passengers, revenueCents: v.revenueCents }))
+    .sort((a, b) => a.vesselName.localeCompare(b.vesselName));
+}
+
+/** Per-vessel totals for the current month, Philippines. */
+export async function getMonthlySummaryByVessel(): Promise<VesselPeriodRow[]> {
+  const { start, end } = getMonthStartEndInManila();
+  const supabase = await createClient();
+
+  const { data: trips } = await supabase
+    .from("trips")
+    .select("id, boat_id, boat:boats(name)")
+    .gte("departure_date", start)
+    .lte("departure_date", end);
+
+  if (!trips?.length) return [];
+
+  const tripIds = trips.map((t) => t.id);
+  const tripToVessel = new Map<string, string>();
+  for (const t of trips) {
+    const boat = (t as { boat?: { name?: string } | null }).boat;
+    tripToVessel.set(t.id, boat?.name?.trim() ?? "—");
+  }
+
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("trip_id, passenger_count, total_amount_cents")
+    .in("trip_id", tripIds)
+    .in("status", PAYMENT_STATUSES);
+
+  const byVessel = new Map<string, { passengers: number; revenueCents: number }>();
+  for (const b of bookings ?? []) {
+    const vessel = tripToVessel.get(b.trip_id) ?? "—";
+    const cur = byVessel.get(vessel) ?? { passengers: 0, revenueCents: 0 };
+    cur.passengers += b.passenger_count ?? 0;
+    cur.revenueCents += b.total_amount_cents ?? 0;
+    byVessel.set(vessel, cur);
+  }
+
+  return [...byVessel.entries()]
+    .map(([vesselName, v]) => ({ vesselName, passengers: v.passengers, revenueCents: v.revenueCents }))
+    .sort((a, b) => a.vesselName.localeCompare(b.vesselName));
 }
 
 export interface VesselDayReport {

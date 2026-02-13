@@ -13,6 +13,8 @@ export type TripRow = {
   departureTime: string;
   status: string;
   avail: number;
+  totalBooked?: number;
+  capacity?: number;
   onlineQuota: number;
   confirmedCount: number;
 };
@@ -187,7 +189,7 @@ export function TripsTableWithBulkActions({ boatId, trips, totalConfirmed }: Tri
               <th className="px-4 py-2 text-left font-semibold text-[#134e4a]">Date</th>
               <th className="px-4 py-2 text-left font-semibold text-[#134e4a]">Time</th>
               <th className="px-4 py-2 text-left font-semibold text-[#134e4a]">Status</th>
-              <th className="px-4 py-2 text-right font-semibold text-[#134e4a]" title="Booked / total seats">Booked</th>
+              <th className="px-4 py-2 text-right font-semibold text-[#134e4a]" title="Booked / capacity, seats available">Booked / Avail</th>
               <th className="px-4 py-2 text-center font-semibold text-[#134e4a]">Actions</th>
             </tr>
           </thead>
@@ -208,7 +210,9 @@ export function TripsTableWithBulkActions({ boatId, trips, totalConfirmed }: Tri
                 <td className="px-4 py-2 text-[#134e4a]">{t.departureDate}</td>
                 <td className="px-4 py-2 text-[#134e4a]">{t.departureTime}</td>
                 <td className="px-4 py-2 text-[#134e4a]">{t.status}</td>
-                <td className="px-4 py-2 text-right text-[#134e4a]">{t.onlineQuota - t.avail} / {t.onlineQuota}</td>
+                <td className="px-4 py-2 text-right text-[#134e4a]">
+                  {t.capacity != null ? `${t.totalBooked ?? 0} / ${t.capacity} · ${t.avail} avail` : `${t.onlineQuota - t.avail} / ${t.onlineQuota}`}
+                </td>
                 <td className="px-4 py-2 text-center">
                   <div className="flex items-center justify-center gap-2">
                     <button

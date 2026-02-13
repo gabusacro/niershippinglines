@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
-import { getReportsTodayPerTrip, getMonthlySummary, getFuelSettings, getAnnualMonthlyStatsWithVessels } from "@/lib/admin/reports-stats";
-import { getNowManilaString } from "@/lib/admin/ph-time";
+import { getReportsTodayPerTrip, getMonthlySummary, getWeeklySummary, getWeeklySummaryByVessel, getMonthlySummaryByVessel, getFuelSettings, getAnnualMonthlyStatsWithVessels } from "@/lib/admin/reports-stats";
+import { getWeekStartEndInManila } from "@/lib/admin/ph-time";
 import { formatTime } from "@/lib/dashboard/format";
 import { ROUTES } from "@/lib/constants";
 import { FuelSettingsForm } from "./FuelSettingsForm";
@@ -13,24 +13,72 @@ export const metadata = {
   description: "Per-trip today & monthly summary — Nier Shipping Lines",
 };
 
-export default async function AdminReportsPage() {
+type Period = "daily" | "weekly" | "monthly" | "yearly";
+
+const YEAR_MIN = 2020;
+const YEAR_MAX_OFFSET = 1;
+
+export default async function AdminReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string; year?: string }>;
+}) {
   const user = await getAuthUser();
   if (!user) redirect(ROUTES.dashboard);
   const isAdmin = user.role === "admin";
   const isTicketBooth = user.role === "ticket_booth";
   if (!isAdmin && !isTicketBooth) redirect(ROUTES.dashboard);
 
+  const params = await searchParams;
+  const period: Period =
+    params?.period === "weekly" || params?.period === "monthly" || params?.period === "yearly"
+      ? params.period
+      : "daily";
+
   const supabase = await createClient();
   const currentYear = parseInt(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }).slice(0, 4), 10);
-  const [tripRows, monthly, fuelSettings, annualData] = await Promise.all([
+  const yearMax = currentYear + YEAR_MAX_OFFSET;
+  const yearParam = params?.year != null ? parseInt(params.year, 10) : NaN;
+  const selectedYear =
+    period === "yearly" && Number.isInteger(yearParam) && yearParam >= YEAR_MIN && yearParam <= yearMax
+      ? yearParam
+      : currentYear;
+
+  const todayManila = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+  const weekRange = getWeekStartEndInManila();
+
+  const annualDataPromise =
+    period === "yearly"
+      ? getAnnualMonthlyStatsWithVessels(supabase, selectedYear)
+        : Promise.resolve({
+          monthly: [
+            { month: 1, monthName: "January", passengers: 0, revenueCents: 0 },
+            { month: 2, monthName: "February", passengers: 0, revenueCents: 0 },
+            { month: 3, monthName: "March", passengers: 0, revenueCents: 0 },
+            { month: 4, monthName: "April", passengers: 0, revenueCents: 0 },
+            { month: 5, monthName: "May", passengers: 0, revenueCents: 0 },
+            { month: 6, monthName: "June", passengers: 0, revenueCents: 0 },
+            { month: 7, monthName: "July", passengers: 0, revenueCents: 0 },
+            { month: 8, monthName: "August", passengers: 0, revenueCents: 0 },
+            { month: 9, monthName: "September", passengers: 0, revenueCents: 0 },
+            { month: 10, monthName: "October", passengers: 0, revenueCents: 0 },
+            { month: 11, monthName: "November", passengers: 0, revenueCents: 0 },
+            { month: 12, monthName: "December", passengers: 0, revenueCents: 0 },
+          ],
+          byMonthVessel: [],
+        });
+
+  const [tripRows, monthly, weekly, weeklyByVessel, monthlyByVessel, fuelSettings, annualData] = await Promise.all([
     getReportsTodayPerTrip(),
     getMonthlySummary(),
+    getWeeklySummary(),
+    getWeeklySummaryByVessel(),
+    getMonthlySummaryByVessel(),
     getFuelSettings(supabase),
-    getAnnualMonthlyStatsWithVessels(supabase, currentYear),
+    annualDataPromise,
   ]);
 
   const { monthly: annualMonthly, byMonthVessel } = annualData;
-  const nowManila = getNowManilaString();
   const fuelPriceLabel = fuelSettings.fuelPesosPerLiter;
   const peakMonth = annualMonthly.length
     ? annualMonthly.reduce((a, b) => (b.passengers > a.passengers ? b : a), annualMonthly[0])
@@ -78,18 +126,61 @@ export default async function AdminReportsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-[#134e4a]">Reports</h1>
-      <p className="mt-1 text-sm text-[#0f766e]">
-        Per-trip for today (Philippines time). Available seats shown per departure time.
-      </p>
-      <p className="mt-1 text-sm font-medium text-[#0c7b93]">
-        Current time (Philippines): {nowManila}
-      </p>
       <p className="mt-2 text-sm text-[#0f766e]">
-        The table below shows <strong>today’s trips</strong> (one row per departure); the Vessel column appears when there are trips. To view or manage all vessels:{" "}
-        <Link href={ROUTES.adminVessels} className="font-semibold text-[#0c7b93] hover:underline">
-          List of vessels →
-        </Link>
+        View daily departures, monthly and annual summaries, passengers and revenue per vessel, fuel and net revenue, and trip manifests for operations and planning.
       </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href={ROUTES.adminSchedule} className="rounded-lg bg-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0f766e]">
+          Schedule
+        </Link>
+        <Link href={ROUTES.adminVessels} className="rounded-lg border-2 border-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5">
+          Vessels
+        </Link>
+        <Link href={`${ROUTES.adminReports}?period=yearly`} className="rounded-lg border-2 border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
+          Passengers per vessel & manifests
+        </Link>
+      </div>
+
+      {/* Period: Daily | Weekly | Monthly | Yearly — clickable, data from Supabase */}
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Link
+          href={`${ROUTES.adminReports}?period=daily`}
+          className={period === "daily" ? "rounded-lg bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f766e]" : "rounded-lg border-2 border-[#0c7b93] px-4 py-2 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5"}
+        >
+          Daily
+        </Link>
+        <Link
+          href={`${ROUTES.adminReports}?period=weekly`}
+          className={period === "weekly" ? "rounded-lg bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f766e]" : "rounded-lg border-2 border-[#0c7b93] px-4 py-2 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5"}
+        >
+          Weekly
+        </Link>
+        <Link
+          href={`${ROUTES.adminReports}?period=monthly`}
+          className={period === "monthly" ? "rounded-lg bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f766e]" : "rounded-lg border-2 border-[#0c7b93] px-4 py-2 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5"}
+        >
+          Monthly
+        </Link>
+        <Link
+          href={`${ROUTES.adminReports}?period=yearly${period === "yearly" ? `&year=${selectedYear}` : ""}`}
+          className={period === "yearly" ? "rounded-lg bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f766e]" : "rounded-lg border-2 border-[#0c7b93] px-4 py-2 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5"}
+        >
+          Yearly
+        </Link>
+      </div>
+
+      {/* Daily: Today's departures */}
+      {period === "daily" && (
+        <>
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-[#134e4a]">Today&apos;s departures</h2>
+        <p className="mt-0.5 text-sm text-[#0f766e]/80">
+          Per-trip view for today (Philippines date). One row per departure. Shows available seats, boarded passengers, revenue, fuel, net. Click a vessel to open the manifest.
+        </p>
+        <p className="mt-1 text-xs text-[#0f766e]/90">
+          <strong>Schedule vs Trips:</strong> Schedule defines <em>when</em> boats can leave (e.g. 5:30 AM, 11:30 AM). <strong>Trips</strong> are the actual dated sailings—created in <strong>Vessels → Add trips</strong> for a date range. This table shows trips with departure_date = <strong>{todayManila}</strong>.
+        </p>
+      </div>
 
       {isAdmin && (
         <div className="mt-6 rounded-xl border border-teal-200 bg-white p-5 shadow-sm">
@@ -115,14 +206,15 @@ export default async function AdminReportsPage() {
           <tbody className="divide-y divide-teal-100">
             {tripRows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-sm text-[#0f766e]">
-                  <p>No trips scheduled for today (Philippines date). When there are trips, every departure is listed here—one row per trip. Data from Supabase.</p>
-                  <p className="mt-2 font-medium text-[#134e4a]">Why no trips today?</p>
-                  <p className="mt-1">Trips are created in the schedule. Add trips for today&apos;s date in{" "}
-                    <Link href={ROUTES.adminSchedule} className="text-[#0c7b93] underline hover:no-underline">Admin → Schedule</Link>
-                    {" "}or{" "}
-                    <Link href={ROUTES.adminVessels} className="text-[#0c7b93] underline hover:no-underline">Vessels</Link>
-                    {" "}to see them here.
+                <td colSpan={9} className="px-4 py-6 text-center text-sm text-[#0f766e]">
+                  <p>No trips found for <strong>{todayManila}</strong>.</p>
+                  <p className="mt-2">
+                    Trips are created in{" "}
+                    <Link href={ROUTES.adminVessels} className="font-semibold text-[#0c7b93] hover:underline">Vessels</Link>
+                    {" "}→ pick a vessel → <strong>Add trips</strong> → choose route and a date range that includes today. Schedule only defines times; Vessels creates the actual dated sailings.
+                  </p>
+                  <p className="mt-2 text-[#0f766e]/90">
+                    Scroll down for monthly & annual analytics, passengers per vessel, and manifest links.
                   </p>
                 </td>
               </tr>
@@ -152,12 +244,154 @@ export default async function AdminReportsPage() {
           </tbody>
         </table>
       </div>
+        </>
+      )}
 
-      {/* Annual analytics — peak travel by month + line graph + vessel breakdown */}
-      <div className="mt-10">
+      {/* Weekly: This week summary + per vessel */}
+      {period === "weekly" && (
+        <>
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-[#134e4a]">This week</h2>
+        <p className="mt-0.5 text-sm text-[#0f766e]/80">Week of {weekRange.start} to {weekRange.end} (Philippines, Mon–Sun).</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Passengers</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">{weekly.totalPassengers.toLocaleString()}</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Revenue</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">₱{(weekly.totalRevenueCents / 100).toLocaleString()}</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Fuel (L)</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">{weekly.totalFuelLiters} L</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Fuel cost</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">₱{(weekly.totalFuelCostCents / 100).toLocaleString()}</p>
+            <p className="mt-0.5 text-xs text-[#0f766e]/80">{fuelPriceLabel} ₱/L</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Net revenue</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">₱{(weekly.netRevenueCents / 100).toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+      {weeklyByVessel.length > 0 && (
+        <div className="mt-6">
+          <p className="text-sm font-medium text-[#134e4a]">Week record per vessel</p>
+          <p className="mt-0.5 text-xs text-[#0f766e]/80">Total passengers and revenue per vessel for this week.</p>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-teal-100 text-sm">
+              <thead>
+                <tr className="bg-[#0c7b93]/10">
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Vessel</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers (week)</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Revenue (week)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-teal-100">
+                {weeklyByVessel.map((v) => (
+                  <tr key={v.vesselName} className="hover:bg-teal-50/50">
+                    <td className="px-4 py-2 font-medium text-[#134e4a]">{v.vesselName}</td>
+                    <td className="px-4 py-2 text-right text-[#134e4a]">{v.passengers.toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right text-[#134e4a]">₱{(v.revenueCents / 100).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+        </>
+      )}
+
+      {/* Monthly: This month summary + per vessel */}
+      {period === "monthly" && (
+        <>
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-[#134e4a]">This month</h2>
+        <p className="mt-0.5 text-sm text-[#0f766e]/80">Current month totals (Philippines).</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Passengers</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">{monthly.totalPassengers.toLocaleString()}</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Revenue</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">₱{(monthly.totalRevenueCents / 100).toLocaleString()}</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Fuel (L)</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">{monthly.totalFuelLiters} L</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Fuel cost</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">₱{(monthly.totalFuelCostCents / 100).toLocaleString()}</p>
+            <p className="mt-0.5 text-xs text-[#0f766e]/80">{fuelPriceLabel} ₱/L</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-[#0f766e]">Net revenue</p>
+            <p className="mt-2 text-2xl font-bold text-[#134e4a]">₱{(monthly.netRevenueCents / 100).toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+      {monthlyByVessel.length > 0 && (
+        <div className="mt-6">
+          <p className="text-sm font-medium text-[#134e4a]">Month record per vessel</p>
+          <p className="mt-0.5 text-xs text-[#0f766e]/80">Total passengers and revenue per vessel for this month.</p>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-teal-100 text-sm">
+              <thead>
+                <tr className="bg-[#0c7b93]/10">
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Vessel</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers (month)</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Revenue (month)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-teal-100">
+                {monthlyByVessel.map((v) => (
+                  <tr key={v.vesselName} className="hover:bg-teal-50/50">
+                    <td className="px-4 py-2 font-medium text-[#134e4a]">{v.vesselName}</td>
+                    <td className="px-4 py-2 text-right text-[#134e4a]">{v.passengers.toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right text-[#134e4a]">₱{(v.revenueCents / 100).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+        </>
+      )}
+
+      {/* Yearly: Annual analytics — peak travel by month + line graph + vessel breakdown */}
+      {period === "yearly" && (
+      <div id="annual-analytics" className="mt-8 scroll-mt-24">
         <h2 className="text-lg font-semibold text-[#134e4a]">Annual analytics — Peak travel by month</h2>
-        <p className="mt-0.5 text-sm text-[#0f766e]/80">
-          {currentYear} (Philippines). See which months have the most passengers (peak tourist travel) and which vessel in each month.
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          {selectedYear > YEAR_MIN && (
+            <Link
+              href={`${ROUTES.adminReports}?period=yearly&year=${selectedYear - 1}`}
+              className="rounded-lg border-2 border-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10"
+            >
+              ← {selectedYear - 1}
+            </Link>
+          )}
+          <span className="rounded-lg bg-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-white">
+            {selectedYear}
+          </span>
+          {selectedYear < yearMax && (
+            <Link
+              href={`${ROUTES.adminReports}?period=yearly&year=${selectedYear + 1}`}
+              className="rounded-lg border-2 border-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10"
+            >
+              {selectedYear + 1} →
+            </Link>
+          )}
+        </div>
+        <p className="mt-2 text-sm text-[#0f766e]/80">
+          {selectedYear} (Philippines). See which months have the most passengers (peak tourist travel) and which vessel in each month. Future months show 0 until trips are recorded.
         </p>
         {peakMonth && peakMonth.passengers > 0 && (
           <p className="mt-2 rounded-lg bg-[#0c7b93]/10 px-3 py-2 text-sm font-medium text-[#134e4a]">
@@ -211,11 +445,11 @@ export default async function AdminReportsPage() {
           </svg>
         </div>
 
-        {/* Year record per vessel */}
-        {yearRecordPerVessel.length > 0 && (
-          <div className="mt-6">
-            <p className="text-sm font-medium text-[#134e4a]">Year record per vessel ({currentYear})</p>
-            <p className="mt-0.5 text-xs text-[#0f766e]/80">Total passengers and revenue per vessel for the full year.</p>
+        {/* Year record per vessel — always show for selected year (empty state for future/past with no data) */}
+        <div className="mt-6">
+          <p className="text-sm font-medium text-[#134e4a]">Year record per vessel ({selectedYear})</p>
+          <p className="mt-0.5 text-xs text-[#0f766e]/80">Total passengers and revenue per vessel for the full year.</p>
+          {yearRecordPerVessel.length > 0 ? (
             <div className="mt-2 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
               <table className="min-w-full divide-y divide-teal-100 text-sm">
                 <thead>
@@ -236,8 +470,10 @@ export default async function AdminReportsPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="mt-2 rounded-xl border border-teal-200 bg-white px-4 py-3 text-sm text-[#0f766e]/80">No trips recorded for {selectedYear} yet.</p>
+          )}
+        </div>
 
         <div className="mt-4 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
           <table className="min-w-full divide-y divide-teal-100 text-sm">
@@ -265,7 +501,7 @@ export default async function AdminReportsPage() {
 
         {/* Which vessel in each month (e.g. February) */}
         {byMonthVessel.length > 0 && (
-          <div className="mt-6">
+          <div id="by-month-vessel" className="mt-6 scroll-mt-24">
             <p className="text-sm font-medium text-[#134e4a]">By month & vessel</p>
             <p className="mt-0.5 text-xs text-[#0f766e]/80">Which vessel had trips and passengers in each month (e.g. February). Click a vessel or &quot;View manifests&quot; to see trips and open the passenger manifest.</p>
             <div className="mt-2 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
@@ -282,7 +518,7 @@ export default async function AdminReportsPage() {
                 <tbody className="divide-y divide-teal-100">
                   {byMonthVessel.map((row, i) => {
                     const tripsUrl = row.boatId
-                      ? `/admin/reports/trips?year=${currentYear}&month=${row.month}&boatId=${encodeURIComponent(row.boatId)}&vessel=${encodeURIComponent(row.vesselName)}`
+                      ? `/admin/reports/trips?year=${selectedYear}&month=${row.month}&boatId=${encodeURIComponent(row.boatId)}&vessel=${encodeURIComponent(row.vesselName)}`
                       : null;
                     return (
                       <tr key={`${row.month}-${row.vesselName}-${i}`} className="hover:bg-teal-50/50">
@@ -316,35 +552,7 @@ export default async function AdminReportsPage() {
           </div>
         )}
       </div>
-
-      {/* Monthly summary cards (same style as Live today - passengers by vessel) */}
-      <div className="mt-10">
-        <h2 className="text-lg font-semibold text-[#134e4a]">Monthly summary</h2>
-        <p className="mt-0.5 text-sm text-[#0f766e]/80">Current month (Philippines). From Supabase.</p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-[#0f766e]">Passengers catered (month)</p>
-            <p className="mt-2 text-2xl font-bold text-[#134e4a]">{monthly.totalPassengers.toLocaleString()}</p>
-          </div>
-          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-[#0f766e]">Revenue (month)</p>
-            <p className="mt-2 text-2xl font-bold text-[#134e4a]">₱{(monthly.totalRevenueCents / 100).toLocaleString()}</p>
-          </div>
-          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-[#0f766e]">Fuel (L, month)</p>
-            <p className="mt-2 text-2xl font-bold text-[#134e4a]">{monthly.totalFuelLiters} L</p>
-          </div>
-          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-[#0f766e]">Fuel cost (month)</p>
-            <p className="mt-2 text-2xl font-bold text-[#134e4a]">₱{(monthly.totalFuelCostCents / 100).toLocaleString()}</p>
-            <p className="mt-0.5 text-xs text-[#0f766e]/80">{fuelPriceLabel} ₱/L × {monthly.totalFuelLiters} L</p>
-          </div>
-          <div className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-[#0f766e]">Net revenue (month)</p>
-            <p className="mt-2 text-2xl font-bold text-[#134e4a]">₱{(monthly.netRevenueCents / 100).toLocaleString()}</p>
-          </div>
-        </div>
-      </div>
+      )}
 
       <div className="mt-8 flex flex-wrap gap-4">
         <Link href={ROUTES.admin} className="rounded-xl border-2 border-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10">

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/ActionToast";
 import type { UpcomingTripRow } from "@/lib/dashboard/get-upcoming-trips";
 import { formatTime, passengerTypeLabel } from "@/lib/dashboard/format";
-import { GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { GCASH_NUMBER, GCASH_ACCOUNT_NAME, GCASH_FEE_CENTS, ADMIN_FEE_CENTS_PER_PASSENGER } from "@/lib/constants";
+import { TranslatableNotices } from "@/components/booking/TranslatableNotices";
 
 const FARE_TYPE_OPTIONS = [
   { value: "adult", label: "Adult" },
@@ -72,6 +74,11 @@ export function BookingModal({
   const [infantAddresses, setInfantAddresses] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [proofUploaded, setProofUploaded] = useState(false);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [proofError, setProofError] = useState("");
+  const paymentProofInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   const [result, setResult] = useState<{
     reference: string;
     total_amount_cents: number;
@@ -79,6 +86,9 @@ export function BookingModal({
       base_fare_cents?: number;
       discount_percent?: number;
       passenger_details?: { fare_type: string; full_name: string; per_person_cents: number }[];
+      fare_subtotal_cents?: number;
+      gcash_fee_cents?: number;
+      admin_fee_cents?: number;
       total_cents?: number;
     };
   } | null>(null);
@@ -134,11 +144,13 @@ export function BookingModal({
     return list;
   }, [countAdult, countSenior, countPwd, countChild, countInfant, adultNames, seniorNames, pwdNames, childNames, infantNames, adultAddresses, seniorAddresses, pwdAddresses, childAddresses, infantAddresses, customerAddress]);
 
-  const totalCents = useMemo(
+  const fareSubtotalCents = useMemo(
     () => passengerDetails.reduce((sum, p) => sum + fareCents(baseFare, discount, p.fare_type), 0),
     [passengerDetails, baseFare, discount]
   );
   const totalPassengers = countAdult + countSenior + countPwd + countChild + countInfant;
+  const adminFeeCents = totalPassengers * ADMIN_FEE_CENTS_PER_PASSENGER;
+  const totalCents = fareSubtotalCents + GCASH_FEE_CENTS + adminFeeCents;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,11 +196,42 @@ export function BookingModal({
         total_amount_cents: data.total_amount_cents,
         fare_breakdown: data.fare_breakdown,
       });
-      toast.showSuccess(`Booking ${data.reference} created. Please upload payment proof to confirm.`);
+      toast.showSuccess(`Booking ${data.reference} created. Upload payment proof below to confirm.`);
     } catch {
       setError("Network error. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleConfirmBooking = async () => {
+    const file = paymentProofInputRef.current?.files?.[0];
+    if (!file) {
+      setProofError("Please upload your GCash payment screenshot first.");
+      return;
+    }
+    if (!result?.reference) return;
+    setProofError("");
+    setUploadingProof(true);
+    try {
+      const formData = new FormData();
+      formData.set("reference", result.reference);
+      formData.set("file", file);
+      const res = await fetch("/api/booking/upload-proof", { method: "POST", body: formData });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setProofError(data.error ?? "Upload failed");
+        return;
+      }
+      setProofUploaded(true);
+      toast.showSuccess("Payment proof uploaded. We'll verify and confirm your booking soon.");
+      router.refresh();
+      onClose();
+    } catch {
+      setProofError("Network error. Please try again.");
+    } finally {
+      setUploadingProof(false);
+      if (paymentProofInputRef.current) paymentProofInputRef.current.value = "";
     }
   };
 
@@ -206,7 +249,7 @@ export function BookingModal({
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-teal-200 bg-white px-4 py-3">
           <h2 id="booking-modal-title" className="text-lg font-bold text-[#134e4a]">
-            Book this trip
+            Book This Trip
           </h2>
           <button
             type="button"
@@ -267,38 +310,68 @@ export function BookingModal({
                     })}
                   </ul>
                 ) : null}
+                {result.fare_breakdown?.fare_subtotal_cents != null && (
+                  <>
+                    <p className="mt-2 text-sm text-[#134e4a]">Fare: ₱{(result.fare_breakdown.fare_subtotal_cents / 100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">Admin fee (₱15/pax): ₱{((result.fare_breakdown.admin_fee_cents ?? 0) / 100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">GCash fee: ₱{((result.fare_breakdown.gcash_fee_cents ?? 0) / 100).toLocaleString()}</p>
+                  </>
+                )}
                 <p className="mt-2 pt-2 border-t border-teal-200 text-sm font-semibold text-[#134e4a]">
                   Total to pay: ₱{(result.total_amount_cents / 100).toLocaleString()}
                 </p>
               </div>
 
-              {/* Payment method */}
-              <div className="mt-4 rounded-lg border border-teal-200 bg-white p-3">
-                <p className="text-xs font-semibold uppercase text-[#0f766e] mb-2">Payment method</p>
-                <ul className="space-y-2 text-sm text-[#134e4a]">
-                  <li>
-                    <strong>Ticket booth:</strong> Pay in person and present reference <span className="font-mono font-semibold">{result.reference}</span>.
-                  </li>
-                  {GCASH_NUMBER ? (
-                    <li>
-                      <strong>GCash deposit:</strong> Send <strong>₱{(result.total_amount_cents / 100).toLocaleString()}</strong> to the number below. Put reference <span className="font-mono font-semibold">{result.reference}</span> in the message. Show proof at the ticket booth.
-                    </li>
-                  ) : null}
-                </ul>
-                {GCASH_NUMBER ? (
-                  <div className="mt-2 rounded bg-teal-50 p-2 text-sm">
-                    <p><strong>GCash number:</strong> <span className="font-mono">{GCASH_NUMBER}</span></p>
-                    {GCASH_ACCOUNT_NAME ? <p><strong>Account name:</strong> {GCASH_ACCOUNT_NAME}</p> : null}
-                  </div>
-                ) : null}
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                <TranslatableNotices listClassName="text-sm text-amber-900 space-y-1 list-disc list-outside pl-5 ml-1" />
+              </div>
+
+              {/* Pay via GCash */}
+              {GCASH_NUMBER && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                  <p className="text-xs font-semibold uppercase text-amber-800 mb-1">Pay via GCash</p>
+                  <p className="text-sm text-amber-900">
+                    Send <strong>₱{(result.total_amount_cents / 100).toLocaleString()}</strong> to <strong>{GCASH_NUMBER}</strong> ({GCASH_ACCOUNT_NAME}). Put reference <span className="font-mono font-semibold">{result.reference}</span> in the message.
+                  </p>
+                </div>
+              )}
+
+              {/* Submit payment proof + Confirm Booking */}
+              <div className="mt-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-[#134e4a] mb-2">Submit payment proof</p>
+                  <p className="text-xs text-[#0f766e] mb-2">
+                    Upload a screenshot of your GCash payment showing the reference number so we can confirm your booking faster.
+                  </p>
+                  <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-xl border-2 border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50">
+                    <input
+                      ref={paymentProofInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                      className="sr-only"
+                      onChange={() => setProofError("")}
+                      disabled={uploadingProof || proofUploaded}
+                    />
+                    {uploadingProof ? "Uploading…" : proofUploaded ? "Proof submitted" : "Choose screenshot or PDF"}
+                  </label>
+                </div>
+                {proofError && <p className="text-sm text-red-600">{proofError}</p>}
+                <button
+                  type="button"
+                  onClick={handleConfirmBooking}
+                  disabled={uploadingProof || proofUploaded}
+                  className="w-full min-h-[44px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50"
+                >
+                  {uploadingProof ? "Uploading…" : proofUploaded ? "Done" : "Confirm Booking"}
+                </button>
               </div>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="mt-4 w-full rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e]"
+                className="mt-2 w-full rounded-xl border border-[#0c7b93] px-4 py-2 text-sm font-medium text-[#0c7b93] hover:bg-[#0c7b93]/10"
               >
-                Close
+                {proofUploaded ? "Close" : "I'll upload later"}
               </button>
             </div>
           ) : (
@@ -325,10 +398,20 @@ export function BookingModal({
               </div>
 
               {totalPassengers > 0 && fare && (
-                <p className="text-sm text-[#0f766e]">
-                  Total: <strong>₱{(totalCents / 100).toLocaleString()}</strong> ({totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""})
-                </p>
+                <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 space-y-1">
+                  <p className="text-xs font-semibold uppercase text-[#0f766e]">Amount breakdown</p>
+                  <p className="text-sm text-[#134e4a]">Fare: ₱{(fareSubtotalCents / 100).toLocaleString()}</p>
+                  <p className="text-sm text-[#134e4a]">Admin fee (₱15/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
+                  <p className="text-sm text-[#134e4a]">GCash fee: ₱{(GCASH_FEE_CENTS / 100).toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-[#134e4a] pt-1 border-t border-teal-200">
+                    Total: ₱{(totalCents / 100).toLocaleString()} ({totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""})
+                  </p>
+                </div>
               )}
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                <TranslatableNotices listClassName="text-sm text-amber-900 space-y-1 list-disc list-outside pl-5 ml-1" />
+              </div>
 
               {/* Address */}
               <div>
@@ -577,7 +660,7 @@ export function BookingModal({
                   disabled={submitting || totalPassengers < 1}
                   className="flex-1 rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50"
                 >
-                  {submitting ? "Creating…" : "Create booking"}
+                  {submitting ? "Creating…" : "Create Booking"}
                 </button>
               </div>
             </form>

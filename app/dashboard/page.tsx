@@ -68,7 +68,9 @@ export default async function DashboardPage() {
     ? (salutation ? `${salutation}. ${displayName}` : displayName)
     : null;
   const showWelcomeName = welcomeName ?? (user.email ? null : "User");
-  const pendingBookings = isPassenger ? await getPendingPaymentBookings(user.email ?? "") : [];
+  const allPending = isPassenger ? await getPendingPaymentBookings(user.email ?? "") : [];
+  const awaitingPayment = allPending.filter((b) => !b.payment_proof_path);
+  const awaitingConfirmation = allPending.filter((b) => !!b.payment_proof_path);
   const recentlyConfirmed = isPassenger ? await getRecentlyConfirmedBookings(user.email ?? "") : [];
   const refundedBookings = isPassenger ? await getRefundedBookings(user.email ?? "") : [];
 
@@ -107,17 +109,17 @@ export default async function DashboardPage() {
           {/* Find by reference — so passenger can open any booking (e.g. pending L7HHU7NCHR) even if list missed it */}
           <FindBookingByReference />
 
-          {/* Pending payment — show first so passenger sees bookings needing attention (not yet confirmed) */}
-          {pendingBookings.length > 0 && (
+          {/* Awaiting payment — no proof uploaded yet */}
+          {awaitingPayment.length > 0 && (
             <div className="mt-6 rounded-2xl border-2 border-amber-400 bg-amber-50 p-6 shadow-sm sm:p-8">
               <h2 className="text-lg font-bold text-amber-900">
                 Awaiting payment — needs your attention
               </h2>
               <p className="mt-1 text-sm text-amber-800">
-                You have {pendingBookings.length} booking{pendingBookings.length !== 1 ? "s" : ""} that need payment. Pay via GCash or at the ticket booth to confirm your trip.
+                You have {awaitingPayment.length} booking{awaitingPayment.length !== 1 ? "s" : ""} that need payment. Pay via GCash or at the ticket booth, then upload proof to confirm your trip.
               </p>
               <ul className="mt-4 space-y-3">
-                {pendingBookings.map((b) => {
+                {awaitingPayment.map((b) => {
                   const routeName = b.trip?.route?.display_name ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
                   return (
                     <li key={b.id}>
@@ -143,6 +145,43 @@ export default async function DashboardPage() {
               <Link
                 href={ROUTES.myBookings}
                 className="mt-4 inline-block rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 transition-colors"
+              >
+                View all my bookings →
+              </Link>
+            </div>
+          )}
+
+          {/* Awaiting confirmation — proof uploaded, waiting for admin */}
+          {awaitingConfirmation.length > 0 && (
+            <div className="mt-6 rounded-2xl border-2 border-teal-400 bg-teal-50 p-6 shadow-sm sm:p-8">
+              <h2 className="text-lg font-bold text-teal-900">
+                Awaiting Confirmation — Please wait while we process the transaction
+              </h2>
+              <p className="mt-1 text-sm text-teal-800">
+                You have {awaitingConfirmation.length} booking{awaitingConfirmation.length !== 1 ? "s" : ""} with payment proof submitted. We&apos;ll verify and confirm your trip soon.
+              </p>
+              <ul className="mt-4 space-y-3">
+                {awaitingConfirmation.map((b) => {
+                  const routeName = b.trip?.route?.display_name ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
+                  return (
+                    <li key={b.id}>
+                      <Link
+                        href={`/dashboard/bookings/${b.reference}`}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-200 bg-white px-4 py-3 transition-colors hover:border-teal-400 hover:bg-teal-50/50"
+                      >
+                        <span className="font-mono font-semibold text-[#0c7b93]">{b.reference}</span>
+                        <span className="text-sm text-[#134e4a]">{routeName}</span>
+                        <span className="font-semibold text-[#134e4a]">
+                          ₱{(b.total_amount_cents / 100).toLocaleString()}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              <Link
+                href={ROUTES.myBookings}
+                className="mt-4 inline-block rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition-colors"
               >
                 View all my bookings →
               </Link>
@@ -273,20 +312,36 @@ export default async function DashboardPage() {
       ) : user.role === "ticket_booth" ? (
         <div className="mt-6 space-y-4">
           <p className="mt-1 text-sm text-[#0f766e]/80">
-            Add walk-in bookings when you collect payment. Open Reports to view passenger manifests (Coast Guard) and enter walk-in passenger count per trip.
+            Serve walk-ins: take cash or GCash, confirm payment by reference, view booking history, and process refunds or reschedules when needed. Same rules apply (e.g. 24h for reschedule, refund reasons).
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Link
-              href={ROUTES.adminReports}
-              className="inline-flex min-h-[44px] items-center rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
+              href={ROUTES.adminPendingPayments}
+              className="rounded-xl border-2 border-[#0c7b93] px-5 py-4 text-left transition-colors hover:bg-[#0c7b93]/10"
             >
-              Reports → Manifests & walk-in count
+              <h2 className="font-semibold text-[#134e4a]">Pending payments</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">See walk-ins who paid by reference; confirm when they show proof (cash/GCash).</p>
+            </Link>
+            <Link
+              href={ROUTES.adminBookings}
+              className="rounded-xl border-2 border-[#0c7b93] px-5 py-4 text-left transition-colors hover:bg-[#0c7b93]/10"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Booking history</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">View all bookings; open any to process refund or reschedule.</p>
             </Link>
             <Link
               href={ROUTES.adminManualBooking}
-              className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50"
+              className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50"
             >
-              Add manual booking (walk-in) →
+              <h2 className="font-semibold text-[#134e4a]">Add walk-in booking</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Create booking when you collect payment at the booth.</p>
+            </Link>
+            <Link
+              href={ROUTES.adminReports}
+              className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Reports & manifests</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Daily/weekly/monthly/yearly reports; trip manifests.</p>
             </Link>
           </div>
         </div>

@@ -146,7 +146,10 @@ export function TripCalendar({
           ) : (
             <ul className="mt-4 space-y-3">
               {selectedTrips.map((t) => {
-                const available = (t.online_quota ?? 0) - (t.online_booked ?? 0);
+                const ob = t.online_booked ?? 0;
+                const wb = t.walk_in_booked ?? 0;
+                const capacity = (t.boat as { capacity?: number })?.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
+                const available = Math.max(0, capacity - ob - wb);
                 const routeName =
                   t.route?.display_name ??
                   [t.route?.origin, t.route?.destination].filter(Boolean).join(" ↔ ") ??

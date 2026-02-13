@@ -1,23 +1,16 @@
 import Link from "next/link";
 import { APP_NAME, ROUTES } from "@/lib/constants";
-import { Boat, Sun, Wave } from "@/components/icons";
+import { Boat, Wave } from "@/components/icons";
 import BookingForm from "./BookingForm";
+import { HowItWorksSection } from "./HowItWorksSection";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { getActiveAnnouncements } from "@/lib/announcements/get-announcements";
 import { AnnouncementsBlock } from "@/components/announcements/AnnouncementsBlock";
 
 export const metadata = {
-  title: "Book a Trip",
+  title: "Book A Trip",
   description: `Book ferry tickets — ${APP_NAME}`,
 };
-
-const STEPS = [
-  { step: 1, title: "Choose route & date", desc: "Pick Siargao ↔ Surigao or Dinagat ↔ Surigao, then your travel date." },
-  { step: 2, title: "Pick a time & boat", desc: "Select your preferred departure time and we’ll show available boats." },
-  { step: 3, title: "Enter passenger details", desc: "Add names and contact info. Choose fare type (adult, senior, PWD, child)." },
-  { step: 4, title: "Pay via GCash", desc: "Pay with GCash and upload a screenshot of your payment for verification." },
-  { step: 5, title: "Get your e-ticket", desc: "Receive your e-ticket with QR code and reference number. Show it at the pier." },
-];
 
 export default async function BookPage() {
   const [announcements, user] = await Promise.all([
@@ -34,7 +27,7 @@ export default async function BookPage() {
           <Boat size={28} className="text-[#0c7b93]" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-[#134e4a] sm:text-2xl">Book a trip</h1>
+          <h1 className="text-xl font-bold text-[#134e4a] sm:text-2xl">Book A Trip</h1>
           <p className="text-sm text-[#0f766e] sm:text-base">Reserve your seat in a few steps. Booking will connect to live inventory soon.</p>
         </div>
       </div>
@@ -45,28 +38,7 @@ export default async function BookPage() {
         </div>
       )}
 
-      {/* How to book */}
-      <section className="rounded-2xl border border-teal-200 bg-white/80 shadow-sm overflow-hidden mb-8 sm:mb-10">
-        <div className="bg-[#0c7b93]/10 px-4 py-3 sm:px-6 sm:py-4 border-b border-teal-200">
-          <h2 className="font-semibold text-[#134e4a] flex items-center gap-2 text-sm sm:text-base">
-            <Sun size={20} className="text-[#f59e0b] shrink-0" />
-            How it works
-          </h2>
-        </div>
-        <ol className="divide-y divide-teal-100">
-          {STEPS.map(({ step, title, desc }) => (
-            <li key={step} className="flex gap-3 sm:gap-4 px-4 py-4 sm:px-6">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0c7b93] text-sm font-bold text-white touch-target">
-                {step}
-              </span>
-              <div className="min-w-0">
-                <h3 className="font-medium text-[#134e4a] text-sm sm:text-base">{title}</h3>
-                <p className="mt-0.5 text-xs sm:text-sm text-[#0f766e]">{desc}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <HowItWorksSection />
 
       {/* Pricing (static) */}
       <section className="rounded-2xl border border-teal-200 bg-[#fef9e7]/80 p-4 sm:p-6 mb-8 sm:mb-10">
@@ -87,7 +59,10 @@ export default async function BookPage() {
           </div>
         </div>
         <p className="mt-4 text-sm text-[#0f766e]">
-          Same base fare for Siargao and Dinagat routes. Date change: 20% additional fee. No seat numbers—first-come seating at the pier.
+          Same base fare for Siargao and Dinagat routes. Reschedule: 10% + ₱15 (24+ hours before departure only). No seat numbers—first-come seating at the pier. Fee breakdown: Fare + Admin fee (₱15/pax) + GCash fee (₱15 per transaction).
+        </p>
+        <p className="mt-2 text-sm font-medium text-amber-800">
+          For a smooth trip, please arrive at the port <strong>30 min–1 hour</strong> before boarding. Once the vessel has departed, we’re unable to offer refunds or rebooking.
         </p>
       </section>
 

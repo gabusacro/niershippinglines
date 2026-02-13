@@ -75,7 +75,11 @@ export async function POST(request: NextRequest) {
   const updateClient = createAdminClient() ?? supabase;
   const { error: updateErr } = await updateClient
     .from("bookings")
-    .update({ payment_proof_path: path, updated_at: new Date().toISOString() })
+    .update({
+      payment_proof_path: path,
+      proof_resend_requested_at: null,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", booking.id);
 
   if (updateErr) {

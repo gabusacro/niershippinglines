@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 /** POST: Admin-only. Set booking status to confirmed (payment received). Notifies passenger by email. */
 export async function POST(request: NextRequest) {
   const user = await getAuthUser();
-  if (!user || user.role !== "admin") {
+  if (!user || (user.role !== "admin" && user.role !== "ticket_booth")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

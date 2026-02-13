@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendBookingPaymentRequired } from "@/lib/email/send-booking-payment-required";
-import { GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { GCASH_NUMBER, GCASH_ACCOUNT_NAME, GCASH_FEE_CENTS, ADMIN_FEE_CENTS_PER_PASSENGER } from "@/lib/constants";
 import { getTodayInManila, isTripDepartureAtLeast30MinFromNow } from "@/lib/admin/ph-time";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -185,6 +185,10 @@ export async function POST(request: NextRequest) {
     const perPersonCents = fareCents(base, discount, fareType);
     totalCents = passengerCount * perPersonCents;
   }
+  const fareSubtotalCents = totalCents;
+  const gcashFeeCents = GCASH_FEE_CENTS; // Online bookings pay via GCash
+  const adminFeeCents = passengerCount * ADMIN_FEE_CENTS_PER_PASSENGER;
+  totalCents = fareSubtotalCents + gcashFeeCents + adminFeeCents;
 
   let createdBy: string | null = null;
   const { data: { user } } = await supabase.auth.getUser();
@@ -214,6 +218,8 @@ export async function POST(request: NextRequest) {
     passenger_count: passengerCount,
     fare_type: fareType,
     total_amount_cents: totalCents,
+    gcash_fee_cents: gcashFeeCents,
+    admin_fee_cents: adminFeeCents,
     status: "pending_payment",
     is_walk_in: false,
     created_by: createdBy,
@@ -266,6 +272,9 @@ export async function POST(request: NextRequest) {
             full_name: p.full_name.trim(),
             per_person_cents: fareCents(base, discount, p.fare_type),
           })),
+          fare_subtotal_cents: fareSubtotalCents,
+          gcash_fee_cents: gcashFeeCents,
+          admin_fee_cents: adminFeeCents,
           total_cents: totalCents,
         }
       : {
@@ -274,6 +283,9 @@ export async function POST(request: NextRequest) {
           fare_type: fareType,
           per_person_cents: fareCents(base, discount, fareType),
           passenger_count: passengerCount,
+          fare_subtotal_cents: fareSubtotalCents,
+          gcash_fee_cents: gcashFeeCents,
+          admin_fee_cents: adminFeeCents,
           total_cents: totalCents,
         },
   });

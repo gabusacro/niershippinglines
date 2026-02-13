@@ -94,6 +94,9 @@ export default function HomePage() {
         <div className="mx-auto max-w-4xl px-4 text-center text-[#0f766e] text-xs sm:text-sm sm:px-6">
           Easy online booking &middot; E-ticket with QR code &middot; Siargao &amp; Dinagat routes &middot; Senior, PWD &amp; child discounts
         </div>
+        <div className="mx-auto max-w-4xl px-4 mt-3 text-center text-amber-800 text-xs sm:text-sm sm:px-6">
+          Arrive 30 min–1 hour before boarding so you don’t miss your sailing
+        </div>
       </section>
     </div>
   );
