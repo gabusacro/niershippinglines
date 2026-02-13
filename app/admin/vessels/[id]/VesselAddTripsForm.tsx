@@ -194,7 +194,7 @@ export default function VesselAddTripsForm({ boatId, routes, ports }: VesselAddT
         </div>
         <button
           type="submit"
-          disabled={submitting || routes.length === 0 || (routeId && scheduleTimes.length === 0)}
+          disabled={submitting || routes.length === 0 || (routeId ? scheduleTimes.length === 0 : false)}
           className="rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50"
         >
           {submitting ? "Creating…" : "Create trips"}
