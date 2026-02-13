@@ -21,6 +21,7 @@ import {
   getCurrentTripFromTodays,
 } from "@/lib/dashboard/get-todays-trips-for-boats";
 import { getTripManifestData } from "@/lib/admin/trip-manifest";
+import { getPassengerRestrictions, isBlockedNow } from "@/lib/dashboard/get-passenger-restrictions";
 import { CrewCaptainManifestSection } from "@/app/dashboard/CrewCaptainManifestSection";
 
 export async function generateMetadata() {
@@ -85,8 +86,9 @@ export default async function DashboardPage({
     ? (salutation ? `${salutation}. ${displayName}` : displayName)
     : null;
   const showWelcomeName = welcomeName ?? (user.email ? null : "User");
-  const [branding, allPending, recentlyConfirmed, refundedBookings, pendingPreviewBooth] = await Promise.all([
+  const [branding, passengerRestriction, allPending, recentlyConfirmed, refundedBookings, pendingPreviewBooth] = await Promise.all([
     getSiteBranding(),
+    isPassenger ? getPassengerRestrictions(user.id) : Promise.resolve(null),
     isPassenger ? getPendingPaymentBookings(user.email ?? "") : Promise.resolve([]),
     isPassenger ? getRecentlyConfirmedBookings(user.email ?? "") : Promise.resolve([]),
     isPassenger ? getRefundedBookings(user.email ?? "") : Promise.resolve([]),
@@ -146,6 +148,25 @@ export default async function DashboardPage({
 
       {isPassenger ? (
         <>
+          {/* Warning notice (orange) — passenger has received a warning */}
+          {passengerRestriction && passengerRestriction.booking_warnings >= 1 && !isBlockedNow(passengerRestriction) && (
+            <div className="mt-6 rounded-2xl border-2 border-amber-500 bg-amber-50 p-6 shadow-sm sm:p-8">
+              <h2 className="text-lg font-bold text-amber-900">Notice about your account</h2>
+              <p className="mt-2 text-sm text-amber-800">
+                We&apos;ve noticed some issues with your recent booking activity. Please ensure you only book when you intend to complete payment. Repeated abuse may result in temporary or permanent restrictions on your account.
+              </p>
+            </div>
+          )}
+          {/* Blocked notice — passenger is restricted from booking */}
+          {passengerRestriction && isBlockedNow(passengerRestriction) && (
+            <div className="mt-6 rounded-2xl border-2 border-red-400 bg-red-50 p-6 shadow-sm sm:p-8">
+              <h2 className="text-lg font-bold text-red-900">Account temporarily restricted</h2>
+              <p className="mt-2 text-sm text-red-800">
+                We noticed unusual activity and have temporarily restricted your account from making new bookings. If you believe this is an error, please contact us at{" "}
+                <a href="mailto:gabu.sacro@gmail.com" className="font-semibold underline">gabu.sacro@gmail.com</a>.
+              </p>
+            </div>
+          )}
           {/* Find by reference — so passenger can open any booking (e.g. pending L7HHU7NCHR) even if list missed it */}
           <FindBookingByReference />
 

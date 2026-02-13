@@ -23,9 +23,9 @@ export async function POST(request: NextRequest) {
   const action = typeof body.action === "string" ? body.action.trim() : null;
 
   if (!profileId) return NextResponse.json({ error: "Missing profile_id" }, { status: 400 });
-  const validActions = ["warn", "block", "unblock", "clear_warnings"] as const;
+  const validActions = ["warn", "block", "unblock", "clear_warnings", "spam", "lift"] as const;
   if (!action || !validActions.includes(action as (typeof validActions)[number])) {
-    return NextResponse.json({ error: "Missing or invalid action. Use: warn, block, unblock, clear_warnings" }, { status: 400 });
+    return NextResponse.json({ error: "Missing or invalid action. Use: warn, block, unblock, clear_warnings, spam, lift" }, { status: 400 });
   }
 
   // Ensure target is a passenger (optional: don't allow restricting staff).
@@ -92,10 +92,51 @@ export async function POST(request: NextRequest) {
   if (action === "unblock") {
     const { error: updateErr } = await supabase
       .from("passenger_booking_restrictions")
-      .update({ booking_blocked_at: null, updated_at: now, updated_by: user.id })
+      .update({ booking_blocked_at: null, blocked_until: null, updated_at: now, updated_by: user.id })
       .eq("profile_id", profileId);
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
     return NextResponse.json({ ok: true, message: "Passenger unblocked. They can book again." });
+  }
+
+  if (action === "spam") {
+    const in15Days = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: upsertErr } = await supabase
+      .from("passenger_booking_restrictions")
+      .upsert(
+        {
+          profile_id: profileId,
+          booking_warnings: 2,
+          blocked_until: in15Days,
+          updated_at: now,
+          updated_by: user.id,
+        },
+        { onConflict: "profile_id" }
+      );
+    if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true, message: "Passenger restricted from booking for 15 days. They will see a message to contact support." });
+  }
+
+  if (action === "lift") {
+    const { data: existing } = await supabase
+      .from("passenger_booking_restrictions")
+      .select("profile_id")
+      .eq("profile_id", profileId)
+      .maybeSingle();
+    if (!existing) {
+      return NextResponse.json({ ok: true, message: "No restrictions to lift." });
+    }
+    const { error: updateErr } = await supabase
+      .from("passenger_booking_restrictions")
+      .update({
+        booking_blocked_at: null,
+        blocked_until: null,
+        booking_warnings: 0,
+        updated_at: now,
+        updated_by: user.id,
+      })
+      .eq("profile_id", profileId);
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true, message: "Restrictions lifted. Passenger can book again." });
   }
 
   // clear_warnings
@@ -115,3 +156,4 @@ export async function POST(request: NextRequest) {
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
   return NextResponse.json({ ok: true, message: "Warnings cleared.", booking_warnings: 0 });
 }
+

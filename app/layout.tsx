@@ -20,6 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL) : undefined,
     title: { default: branding.site_name, template: `%s | ${branding.site_name}` },
     description: siteDescription,
+    icons: { icon: "/favicon.png" },
     keywords: ["ferry", "Siargao", "Surigao", "Dinagat", "boat", "tickets", "schedule", branding.site_name, "Philippines"],
     openGraph: { title: branding.site_name, description: siteDescription, type: "website", locale: "en_PH" },
     twitter: { card: "summary_large_image", title: branding.site_name, description: siteDescription },

@@ -127,12 +127,19 @@ export async function POST(request: NextRequest) {
     if (adminForCheck) {
       const { data: restriction } = await adminForCheck
         .from("passenger_booking_restrictions")
-        .select("booking_blocked_at")
+        .select("booking_blocked_at, blocked_until")
         .eq("profile_id", authUser.id)
         .maybeSingle();
+      const now = new Date().toISOString();
       if (restriction?.booking_blocked_at) {
         return NextResponse.json(
-          { error: "Your account is blocked from making new bookings. Contact support if you believe this is an error." },
+          { error: "Your account is blocked from making new bookings. If you believe this is an error, please contact us at gabu.sacro@gmail.com." },
+          { status: 403 }
+        );
+      }
+      if (restriction?.blocked_until && restriction.blocked_until > now) {
+        return NextResponse.json(
+          { error: "We noticed unusual activity and have temporarily restricted your account. If you believe this is an error, please contact us at gabu.sacro@gmail.com." },
           { status: 403 }
         );
       }

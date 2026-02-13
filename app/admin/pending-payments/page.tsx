@@ -4,19 +4,21 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { ROUTES } from "@/lib/constants";
 import { ConfirmPaymentButton } from "./ConfirmPaymentButton";
+import { PendingPaymentActions } from "@/components/admin/PendingPaymentActions";
 import { ResendProofButton } from "@/components/admin/ResendProofButton";
 import { formatTime } from "@/lib/dashboard/format";
 import { getPaymentProofSignedUrl } from "@/lib/admin/payment-proof-url";
 import { PaymentProofViewer } from "@/components/admin/PaymentProofViewer";
 
 export const metadata = {
-  title: "Pending payments",
+  title: "Pending Payments",
   description: "Bookings awaiting payment — Nier Shipping Lines Admin",
 };
 
 type Row = {
   id: string;
   reference: string;
+  created_by: string | null;
   customer_full_name: string;
   customer_email: string;
   customer_mobile: string | null;
@@ -42,7 +44,7 @@ export default async function AdminPendingPaymentsPage() {
   const { data: bookings, error } = await supabase
     .from("bookings")
     .select(
-      "id, reference, customer_full_name, customer_email, customer_mobile, passenger_count, total_amount_cents, created_at, payment_proof_path, gcash_transaction_reference, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
+      "id, reference, created_by, customer_full_name, customer_email, customer_mobile, passenger_count, total_amount_cents, created_at, payment_proof_path, gcash_transaction_reference, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
     )
     .eq("status", "pending_payment")
     .order("created_at", { ascending: false })
@@ -71,7 +73,7 @@ export default async function AdminPendingPaymentsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-      <h1 className="text-2xl font-bold text-[#134e4a]">Pending payments</h1>
+      <h1 className="text-2xl font-bold text-[#134e4a]">Pending Payments</h1>
       <p className="mt-1 text-sm text-[#0f766e]">
         Bookings waiting for payment. When a walk-in shows their reference (or phone), find them here and confirm to mark as paid (cash or GCash).
       </p>
@@ -157,9 +159,16 @@ export default async function AdminPendingPaymentsPage() {
                     <p className="mt-2 text-xs text-amber-700">Proof uploaded (preview unavailable)</p>
                   ) : null}
                 </div>
-                <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
-                  {b.payment_proof_path && <ResendProofButton reference={b.reference} />}
-                  <ConfirmPaymentButton reference={b.reference} />
+                <div className="flex flex-col items-stretch gap-3 sm:items-end">
+                  <PendingPaymentActions
+                    bookingId={b.id}
+                    reference={b.reference}
+                    profileId={b.created_by}
+                  />
+                  <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+                    {b.payment_proof_path && <ResendProofButton reference={b.reference} />}
+                    <ConfirmPaymentButton reference={b.reference} />
+                  </div>
                 </div>
               </div>
             );
