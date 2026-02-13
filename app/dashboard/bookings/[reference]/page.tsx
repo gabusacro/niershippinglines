@@ -3,7 +3,8 @@ import { redirect, notFound } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
 import { isDepartureAtLeast24HoursFromNow } from "@/lib/admin/ph-time";
-import { APP_NAME, ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { getSiteBranding } from "@/lib/site-branding";
 import { TranslatableNotices } from "@/components/booking/TranslatableNotices";
 import { passengerTypeLabel } from "@/lib/dashboard/format";
 import { PrintTicketsTrigger } from "@/components/tickets/PrintTicketsTrigger";
@@ -13,10 +14,10 @@ import { AcknowledgeRefundButton } from "./AcknowledgeRefundButton";
 import { RequestRefundButton } from "./RequestRefundButton";
 import { RequestRescheduleButton } from "./RequestRescheduleButton";
 
-export const metadata = {
-  title: "Booking details",
-  description: `Booking details — ${APP_NAME}`,
-};
+export async function generateMetadata() {
+  const branding = await getSiteBranding();
+  return { title: "Booking details", description: `Booking details — ${branding.site_name}` };
+}
 
 function formatTime(t: string | null | undefined) {
   if (!t) return "—";
@@ -64,6 +65,7 @@ export default async function BookingDetailPage({
   const { reference } = await params;
   const refNormalized = reference.trim().toUpperCase();
   if (!refNormalized) notFound();
+  const branding = await getSiteBranding();
   const supabase = await createClient();
   const email = (user.email ?? "").trim().toLowerCase();
   if (!email) notFound();
@@ -259,6 +261,7 @@ export default async function BookingDetailPage({
               reference={booking.reference}
               passengerCount={booking.passenger_count}
               className="inline-flex min-h-[44px] items-center rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
+              siteName={branding.site_name}
             />
           </div>
         )}
@@ -285,7 +288,7 @@ export default async function BookingDetailPage({
               Your ticket has been refunded
             </h2>
             <p className="mt-2 text-sm text-amber-800">
-              {APP_NAME} has processed a refund for your booking. The amount of{" "}
+              {branding.site_name} has processed a refund for your booking. The amount of{" "}
               <strong>₱{(booking.total_amount_cents / 100).toLocaleString()}</strong> for {routeName} on {formatDate(b.trip_snapshot_departure_date)} at {formatTime(b.trip_snapshot_departure_time)} has been refunded.
             </p>
             {gcashRef && (

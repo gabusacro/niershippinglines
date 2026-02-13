@@ -3,7 +3,8 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { getTripManifestData } from "@/lib/admin/trip-manifest";
-import { ROUTES, APP_NAME } from "@/lib/constants";
+import { ROUTES } from "@/lib/constants";
+import { getSiteBranding } from "@/lib/site-branding";
 import { ManifestDocument } from "./ManifestDocument";
 import { WalkInNamesForm } from "./WalkInNamesForm";
 import { ManifestActions } from "./ManifestActions";
@@ -31,6 +32,7 @@ export default async function TripManifestPage({
   const data = await getTripManifestData(tripId);
   if (!data) notFound();
 
+  const branding = await getSiteBranding();
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto = h.get("x-forwarded-proto") ?? "https";
@@ -71,7 +73,7 @@ export default async function TripManifestPage({
           <ReconcileWalkInButton tripId={tripId} walkInNoNames={data.walkInNoNames} />
         </div>
 
-        <ManifestDocument data={data} manifestUrl={manifestUrl} appName={APP_NAME} />
+        <ManifestDocument data={data} manifestUrl={manifestUrl} appName={branding.site_name} />
       </div>
     </div>
   );

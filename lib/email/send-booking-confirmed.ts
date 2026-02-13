@@ -3,10 +3,10 @@
  * Uses Gmail SMTP first, else Resend. No-op if neither configured.
  */
 
+import type { SiteBranding } from "@/lib/site-branding";
 import { sendViaGmail, isGmailConfigured } from "./send-via-gmail";
 
 const RESEND_API = "https://api.resend.com/emails";
-const APP_NAME = "Nier Shipping Lines";
 
 export type SendBookingConfirmedParams = {
   to: string;
@@ -15,17 +15,16 @@ export type SendBookingConfirmedParams = {
   ticketsUrl?: string;
 };
 
-function buildHtml(params: SendBookingConfirmedParams): string {
+function buildHtml(params: SendBookingConfirmedParams, branding: SiteBranding): string {
   const { reference, totalAmountCents, ticketsUrl } = params;
   const totalPhp = (totalAmountCents / 100).toLocaleString();
-  const link = ticketsUrl ?? `https://example.com/bookings/${reference}/tickets`;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Payment confirmed – ${APP_NAME}</title>
+  <title>Payment confirmed – ${branding.site_name}</title>
 </head>
 <body style="margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; color: #134e4a;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f5f5f5;">
@@ -34,8 +33,8 @@ function buildHtml(params: SendBookingConfirmedParams): string {
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 520px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(19, 78, 74, 0.08); overflow: hidden;">
           <tr>
             <td style="background: linear-gradient(135deg, #0c7b93 0%, #0f766e 100%); padding: 28px 32px; text-align: center;">
-              <p style="margin:0; font-size: 22px; font-weight: 700; color: #fef9e7;">${APP_NAME}</p>
-              <p style="margin: 6px 0 0 0; font-size: 13px; color: rgba(254, 249, 231, 0.9);">Siargao Island ↔ Surigao · Dinagat ↔ Surigao City</p>
+              <p style="margin:0; font-size: 22px; font-weight: 700; color: #fef9e7;">${branding.site_name}</p>
+              <p style="margin: 6px 0 0 0; font-size: 13px; color: rgba(254, 249, 231, 0.9);">${branding.routes_text}</p>
             </td>
           </tr>
           <tr>
@@ -64,8 +63,10 @@ function buildHtml(params: SendBookingConfirmedParams): string {
 }
 
 export async function sendBookingConfirmed(params: SendBookingConfirmedParams): Promise<boolean> {
-  const subject = `Payment confirmed – Reference ${params.reference} – ${APP_NAME}`;
-  const html = buildHtml(params);
+  const { getSiteBranding } = await import("@/lib/site-branding");
+  const branding = await getSiteBranding();
+  const subject = `Payment confirmed – Reference ${params.reference} – ${branding.site_name}`;
+  const html = buildHtml(params, branding);
 
   if (isGmailConfigured()) {
     const ok = await sendViaGmail({ to: params.to, subject, html });
@@ -75,7 +76,7 @@ export async function sendBookingConfirmed(params: SendBookingConfirmedParams): 
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) return false;
 
-  const from = process.env.RESEND_FROM?.trim() || "Nier Shipping Lines <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM?.trim() || `${branding.site_name} <onboarding@resend.dev>`;
   try {
     const res = await fetch(RESEND_API, {
       method: "POST",

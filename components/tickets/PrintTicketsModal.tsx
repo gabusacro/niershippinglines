@@ -1,14 +1,18 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
+import { APP_NAME } from "@/lib/constants";
 
 interface PrintTicketsModalProps {
   reference: string;
   open: boolean;
   onClose: () => void;
+  /** Site name for share text (from admin branding). */
+  siteName?: string;
 }
 
-export function PrintTicketsModal({ reference, open, onClose }: PrintTicketsModalProps) {
+export function PrintTicketsModal({ reference, open, onClose, siteName }: PrintTicketsModalProps) {
+  const displayName = siteName ?? APP_NAME;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const ticketsUrl =
     typeof window !== "undefined"
@@ -29,7 +33,7 @@ export function PrintTicketsModal({ reference, open, onClose }: PrintTicketsModa
   const handleShare = useCallback(async () => {
     const url = typeof window !== "undefined" ? `${window.location.origin}/bookings/${reference}/tickets` : "";
     const title = "My ferry tickets";
-    const text = `Nier Shipping Lines – Booking ${reference}. View and print tickets: ${url}`;
+    const text = `${displayName} – Booking ${reference}. View and print tickets: ${url}`;
     setShareMessage(null);
 
     if (typeof navigator !== "undefined" && navigator.share) {

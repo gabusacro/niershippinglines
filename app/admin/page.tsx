@@ -90,6 +90,12 @@ export default async function AdminDashboardPage() {
           >
             Manual Booking
           </Link>
+          <Link
+            href={ROUTES.adminBranding}
+            className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 touch-manipulation"
+          >
+            Site branding
+          </Link>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
-import { APP_NAME } from "@/lib/constants";
+import { getSiteBranding } from "@/lib/site-branding";
 import { TranslatableNotices } from "@/components/booking/TranslatableNotices";
 import { formatTime, passengerTypeLabel } from "@/lib/dashboard/format";
 import { PrintTicketsButton } from "./PrintTicketsButton";
@@ -47,6 +47,7 @@ export default async function BookingTicketsPage({
     route?: { display_name?: string; origin?: string; destination?: string } | null;
   } | null;
 
+  const branding = await getSiteBranding();
   const today = new Date().toISOString().slice(0, 10);
   let baseFareCents = 55000;
   let discountPercent = 20;
@@ -130,8 +131,8 @@ export default async function BookingTicketsPage({
             style={{ breakAfter: "page" }}
           >
             <div className="border-b-2 border-teal-200 pb-4">
-              <p className="text-2xl font-bold text-[#0c7b93]">{APP_NAME}</p>
-              <p className="text-sm text-[#0f766e]">Siargao Island ↔ Surigao · Dinagat ↔ Surigao City</p>
+              <p className="text-2xl font-bold text-[#0c7b93]">{branding.site_name}</p>
+              <p className="text-sm text-[#0f766e]">{branding.routes_text}</p>
             </div>
             <div className="mt-4 space-y-2">
               <p>

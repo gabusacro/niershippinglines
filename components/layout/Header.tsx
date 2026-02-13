@@ -9,6 +9,8 @@ import { Boat } from "@/components/icons";
 import { OfficialTime } from "@/components/ui/OfficialTime";
 import { createClient } from "@/lib/supabase/client";
 
+type HeaderProps = { siteName?: string };
+
 const BASE_NAV_LINKS = [
   { href: ROUTES.home, label: "Home" },
   { href: ROUTES.schedule, label: "Schedule" },
@@ -17,7 +19,8 @@ const BASE_NAV_LINKS = [
   { href: ROUTES.weather, label: "Weather" },
 ];
 
-export function Header() {
+export function Header({ siteName }: HeaderProps = {}) {
+  const displayName = siteName ?? APP_NAME;
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<{ id: string } | null>(null);
   const pathname = usePathname();
@@ -52,7 +55,7 @@ export function Header() {
         >
           <Boat size={24} className="shrink-0 text-[#fef9e7] sm:w-7 sm:h-7" />
           <span className="text-sm font-semibold leading-tight tracking-tight text-white line-clamp-2 min-w-0 sm:text-base md:text-lg md:font-bold md:leading-normal md:line-clamp-none md:truncate md:max-w-[200px] lg:max-w-none">
-            {APP_NAME}
+            {displayName}
           </span>
         </Link>
 

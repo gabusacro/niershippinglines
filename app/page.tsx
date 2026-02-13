@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { APP_NAME, ROUTES } from "@/lib/constants";
+import { ROUTES } from "@/lib/constants";
+import { getSiteBranding } from "@/lib/site-branding";
 import { PalmTree, Wave, Sun, Boat } from "@/components/icons";
 import { WeatherWidget } from "@/components/weather/WeatherWidget";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const branding = await getSiteBranding();
   return (
     <div className="min-h-[calc(100vh-8rem)]">
       {/* Hero: island vibe with icons */}
@@ -15,13 +17,13 @@ export default function HomePage() {
         </div>
         <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6">
           <h1 className="text-3xl font-bold text-[#134e4a] leading-tight tracking-tight sm:text-4xl md:text-5xl">
-            {APP_NAME}
+            {branding.site_name}
           </h1>
           <p className="mt-3 text-base text-[#0f766e] font-medium tracking-tight sm:mt-4 sm:text-lg md:text-xl">
-            Siargao Island ↔ Surigao &middot; Dinagat ↔ Surigao City
+            {branding.routes_text}
           </p>
           <p className="mt-2 text-[#0f766e]/90 text-base sm:mt-3 sm:text-lg tracking-tight">
-            Feel the island before you arrive. Sun, waves, and a smooth sail away.
+            {branding.tagline}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
             <Link

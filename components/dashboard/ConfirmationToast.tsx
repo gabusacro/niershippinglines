@@ -12,9 +12,10 @@ const POLL_INTERVAL_MS = 15_000;
 
 interface ConfirmationToastProps {
   items: ConfirmationToastItem[];
+  siteName?: string;
 }
 
-export function ConfirmationToast({ items: initialItems }: ConfirmationToastProps) {
+export function ConfirmationToast({ items: initialItems, siteName }: ConfirmationToastProps) {
   const [items, setItems] = useState<ConfirmationToastItem[]>(initialItems);
   const [visible, setVisible] = useState(initialItems.length > 0);
   const [printRef, setPrintRef] = useState<string | null>(null);
@@ -123,6 +124,7 @@ export function ConfirmationToast({ items: initialItems }: ConfirmationToastProp
         reference={printRef ?? ""}
         open={!!printRef}
         onClose={() => setPrintRef(null)}
+        siteName={siteName}
       />
     </>
   );

@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthUser } from "@/lib/auth/get-user";
-import { APP_NAME, ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { getSiteBranding } from "@/lib/site-branding";
 import { passengerTypeLabel } from "@/lib/dashboard/format";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata = {
-  title: "My bookings",
-  description: `Your ferry bookings — ${APP_NAME}`,
-};
+export async function generateMetadata() {
+  const branding = await getSiteBranding();
+  return { title: "My bookings", description: `Your ferry bookings — ${branding.site_name}` };
+}
 
 function formatTime(t: string | null | undefined) {
   if (!t) return "—";
@@ -69,7 +70,7 @@ export default async function MyBookingsPage() {
   if (!user) redirect(ROUTES.login);
   if (user.role !== "passenger") redirect(ROUTES.dashboard);
 
-  const supabase = await createClient();
+  const [branding, supabase] = await Promise.all([getSiteBranding(), createClient()]);
   const fullRes = await supabase
     .from("bookings")
     .select(
@@ -218,7 +219,7 @@ export default async function MyBookingsPage() {
                   {b.status === "refunded" && (
                     <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
                       <p className="text-sm font-semibold text-amber-900">
-                        Your ticket has been refunded by {APP_NAME}.
+                        Your ticket has been refunded by {branding.site_name}.
                       </p>
                       <p className="mt-1 text-sm text-amber-800">
                         The amount of <strong>₱{(b.total_amount_cents / 100).toLocaleString()}</strong> has been processed. We apologize for any inconvenience. If you have questions, please contact us.

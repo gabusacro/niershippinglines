@@ -21,6 +21,7 @@ export const ROUTES = {
   adminPendingPayments: "/admin/pending-payments",
   adminBookings: "/admin/bookings",
   adminManualBooking: "/admin/manual-booking",
+  adminBranding: "/admin/branding",
   crew: "/crew",
   crewScan: "/crew/scan",
   captain: "/captain",

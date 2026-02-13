@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { ExtensionFriendlyHandlers } from "@/components/ExtensionFriendlyHandlers";
 import { ActionToastProvider } from "@/components/ui/ActionToast";
-import { APP_NAME } from "@/lib/constants";
+import { getSiteBranding } from "@/lib/site-branding";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -13,19 +13,20 @@ const nunito = Nunito({
   weight: ["400", "600", "700"],
 });
 
-const siteDescription =
-  "Book ferry tickets from Siargao to Surigao, Dinagat to Surigao. Schedules, weather & attractions. Nier Shipping Lines.";
-
-export const metadata: Metadata = {
-  metadataBase: process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL) : undefined,
-  title: { default: APP_NAME, template: `%s | ${APP_NAME}` },
-  description: siteDescription,
-  keywords: ["ferry", "Siargao", "Surigao", "Dinagat", "boat", "tickets", "schedule", "Nier Shipping Lines", "Philippines"],
-  openGraph: { title: APP_NAME, description: siteDescription, type: "website", locale: "en_PH" },
-  twitter: { card: "summary_large_image", title: APP_NAME, description: siteDescription },
-  robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
-  alternates: { canonical: process.env.NEXT_PUBLIC_APP_URL ?? undefined },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getSiteBranding();
+  const siteDescription = `Book ferry tickets from Siargao to Surigao, Dinagat to Surigao. Schedules, weather & attractions. ${branding.site_name}.`;
+  return {
+    metadataBase: process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL) : undefined,
+    title: { default: branding.site_name, template: `%s | ${branding.site_name}` },
+    description: siteDescription,
+    keywords: ["ferry", "Siargao", "Surigao", "Dinagat", "boat", "tickets", "schedule", branding.site_name, "Philippines"],
+    openGraph: { title: branding.site_name, description: siteDescription, type: "website", locale: "en_PH" },
+    twitter: { card: "summary_large_image", title: branding.site_name, description: siteDescription },
+    robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
+    alternates: { canonical: process.env.NEXT_PUBLIC_APP_URL ?? undefined },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -34,19 +35,20 @@ export const viewport: Viewport = {
   themeColor: "#0c7b93",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const branding = await getSiteBranding();
   return (
     <html lang="en" className={nunito.variable} data-scroll-behavior="smooth">
       <body className="min-h-screen min-h-[100dvh] antialiased flex flex-col font-sans bg-[#fef9e7] text-[#134e4a] safe-area-pad overflow-x-hidden selection:bg-[#0c7b93]/20 selection:text-[#134e4a]" suppressHydrationWarning>
         <ActionToastProvider>
           <ExtensionFriendlyHandlers />
-          <Header />
+          <Header siteName={branding.site_name} />
           <main className="flex-1">{children}</main>
-          <Footer />
+          <Footer siteName={branding.site_name} />
         </ActionToastProvider>
       </body>
     </html>

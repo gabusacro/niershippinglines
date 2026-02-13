@@ -13,7 +13,8 @@ import { FindBookingByReference } from "@/components/dashboard/FindBookingByRefe
 import { SetDisplayNameForm } from "@/app/dashboard/SetDisplayNameForm";
 import { SetAddressForm } from "@/app/dashboard/SetAddressForm";
 import { DashboardAutoRefresh } from "@/components/dashboard/DashboardAutoRefresh";
-import { APP_NAME, ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { getSiteBranding } from "@/lib/site-branding";
 import { getCrewCaptainAssignedBoatIds } from "@/lib/dashboard/get-crew-captain-assigned-boats";
 import {
   getTodaysTripsForBoats,
@@ -22,10 +23,10 @@ import {
 import { getTripManifestData } from "@/lib/admin/trip-manifest";
 import { CrewCaptainManifestSection } from "@/app/dashboard/CrewCaptainManifestSection";
 
-export const metadata = {
-  title: "Dashboard",
-  description: `Dashboard — ${APP_NAME}`,
-};
+export async function generateMetadata() {
+  const branding = await getSiteBranding();
+  return { title: "Dashboard", description: `Dashboard — ${branding.site_name}` };
+}
 
 /** Always fetch fresh user so "Set your name" disappears after save. */
 export const dynamic = "force-dynamic";
@@ -84,7 +85,8 @@ export default async function DashboardPage({
     ? (salutation ? `${salutation}. ${displayName}` : displayName)
     : null;
   const showWelcomeName = welcomeName ?? (user.email ? null : "User");
-  const [allPending, recentlyConfirmed, refundedBookings, pendingPreviewBooth] = await Promise.all([
+  const [branding, allPending, recentlyConfirmed, refundedBookings, pendingPreviewBooth] = await Promise.all([
+    getSiteBranding(),
     isPassenger ? getPendingPaymentBookings(user.email ?? "") : Promise.resolve([]),
     isPassenger ? getRecentlyConfirmedBookings(user.email ?? "") : Promise.resolve([]),
     isPassenger ? getRefundedBookings(user.email ?? "") : Promise.resolve([]),
@@ -228,7 +230,7 @@ export default async function DashboardPage({
 
           {/* Lower-right toast when payment was recently confirmed (Facebook-style notification) */}
           {recentlyConfirmed.length > 0 && (
-            <ConfirmationToast items={recentlyConfirmed.map((b) => ({ reference: b.reference }))} />
+            <ConfirmationToast items={recentlyConfirmed.map((b) => ({ reference: b.reference }))} siteName={branding.site_name} />
           )}
           {/* Payment confirmed — show so passenger sees ticket is ready */}
           {recentlyConfirmed.length > 0 && (
@@ -243,7 +245,7 @@ export default async function DashboardPage({
                 {recentlyConfirmed.map((b) => (
                   <li key={b.id} className="flex flex-wrap items-center gap-2">
                     <span className="font-mono font-semibold text-[#0c7b93]">{b.reference}</span>
-                    <PrintTicketsTrigger reference={b.reference} />
+                    <PrintTicketsTrigger reference={b.reference} siteName={branding.site_name} />
                   </li>
                 ))}
               </ul>
@@ -257,7 +259,7 @@ export default async function DashboardPage({
                 Refund notice ({refundedBookings.length} ticket{refundedBookings.length !== 1 ? "s" : ""})
               </h2>
               <p className="mt-1 text-sm text-amber-800">
-                {APP_NAME} has refunded your ticket(s). The amount has been processed. We apologize for any inconvenience.
+                {branding.site_name} has refunded your ticket(s). The amount has been processed. We apologize for any inconvenience.
               </p>
               <ul className="mt-4 space-y-2">
                 {refundedBookings.map((b) => {

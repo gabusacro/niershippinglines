@@ -8,6 +8,7 @@ interface PrintTicketsTriggerProps {
   passengerCount?: number;
   className?: string;
   children?: React.ReactNode;
+  siteName?: string;
 }
 
 export function PrintTicketsTrigger({
@@ -15,6 +16,7 @@ export function PrintTicketsTrigger({
   passengerCount,
   className = "inline-flex min-h-[44px] items-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors",
   children,
+  siteName,
 }: PrintTicketsTriggerProps) {
   const [open, setOpen] = useState(false);
 
@@ -37,6 +39,7 @@ export function PrintTicketsTrigger({
         reference={reference}
         open={open}
         onClose={() => setOpen(false)}
+        siteName={siteName}
       />
     </>
   );
