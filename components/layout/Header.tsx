@@ -23,15 +23,29 @@ export function Header({ siteName }: HeaderProps = {}) {
   const displayName = siteName ?? APP_NAME;
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<{ id: string } | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const toast = useToast();
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u ?? null));
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      setUser(u ?? null);
+      if (u?.id) {
+        supabase.from("profiles").select("role").eq("id", u.id).maybeSingle().then(({ data: p }) => {
+          setRole((p as { role?: string } | null)?.role ?? null);
+        });
+      } else setRole(null);
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u?.id) {
+        supabase.from("profiles").select("role").eq("id", u.id).maybeSingle().then(({ data: p }) => {
+          setRole((p as { role?: string } | null)?.role ?? null);
+        });
+      } else setRole(null);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -87,14 +101,16 @@ export function Header({ siteName }: HeaderProps = {}) {
               >
                 Dashboard
               </Link>
-              <Link
-                href={ROUTES.account}
-                className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
-                  pathname === ROUTES.account ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
-                }`}
-              >
-                Account
-              </Link>
+              {role !== "admin" && role !== "ticket_booth" && (
+                <Link
+                  href={ROUTES.account}
+                  className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+                    pathname === ROUTES.account ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+                  }`}
+                >
+                  Account
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={handleSignOut}
@@ -173,17 +189,19 @@ export function Header({ siteName }: HeaderProps = {}) {
                     Dashboard
                   </Link>
                 </li>
-                <li>
-                  <Link
-                    href={ROUTES.account}
-                    onClick={() => setMenuOpen(false)}
-                    className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
-                      pathname === ROUTES.account ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
-                    }`}
-                  >
-                    Account
-                  </Link>
-                </li>
+                {role !== "admin" && role !== "ticket_booth" && (
+                  <li>
+                    <Link
+                      href={ROUTES.account}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                        pathname === ROUTES.account ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                      }`}
+                    >
+                      Account
+                    </Link>
+                  </li>
+                )}
                 <li>
                   <button
                     type="button"

@@ -24,7 +24,7 @@ type RestrictionRow = {
 
 export default async function AdminFlaggedPage() {
   const user = await getAuthUser();
-  if (!user || user.role !== "admin") redirect(ROUTES.dashboard);
+  if (!user || (user.role !== "admin" && user.role !== "ticket_booth")) redirect(ROUTES.dashboard);
 
   const supabase = await createClient();
   const { data: rows, error } = await supabase
@@ -42,21 +42,31 @@ export default async function AdminFlaggedPage() {
   }
 
   const restrictionList = (rows ?? []) as { profile_id: string; booking_warnings: number; booking_blocked_at: string | null; blocked_until: string | null; updated_at: string }[];
-  const profileIds = restrictionList.map((r) => r.profile_id);
+  // Only show currently flagged: has warnings or is blocked (indefinite or temp)
+  const currentlyFlagged = restrictionList.filter((r) => {
+    if (r.booking_warnings >= 1) return true;
+    if (r.booking_blocked_at) return true;
+    if (r.blocked_until && new Date(r.blocked_until) > new Date()) return true;
+    return false;
+  });
+  const profileIds = currentlyFlagged.map((r) => r.profile_id);
   const { data: profiles } = profileIds.length > 0
     ? await supabase.from("profiles").select("id, email, full_name").in("id", profileIds)
     : { data: [] };
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, { email: p.email ?? null, full_name: p.full_name ?? null }]));
 
-  const list: RestrictionRow[] = restrictionList.map((r) => ({
+  const list: RestrictionRow[] = currentlyFlagged.map((r) => ({
     ...r,
     profiles: profileMap.get(r.profile_id) ?? null,
   }));
 
+  const backHref = user.role === "ticket_booth" ? ROUTES.dashboard : ROUTES.admin;
+  const backLabel = user.role === "ticket_booth" ? "← Dashboard" : "← Admin dashboard";
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-      <Link href={ROUTES.admin} className="text-sm font-semibold text-[#0c7b93] hover:underline">
-        ← Admin dashboard
+      <Link href={backHref} className="text-sm font-semibold text-[#0c7b93] hover:underline">
+        {backLabel}
       </Link>
       <h1 className="mt-4 text-2xl font-bold text-[#134e4a]">Flagged accounts</h1>
       <p className="mt-1 text-sm text-[#0f766e]">
@@ -99,8 +109,8 @@ export default async function AdminFlaggedPage() {
         <Link href={ROUTES.adminPendingPayments} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
           Pending Payments
         </Link>
-        <Link href={ROUTES.admin} className="rounded-xl border-2 border-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10">
-          Admin dashboard
+        <Link href={backHref} className="rounded-xl border-2 border-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10">
+          {user.role === "ticket_booth" ? "Dashboard" : "Admin dashboard"}
         </Link>
       </div>
     </div>

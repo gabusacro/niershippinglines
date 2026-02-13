@@ -405,7 +405,7 @@ export default async function DashboardPage({
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Link
               href={ROUTES.adminPendingPayments}
               className="rounded-xl border-2 border-[#0c7b93] px-5 py-4 text-left transition-colors hover:bg-[#0c7b93]/10"
@@ -426,6 +426,20 @@ export default async function DashboardPage({
             >
               <h2 className="font-semibold text-[#134e4a]">Add walk-in booking</h2>
               <p className="mt-1 text-sm text-[#0f766e]">Create booking when you collect payment at the booth.</p>
+            </Link>
+            <Link
+              href={ROUTES.adminFlagged}
+              className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Flagged accounts</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Passengers with warnings or booking restrictions. Lift to allow booking again.</p>
+            </Link>
+            <Link
+              href={ROUTES.account}
+              className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Account</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Your profile and password.</p>
             </Link>
             <Link
               href={ROUTES.adminReports}

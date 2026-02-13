@@ -34,7 +34,9 @@ Then open the page in the browser (e.g. http://localhost:3000/schedule).
 
 ## 2. Pushing changes to GitHub
 
-From the project folder in a terminal:
+You may have two remotes: **origin** (e.g. jniervg/niershippinglines) and **gabusacro** (gabusacro/niershippinglines). Push to the one you have write access to.
+
+**Push to gabusacro (your repo):**
 
 ```bash
 # 1. See what changed
@@ -42,20 +44,24 @@ git status
 
 # 2. Stage the files you edited (or all changes)
 git add .
-# Or stage one file:  git add app/schedule/page.tsx
 
 # 3. Commit with a short message
-git commit -m "Update schedule page title and description"
+git commit -m "Your message"
 
-# 4. Push to GitHub (default branch is usually main)
+# 4. Push to gabusacro (not origin)
+git push gabusacro main
+```
+
+**If you only have origin and that’s your repo:**
+
+```bash
 git push origin main
 ```
 
-If your branch is different (e.g. `master` or a feature branch), use that name:
+**Why you might see “couldn't find remote ref main” or “403 Permission denied”:**
 
-```bash
-git push origin your-branch-name
-```
+- **“couldn't find remote ref main”** — The remote branch might be named `master` or the remote has no branches yet. Use `git push gabusacro main` (or `master` if that’s the branch name). For a new empty repo, the first push creates the branch: `git push -u gabusacro main`.
+- **“Permission to jniervg/niershippinglines.git denied to gabusacro”** — You’re pushing to **origin**, which points to jniervg’s repo. You don’t have write access there. Push to **your** remote instead: `git push gabusacro main`.
 
 ---
 

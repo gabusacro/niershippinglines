@@ -49,58 +49,62 @@ export default async function AdminDashboardPage() {
         </p>
       </div>
 
-      {/* Quick actions — top nav to control all admin areas */}
+      {/* Admin nav — reports, vessels, schedule, payments, bookings, branding, flagged, account */}
       <div className="mt-6">
-        <h2 className="text-sm font-semibold text-[#0f766e]/80">Quick actions</h2>
-        <p className="mt-0.5 text-xs text-[#0f766e]/70">Navigate between admin pages. Each fetches live data from Supabase.</p>
-        <div className="mt-3 flex flex-wrap gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <Link
             href={ROUTES.adminReports}
-            className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 touch-manipulation"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >
             Reports (per vessel)
           </Link>
           <Link
             href={ROUTES.adminVessels}
-            className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 touch-manipulation"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >
             Vessels
           </Link>
           <Link
             href={ROUTES.adminSchedule}
-            className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 touch-manipulation"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >
             Schedule (routes & times)
           </Link>
           <Link
             href={ROUTES.adminPendingPayments}
-            className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 touch-manipulation"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >
             Pending payments
           </Link>
           <Link
             href={ROUTES.adminBookings}
-            className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 touch-manipulation"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >
             Booking history
           </Link>
           <Link
             href={ROUTES.adminManualBooking}
-            className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f766e] touch-manipulation"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f766e]"
           >
             Manual Booking
           </Link>
           <Link
             href={ROUTES.adminBranding}
-            className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 touch-manipulation"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >
             Site branding
           </Link>
           <Link
             href={ROUTES.adminFlagged}
-            className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 touch-manipulation"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >
             Flagged accounts
+          </Link>
+          <Link
+            href={ROUTES.account}
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
+          >
+            Account
           </Link>
         </div>
       </div>
