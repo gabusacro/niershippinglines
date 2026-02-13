@@ -125,10 +125,12 @@ export async function POST(
       trip_snapshot_departure_time: t.departure_time ?? null,
       passenger_details: [{ fare_type: p.fare_type, full_name: p.full_name }],
     };
-    const { error: insertErr } = await supabase.from("bookings").insert(insertPayload);
-    if (insertErr) {
-      return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    const { data: inserted, error: insertErr } = await supabase.from("bookings").insert(insertPayload).select("id").single();
+    if (insertErr || !inserted) {
+      return NextResponse.json({ error: insertErr?.message ?? "Insert failed" }, { status: 500 });
     }
+    const { assignTicketNumbersToBooking } = await import("@/lib/tickets/assign-ticket-numbers");
+    await assignTicketNumbersToBooking(inserted.id);
     created += 1;
   }
 

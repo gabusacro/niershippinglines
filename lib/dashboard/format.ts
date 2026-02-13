@@ -38,3 +38,17 @@ export function getDayLabel(dateStr: string): string {
     return dateStr;
   }
 }
+
+/** Always show explicit date (e.g. "Sat, Feb 14") so dropdowns don't repeat "Tomorrow" for many trips on the same day. Uses Philippines date. */
+export function getDayLabelExplicit(dateStr: string): string {
+  try {
+    return new Date(dateStr + "T12:00:00+08:00").toLocaleDateString("en-PH", {
+      timeZone: "Asia/Manila",
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+}

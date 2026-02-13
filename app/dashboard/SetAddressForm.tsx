@@ -13,18 +13,24 @@ export function SetAddressForm({
   const toast = useToast();
   const [address, setAddress] = useState(initialAddress);
   const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(!(initialAddress?.trim()));
+  const displayAddress = initialAddress?.trim() || null;
+  const showCompact = displayAddress && !showForm;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
+      const trimmed = address.trim() || null;
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: address.trim() || null }),
+        body: JSON.stringify({ address: trimmed }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to save");
+      setShowForm(false);
+      setAddress(trimmed ?? "");
       toast.showSuccess("Address saved. It will appear on your tickets and the manifest.");
       router.refresh();
     } catch (err) {
@@ -33,6 +39,23 @@ export function SetAddressForm({
       setSaving(false);
     }
   };
+
+  if (showCompact) {
+    return (
+      <div className="mt-2">
+        <p className="text-sm text-[#134e4a]">
+          <span className="font-medium">Saved address:</span> {displayAddress}
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="mt-1 text-sm font-medium text-[#0c7b93] hover:underline"
+        >
+          Edit address
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="mt-2">

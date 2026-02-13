@@ -6,7 +6,7 @@ import { ManualBookingForm } from "./ManualBookingForm";
 import { ROUTES } from "@/lib/constants";
 
 export const metadata = {
-  title: "Manual booking",
+  title: "Manual Booking",
   description: "Add walk-in passenger to a trip — Nier Shipping Lines Admin",
 };
 
@@ -22,7 +22,7 @@ export default async function AdminManualBookingPage() {
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#134e4a]">Manual booking</h1>
+          <h1 className="text-2xl font-bold text-[#134e4a]">Manual Booking</h1>
           <p className="mt-1 text-sm text-[#0f766e]">
             Add a passenger to a trip when you collect payment in person. Walk-in seats update automatically in Supabase.
           </p>

@@ -7,7 +7,13 @@ import { ROUTES, ADMIN_FEE_CENTS_PER_PASSENGER, BOOKING_NOTICES } from "@/lib/co
 import { useToast } from "@/components/ui/ActionToast";
 import type { TripForManualBooking } from "@/lib/admin/get-trips-for-manual-booking";
 import { formatTime } from "@/lib/dashboard/format";
-import { getDayLabel } from "@/lib/dashboard/format";
+import { getDayLabelExplicit } from "@/lib/dashboard/format";
+
+function fareCents(baseFareCents: number, discountPercent: number, fareType: string): number {
+  if (fareType === "adult") return baseFareCents;
+  if (fareType === "infant") return 0;
+  return Math.round(baseFareCents * (1 - discountPercent / 100));
+}
 
 const FARE_TYPE_OPTIONS = [
   { value: "adult", label: "Adult" },
@@ -50,6 +56,12 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<{ reference: string; total: number } | null>(null);
+  const [farePreview, setFarePreview] = useState<{
+    base_fare_cents: number;
+    discount_percent: number;
+    admin_fee_cents_per_passenger: number;
+    gcash_fee_cents: number;
+  } | null>(null);
 
   const totalPassengers = countAdult + countSenior + countPwd + countChild + countInfant;
 
@@ -84,6 +96,47 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
     const capacity = (t.boat as { capacity?: number })?.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
     return Math.max(0, capacity - ob - wb) > 0;
   });
+
+  const selectedTrip = tripId ? tripsWithSpace.find((t) => t.id === tripId) : null;
+  const routeId = selectedTrip?.route?.id ?? null;
+
+  useEffect(() => {
+    if (!routeId || totalPassengers < 1) {
+      setFarePreview(null);
+      return;
+    }
+    fetch(`/api/booking/fare?route_id=${encodeURIComponent(routeId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.base_fare_cents != null) {
+          setFarePreview({
+            base_fare_cents: data.base_fare_cents,
+            discount_percent: data.discount_percent ?? 20,
+            admin_fee_cents_per_passenger: data.admin_fee_cents_per_passenger ?? ADMIN_FEE_CENTS_PER_PASSENGER,
+            gcash_fee_cents: 0,
+          });
+        } else {
+          setFarePreview(null);
+        }
+      })
+      .catch(() => setFarePreview(null));
+  }, [routeId, totalPassengers]);
+
+  const fareBreakdown = useMemo(() => {
+    if (!farePreview || totalPassengers < 1) return null;
+    const base = farePreview.base_fare_cents;
+    const discount = farePreview.discount_percent;
+    const fareSubtotalCents =
+      countAdult * fareCents(base, discount, "adult") +
+      countSenior * fareCents(base, discount, "senior") +
+      countPwd * fareCents(base, discount, "pwd") +
+      countChild * fareCents(base, discount, "child") +
+      countInfant * fareCents(base, discount, "infant");
+    const adminFeeCents = totalPassengers * farePreview.admin_fee_cents_per_passenger;
+    const gcashCents = 0;
+    const totalCents = fareSubtotalCents + adminFeeCents + gcashCents;
+    return { fareSubtotalCents, adminFeeCents, gcashCents, totalCents };
+  }, [farePreview, totalPassengers, countAdult, countSenior, countPwd, countChild, countInfant]);
 
   const lookupPassenger = useCallback((email: string) => {
     const e = email.trim().toLowerCase();
@@ -184,7 +237,7 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
     const ticketsUrl = `/bookings/${success.reference}/tickets`;
     return (
       <div className="rounded-2xl border-2 border-teal-200 bg-teal-50/50 p-6">
-        <p className="font-semibold text-[#134e4a]">Manual booking created</p>
+        <p className="font-semibold text-[#134e4a]">Manual Booking created</p>
         <p className="mt-2 font-mono text-lg font-bold text-[#0c7b93]">Reference: {success.reference}</p>
         <p className="mt-1 text-sm text-[#134e4a]">Total: ₱{(success.total / 100).toLocaleString()} · Walk-in seats updated in Supabase.</p>
         <div className="mt-4 flex flex-wrap gap-3">
@@ -227,7 +280,7 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
             const routeName = t.route?.display_name ?? [t.route?.origin, t.route?.destination].filter(Boolean).join(" → ") ?? "—";
             return (
               <option key={t.id} value={t.id}>
-                {getDayLabel(t.departure_date)} {formatTime(t.departure_time)} — {routeName} — {t.boat?.name ?? "—"} ({available} seats available, {ob + wb} booked)
+                {getDayLabelExplicit(t.departure_date)} {formatTime(t.departure_time)} — {routeName} — {t.boat?.name ?? "—"} ({available} seats available, {ob + wb} booked)
               </option>
             );
           })}
@@ -259,9 +312,21 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           })}
         </div>
         {totalPassengers > 0 && (
-          <p className="mt-2 text-sm text-[#0f766e]">
-            {totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""} · Admin fee (₱15/pax): ₱{(adminFeeCents / 100).toLocaleString()}. No GCash fee for walk-in.
-          </p>
+          <div className="mt-2 rounded-lg border border-teal-200 bg-teal-50/50 px-3 py-2 text-sm text-[#134e4a]">
+            {fareBreakdown ? (
+              <>
+                <p className="font-medium">Fare calculation</p>
+                <p className="mt-0.5">
+                  Base fare: ₱{(fareBreakdown.fareSubtotalCents / 100).toLocaleString()} · Admin fee (₱{((fareBreakdown.adminFeeCents / totalPassengers) / 100).toLocaleString()}/pax): ₱{(fareBreakdown.adminFeeCents / 100).toLocaleString()} · GCash (walk-in): ₱0
+                </p>
+                <p className="mt-1 font-semibold">Total: ₱{(fareBreakdown.totalCents / 100).toLocaleString()}</p>
+              </>
+            ) : (
+              <p>
+                {totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""} · Admin fee (₱{(ADMIN_FEE_CENTS_PER_PASSENGER / 100).toLocaleString()}/pax): ₱{(adminFeeCents / 100).toLocaleString()}. No GCash fee for walk-in. Select a trip to see full fare.
+              </p>
+            )}
+          </div>
         )}
       </div>
 

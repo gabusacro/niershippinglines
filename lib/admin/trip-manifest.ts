@@ -5,6 +5,8 @@ const MANIFEST_STATUSES = ["confirmed", "checked_in", "boarded", "completed"] as
 /** One row per passenger (all names listed individually). */
 export interface ManifestPassengerRow {
   seq: number;
+  /** Unique ticket number per passenger (or booking reference for legacy). */
+  ticketNumber: string;
   reference: string;
   passengerName: string;
   /** Passenger type: adult, senior, pwd, child, infant. */
@@ -80,7 +82,7 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
   const passengers: ManifestPassengerRow[] = [];
   const fareTypeLabels: Record<string, string> = { adult: "Adult", senior: "Senior", pwd: "PWD", child: "Child", infant: "Infant" };
   for (const b of bookings ?? []) {
-    const pd = (b.passenger_details ?? []) as { fare_type?: string; full_name?: string; address?: string }[];
+    const pd = (b.passenger_details ?? []) as { fare_type?: string; full_name?: string; address?: string; ticket_number?: string }[];
     const bookingFareType = (b as { fare_type?: string }).fare_type ?? "adult";
     const bookingAddress = (b as { customer_address?: string | null }).customer_address?.trim() || null;
     const role = b.created_by ? creators.get(b.created_by) : null;
@@ -93,14 +95,15 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
         const name = (p.full_name ?? "—").trim() || "—";
         const fareType = fareTypeLabels[p.fare_type ?? ""] ?? (p.fare_type ?? bookingFareType);
         const address = (p.address && p.address.trim()) ? p.address.trim() : bookingAddress;
+        const ticketNumber = (p.ticket_number && String(p.ticket_number).trim()) ? String(p.ticket_number).trim() : ref;
         seq += 1;
-        passengers.push({ seq, reference: ref, passengerName: name, fareType, address, contact, source });
+        passengers.push({ seq, ticketNumber, reference: ref, passengerName: name, fareType, address, contact, source });
       }
     } else {
       const name = b.customer_full_name ?? "—";
       const fareType = fareTypeLabels[bookingFareType] ?? bookingFareType;
       seq += 1;
-      passengers.push({ seq, reference: ref, passengerName: name, fareType, address: bookingAddress, contact, source });
+      passengers.push({ seq, ticketNumber: ref, reference: ref, passengerName: name, fareType, address: bookingAddress, contact, source });
     }
   }
 

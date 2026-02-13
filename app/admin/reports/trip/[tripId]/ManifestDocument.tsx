@@ -46,6 +46,7 @@ export function ManifestDocument({ data, manifestUrl, appName }: ManifestDocumen
         <thead>
           <tr className="bg-gray-100">
             <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">No.</th>
+            <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Ticket #</th>
             <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Booking ref.</th>
             <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Passenger name</th>
             <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Type</th>
@@ -57,12 +58,13 @@ export function ManifestDocument({ data, manifestUrl, appName }: ManifestDocumen
         <tbody>
           {data.passengers.length === 0 && !hasWalkInNoNames ? (
             <tr>
-              <td colSpan={7} className="border border-gray-800 px-2 py-3 text-center text-gray-600">No passengers on manifest</td>
+              <td colSpan={8} className="border border-gray-800 px-2 py-3 text-center text-gray-600">No passengers on manifest</td>
             </tr>
           ) : (
             data.passengers.map((p) => (
-              <tr key={`${p.reference}-${p.seq}`}>
+              <tr key={`${p.ticketNumber}-${p.seq}`}>
                 <td className="border border-gray-800 px-2 py-1">{p.seq}</td>
+                <td className="border border-gray-800 px-2 py-1 font-mono font-semibold">{p.ticketNumber}</td>
                 <td className="border border-gray-800 px-2 py-1">{p.reference}</td>
                 <td className="border border-gray-800 px-2 py-1">{p.passengerName}</td>
                 <td className="border border-gray-800 px-2 py-1">{p.fareType}</td>

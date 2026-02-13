@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { sendBookingConfirmed } from "@/lib/email/send-booking-confirmed";
+import { assignTicketNumbersToBooking } from "@/lib/tickets/assign-ticket-numbers";
 import { NextRequest, NextResponse } from "next/server";
 
 /** POST: Admin-only. Set booking status to confirmed (payment received). Notifies passenger by email. */
@@ -66,6 +67,8 @@ export async function POST(request: NextRequest) {
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
+
+  await assignTicketNumbersToBooking(booking.id);
 
   const to = (booking as { customer_email?: string }).customer_email?.trim();
   const notifyAlso = (booking as { notify_also_email?: string | null }).notify_also_email?.trim();

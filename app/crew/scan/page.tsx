@@ -13,8 +13,8 @@ export default async function CrewScanPage() {
   return (
     <div className="mx-auto max-w-md px-4 py-8 sm:px-6">
       <div className="mb-6">
-        <Link href={ROUTES.crew} className="text-sm font-semibold text-[#0c7b93] hover:underline">
-          ← Back to Crew
+        <Link href={ROUTES.dashboard} className="text-sm font-semibold text-[#0c7b93] hover:underline">
+          ← Back to Dashboard
         </Link>
       </div>
       <h1 className="text-xl font-bold text-[#134e4a]">Scan ticket</h1>

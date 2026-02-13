@@ -5,13 +5,22 @@ import { getUpcomingTrips } from "@/lib/dashboard/get-upcoming-trips";
 import { getPendingPaymentBookings } from "@/lib/dashboard/get-pending-payment-bookings";
 import { getRecentlyConfirmedBookings } from "@/lib/dashboard/get-recently-confirmed-bookings";
 import { getRefundedBookings } from "@/lib/dashboard/get-refunded-bookings";
+import { getPendingPaymentsPreview } from "@/lib/admin/pending-payments-preview";
 import { TripCalendar } from "@/app/dashboard/TripCalendar";
 import { PrintTicketsTrigger } from "@/components/tickets/PrintTicketsTrigger";
 import { ConfirmationToast } from "@/components/dashboard/ConfirmationToast";
 import { FindBookingByReference } from "@/components/dashboard/FindBookingByReference";
 import { SetDisplayNameForm } from "@/app/dashboard/SetDisplayNameForm";
 import { SetAddressForm } from "@/app/dashboard/SetAddressForm";
+import { DashboardAutoRefresh } from "@/components/dashboard/DashboardAutoRefresh";
 import { APP_NAME, ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { getCrewCaptainAssignedBoatIds } from "@/lib/dashboard/get-crew-captain-assigned-boats";
+import {
+  getTodaysTripsForBoats,
+  getCurrentTripFromTodays,
+} from "@/lib/dashboard/get-todays-trips-for-boats";
+import { getTripManifestData } from "@/lib/admin/trip-manifest";
+import { CrewCaptainManifestSection } from "@/app/dashboard/CrewCaptainManifestSection";
 
 export const metadata = {
   title: "Dashboard",
@@ -41,7 +50,13 @@ async function TripCalendarWrapper({
   );
 }
 
-export default async function DashboardPage() {
+type DashboardSearchParams = Promise<{ tripId?: string }>;
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: DashboardSearchParams;
+}) {
   const user = await getAuthUser();
   if (!user) {
     redirect(ROUTES.login);
@@ -51,6 +66,7 @@ export default async function DashboardPage() {
     redirect(ROUTES.admin);
   }
 
+  const params = await searchParams;
   const roleLabel: Record<string, string> = {
     admin: "Admin",
     captain: "Captain",
@@ -68,11 +84,33 @@ export default async function DashboardPage() {
     ? (salutation ? `${salutation}. ${displayName}` : displayName)
     : null;
   const showWelcomeName = welcomeName ?? (user.email ? null : "User");
-  const allPending = isPassenger ? await getPendingPaymentBookings(user.email ?? "") : [];
+  const [allPending, recentlyConfirmed, refundedBookings, pendingPreviewBooth] = await Promise.all([
+    isPassenger ? getPendingPaymentBookings(user.email ?? "") : Promise.resolve([]),
+    isPassenger ? getRecentlyConfirmedBookings(user.email ?? "") : Promise.resolve([]),
+    isPassenger ? getRefundedBookings(user.email ?? "") : Promise.resolve([]),
+    user.role === "ticket_booth" ? getPendingPaymentsPreview() : Promise.resolve({ count: 0, items: [] }),
+  ]);
   const awaitingPayment = allPending.filter((b) => !b.payment_proof_path);
   const awaitingConfirmation = allPending.filter((b) => !!b.payment_proof_path);
-  const recentlyConfirmed = isPassenger ? await getRecentlyConfirmedBookings(user.email ?? "") : [];
-  const refundedBookings = isPassenger ? await getRefundedBookings(user.email ?? "") : [];
+
+  let crewCaptainData: {
+    boatIds: string[];
+    todayTrips: Awaited<ReturnType<typeof getTodaysTripsForBoats>>;
+    currentTrip: ReturnType<typeof getCurrentTripFromTodays>;
+    selectedTripId: string | null;
+    manifest: Awaited<ReturnType<typeof getTripManifestData>>;
+  } | null = null;
+  if (user.role === "crew" || user.role === "captain") {
+    const boatIds = await getCrewCaptainAssignedBoatIds(user.id);
+    const todayTrips = await getTodaysTripsForBoats(boatIds);
+    const currentTrip = getCurrentTripFromTodays(todayTrips);
+    const selectedTripId =
+      params.tripId && todayTrips.some((t) => t.id === params.tripId)
+        ? params.tripId
+        : currentTrip?.id ?? null;
+    const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
+    crewCaptainData = { boatIds, todayTrips, currentTrip, selectedTripId, manifest };
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
@@ -311,9 +349,37 @@ export default async function DashboardPage() {
         </>
       ) : user.role === "ticket_booth" ? (
         <div className="mt-6 space-y-4">
+          <DashboardAutoRefresh intervalSeconds={90} />
           <p className="mt-1 text-sm text-[#0f766e]/80">
             Serve walk-ins: take cash or GCash, confirm payment by reference, view booking history, and process refunds or reschedules when needed. Same rules apply (e.g. 24h for reschedule, refund reasons).
           </p>
+
+          {/* Pending payments notice — same as admin so booth can confirm walk-ins promptly */}
+          {pendingPreviewBooth.count > 0 && (
+            <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-amber-900">Pending payments ({pendingPreviewBooth.count})</h2>
+                  <p className="mt-0.5 text-sm text-amber-800">Confirm payments so passengers receive tickets on time. When a walk-in shows their reference, find them here.</p>
+                </div>
+                <Link
+                  href={ROUTES.adminPendingPayments}
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
+                >
+                  View all →
+                </Link>
+              </div>
+              <ul className="mt-4 space-y-2">
+                {pendingPreviewBooth.items.map((b) => (
+                  <li key={b.reference} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 px-3 py-2">
+                    <Link href={ROUTES.adminPendingPayments} className="font-mono font-semibold text-[#0c7b93] hover:underline">{b.reference}</Link>
+                    <span className="text-sm text-[#134e4a]">{b.customer_full_name} · ₱{(b.total_amount_cents / 100).toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <Link
               href={ROUTES.adminPendingPayments}
@@ -345,18 +411,20 @@ export default async function DashboardPage() {
             </Link>
           </div>
         </div>
-      ) : user.role === "captain" ? (
-        <div className="mt-6">
+      ) : (user.role === "crew" || user.role === "captain") && crewCaptainData ? (
+        crewCaptainData.boatIds.length === 0 ? (
           <p className="mt-1 text-sm text-[#0f766e]/80">
-            Post schedule or trip updates for passengers. They will see announcements on the Schedule and Book pages.
+            You have no vessel assignments. Contact admin to be assigned to a vessel.
           </p>
-          <Link
-            href={ROUTES.adminVessels}
-            className="mt-4 inline-flex min-h-[44px] items-center rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
-          >
-            Your vessels → Post announcements
-          </Link>
-        </div>
+        ) : (
+          <CrewCaptainManifestSection
+            roleLabel={yourRoleLabel}
+            todayTrips={crewCaptainData.todayTrips}
+            currentTrip={crewCaptainData.currentTrip}
+            selectedTripId={crewCaptainData.selectedTripId}
+            manifest={crewCaptainData.manifest}
+          />
+        )
       ) : (
         <p className="mt-1 text-sm text-[#0f766e]/80">
           Crew and captain access are assigned per vessel by admin. You only see the areas you have access to.

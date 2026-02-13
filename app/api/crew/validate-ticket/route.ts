@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-/** GET: Validate ticket from QR scan. Crew/ticket_booth/admin only. Payload format: NIER:reference:passengerIndex */
+/** GET: Validate ticket from QR scan. Crew/ticket_booth/admin only.
+ *  Payload: NIER:ticketNumber (unique per passenger) or legacy NIER:reference:passengerIndex */
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -13,23 +14,65 @@ export async function GET(request: NextRequest) {
   if (!allowed) return NextResponse.json({ error: "Forbidden: crew access required" }, { status: 403 });
 
   const payload = request.nextUrl.searchParams.get("payload") ?? "";
-  const match = payload.match(/^NIER:([A-Z0-9]+):(\d+)$/i);
-  if (!match) {
+  if (!payload.startsWith("NIER:")) {
     return NextResponse.json({ error: "Invalid QR format. Scan a valid ticket." }, { status: 400 });
   }
-  const [, reference, idxStr] = match;
-  const passengerIndex = parseInt(idxStr ?? "0", 10);
+  const afterNier = payload.slice(5).trim();
+  let booking: {
+    id: string;
+    reference: string | null;
+    status: string | null;
+    customer_full_name: string | null;
+    passenger_details: unknown;
+    trip: unknown;
+  } | null = null;
+  let passengerIndex: number;
 
-  const { data: booking, error } = await supabase
-    .from("bookings")
-    .select(
-      "id, reference, customer_full_name, customer_email, passenger_count, status, passenger_details, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))"
-    )
-    .eq("reference", reference.toUpperCase())
-    .maybeSingle();
+  const legacyMatch = afterNier.match(/^([A-Z0-9]+):(\d+)$/i);
+  if (legacyMatch) {
+    const [, ref, idxStr] = legacyMatch;
+    passengerIndex = parseInt(idxStr ?? "0", 10);
+    const { data: b, error } = await supabase
+      .from("bookings")
+      .select("id, reference, status, customer_full_name, passenger_details, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
+      .eq("reference", ref!.toUpperCase())
+      .maybeSingle();
+    if (error || !b) {
+      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+    }
+    booking = b;
+    const details = (booking.passenger_details ?? []) as { full_name?: string }[];
+    const passengers = details.length > 0 ? details : [{ full_name: booking.customer_full_name ?? "" }];
+    if (!passengers[passengerIndex]) {
+      return NextResponse.json({ error: "Invalid passenger index" }, { status: 400 });
+    }
+  } else {
+    const ticketNumber = afterNier;
+    if (!ticketNumber) {
+      return NextResponse.json({ error: "Invalid QR format. Scan a valid ticket." }, { status: 400 });
+    }
+    const { data: ticket, error: ticketError } = await supabase
+      .from("tickets")
+      .select("booking_id, passenger_index")
+      .eq("ticket_number", ticketNumber)
+      .maybeSingle();
+    if (ticketError || !ticket) {
+      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+    }
+    passengerIndex = ticket.passenger_index;
+    const { data: b, error: bookError } = await supabase
+      .from("bookings")
+      .select("id, reference, status, customer_full_name, passenger_details, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
+      .eq("id", ticket.booking_id)
+      .single();
+    if (bookError || !b) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+    booking = b;
+  }
 
-  if (error || !booking) {
-    return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+  if (!booking) {
+    return NextResponse.json({ error: "Booking not found" }, { status: 404 });
   }
 
   const validStatuses = ["confirmed", "checked_in", "boarded", "completed"];
@@ -40,10 +83,8 @@ export async function GET(request: NextRequest) {
     }, { status: 400 });
   }
 
-  const details = booking.passenger_details as { full_name?: string }[] | null;
-  const passengers = Array.isArray(details) && details.length > 0
-    ? details
-    : [{ full_name: booking.customer_full_name ?? "" }];
+  const details = (booking.passenger_details ?? []) as { full_name?: string }[];
+  const passengers = details.length > 0 ? details : [{ full_name: booking.customer_full_name ?? "" }];
   const passenger = passengers[passengerIndex];
   if (!passenger) {
     return NextResponse.json({ error: "Invalid passenger index" }, { status: 400 });
@@ -53,7 +94,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     valid: true,
-    reference: booking.reference,
+    reference: booking.reference ?? "—",
     passenger_index: passengerIndex,
     passenger_name: passenger.full_name ?? "",
     status: booking.status,

@@ -39,8 +39,8 @@ export const DEVELOPER_COPYRIGHT = "© 2026 Gabriel Sacro. All rights reserved."
 export const GCASH_NUMBER = process.env.NEXT_PUBLIC_GCASH_NUMBER ?? "09463657331";
 export const GCASH_ACCOUNT_NAME = process.env.NEXT_PUBLIC_GCASH_ACCOUNT_NAME ?? "Gabriel Sacro";
 
-/** Fees added to booking total. */
-export const GCASH_FEE_CENTS = 1500; // ₱15 per transaction (online/GCash only)
+/** Fees added to booking total. To change these, edit here; see docs/WHERE_FEES_AND_FARES_ARE_SET.md. */
+export const GCASH_FEE_CENTS = 1500; // ₱15 per transaction (online/GCash only; walk-in = 0)
 export const ADMIN_FEE_CENTS_PER_PASSENGER = 1500; // ₱15 per passenger
 
 /** Passenger-initiated reschedule (MARINA: P10–10% before departure). */

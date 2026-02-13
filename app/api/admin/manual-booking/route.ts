@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { ADMIN_FEE_CENTS_PER_PASSENGER } from "@/lib/constants";
+import { assignTicketNumbersToBooking } from "@/lib/tickets/assign-ticket-numbers";
 import { NextRequest, NextResponse } from "next/server";
 
 const FARE_TYPES = ["adult", "senior", "pwd", "child", "infant"] as const;
@@ -212,8 +213,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
+  await assignTicketNumbersToBooking(booking.id);
+
   return NextResponse.json({
-    message: "Manual booking created. Walk-in seats updated in Supabase.",
+    message: "Manual Booking created. Walk-in seats updated in Supabase.",
     booking_id: booking.id,
     reference: booking.reference,
     total_amount_cents: booking.total_amount_cents,

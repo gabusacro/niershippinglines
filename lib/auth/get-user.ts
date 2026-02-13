@@ -28,12 +28,16 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     console.error("[getAuthUser] profiles fetch error:", profileError.message);
   }
 
+  const meta = user.user_metadata as Record<string, unknown> | undefined;
+  const metaFullName = typeof meta?.full_name === "string" ? meta.full_name.trim() || null : null;
+  const metaSalutation = typeof meta?.salutation === "string" ? meta.salutation.trim() || null : null;
+
   return {
     id: user.id,
     email: user.email ?? null,
     role: (profile?.role as AppRole) ?? "passenger",
-    fullName: profile?.full_name ?? null,
-    salutation: profile?.salutation ?? null,
+    fullName: profile?.full_name?.trim() || metaFullName || null,
+    salutation: profile?.salutation?.trim() || metaSalutation || null,
     address: profile?.address ?? null,
     approvedAt: profile?.approved_at ?? null,
   };

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { getTodayDashboardStats } from "@/lib/admin/dashboard-stats";
+import { DashboardAutoRefresh } from "@/components/dashboard/DashboardAutoRefresh";
 import { getTodayPassengersByVessel } from "@/lib/admin/today-passengers-by-vessel";
 import { getPendingPaymentsPreview } from "@/lib/admin/pending-payments-preview";
 import { ROUTES } from "@/lib/constants";
@@ -36,6 +37,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+      <DashboardAutoRefresh intervalSeconds={90} />
       {/* Header with welcome */}
       <div className="rounded-2xl bg-gradient-to-br from-[#0c7b93] to-[#0f766e] px-6 py-8 text-white shadow-lg sm:px-8">
         <p className="text-sm font-medium uppercase tracking-wider text-white/80">Admin dashboard</p>
@@ -86,7 +88,7 @@ export default async function AdminDashboardPage() {
             href={ROUTES.adminManualBooking}
             className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0f766e] touch-manipulation"
           >
-            Manual booking
+            Manual Booking
           </Link>
         </div>
       </div>

@@ -7,7 +7,7 @@ import { formatTime, passengerTypeLabel } from "@/lib/dashboard/format";
 import { PrintTicketsButton } from "./PrintTicketsButton";
 import { TicketQRCode } from "@/components/tickets/TicketQRCode";
 
-type PassengerForTicket = { full_name: string; fare_type: string; address: string };
+type PassengerForTicket = { full_name: string; fare_type: string; address: string; ticket_number?: string };
 
 export default async function BookingTicketsPage({
   params,
@@ -91,12 +91,13 @@ export default async function BookingTicketsPage({
 
   const bookingAddress = (booking as { customer_address?: string | null }).customer_address?.trim() || "—";
   let passengers: PassengerForTicket[];
-  const details = booking.passenger_details as { full_name?: string; fare_type?: string; address?: string }[] | null;
+  const details = booking.passenger_details as { full_name?: string; fare_type?: string; address?: string; ticket_number?: string }[] | null;
   if (Array.isArray(details) && details.length > 0) {
     passengers = details.map((p) => ({
       full_name: p.full_name?.trim() ?? "",
       fare_type: (p.fare_type ?? "adult") as string,
       address: (p.address && p.address.trim()) ? p.address.trim() : bookingAddress,
+      ticket_number: (p.ticket_number && String(p.ticket_number).trim()) ? String(p.ticket_number).trim() : undefined,
     }));
   } else {
     passengers = [
@@ -104,6 +105,7 @@ export default async function BookingTicketsPage({
         full_name: (booking.customer_full_name ?? "").trim(),
         fare_type: (booking.fare_type ?? "adult") as string,
         address: bookingAddress,
+        ticket_number: undefined,
       },
     ];
   }
@@ -116,10 +118,12 @@ export default async function BookingTicketsPage({
           <PrintTicketsButton />
         </div>
         <p className="mb-6 text-sm text-[#0f766e] print:hidden">
-          One ticket per passenger. Use Print or Save as PDF to print at home or share.
+          One ticket per passenger. Each ticket has a unique ticket number. Use Print or Save as PDF to print at home or share.
         </p>
 
-        {passengers.map((p, i) => (
+        {passengers.map((p, i) => {
+          const ticketNumber = p.ticket_number ?? reference;
+          return (
           <div
             key={i}
             className="break-after-page border-2 border-teal-200 bg-white p-6 shadow-sm print:shadow-none print:border-teal-300"
@@ -131,8 +135,12 @@ export default async function BookingTicketsPage({
             </div>
             <div className="mt-4 space-y-2">
               <p>
-                <span className="text-xs font-semibold uppercase text-[#0f766e]">Reference</span>
-                <span className="ml-2 font-mono text-lg font-bold text-[#134e4a]">{reference}</span>
+                <span className="text-xs font-semibold uppercase text-[#0f766e]">Ticket #</span>
+                <span className="ml-2 font-mono text-lg font-bold text-[#134e4a]">{ticketNumber}</span>
+              </p>
+              <p>
+                <span className="text-xs font-semibold uppercase text-[#0f766e]">Booking reference</span>
+                <span className="ml-2 font-mono text-sm text-[#134e4a]">{reference}</span>
               </p>
               <p>
                 <span className="text-xs font-semibold uppercase text-[#0f766e]">Passenger</span>
@@ -166,7 +174,7 @@ export default async function BookingTicketsPage({
                 </p>
               )}
             </div>
-            <TicketQRCode reference={reference} passengerIndex={i} />
+            <TicketQRCode reference={reference} passengerIndex={i} ticketNumber={p.ticket_number} />
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
               <TranslatableNotices listClassName="text-xs text-amber-900 space-y-0.5 list-disc list-outside pl-5 ml-1" compact showSelector={i === 0} />
             </div>
@@ -174,7 +182,8 @@ export default async function BookingTicketsPage({
               Present this ticket at the ticket booth. Valid for the passenger named above. Bring 1 any valid identification card.
             </p>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

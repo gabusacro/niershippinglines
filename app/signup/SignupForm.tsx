@@ -38,7 +38,7 @@ export function SignupForm() {
           full_name: fullName.trim() || null,
           salutation: salutation || null,
           email: data.user.email ?? null,
-          role: "crew",
+          role: "passenger",
         });
       }
       setSuccess(true);
