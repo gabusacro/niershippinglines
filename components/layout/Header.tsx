@@ -100,7 +100,7 @@ export function Header({ siteName }: HeaderProps = {}) {
               >
                 Dashboard
               </Link>
-              {role !== "admin" && role !== "ticket_booth" && (
+              {role !== "admin" && role !== "ticket_booth" && role !== "passenger" && (
                 <Link
                   href={ROUTES.account}
                   className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
@@ -188,7 +188,7 @@ export function Header({ siteName }: HeaderProps = {}) {
                     Dashboard
                   </Link>
                 </li>
-                {role !== "admin" && role !== "ticket_booth" && (
+                {role !== "admin" && role !== "ticket_booth" && role !== "passenger" && (
                   <li>
                     <Link
                       href={ROUTES.account}

@@ -11,6 +11,7 @@ import { PrintTicketsTrigger } from "@/components/tickets/PrintTicketsTrigger";
 import { ConfirmationToast } from "@/components/dashboard/ConfirmationToast";
 import { FindBookingByReference } from "@/components/dashboard/FindBookingByReference";
 import { ClaimBookingFromRef } from "@/components/dashboard/ClaimBookingFromRef";
+import { ClaimGuestBookingsByEmail } from "@/components/dashboard/ClaimGuestBookingsByEmail";
 import { SetDisplayNameForm } from "@/app/dashboard/SetDisplayNameForm";
 import { SetAddressForm } from "@/app/dashboard/SetAddressForm";
 import { DashboardAutoRefresh } from "@/components/dashboard/DashboardAutoRefresh";
@@ -148,6 +149,7 @@ export default async function DashboardPage({
      )}
 
       {isPassenger && params.ref ? <ClaimBookingFromRef refParam={params.ref} /> : null}
+      {isPassenger ? <ClaimGuestBookingsByEmail /> : null}
       {isPassenger ? (
         <>
           {/* Warning notice (orange) — passenger has received a warning */}
@@ -317,9 +319,8 @@ export default async function DashboardPage({
             loggedInAddress={user.address ?? ""}
           />
 
-          {/* Quick actions */}
-          <h2 className="mt-10 text-lg font-semibold text-[#134e4a]">Quick actions</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Book, Schedule, My bookings, Account — aligned row */}
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Link
               href={ROUTES.book}
               className="group flex flex-col rounded-2xl border-2 border-[#0c7b93] bg-[#0c7b93] p-6 text-white shadow-lg shadow-[#0c7b93]/20 transition-all hover:border-[#0f766e] hover:bg-[#0f766e] hover:shadow-xl hover:shadow-[#0c7b93]/25"
@@ -340,6 +341,13 @@ export default async function DashboardPage({
             >
               <span className="text-xl font-bold">My bookings</span>
               <span className="mt-2 text-sm text-[#0f766e]">Your reservations and references</span>
+            </Link>
+            <Link
+              href={ROUTES.account}
+              className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-6 text-[#134e4a] transition-all hover:border-[#0c7b93] hover:bg-[#0c7b93]/5"
+            >
+              <span className="text-xl font-bold">Account</span>
+              <span className="mt-2 text-sm text-[#0f766e]">Profile and password</span>
             </Link>
           </div>
         </>

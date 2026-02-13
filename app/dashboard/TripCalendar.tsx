@@ -38,6 +38,31 @@ export function TripCalendar({
     return map;
   }, [trips]);
 
+  /** Direction label per trip: same logic as Book form and manual booking — group by route+date, sort by time; first = origin→destination, second = destination→origin. */
+  const getDirectionLabel = useMemo(() => {
+    const groupKey = (t: UpcomingTripRow) => `${t.route?.id ?? ""}-${t.departure_date ?? ""}`;
+    const byGroup = new Map<string, UpcomingTripRow[]>();
+    for (const t of trips) {
+      const k = groupKey(t);
+      if (!byGroup.has(k)) byGroup.set(k, []);
+      byGroup.get(k)!.push(t);
+    }
+    for (const arr of byGroup.values()) {
+      arr.sort((a, b) => (a.departure_time ?? "").localeCompare(b.departure_time ?? ""));
+    }
+    return (t: UpcomingTripRow): string => {
+      const r = t.route;
+      const origin = r?.origin ?? "";
+      const destination = r?.destination ?? "";
+      if (!origin && !destination) return t.route?.display_name ?? "—";
+      const group = byGroup.get(groupKey(t)) ?? [];
+      const idx = group.findIndex((x) => x.id === t.id);
+      if (idx === 0) return `${origin} → ${destination}`;
+      if (idx === 1) return `${destination} → ${origin}`;
+      return `${origin} → ${destination}`;
+    };
+  }, [trips]);
+
   const selectedTrips = selectedDate ? (byDate.get(selectedDate) ?? []) : [];
   const selectedLabel = selectedDate ? getDayLabel(selectedDate) : null;
 
@@ -150,10 +175,7 @@ export function TripCalendar({
                 const wb = t.walk_in_booked ?? 0;
                 const capacity = (t.boat as { capacity?: number })?.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
                 const available = Math.max(0, capacity - ob - wb);
-                const routeName =
-                  t.route?.display_name ??
-                  [t.route?.origin, t.route?.destination].filter(Boolean).join(" ↔ ") ??
-                  "—";
+                const directionLabel = getDirectionLabel(t);
                 const vesselName = t.boat?.name ?? "—";
                 return (
                   <li
@@ -163,7 +185,7 @@ export function TripCalendar({
                     <div className="min-w-0">
                       <p className="font-semibold text-[#134e4a]">{formatTime(t.departure_time)}</p>
                       <p className="text-sm text-[#0f766e]">
-                        {vesselName} · {routeName}
+                        {vesselName} · {directionLabel}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
