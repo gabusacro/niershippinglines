@@ -6,7 +6,7 @@ import { ROUTES } from "@/lib/constants";
 import VesselEditForm from "./VesselEditForm";
 import VesselAddTripsForm from "./VesselAddTripsForm";
 import { TripsTableWithBulkActions } from "./TripsTableWithBulkActions";
-import { PastTripsTable } from "./PastTripsTable";
+import { PastTripsTable, type PastTrip } from "./PastTripsTable";
 import { DeleteVesselButton } from "../DeleteVesselButton";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { VesselAnnouncementsSection } from "./VesselAnnouncementsSection";
@@ -64,7 +64,7 @@ export default async function AdminVesselEditPage({
     .order("departure_time")
     .limit(90);
 
-  const { data: pastTrips } = await supabase
+  const { data: pastTripsRaw } = await supabase
     .from("trips")
     .select("id, departure_date, departure_time, status, online_quota, online_booked, walk_in_quota, walk_in_booked, route:routes(id, display_name, origin, destination)")
     .eq("boat_id", id)
@@ -72,6 +72,18 @@ export default async function AdminVesselEditPage({
     .order("departure_date", { ascending: false })
     .order("departure_time", { ascending: false })
     .limit(30);
+
+  const pastTrips: PastTrip[] = (pastTripsRaw ?? []).map((t) => {
+    const route = Array.isArray((t as { route?: unknown }).route)
+      ? ((t as { route: unknown[] }).route[0] as { display_name?: string } | null)
+      : ((t as { route?: { display_name?: string } | null }).route ?? null);
+    return {
+      id: t.id,
+      departure_date: t.departure_date,
+      departure_time: t.departure_time ?? null,
+      route: route && typeof route === "object" ? { display_name: route.display_name } : null,
+    };
+  });
 
   const { data: routes } = await supabase
     .from("routes")
@@ -86,7 +98,7 @@ export default async function AdminVesselEditPage({
     // ports table may not exist until migration 010
   }
 
-  const allTripIds = [...(upcomingTrips ?? []).map((t) => t.id), ...(pastTrips ?? []).map((t) => t.id)];
+  const allTripIds = [...(upcomingTrips ?? []).map((t) => t.id), ...pastTrips.map((t) => t.id)];
   const confirmedByTrip = new Map<string, number>();
   if (allTripIds.length > 0) {
     const { data: confirmedBookings } = await supabase
@@ -175,7 +187,7 @@ export default async function AdminVesselEditPage({
         ) : (
           <p className="mt-4 text-sm text-[#0f766e]">No upcoming trips. Use the form below to assign a route and date range.</p>
         )}
-        {pastTrips && pastTrips.length > 0 && (
+        {pastTrips.length > 0 && (
           <div className="mt-8">
             <h3 className="text-sm font-semibold text-[#134e4a]">Past trips</h3>
             <p className="mt-0.5 text-xs text-[#0f766e]">

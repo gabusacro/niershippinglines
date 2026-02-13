@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ViewBookingsModal } from "./ViewBookingsModal";
 import { DeleteTripButton } from "./DeleteTripButton";
 
-type PastTrip = {
+export type PastTrip = {
   id: string;
   departure_date: string;
   departure_time: string | null;
