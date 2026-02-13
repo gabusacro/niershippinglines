@@ -36,13 +36,28 @@ Then open the page in the browser (e.g. http://localhost:3000/schedule).
 
 You may have two remotes: **origin** (e.g. jniervg/niershippinglines) and **gabusacro** (gabusacro/niershippinglines). Push to the one you have write access to.
 
-**Push to gabusacro (your repo):**
+### Step-by-step (copy each line exactly)
+
+Run these **one at a time** in your terminal, in order. Do not skip the **dot** in `git add .`.
+
+| Step | Command | What it does |
+|------|---------|--------------|
+| 1 | `git status` | See which files changed (optional but useful). |
+| 2 | `git add .` | Stage **all** changes. The **dot (`.`)** means “current folder”; without it, Git says “Nothing specified, nothing added.” |
+| 3 | `git commit -m "Your message"` | Save a snapshot with a short message (replace `Your message` with e.g. `Update schedule page`). |
+| 4 | `git push gabusacro main` | Upload to GitHub (use `gabusacro` if that’s your remote; otherwise `origin`). |
+
+**Why you saw “Nothing specified, nothing added”:**
+
+- You ran `git add` **without** the dot. `git add` by itself doesn’t add anything — you must tell Git *what* to add. Use `git add .` to add everything in the current folder.
+
+**Push to gabusacro (your repo) — full block:**
 
 ```bash
 # 1. See what changed
 git status
 
-# 2. Stage the files you edited (or all changes)
+# 2. Stage ALL changes (the dot is required)
 git add .
 
 # 3. Commit with a short message
@@ -179,9 +194,9 @@ To run the **attraction_images** table migration if needed: apply `supabase/migr
 | Goal | Command |
 |------|---------|
 | See changed files | `git status` |
-| Stage all changes | `git add .` |
+| Stage all changes | `git add .` ← **don’t forget the dot** |
 | Commit | `git commit -m "Your message"` |
-| Push to GitHub | `git push origin main` |
+| Push to your repo | `git push gabusacro main` (or `git push origin main`) |
 | Pull latest from GitHub | `git pull origin main` |
 | Force push (overwrite remote) | `git push --force origin main` |
 

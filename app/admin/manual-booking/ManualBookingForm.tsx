@@ -272,18 +272,40 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
           className="mt-1 w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
         >
           <option value="">Select a trip</option>
-          {tripsWithSpace.map((t) => {
-            const ob = t.online_booked ?? 0;
-            const wb = t.walk_in_booked ?? 0;
-            const capacity = (t.boat as { capacity?: number })?.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
-            const available = Math.max(0, capacity - ob - wb);
-            const routeName = t.route?.display_name ?? [t.route?.origin, t.route?.destination].filter(Boolean).join(" → ") ?? "—";
-            return (
-              <option key={t.id} value={t.id}>
-                {getDayLabelExplicit(t.departure_date)} {formatTime(t.departure_time)} — {routeName} — {t.boat?.name ?? "—"} ({available} seats available, {ob + wb} booked)
-              </option>
-            );
-          })}
+          {(() => {
+            const groupKey = (t: TripForManualBooking) => `${t.route?.id ?? ""}-${t.departure_date ?? ""}`;
+            const byGroup = new Map<string, TripForManualBooking[]>();
+            for (const t of tripsWithSpace) {
+              const key = groupKey(t);
+              const list = byGroup.get(key) ?? [];
+              list.push(t);
+              byGroup.set(key, list);
+            }
+            for (const list of byGroup.values()) {
+              list.sort((a, b) => (a.departure_time ?? "").localeCompare(b.departure_time ?? ""));
+            }
+            const tripIndexInRoute = (t: TripForManualBooking) => {
+              const key = groupKey(t);
+              const list = byGroup.get(key) ?? [];
+              const idx = list.findIndex((x) => x.id === t.id);
+              return idx >= 0 ? idx : 0;
+            };
+            return tripsWithSpace.map((t) => {
+              const ob = t.online_booked ?? 0;
+              const wb = t.walk_in_booked ?? 0;
+              const capacity = (t.boat as { capacity?: number })?.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
+              const available = Math.max(0, capacity - ob - wb);
+              const origin = t.route?.origin ?? "";
+              const destination = t.route?.destination ?? "";
+              const idx = tripIndexInRoute(t);
+              const directionLabel = idx === 0 ? `${origin} → ${destination}` : `${destination} → ${origin}`;
+              return (
+                <option key={t.id} value={t.id}>
+                  {getDayLabelExplicit(t.departure_date)} {formatTime(t.departure_time)} — {directionLabel} — {t.boat?.name ?? "—"} ({available} seats available, {ob + wb} booked)
+                </option>
+              );
+            });
+          })()}
         </select>
         {tripsWithSpace.length === 0 && (
           <p className="mt-1 text-sm text-amber-700">No trips with walk-in seats in the next 7 days.</p>
