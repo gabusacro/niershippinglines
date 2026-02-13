@@ -84,6 +84,14 @@ export function Header() {
               >
                 Dashboard
               </Link>
+              <Link
+                href={ROUTES.account}
+                className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+                  pathname === ROUTES.account ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+                }`}
+              >
+                Account
+              </Link>
               <button
                 type="button"
                 onClick={handleSignOut}
@@ -160,6 +168,17 @@ export function Header() {
                     }`}
                   >
                     Dashboard
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href={ROUTES.account}
+                    onClick={() => setMenuOpen(false)}
+                    className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                      pathname === ROUTES.account ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                    }`}
+                  >
+                    Account
                   </Link>
                 </li>
                 <li>

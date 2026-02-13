@@ -11,6 +11,7 @@ export const ROUTES = {
   login: "/login",
   signup: "/signup",
   dashboard: "/dashboard",
+  account: "/account",
   myBookings: "/dashboard/bookings",
   firstAdminSetup: "/first-admin-setup",
   admin: "/admin",
