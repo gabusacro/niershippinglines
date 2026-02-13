@@ -5,6 +5,8 @@ import { getScheduleFromSupabase } from "@/lib/schedule/get-schedule";
 import { getActiveAnnouncements } from "@/lib/announcements/get-announcements";
 import { AnnouncementsBlock } from "@/components/announcements/AnnouncementsBlock";
 import { VesselThumbnail } from "./VesselThumbnail";
+import { getTodayInManila } from "@/lib/admin/ph-time";
+import { WeatherWidget } from "@/components/weather/WeatherWidget";
 
 export const metadata = {
   title: "Schedule",
@@ -12,6 +14,7 @@ export const metadata = {
 };
 
 export default async function SchedulePage() {
+  const today = getTodayInManila();
   const [schedule, announcements] = await Promise.all([
     getScheduleFromSupabase(),
     getActiveAnnouncements(),
@@ -58,16 +61,21 @@ export default async function SchedulePage() {
                     <Wave size={20} className="text-[#0c7b93] shrink-0 mt-0.5" />
                   )}
                   <div className="min-w-0">
-                    <span className="font-medium text-[#134e4a] text-sm sm:text-base break-words">{row.routeDisplayName}</span>
+                    <Link
+                      href={`${ROUTES.book}?route_id=${encodeURIComponent(row.routeId)}&date=${encodeURIComponent(today)}`}
+                      className="font-medium text-[#134e4a] text-sm sm:text-base break-words hover:text-[#0c7b93] hover:underline"
+                    >
+                      {row.routeDisplayName}
+                    </Link>
                     {row.vesselName && (
                       <p className="text-xs text-[#0f766e] mt-0.5">Vessel: {row.vesselName}</p>
                     )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 pl-7 sm:pl-0">
-                  {row.times.map((t) => (
-                    <span key={t} className="rounded-lg bg-[#0c7b93]/10 px-3 py-1.5 text-sm font-medium text-[#0c7b93]">
-                      {t}
+                  {(row.timesWithDirection ?? row.times.map((t) => ({ time: t, directionLabel: t }))).map((tw) => (
+                    <span key={tw.time} className="rounded-lg bg-[#0c7b93]/10 px-3 py-1.5 text-sm font-medium text-[#0c7b93]" title={tw.directionLabel}>
+                      {tw.time} — {tw.directionLabel}
                     </span>
                   ))}
                 </div>
@@ -90,6 +98,11 @@ export default async function SchedulePage() {
           <li>• Schedules can change due to weather or sea conditions. We&apos;ll notify you of any changes.</li>
           <li>• For the latest times and to book, use the <Link href={ROUTES.book} className="font-semibold text-[#0c7b93] hover:underline">Book</Link> page—it shows only available trips.</li>
         </ul>
+      </div>
+
+      <div className="mt-8 sm:mt-10">
+        <h3 className="font-semibold text-[#134e4a] mb-3">Siargao weather</h3>
+        <WeatherWidget />
       </div>
 
       <div className="mt-8 text-center">

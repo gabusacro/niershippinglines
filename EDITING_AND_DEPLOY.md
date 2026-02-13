@@ -132,7 +132,49 @@ Repeat “Insert row” in **boat_images** for each extra photo; use the same **
 
 ---
 
-## 5. Quick reference: Git commands
+## 5. Adding attractions and attraction photos (Attractions page)
+
+The **Attractions** page (“Explore Siargao”) can show items from Supabase. Each attraction can have one main image and a gallery of extra photos. Clicking the thumbnail opens a modal with all photos (swipe/Previous–Next). Each card has a “Book your trip to Siargao →” link to the Book page.
+
+### Where data is stored
+
+- **attractions** table: `id`, `title`, `slug`, `description`, `image_url` (main thumbnail), `sort_order`, `is_published`.
+- **attraction_images** table: `attraction_id`, `image_url`, `sort_order` — one row per extra photo for the gallery.
+
+If **attractions** has no published rows, the page shows a static fallback list with icons. As soon as you add published attractions in Supabase, they appear with images and the “Book your trip to Siargao →” button.
+
+### How to add an attraction
+
+1. **Open Supabase** → your project → **Table Editor**.
+2. Open the **attractions** table.
+3. Click **Insert row**.
+4. Fill in:
+   - **title**: e.g. “Cloud 9”.
+   - **slug**: URL-friendly id, e.g. `cloud-9` (unique).
+   - **description**: Full text shown on the card.
+   - **image_url**: Full URL of the main photo (used as thumbnail and first image in the modal).
+   - **sort_order**: Number to order attractions (e.g. 0, 1, 2).
+   - **is_published**: Set to **true** so it appears on the site.
+5. Save.
+
+### How to add extra photos (gallery modal)
+
+1. In **attractions**, find the attraction and copy its **id** (UUID).
+2. Open the **attraction_images** table.
+3. Click **Insert row**.
+4. Fill in:
+   - **attraction_id**: paste the attraction’s **id**.
+   - **image_url**: full URL of the photo.
+   - **sort_order**: 0, 1, 2… to order photos in the modal (0 = first after the main image).
+5. Save.
+
+Repeat for each extra photo; use the same **attraction_id** for the same attraction. Clicking the attraction’s thumbnail on the site opens the modal with the main image first, then these in `sort_order`.
+
+To run the **attraction_images** table migration if needed: apply `supabase/migrations/033_attraction_images_gallery.sql` in the Supabase SQL Editor or via Supabase CLI.
+
+---
+
+## 6. Quick reference: Git commands
 
 | Goal | Command |
 |------|---------|
@@ -143,4 +185,4 @@ Repeat “Insert row” in **boat_images** for each extra photo; use the same **
 | Pull latest from GitHub | `git pull origin main` |
 | Force push (overwrite remote) | `git push --force origin main` |
 
-If you need to run the new migration (boat_images table) on your Supabase project, apply the migration file `supabase/migrations/032_boat_images_gallery.sql` from the Supabase dashboard (SQL Editor) or via Supabase CLI.
+If you need to run migrations on your Supabase project, apply the SQL files from `supabase/migrations/` in the Supabase dashboard (SQL Editor) or via Supabase CLI (e.g. `032_boat_images_gallery.sql`, `033_attraction_images_gallery.sql`).

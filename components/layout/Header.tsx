@@ -16,7 +16,6 @@ const BASE_NAV_LINKS = [
   { href: ROUTES.schedule, label: "Schedule" },
   { href: ROUTES.book, label: "Book A Trip" },
   { href: ROUTES.attractions, label: "Attractions" },
-  { href: ROUTES.weather, label: "Weather" },
 ];
 
 export function Header({ siteName }: HeaderProps = {}) {

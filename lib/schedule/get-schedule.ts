@@ -1,13 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 
+export interface TimeWithDirection {
+  time: string;
+  /** e.g. "Siargao (Dapa) → Surigao" for first slot, "Surigao → Siargao (Dapa)" for second */
+  directionLabel: string;
+}
+
 export interface ScheduleRow {
+  routeId: string;
   routeDisplayName: string;
   routeOrigin: string;
   routeDestination: string;
   times: string[];
-  /** Vessel photo for thumbnail (one representative boat per route) */
+  /** Per-time direction: first slot = origin→destination, second = destination→origin */
+  timesWithDirection: TimeWithDirection[];
   vesselImageUrl?: string | null;
-  /** All images for gallery modal: main image first, then boat_images by sort_order */
   vesselImageUrls?: string[];
   vesselName?: string;
 }
@@ -109,15 +116,15 @@ export async function getScheduleFromSupabase(): Promise<ScheduleRow[]> {
     return [];
   }
 
-  const timesByRouteId = new Map<string, string[]>();
+  const slotsByRouteId = new Map<string, { time: string; formatted: string }[]>();
   for (const s of slots) {
     if (!routeIdsWithVessels.has(s.route_id)) continue;
     const timeStr = typeof s.departure_time === "string" ? s.departure_time : "";
     const formatted = formatTimeForDisplay(timeStr);
     if (!formatted) continue;
-    const arr = timesByRouteId.get(s.route_id) ?? [];
-    arr.push(formatted);
-    timesByRouteId.set(s.route_id, arr);
+    const arr = slotsByRouteId.get(s.route_id) ?? [];
+    arr.push({ time: timeStr, formatted });
+    slotsByRouteId.set(s.route_id, arr);
   }
 
   return routes.map((r) => {
@@ -125,11 +132,21 @@ export async function getScheduleFromSupabase(): Promise<ScheduleRow[]> {
     const mainUrl = vessel?.image_url ?? null;
     const extraUrls = vessel ? (imagesByBoatId.get(vessel.boatId) ?? []) : [];
     const vesselImageUrls = mainUrl ? [mainUrl, ...extraUrls] : extraUrls;
+    const slotList = slotsByRouteId.get(r.id) ?? [];
+    const times = slotList.map((s) => s.formatted);
+    const origin = r.origin ?? "";
+    const destination = r.destination ?? "";
+    const timesWithDirection: TimeWithDirection[] = slotList.map((s, idx) => ({
+      time: s.formatted,
+      directionLabel: idx === 0 ? `${origin} → ${destination}` : `${destination} → ${origin}`,
+    }));
     return {
+      routeId: r.id,
       routeDisplayName: r.display_name,
-      routeOrigin: r.origin,
-      routeDestination: r.destination,
-      times: timesByRouteId.get(r.id) ?? [],
+      routeOrigin: origin,
+      routeDestination: destination,
+      times,
+      timesWithDirection,
       vesselImageUrl: mainUrl,
       vesselImageUrls: vesselImageUrls.length > 0 ? vesselImageUrls : undefined,
       vesselName: vessel?.name,

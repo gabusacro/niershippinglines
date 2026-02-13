@@ -51,12 +51,22 @@ function ensureLength(arr: string[], len: number): string[] {
   return arr.slice(0, len);
 }
 
-type BookingFormProps = { loggedInEmail?: string; loggedInAddress?: string };
+type BookingFormProps = {
+  loggedInEmail?: string;
+  loggedInAddress?: string;
+  initialRouteId?: string;
+  initialDate?: string;
+};
 
-export default function BookingForm({ loggedInEmail = "", loggedInAddress = "" }: BookingFormProps) {
+export default function BookingForm({
+  loggedInEmail = "",
+  loggedInAddress = "",
+  initialRouteId = "",
+  initialDate = "",
+}: BookingFormProps) {
   const [routes, setRoutes] = useState<RouteRow[]>([]);
-  const [routeId, setRouteId] = useState("");
-  const [date, setDate] = useState("");
+  const [routeId, setRouteId] = useState(initialRouteId);
+  const [date, setDate] = useState(initialDate);
   const [trips, setTrips] = useState<TripRow[]>([]);
   const [tripId, setTripId] = useState("");
   const [fare, setFare] = useState<FareRow | null>(null);
@@ -164,6 +174,13 @@ export default function BookingForm({ loggedInEmail = "", loggedInAddress = "" }
       })
       .catch(() => setLoadingRoutes(false));
   }, []);
+
+  useEffect(() => {
+    if (initialRouteId) setRouteId(initialRouteId);
+  }, [initialRouteId]);
+  useEffect(() => {
+    if (initialDate) setDate(initialDate);
+  }, [initialDate]);
 
   useEffect(() => {
     if (!routeId || !date) {
@@ -523,19 +540,22 @@ export default function BookingForm({ loggedInEmail = "", loggedInAddress = "" }
           required
         >
           <option value="">Select a trip</option>
-          {trips.map((t) => {
+          {trips.map((t, idx) => {
             const ob = t.online_booked ?? 0;
             const wb = t.walk_in_booked ?? 0;
             const capacity = t.boat?.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
             const available = Math.max(0, capacity - ob - wb);
             const boatName = t.boat?.name ?? "—";
-            const routeName = t.route?.display_name ?? [t.route?.origin, t.route?.destination].filter(Boolean).join(" ↔ ") ?? "—";
+            const r = t.route;
+            const origin = r?.origin ?? "";
+            const destination = r?.destination ?? "";
+            const directionLabel = idx === 0 ? `${origin} → ${destination}` : `${destination} → ${origin}`;
             const depDate = t.departure_date ?? date;
             const dateLabel = depDate ? new Date(depDate + "Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "";
             const timeStr = formatTime(t.departure_time);
             return (
               <option key={t.id} value={t.id}>
-                {dateLabel} {timeStr} — {boatName} · {routeName} ({available} seats available)
+                {dateLabel} {timeStr} — {directionLabel} · {boatName} ({available} seats available)
               </option>
             );
           })}
