@@ -6,6 +6,7 @@ import { ROUTES } from "@/lib/constants";
 import { passengerTypeLabel } from "@/lib/dashboard/format";
 import { getPaymentProofSignedUrl } from "@/lib/admin/payment-proof-url";
 import { PaymentProofViewer } from "@/components/admin/PaymentProofViewer";
+import { PassengerRestrictionActions } from "@/components/admin/PassengerRestrictionActions";
 import { ResendProofButton } from "@/components/admin/ResendProofButton";
 import { RefundBookingButton } from "@/components/admin/RefundBookingButton";
 
@@ -68,7 +69,7 @@ export default async function AdminBookingDetailPage({
   const { data: booking, error } = await supabase
     .from("bookings")
     .select(
-      "id, reference, customer_full_name, customer_email, customer_mobile, notify_also_email, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, gcash_transaction_reference, created_at, trip_id, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, passenger_details, passenger_names, refund_requested_at, refund_request_reason, refund_request_notes"
+      "id, reference, created_by, customer_full_name, customer_email, customer_mobile, notify_also_email, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, gcash_transaction_reference, created_at, trip_id, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, passenger_details, passenger_names, refund_requested_at, refund_request_reason, refund_request_notes"
     )
     .eq("reference", refNormalized)
     .maybeSingle();
@@ -100,6 +101,28 @@ export default async function AdminBookingDetailPage({
   const proofUrl = booking.payment_proof_path
     ? await getPaymentProofSignedUrl(booking.payment_proof_path)
     : null;
+
+  let passengerRestriction: { booking_warnings: number; booking_blocked_at: string | null } | null = null;
+  const createdBy = (booking as { created_by?: string | null }).created_by;
+  let creatorIsPassenger = false;
+  if (createdBy) {
+    const { data: creatorProfile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", createdBy)
+      .maybeSingle();
+    creatorIsPassenger = creatorProfile?.role === "passenger";
+    if (creatorIsPassenger) {
+      const { data: restriction } = await supabase
+        .from("passenger_booking_restrictions")
+        .select("booking_warnings, booking_blocked_at")
+        .eq("profile_id", createdBy)
+        .maybeSingle();
+      passengerRestriction = restriction
+        ? { booking_warnings: restriction.booking_warnings ?? 0, booking_blocked_at: restriction.booking_blocked_at ?? null }
+        : { booking_warnings: 0, booking_blocked_at: null };
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
@@ -165,6 +188,26 @@ export default async function AdminBookingDetailPage({
             </p>
           )}
         </div>
+
+        {createdBy && creatorIsPassenger && passengerRestriction !== null && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+            <h3 className="text-sm font-semibold text-[#134e4a]">Passenger restrictions</h3>
+            <p className="mt-1 text-sm text-[#0f766e]">
+              This booking was made by a registered account. Warnings and blocks limit online ticket purchases.
+            </p>
+            <p className="mt-1 text-sm font-medium text-[#134e4a]">
+              Warnings: {passengerRestriction.booking_warnings}
+              {passengerRestriction.booking_blocked_at ? (
+                <span className="ml-2 rounded bg-red-200 px-1.5 py-0.5 text-red-900">Blocked from booking</span>
+              ) : null}
+            </p>
+            <PassengerRestrictionActions
+              profileId={createdBy}
+              bookingWarnings={passengerRestriction.booking_warnings}
+              isBlocked={!!passengerRestriction.booking_blocked_at}
+            />
+          </div>
+        )}
 
         <div className="mt-4 rounded-lg border border-teal-100 bg-white p-4">
           <h3 className="text-sm font-semibold text-[#134e4a]">Passengers ({booking.passenger_count})</h3>

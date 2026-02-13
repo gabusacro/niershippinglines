@@ -34,7 +34,10 @@ export function AuthForm() {
           redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(`${ROUTES.account}?reset=1`)}` : undefined,
         });
         if (resetError) {
-          setError(resetError.message);
+          const msg = /rate limit|too many requests/i.test(resetError.message)
+            ? "Too many reset requests. Please wait an hour and try again."
+            : resetError.message;
+          setError(msg);
           return;
         }
         setResetSent(true);

@@ -118,6 +118,27 @@ export async function POST(request: NextRequest) {
       : "adult";
   }
 
+  // Resolve authenticated user once (for block check and created_by).
+  const authClient = await createClient();
+  const { data: { user: authUser } } = await authClient.auth.getUser();
+
+  if (authUser?.id) {
+    const adminForCheck = createAdminClient();
+    if (adminForCheck) {
+      const { data: restriction } = await adminForCheck
+        .from("passenger_booking_restrictions")
+        .select("booking_blocked_at")
+        .eq("profile_id", authUser.id)
+        .maybeSingle();
+      if (restriction?.booking_blocked_at) {
+        return NextResponse.json(
+          { error: "Your account is blocked from making new bookings. Contact support if you believe this is an error." },
+          { status: 403 }
+        );
+      }
+    }
+  }
+
   // Use service-role client for creating the booking so public (anon) booking is not blocked by RLS.
   const supabase = createAdminClient() ?? (await createClient());
 
@@ -191,13 +212,12 @@ export async function POST(request: NextRequest) {
   totalCents = fareSubtotalCents + gcashFeeCents + adminFeeCents;
 
   let createdBy: string | null = null;
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user?.id) {
+  if (authUser?.id) {
     // Only set created_by when a matching profile exists, to satisfy FK bookings_created_by_fkey.
     const { data: profile } = await supabase
       .from("profiles")
       .select("id")
-      .eq("id", user.id)
+      .eq("id", authUser.id)
       .maybeSingle();
     if (profile?.id) {
       createdBy = profile.id;
