@@ -26,7 +26,7 @@ export default function WeatherPage() {
       </div>
 
       <p className="text-sm text-[#0f766e] text-center">
-        <Link href={ROUTES.home} className="font-semibold text-[#0c7b93] hover:underline">← Back to home</Link>
+        <Link href={ROUTES.home} className="font-semibold text-[#0c7b93] hover:underline">← Back to Home</Link>
       </p>
     </div>
   );
