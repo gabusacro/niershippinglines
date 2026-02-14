@@ -189,7 +189,54 @@ To run the **attraction_images** table migration if needed: apply `supabase/migr
 
 ---
 
-## 6. Quick reference: Git commands
+## 6. Assigning deck crew, ticket booth, and captain (manual)
+
+User accounts get a **role** (passenger, crew, captain, ticket_booth, admin). The **dashboard and navbar change automatically** based on that role (e.g. passengers see “My bookings”, crew/captain see vessel manifests, ticket booth sees “Pending payments” and “Add walk-in”). To assign someone as deck crew, ticket booth, or captain, set their role (and for crew/captain, assign them to a vessel) in Supabase.
+
+### Step 1: Set the user’s role (profiles table)
+
+1. **Open Supabase** → your project → **Table Editor**.
+2. Open the **profiles** table.
+3. Find the user by **email** (e.g. the address they use to log in).
+4. Edit that row and set **role** to one of:
+   - `passenger` — Passenger Account (bookings, schedule, My bookings).
+   - `crew` — Deck crew (dashboard shows vessel manifest for assigned boats).
+   - `captain` — Captain (same as crew; can also post announcements for assigned vessel).
+   - `ticket_booth` — Ticket booth (dashboard: Pending payments, Booking history, Add walk-in, etc.).
+   - `admin` — Full admin (redirected to Admin dashboard).
+5. Save.
+
+After the next login (or refresh), their dashboard and navbar will match the new role (e.g. no “Account” in navbar for passenger/crew/captain/ticket_booth; Account appears on the dashboard).
+
+### Step 2: Assign crew or captain to a vessel (boat_assignments)
+
+Crew and captain only see trips and manifests for **vessels they are assigned to**. Ticket booth does **not** need a vessel assignment; they get the ticket booth dashboard for all bookings.
+
+1. In Supabase → **Table Editor**, open the **boat_assignments** table.
+2. Click **Insert row**.
+3. Fill in:
+   - **boat_id**: UUID of the vessel (from the **boats** table — copy the **id** of e.g. “Vince Gabriel 1” or “Vince Gabriel 3”).
+   - **profile_id**: UUID of the user (from the **profiles** table — copy the **id** of the crew/captain you assigned in Step 1).
+   - **assignment_role**: Choose `deck_crew` or `captain` (one row per person per boat per role).
+4. Save.
+
+Repeat for each vessel that person should see (e.g. one row per boat). The same person can be assigned to more than one boat.
+
+### Summary
+
+| Role           | Where to set        | Vessel assignment (boat_assignments)? | Result |
+|----------------|---------------------|----------------------------------------|--------|
+| Passenger      | profiles.role       | No                                     | Passenger dashboard (Book, Schedule, My bookings, Account on dashboard). |
+| Deck crew      | profiles.role       | Yes — add row with assignment_role `deck_crew` | Crew dashboard: today’s trips and manifest for assigned boats. |
+| Captain        | profiles.role       | Yes — add row with assignment_role `captain`   | Captain dashboard (same as crew; can post vessel announcements). |
+| Ticket booth   | profiles.role       | Optional                                | Ticket booth dashboard (Pending payments, Add walk-in, Account on dashboard). |
+| Admin          | profiles.role       | No                                     | Redirected to Admin; Account in navbar. |
+
+To **remove** someone from a vessel: delete the corresponding row(s) in **boat_assignments**. To make them a passenger again: set **profiles.role** back to `passenger`.
+
+---
+
+## 7. Quick reference: Git commands
 
 | Goal | Command |
 |------|---------|
@@ -201,3 +248,4 @@ To run the **attraction_images** table migration if needed: apply `supabase/migr
 | Force push (overwrite remote) | `git push --force origin main` |
 
 If you need to run migrations on your Supabase project, apply the SQL files from `supabase/migrations/` in the Supabase dashboard (SQL Editor) or via Supabase CLI (e.g. `032_boat_images_gallery.sql`, `033_attraction_images_gallery.sql`).
+

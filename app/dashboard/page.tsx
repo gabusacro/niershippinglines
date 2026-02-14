@@ -459,23 +459,45 @@ export default async function DashboardPage({
           </div>
         </div>
       ) : (user.role === "crew" || user.role === "captain") && crewCaptainData ? (
-        crewCaptainData.boatIds.length === 0 ? (
-          <p className="mt-1 text-sm text-[#0f766e]/80">
-            You have no vessel assignments. Contact admin to be assigned to a vessel.
-          </p>
-        ) : (
-          <CrewCaptainManifestSection
-            roleLabel={yourRoleLabel}
-            todayTrips={crewCaptainData.todayTrips}
-            currentTrip={crewCaptainData.currentTrip}
-            selectedTripId={crewCaptainData.selectedTripId}
-            manifest={crewCaptainData.manifest}
-          />
-        )
+        <>
+          {crewCaptainData.boatIds.length === 0 ? (
+            <p className="mt-1 text-sm text-[#0f766e]/80">
+              You have no vessel assignments. Contact admin to be assigned to a vessel.
+            </p>
+          ) : (
+            <CrewCaptainManifestSection
+              roleLabel={yourRoleLabel}
+              todayTrips={crewCaptainData.todayTrips}
+              currentTrip={crewCaptainData.currentTrip}
+              selectedTripId={crewCaptainData.selectedTripId}
+              manifest={crewCaptainData.manifest}
+            />
+          )}
+          <div className="mt-6">
+            <Link
+              href={ROUTES.account}
+              className="inline-flex rounded-xl border-2 border-teal-200 bg-white px-5 py-4 text-left transition-colors hover:border-[#0c7b93] hover:bg-[#0c7b93]/5"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Account</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Your profile and password.</p>
+            </Link>
+          </div>
+        </>
       ) : (
-        <p className="mt-1 text-sm text-[#0f766e]/80">
-          Crew and captain access are assigned per vessel by admin. You only see the areas you have access to.
-        </p>
+        <>
+          <p className="mt-1 text-sm text-[#0f766e]/80">
+            Crew and captain access are assigned per vessel by admin. You only see the areas you have access to.
+          </p>
+          <div className="mt-6">
+            <Link
+              href={ROUTES.account}
+              className="inline-flex rounded-xl border-2 border-teal-200 bg-white px-5 py-4 text-left transition-colors hover:border-[#0c7b93] hover:bg-[#0c7b93]/5"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Account</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Your profile and password.</p>
+            </Link>
+          </div>
+        </>
       )}
     </div>
   );
