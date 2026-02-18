@@ -237,7 +237,7 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
     const ticketsUrl = `/bookings/${success.reference}/tickets`;
     return (
       <div className="rounded-2xl border-2 border-teal-200 bg-teal-50/50 p-6">
-        <p className="font-semibold text-[#134e4a]">Manual Booking created</p>
+        <p className="font-semibold text-[#134e4a]">Manual Booking Created</p>
         <p className="mt-2 font-mono text-lg font-bold text-[#0c7b93]">Reference: {success.reference}</p>
         <p className="mt-1 text-sm text-[#134e4a]">Total: ₱{(success.total / 100).toLocaleString()} · Walk-in seats updated in Supabase.</p>
         <div className="mt-4 flex flex-wrap gap-3">

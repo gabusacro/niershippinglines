@@ -401,8 +401,8 @@ export function BookingModal({
                 <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 space-y-1">
                   <p className="text-xs font-semibold uppercase text-[#0f766e]">Amount breakdown</p>
                   <p className="text-sm text-[#134e4a]">Fare: ₱{(fareSubtotalCents / 100).toLocaleString()}</p>
-                  <p className="text-sm text-[#134e4a]">Admin fee (₱15/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
-                  <p className="text-sm text-[#134e4a]">GCash fee: ₱{(GCASH_FEE_CENTS / 100).toLocaleString()}</p>
+                  <p className="text-sm text-[#134e4a]">Admin Fee (₱20/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
+                  <p className="text-sm text-[#134e4a]">GCash Fee: ₱{(GCASH_FEE_CENTS / 100).toLocaleString()}</p>
                   <p className="text-sm font-semibold text-[#134e4a] pt-1 border-t border-teal-200">
                     Total: ₱{(totalCents / 100).toLocaleString()} ({totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""})
                   </p>
