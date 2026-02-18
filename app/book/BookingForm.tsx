@@ -408,8 +408,8 @@ export default function BookingForm({
                   {result.fare_breakdown.fare_subtotal_cents != null && (
                     <>
                       <p className="mt-2 text-sm text-[#134e4a]">Fare: ₱{(result.fare_breakdown.fare_subtotal_cents / 100).toLocaleString()}</p>
-                      <p className="text-sm text-[#134e4a]">Admin fee (₱15/pax): ₱{((result.fare_breakdown.admin_fee_cents ?? 0) / 100).toLocaleString()}</p>
-                      <p className="text-sm text-[#134e4a]">GCash fee: ₱{((result.fare_breakdown.gcash_fee_cents ?? 0) / 100).toLocaleString()}</p>
+                      <p className="text-sm text-[#134e4a]">Admin Fee (₱20/pax): ₱{((result.fare_breakdown.admin_fee_cents ?? 0) / 100).toLocaleString()}</p>
+                      <p className="text-sm text-[#134e4a]">GCash Fee: ₱{((result.fare_breakdown.gcash_fee_cents ?? 0) / 100).toLocaleString()}</p>
                     </>
                   )}
                   <p className="mt-2 pt-2 border-t border-teal-200 text-sm font-semibold text-[#134e4a]">
@@ -590,8 +590,8 @@ export default function BookingForm({
         <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 space-y-1">
           <p className="text-xs font-semibold uppercase text-[#0f766e]">Amount breakdown</p>
           <p className="text-sm text-[#134e4a]">Fare: ₱{(fareSubtotalCents / 100).toLocaleString()}</p>
-          <p className="text-sm text-[#134e4a]">Admin fee (₱15/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
-          <p className="text-sm text-[#134e4a]">GCash fee: ₱{(GCASH_FEE_CENTS / 100).toLocaleString()}</p>
+          <p className="text-sm text-[#134e4a]">Admin Fee (₱20/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
+          <p className="text-sm text-[#134e4a]">GCash Fee: ₱{(GCASH_FEE_CENTS / 100).toLocaleString()}</p>
           <p className="text-sm font-semibold text-[#134e4a] pt-1 border-t border-teal-200">
             Total: ₱{(totalCents / 100).toLocaleString()} ({totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""})
           </p>
