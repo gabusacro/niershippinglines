@@ -313,8 +313,8 @@ export function BookingModal({
                 {result.fare_breakdown?.fare_subtotal_cents != null && (
                   <>
                     <p className="mt-2 text-sm text-[#134e4a]">Fare: ₱{(result.fare_breakdown.fare_subtotal_cents / 100).toLocaleString()}</p>
-                    <p className="text-sm text-[#134e4a]">Admin fee (₱15/pax): ₱{((result.fare_breakdown.admin_fee_cents ?? 0) / 100).toLocaleString()}</p>
-                    <p className="text-sm text-[#134e4a]">GCash fee: ₱{((result.fare_breakdown.gcash_fee_cents ?? 0) / 100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">Admin Fee (₱20/pax): ₱{((result.fare_breakdown.admin_fee_cents ?? 0) / 100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">GCash Fee: ₱{((result.fare_breakdown.gcash_fee_cents ?? 0) / 100).toLocaleString()}</p>
                   </>
                 )}
                 <p className="mt-2 pt-2 border-t border-teal-200 text-sm font-semibold text-[#134e4a]">
@@ -430,7 +430,7 @@ export function BookingModal({
               {/* Names per type */}
               {countAdult > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-[#134e4a] mb-2">Adult — full name</p>
+                  <p className="text-sm font-medium text-[#134e4a] mb-2">Adult — Full Name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countAdult }, (_, i) => (
                       <div key={i} className="space-y-1">
@@ -464,7 +464,7 @@ export function BookingModal({
               )}
               {countSenior > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-[#134e4a] mb-2">Senior — full name</p>
+                  <p className="text-sm font-medium text-[#134e4a] mb-2">Senior — Full Name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countSenior }, (_, i) => (
                       <div key={i} className="space-y-1">
@@ -498,7 +498,7 @@ export function BookingModal({
               )}
               {countPwd > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-[#134e4a] mb-2">PWD — full name</p>
+                  <p className="text-sm font-medium text-[#134e4a] mb-2">PWD — Full Name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countPwd }, (_, i) => (
                       <div key={i} className="space-y-1">
@@ -532,7 +532,7 @@ export function BookingModal({
               )}
               {countChild > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-[#134e4a] mb-2">Child — full name</p>
+                  <p className="text-sm font-medium text-[#134e4a] mb-2">Child — Full Name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countChild }, (_, i) => (
                       <div key={i} className="space-y-1">
@@ -566,7 +566,7 @@ export function BookingModal({
               )}
               {countInfant > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-[#134e4a] mb-2">Infant (&lt;7) — full name</p>
+                  <p className="text-sm font-medium text-[#134e4a] mb-2">Infant (&lt;7) — Full Name</p>
                   <div className="space-y-2">
                     {Array.from({ length: countInfant }, (_, i) => (
                       <div key={i} className="space-y-1">
@@ -614,12 +614,12 @@ export function BookingModal({
                     />
                     {loggedInEmail && (
                       <p className="mt-1 text-xs text-[#0f766e]">
-                        Using your account email — this booking will appear in My bookings.
+                        Using your account email — this booking will appear in My Bookings.
                       </p>
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs text-[#0f766e] mb-1">Mobile number</label>
+                    <label className="block text-xs text-[#0f766e] mb-1">Mobile Number</label>
                     <input
                       type="tel"
                       required
@@ -630,7 +630,7 @@ export function BookingModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-[#0f766e] mb-1">Also notify (optional)</label>
+                    <label className="block text-xs text-[#0f766e] mb-1">Also Notify (optional)</label>
                     <input
                       type="email"
                       value={notifyAlsoEmail}
