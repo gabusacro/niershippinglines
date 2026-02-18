@@ -236,7 +236,42 @@ To **remove** someone from a vessel: delete the corresponding row(s) in **boat_a
 
 ---
 
-## 7. Quick reference: Git commands
+## 7. Transaction number vs ticket numbers (where they go in Supabase)
+
+**Transaction number** and **ticket numbers** are different:
+
+- **Transaction number** = one per **booking** (the booking reference, e.g. `L7HHU7NCHR`). Same for the whole transaction no matter how many passengers. Stored in **Supabase** in the **bookings** table as **reference** (and used in URLs, emails, and receipts).
+- **Ticket numbers** = one **unique** number per **passenger**. When a transaction is successful and tickets are issued, each passenger gets their own 12-digit-style alphanumeric ticket number (random, not sequential, hard to copy). Stored in **Supabase** as below.
+
+### Where ticket numbers are stored (Supabase)
+
+1. **tickets** table (one row per passenger per booking):
+   - **ticket_number** (TEXT, primary key) — the unique alphanumeric (e.g. `AB3K9XYZ12`).
+   - **booking_id** (UUID) — links to the booking (transaction).
+   - **passenger_index** (INT) — which passenger on that booking (0, 1, 2…).
+   - So: **one ticket number per passenger**, not per transaction.
+
+2. **bookings.passenger_details** (JSONB):
+   - Each passenger object has **ticket_number** set so the ticket page and manifest can show it. Updated when tickets are issued (confirm-payment or manual booking).
+
+### When ticket numbers are created
+
+- **Confirm payment** (admin/ticket booth confirms a booking) → `assignTicketNumbersToBooking` runs → calls DB function `generate_and_assign_ticket_numbers` → inserts one row per passenger in **tickets** and updates **bookings.passenger_details[].ticket_number**.
+- **Manual booking** (admin/ticket booth creates a walk-in booking) → same: tickets are generated and stored.
+
+Numbers are **random** alphanumeric (from a safe character set, no 0/1/I/O to avoid confusion), **unique** across all tickets (collision check in DB), and **not sequential** so they’re hard to guess or copy. The generator is in `generate_and_assign_ticket_numbers` (migration `027_unique_ticket_numbers_per_passenger.sql`); it currently produces 10-character codes — you can change the loop length there to get 12-character ticket numbers if you prefer.
+
+### QR code on the ticket
+
+- Each ticket shows a **QR code** that encodes the ticket identifier (e.g. `NIER:{ticketNumber}`).
+- **Crew / captain / ticket booth** use the **Crew scan** page (e.g. `/crew/scan`) to scan the QR → app calls **`/api/crew/validate-ticket`** with the payload → backend looks up the ticket in the **tickets** table (and booking), validates status (e.g. confirmed), and returns passenger name, trip, etc. So authenticity is validated server-side when staff scan.
+- **Passenger ID**: The ticket and manifest show the passenger’s name and details so staff can match with ID. The ticket number and QR are the technical proof; the name/ID is the human check.
+
+If you want the QR to **open a browser** on the passenger’s phone and show a modal of that ticket on your website (e.g. for self-check or display), the QR would need to encode a **URL** (e.g. `https://yoursite.com/ticket/XXXXX`) and you’d add a public page that shows that ticket in a modal; that can be added later without changing how ticket numbers are stored.
+
+---
+
+## 8. Quick reference: Git commands
 
 | Goal | Command |
 |------|---------|

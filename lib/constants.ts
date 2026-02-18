@@ -44,7 +44,7 @@ export const GCASH_ACCOUNT_NAME = process.env.NEXT_PUBLIC_GCASH_ACCOUNT_NAME ?? 
 
 /** Fees added to booking total. To change these, edit here; see docs/WHERE_FEES_AND_FARES_ARE_SET.md. */
 export const GCASH_FEE_CENTS = 1500; // ₱15 per transaction (online/GCash only; walk-in = 0)
-export const ADMIN_FEE_CENTS_PER_PASSENGER = 1500; // ₱15 per passenger
+export const ADMIN_FEE_CENTS_PER_PASSENGER = 2000; // ₱20 per passenger
 
 /** Passenger-initiated reschedule (MARINA: P10–10% before departure). */
 export const RESCHEDULE_FEE_PERCENT = 10;
