@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
   const action = body.action === "checked_in" || body.action === "boarded" ? body.action : "checked_in";
   const now = new Date().toISOString();
 
+  console.log("[check-in] body:", JSON.stringify(body));
+
   // ── Per-ticket update (ticket_number provided — from QR scanner) ──────────
   const ticketNumber = typeof body.ticket_number === "string" ? body.ticket_number.trim() : "";
 
