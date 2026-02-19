@@ -95,6 +95,12 @@ export default async function AdminDashboardPage() {
             Site branding
           </Link>
           <Link
+            href={ROUTES.adminFees}
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
+          >
+            Fees & charges
+          </Link>
+          <Link
             href={ROUTES.adminFlagged}
             className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >

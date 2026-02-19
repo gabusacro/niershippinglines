@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/ActionToast";
 import type { UpcomingTripRow } from "@/lib/dashboard/get-upcoming-trips";
 import { formatTime, passengerTypeLabel } from "@/lib/dashboard/format";
-import { GCASH_NUMBER, GCASH_ACCOUNT_NAME, GCASH_FEE_CENTS, ADMIN_FEE_CENTS_PER_PASSENGER } from "@/lib/constants";
+import { GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
 import { TranslatableNotices } from "@/components/booking/TranslatableNotices";
 
 const FARE_TYPE_OPTIONS = [
@@ -22,7 +22,12 @@ function fareCents(base: number, discount: number, fareType: string): number {
   return Math.round(base * (1 - discount / 100));
 }
 
-type FareRow = { base_fare_cents: number; discount_percent: number };
+type FareRow = {
+  base_fare_cents: number;
+  discount_percent: number;
+  admin_fee_cents_per_passenger?: number;
+  gcash_fee_cents?: number;
+};
 
 function ensureLength(arr: string[], len: number): string[] {
   if (arr.length === len) return arr;
@@ -103,6 +108,8 @@ export function BookingModal({
           setFare({
             base_fare_cents: data.base_fare_cents,
             discount_percent: data.discount_percent ?? 20,
+            admin_fee_cents_per_passenger: data.admin_fee_cents_per_passenger,
+            gcash_fee_cents: data.gcash_fee_cents,
           });
         }
       })
@@ -149,8 +156,10 @@ export function BookingModal({
     [passengerDetails, baseFare, discount]
   );
   const totalPassengers = countAdult + countSenior + countPwd + countChild + countInfant;
-  const adminFeeCents = totalPassengers * ADMIN_FEE_CENTS_PER_PASSENGER;
-  const totalCents = fareSubtotalCents + GCASH_FEE_CENTS + adminFeeCents;
+  const adminFeePerPax = fare?.admin_fee_cents_per_passenger ?? 2000;
+  const gcashFee = fare?.gcash_fee_cents ?? 1500;
+  const adminFeeCents = totalPassengers * adminFeePerPax;
+  const totalCents = fareSubtotalCents + gcashFee + adminFeeCents;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -401,8 +410,8 @@ export function BookingModal({
                 <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 space-y-1">
                   <p className="text-xs font-semibold uppercase text-[#0f766e]">Amount breakdown</p>
                   <p className="text-sm text-[#134e4a]">Fare: ₱{(fareSubtotalCents / 100).toLocaleString()}</p>
-                  <p className="text-sm text-[#134e4a]">Admin Fee (₱20/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
-                  <p className="text-sm text-[#134e4a]">GCash Fee: ₱{(GCASH_FEE_CENTS / 100).toLocaleString()}</p>
+                  <p className="text-sm text-[#134e4a]">Admin Fee (₱{(adminFeePerPax / 100).toLocaleString()}/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
+                  <p className="text-sm text-[#134e4a]">GCash Fee: ₱{(gcashFee / 100).toLocaleString()}</p>
                   <p className="text-sm font-semibold text-[#134e4a] pt-1 border-t border-teal-200">
                     Total: ₱{(totalCents / 100).toLocaleString()} ({totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""})
                   </p>

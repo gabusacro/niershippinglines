@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { passengerTypeLabel } from "@/lib/dashboard/format";
-import { GCASH_FEE_CENTS, ADMIN_FEE_CENTS_PER_PASSENGER, GCASH_NUMBER, GCASH_ACCOUNT_NAME, ROUTES } from "@/lib/constants";
+import { GCASH_NUMBER, GCASH_ACCOUNT_NAME, ROUTES } from "@/lib/constants";
 import { TranslatableNotices } from "@/components/booking/TranslatableNotices";
 
 type RouteRow = { id: string; origin: string; destination: string; display_name: string };
@@ -20,7 +20,12 @@ type TripRow = {
   route: { id: string; display_name: string; origin: string; destination: string } | null;
   port: { id: string; name: string } | null;
 };
-type FareRow = { base_fare_cents: number; discount_percent: number };
+type FareRow = {
+  base_fare_cents: number;
+  discount_percent: number;
+  admin_fee_cents_per_passenger?: number;
+  gcash_fee_cents?: number;
+};
 
 const FARE_TYPE_OPTIONS = [
   { value: "adult", label: "Adult" },
@@ -210,7 +215,12 @@ export default function BookingForm({
       .then((data) => {
         setFare(
           data?.base_fare_cents != null
-            ? { base_fare_cents: data.base_fare_cents, discount_percent: data.discount_percent ?? 20 }
+            ? {
+                base_fare_cents: data.base_fare_cents,
+                discount_percent: data.discount_percent ?? 20,
+                admin_fee_cents_per_passenger: data.admin_fee_cents_per_passenger,
+                gcash_fee_cents: data.gcash_fee_cents,
+              }
             : null
         );
         setLoadingFare(false);
@@ -292,8 +302,10 @@ export default function BookingForm({
     [passengerDetails, baseFare, discount]
   );
   const totalPassengers = countAdult + countSenior + countPwd + countChild + countInfant;
-  const adminFeeCents = totalPassengers * ADMIN_FEE_CENTS_PER_PASSENGER;
-  const totalCents = fareSubtotalCents + GCASH_FEE_CENTS + adminFeeCents;
+  const adminFeePerPax = fare?.admin_fee_cents_per_passenger ?? 2000;
+  const gcashFee = fare?.gcash_fee_cents ?? 1500;
+  const adminFeeCents = totalPassengers * adminFeePerPax;
+  const totalCents = fareSubtotalCents + gcashFee + adminFeeCents;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -590,8 +602,8 @@ export default function BookingForm({
         <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 space-y-1">
           <p className="text-xs font-semibold uppercase text-[#0f766e]">Amount breakdown</p>
           <p className="text-sm text-[#134e4a]">Fare: ₱{(fareSubtotalCents / 100).toLocaleString()}</p>
-          <p className="text-sm text-[#134e4a]">Admin Fee (₱20/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
-          <p className="text-sm text-[#134e4a]">GCash Fee: ₱{(GCASH_FEE_CENTS / 100).toLocaleString()}</p>
+          <p className="text-sm text-[#134e4a]">Admin Fee (₱{(adminFeePerPax / 100).toLocaleString()}/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
+          <p className="text-sm text-[#134e4a]">GCash Fee: ₱{(gcashFee / 100).toLocaleString()}</p>
           <p className="text-sm font-semibold text-[#134e4a] pt-1 border-t border-teal-200">
             Total: ₱{(totalCents / 100).toLocaleString()} ({totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""})
           </p>

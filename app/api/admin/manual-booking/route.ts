@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
-import { ADMIN_FEE_CENTS_PER_PASSENGER } from "@/lib/constants";
+import { getFeeSettings } from "@/lib/get-fee-settings";
 import { assignTicketNumbersToBooking } from "@/lib/tickets/assign-ticket-numbers";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -146,8 +146,9 @@ export async function POST(request: NextRequest) {
     totalCents = passengerCount * fareCents(base, discount, fareType);
   }
   const fareSubtotalCents = totalCents;
+  const feeSettings = await getFeeSettings();
   const gcashFeeCents = 0; // Walk-in pays at booth; no GCash fee
-  const adminFeeCents = passengerCount * ADMIN_FEE_CENTS_PER_PASSENGER;
+  const adminFeeCents = passengerCount * feeSettings.admin_fee_cents_per_passenger;
   totalCents = fareSubtotalCents + gcashFeeCents + adminFeeCents;
 
   const { data: ref, error: refError } = await supabase.rpc("generate_booking_reference");

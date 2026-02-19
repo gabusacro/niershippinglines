@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/ActionToast";
 
 export function CrewTicketScanner() {
   const [scanning, setScanning] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [result, setResult] = useState<{
     valid: boolean;
     reference: string;
@@ -63,31 +64,53 @@ export function CrewTicketScanner() {
     const el = document.getElementById(scannerId);
     if (!el) return;
 
-    Html5Qrcode.getCameras()
-      .then((cameras) => {
-        if (cameras.length === 0) {
-          toast.showError("No camera found");
-          return;
-        }
-        const backCam = cameras.find((c) => c.label.toLowerCase().includes("back"));
-        const cam = backCam ?? cameras[0];
+    setStarting(true);
+    // Let the "Scan ticket" button hide and the qr-reader div mount with min-height so camera has space (fixes mobile)
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        Html5Qrcode.getCameras()
+          .then((cameras) => {
+            setStarting(false);
+            if (cameras.length === 0) {
+              toast.showError("No camera found. Use a device with a camera.");
+              return;
+            }
+            // Prefer back camera on mobile for QR scanning
+            const backCam = cameras.find((c) => c.label.toLowerCase().includes("back") || c.label.toLowerCase().includes("environment"));
+            const cam = backCam ?? cameras[0];
 
-        scannerRef.current = new Html5Qrcode(scannerId);
-        scannerRef.current
-          .start(
-            cam.id,
-            { fps: 4, qrbox: { width: 250, height: 250 } },
-            (decodedText) => {
-              scannerRef.current?.stop();
-              setScanning(false);
-              validateTicket(decodedText);
-            },
-            () => {}
-          )
-          .then(() => setScanning(true))
-          .catch((err: Error) => toast.showError(err.message ?? "Could not start camera"));
-      })
-      .catch(() => toast.showError("Could not access camera"));
+            scannerRef.current = new Html5Qrcode(scannerId);
+            const qrboxSize = Math.min(280, typeof window !== "undefined" ? Math.min(window.innerWidth - 32, 280) : 250);
+            scannerRef.current
+              .start(
+                cam.id,
+                {
+                  fps: 4,
+                  qrbox: { width: qrboxSize, height: qrboxSize },
+                  aspectRatio: 1,
+                },
+                (decodedText) => {
+                  scannerRef.current?.stop();
+                  setScanning(false);
+                  validateTicket(decodedText);
+                },
+                () => {}
+              )
+              .then(() => setScanning(true))
+              .catch((err: Error) => {
+                const msg = err?.message ?? "Could not start camera";
+                const hint = /secure|https|permission|denied|not allowed/i.test(msg)
+                  ? " Use HTTPS and allow camera access in browser settings."
+                  : "";
+                toast.showError(msg + hint);
+              });
+          })
+          .catch(() => {
+            setStarting(false);
+            toast.showError("Could not access camera. Allow camera permission and use HTTPS.");
+          });
+      }, 100);
+    });
   }, [validateTicket, toast]);
 
   const stopScan = useCallback(() => {
@@ -102,18 +125,23 @@ export function CrewTicketScanner() {
 
   return (
     <div className="space-y-4">
-      {!scanning ? (
+      {!scanning && !starting ? (
         <button
           type="button"
           onClick={startScan}
           disabled={loading}
-          className="w-full rounded-xl bg-[#0c7b93] px-6 py-4 text-lg font-semibold text-white hover:bg-[#0a6b7d] disabled:opacity-50"
+          className="w-full rounded-xl bg-[#0c7b93] px-6 py-4 text-lg font-semibold text-white hover:bg-[#0a6b7d] disabled:opacity-50 touch-manipulation min-h-[48px]"
         >
           {loading ? "Validating…" : "Scan ticket QR code"}
         </button>
+      ) : starting ? (
+        <div className="rounded-xl border-2 border-teal-300 bg-teal-50/50 p-8 text-center min-h-[220px] flex flex-col items-center justify-center">
+          <p className="text-[#134e4a] font-medium">Starting camera…</p>
+          <p className="mt-2 text-sm text-[#0f766e]">Allow camera access if prompted.</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          <div id="qr-reader" className="overflow-hidden rounded-xl border-2 border-teal-300" />
+          <div id="qr-reader" className="overflow-hidden rounded-xl border-2 border-teal-300 min-h-[220px] w-full bg-black" style={{ minHeight: 220 }} />
           <button
             type="button"
             onClick={stopScan}

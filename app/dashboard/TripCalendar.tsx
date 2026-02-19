@@ -2,12 +2,12 @@
 
 import { useState, useMemo, useRef } from "react";
 import type { UpcomingTripRow } from "@/lib/dashboard/get-upcoming-trips";
-import { getDayLabel, formatTime } from "@/lib/dashboard/format";
+import { getDayLabel, getDayOfMonth, parseDateString, formatTime } from "@/lib/dashboard/format";
 import { BookingModal } from "@/app/dashboard/BookingModal";
 
-/** Unique dates from trips (sorted). Shows all dates that have scheduled vessels. */
+/** Unique valid dates from trips (YYYY-MM-DD, sorted). Filters out invalid/malformed dates. */
 function getTripDates(trips: UpcomingTripRow[]): string[] {
-  const dates = [...new Set(trips.map((t) => t.departure_date))];
+  const dates = [...new Set(trips.map((t) => t.departure_date).filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}/.test(d)))];
   return dates.sort();
 }
 
@@ -131,7 +131,7 @@ export function TripCalendar({
               >
                 <span className="text-xs font-medium opacity-90 sm:text-sm">{label}</span>
                 <span className="mt-1 text-lg font-bold sm:text-xl">
-                  {new Date(dateStr + "Z").getDate()}
+                  {getDayOfMonth(dateStr) ?? "—"}
                 </span>
                 {tripCount > 0 && (
                   <span className={`mt-1 text-xs ${isSelected ? "opacity-90" : "text-[#0f766e]"}`}>
@@ -159,12 +159,13 @@ export function TripCalendar({
         <div className="mt-6 rounded-2xl border-2 border-teal-200 bg-white p-4 shadow-sm sm:p-5">
           <h3 className="text-base font-bold text-[#134e4a]">{selectedLabel}</h3>
           <p className="text-xs text-[#0f766e] sm:text-sm">
-            {new Date(selectedDate + "Z").toLocaleDateString("en-PH", {
+            {parseDateString(selectedDate)?.toLocaleDateString("en-PH", {
+              timeZone: "Asia/Manila",
               weekday: "long",
               month: "long",
               day: "numeric",
               year: "numeric",
-            })}
+            }) ?? selectedDate}
           </p>
           {selectedTrips.length === 0 ? (
             <p className="mt-4 text-sm text-[#0f766e]">No scheduled trips on this day.</p>

@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendBookingPaymentRequired } from "@/lib/email/send-booking-payment-required";
-import { GCASH_NUMBER, GCASH_ACCOUNT_NAME, GCASH_FEE_CENTS, ADMIN_FEE_CENTS_PER_PASSENGER } from "@/lib/constants";
+import { GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
+import { getFeeSettings } from "@/lib/get-fee-settings";
 import { getTodayInManila, isTripDepartureAtLeast30MinFromNow } from "@/lib/admin/ph-time";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -214,8 +215,9 @@ export async function POST(request: NextRequest) {
     totalCents = passengerCount * perPersonCents;
   }
   const fareSubtotalCents = totalCents;
-  const gcashFeeCents = GCASH_FEE_CENTS; // Online bookings pay via GCash
-  const adminFeeCents = passengerCount * ADMIN_FEE_CENTS_PER_PASSENGER;
+  const feeSettings = await getFeeSettings();
+  const gcashFeeCents = feeSettings.gcash_fee_cents; // Online bookings pay via GCash
+  const adminFeeCents = passengerCount * feeSettings.admin_fee_cents_per_passenger;
   totalCents = fareSubtotalCents + gcashFeeCents + adminFeeCents;
 
   let createdBy: string | null = null;
