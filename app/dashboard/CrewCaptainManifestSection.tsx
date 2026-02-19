@@ -118,6 +118,16 @@ export function CrewCaptainManifestSection({
         </div>
       </div>
 
+      {/* Scan ticket — crew/captain verify passengers via QR */}
+      <div className="rounded-xl border-2 border-teal-200 bg-teal-50/30 p-4">
+        <Link
+          href={ROUTES.crewScan}
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
+        >
+          Scan ticket (verify passenger via QR code)
+        </Link>
+      </div>
+
       {roleLabel === "Captain" && (
         <div className="rounded-xl border-2 border-teal-200 bg-teal-50/30 p-4">
           <p className="text-sm text-[#0f766e]">

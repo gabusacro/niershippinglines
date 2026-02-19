@@ -461,9 +461,20 @@ export default async function DashboardPage({
       ) : (user.role === "crew" || user.role === "captain") && crewCaptainData ? (
         <>
           {crewCaptainData.boatIds.length === 0 ? (
-            <p className="mt-1 text-sm text-[#0f766e]/80">
-              You have no vessel assignments. Contact admin to be assigned to a vessel.
-            </p>
+            <div className="mt-6 space-y-4">
+              <p className="text-sm text-[#0f766e]/80">
+                You have no vessel assignments. Contact admin to be assigned to a vessel so you can see the manifest and today&apos;s trips.
+              </p>
+              <p className="text-sm text-[#134e4a] font-medium">
+                You can still scan tickets to verify passengers:
+              </p>
+              <Link
+                href={ROUTES.crewScan}
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
+              >
+                Scan ticket (QR code)
+              </Link>
+            </div>
           ) : (
             <CrewCaptainManifestSection
               roleLabel={yourRoleLabel}

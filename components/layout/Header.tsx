@@ -92,6 +92,16 @@ export function Header({ siteName }: HeaderProps = {}) {
           ))}
           {user ? (
             <>
+              {role && ["crew", "captain", "ticket_booth", "admin"].includes(role) && (
+                <Link
+                  href={ROUTES.crewScan}
+                  className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+                    pathname === ROUTES.crewScan ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+                  }`}
+                >
+                  Scan ticket
+                </Link>
+              )}
               <Link
                 href={ROUTES.dashboard}
                 className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
@@ -167,6 +177,19 @@ export function Header({ siteName }: HeaderProps = {}) {
             ))}
             {user ? (
               <>
+                {role && ["crew", "captain", "ticket_booth", "admin"].includes(role) && (
+                  <li>
+                    <Link
+                      href={ROUTES.crewScan}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                        pathname === ROUTES.crewScan ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                      }`}
+                    >
+                      Scan ticket
+                    </Link>
+                  </li>
+                )}
                 <li>
                   <Link
                     href={ROUTES.dashboard}

@@ -42,6 +42,16 @@ export async function PATCH(request: NextRequest) {
     );
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Sync profile name/salutation to auth.users user_metadata so we can identify users consistently
+  if (fullName !== undefined || salutation !== undefined) {
+    const meta = (user.user_metadata as Record<string, unknown>) ?? {};
+    const newMeta: Record<string, unknown> = { ...meta };
+    if (fullName !== undefined) newMeta.full_name = fullName ?? undefined;
+    if (salutation !== undefined) newMeta.salutation = salutation ?? undefined;
+    await supabase.auth.updateUser({ data: newMeta });
+  }
+
   revalidatePath("/dashboard", "layout");
   return NextResponse.json({ ok: true, full_name: fullName ?? null, salutation: salutation ?? null, address: address ?? null });
 }
