@@ -99,6 +99,7 @@ export default async function DashboardPage({
   const awaitingPayment = allPending.filter((b) => !b.payment_proof_path);
   const awaitingConfirmation = allPending.filter((b) => !!b.payment_proof_path);
 
+  // Fetch manifest data for crew, captain, AND ticket_booth
   let crewCaptainData: {
     boatIds: string[];
     todayTrips: Awaited<ReturnType<typeof getTodaysTripsForBoats>>;
@@ -106,6 +107,7 @@ export default async function DashboardPage({
     selectedTripId: string | null;
     manifest: Awaited<ReturnType<typeof getTripManifestData>>;
   } | null = null;
+
   if (user.role === "crew" || user.role === "captain") {
     const boatIds = await getCrewCaptainAssignedBoatIds(user.id);
     const todayTrips = await getTodaysTripsForBoats(boatIds);
@@ -116,6 +118,31 @@ export default async function DashboardPage({
         : currentTrip?.id ?? null;
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
     crewCaptainData = { boatIds, todayTrips, currentTrip, selectedTripId, manifest };
+  }
+
+  // ticket_booth sees ALL boats' trips today (not assigned to a specific vessel)
+  let ticketBoothManifestData: {
+    boatIds: string[];
+    todayTrips: Awaited<ReturnType<typeof getTodaysTripsForBoats>>;
+    currentTrip: ReturnType<typeof getCurrentTripFromTodays>;
+    selectedTripId: string | null;
+    manifest: Awaited<ReturnType<typeof getTripManifestData>>;
+  } | null = null;
+
+  if (user.role === "ticket_booth") {
+    // ticket_booth sees all boats — pass empty array to get all trips
+    // We reuse getCrewCaptainAssignedBoatIds but for ticket_booth we fetch all boats
+    const { data: allBoats } = await (await import("@/lib/supabase/server")).createClient()
+      .then((sb) => sb.from("boats").select("id"));
+    const boatIds = (allBoats ?? []).map((b: { id: string }) => b.id);
+    const todayTrips = await getTodaysTripsForBoats(boatIds);
+    const currentTrip = getCurrentTripFromTodays(todayTrips);
+    const selectedTripId =
+      params.tripId && todayTrips.some((t) => t.id === params.tripId)
+        ? params.tripId
+        : currentTrip?.id ?? null;
+    const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
+    ticketBoothManifestData = { boatIds, todayTrips, currentTrip, selectedTripId, manifest };
   }
 
   return (
@@ -171,7 +198,6 @@ export default async function DashboardPage({
               </p>
             </div>
           )}
-          {/* Find by reference — so passenger can open any booking (e.g. pending L7HHU7NCHR) even if list missed it */}
           <FindBookingByReference />
 
           {/* Awaiting payment — no proof uploaded yet */}
@@ -253,11 +279,9 @@ export default async function DashboardPage({
             </div>
           )}
 
-          {/* Lower-right toast when payment was recently confirmed (Facebook-style notification) */}
           {recentlyConfirmed.length > 0 && (
             <ConfirmationToast items={recentlyConfirmed.map((b) => ({ reference: b.reference }))} siteName={branding.site_name} />
           )}
-          {/* Payment confirmed — show so passenger sees ticket is ready */}
           {recentlyConfirmed.length > 0 && (
             <div className="mt-6 rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-6 shadow-sm sm:p-8">
               <h2 className="text-lg font-bold text-emerald-900">
@@ -277,7 +301,6 @@ export default async function DashboardPage({
             </div>
           )}
 
-          {/* Refunded — notify passenger their ticket was refunded */}
           {refundedBookings.length > 0 && (
             <div className="mt-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 shadow-sm sm:p-8">
               <h2 className="text-lg font-bold text-amber-900">
@@ -312,14 +335,12 @@ export default async function DashboardPage({
             </div>
           )}
 
-          {/* Week calendar: click a day to see times and seats */}
           <TripCalendarWrapper
             loggedInEmail={user.email ?? ""}
             passengerName={welcomeName ?? undefined}
             loggedInAddress={user.address ?? ""}
           />
 
-          {/* Book, Schedule, My bookings, Account — aligned row */}
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Link
               href={ROUTES.book}
@@ -384,16 +405,16 @@ export default async function DashboardPage({
         <div className="mt-6 space-y-4">
           <DashboardAutoRefresh intervalSeconds={90} />
           <p className="mt-1 text-sm text-[#0f766e]/80">
-            Serve walk-ins: take cash or GCash, confirm payment by reference, view booking history, and process refunds or reschedules when needed. Same rules apply (e.g. 24h for reschedule, refund reasons).
+            Serve walk-ins: take cash or GCash, confirm payment by reference, view booking history, and process refunds or reschedules when needed.
           </p>
 
-          {/* Pending payments notice — same as admin so booth can confirm walk-ins promptly */}
+          {/* Pending payments notice */}
           {pendingPreviewBooth.count > 0 && (
             <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-bold text-amber-900">Pending payments ({pendingPreviewBooth.count})</h2>
-                  <p className="mt-0.5 text-sm text-amber-800">Confirm payments so passengers receive tickets on time. When a walk-in shows their reference, find them here.</p>
+                  <p className="mt-0.5 text-sm text-amber-800">Confirm payments so passengers receive tickets on time.</p>
                 </div>
                 <Link
                   href={ROUTES.adminPendingPayments}
@@ -414,49 +435,46 @@ export default async function DashboardPage({
           )}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Link
-              href={ROUTES.adminPendingPayments}
-              className="rounded-xl border-2 border-[#0c7b93] px-5 py-4 text-left transition-colors hover:bg-[#0c7b93]/10"
-            >
+            <Link href={ROUTES.adminPendingPayments} className="rounded-xl border-2 border-[#0c7b93] px-5 py-4 text-left transition-colors hover:bg-[#0c7b93]/10">
               <h2 className="font-semibold text-[#134e4a]">Pending payments</h2>
-              <p className="mt-1 text-sm text-[#0f766e]">See walk-ins who paid by reference; confirm when they show proof (cash/GCash).</p>
+              <p className="mt-1 text-sm text-[#0f766e]">See walk-ins who paid by reference; confirm when they show proof.</p>
             </Link>
-            <Link
-              href={ROUTES.adminBookings}
-              className="rounded-xl border-2 border-[#0c7b93] px-5 py-4 text-left transition-colors hover:bg-[#0c7b93]/10"
-            >
+            <Link href={ROUTES.adminBookings} className="rounded-xl border-2 border-[#0c7b93] px-5 py-4 text-left transition-colors hover:bg-[#0c7b93]/10">
               <h2 className="font-semibold text-[#134e4a]">Booking history</h2>
               <p className="mt-1 text-sm text-[#0f766e]">View all bookings; open any to process refund or reschedule.</p>
             </Link>
-            <Link
-              href={ROUTES.adminManualBooking}
-              className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50"
-            >
+            <Link href={ROUTES.adminManualBooking} className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50">
               <h2 className="font-semibold text-[#134e4a]">Add walk-in booking</h2>
               <p className="mt-1 text-sm text-[#0f766e]">Create booking when you collect payment at the booth.</p>
             </Link>
-            <Link
-              href={ROUTES.adminFlagged}
-              className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50"
-            >
+            <Link href={ROUTES.adminFlagged} className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50">
               <h2 className="font-semibold text-[#134e4a]">Flagged accounts</h2>
-              <p className="mt-1 text-sm text-[#0f766e]">Passengers with warnings or booking restrictions. Lift to allow booking again.</p>
+              <p className="mt-1 text-sm text-[#0f766e]">Passengers with warnings or booking restrictions.</p>
             </Link>
-            <Link
-              href={ROUTES.account}
-              className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50"
-            >
+            <Link href={ROUTES.account} className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50">
               <h2 className="font-semibold text-[#134e4a]">Account</h2>
               <p className="mt-1 text-sm text-[#0f766e]">Your profile and password.</p>
             </Link>
-            <Link
-              href={ROUTES.adminReports}
-              className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50"
-            >
+            <Link href={ROUTES.adminReports} className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50">
               <h2 className="font-semibold text-[#134e4a]">Reports & manifests</h2>
               <p className="mt-1 text-sm text-[#0f766e]">Daily/weekly/monthly/yearly reports; trip manifests.</p>
             </Link>
           </div>
+
+          {/* Today's manifest — ticket booth sees all vessels */}
+          {ticketBoothManifestData && (
+            <div className="mt-6">
+              <h2 className="text-lg font-bold text-[#134e4a] mb-1">Today&apos;s passenger manifest</h2>
+              <p className="text-sm text-[#0f766e]/80 mb-4">Live check-in and boarding status for all vessels today.</p>
+              <CrewCaptainManifestSection
+                roleLabel={yourRoleLabel}
+                todayTrips={ticketBoothManifestData.todayTrips}
+                currentTrip={ticketBoothManifestData.currentTrip}
+                selectedTripId={ticketBoothManifestData.selectedTripId}
+                manifest={ticketBoothManifestData.manifest}
+              />
+            </div>
+          )}
         </div>
       ) : (user.role === "crew" || user.role === "captain") && crewCaptainData ? (
         <>
