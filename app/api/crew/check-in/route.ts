@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       if (!ticket.checked_in_at) ticketUpdates.checked_in_at = now;
     }
 
-    // Update using ticket_number as the key instead of id
+    // Update only THIS ticket using ticket_number as the key
     const { error: ticketUpdateErr } = await supabase
       .from("tickets")
       .update(ticketUpdates)
@@ -138,5 +138,6 @@ export async function POST(request: NextRequest) {
     .eq("id", booking.id);
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
-      return NextResponse.json({ ok: true, status: action });
+
+  return NextResponse.json({ ok: true, status: action });
 }
