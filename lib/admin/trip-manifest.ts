@@ -16,7 +16,7 @@ export interface ManifestPassengerRow {
   /** Contact number from booking (customer_mobile). */
   contact: string | null;
   source: string;
-  /** Booking status: confirmed, checked_in, boarded, completed */
+  /** Ticket status: confirmed, checked_in, boarded, completed */
   status: string;
   /** ISO timestamp when crew checked this passenger in (null if not yet). */
   checkedInAt: string | null;
@@ -70,13 +70,26 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
 
   const { data: bookings, error: bookError } = await supabase
     .from("bookings")
-    // Added status, checked_in_at, boarded_at to the select
     .select("id, reference, customer_full_name, customer_mobile, customer_address, fare_type, passenger_count, passenger_details, is_walk_in, created_by, status, checked_in_at, boarded_at")
     .eq("trip_id", tripId)
     .in("status", [...MANIFEST_STATUSES])
     .order("created_at", { ascending: true });
 
   if (bookError) return null;
+
+  // Fetch all tickets for these bookings so we can show per-ticket status
+  const bookingIds = (bookings ?? []).map((b) => b.id);
+  const ticketsByBooking = new Map<string, { ticket_number: string; passenger_index: number; status: string; checked_in_at: string | null; boarded_at: string | null }[]>();
+  if (bookingIds.length > 0) {
+    const { data: tickets } = await supabase
+      .from("tickets")
+      .select("ticket_number, booking_id, passenger_index, status, checked_in_at, boarded_at")
+      .in("booking_id", bookingIds);
+    for (const t of tickets ?? []) {
+      if (!ticketsByBooking.has(t.booking_id)) ticketsByBooking.set(t.booking_id, []);
+      ticketsByBooking.get(t.booking_id)!.push(t);
+    }
+  }
 
   const creatorIds = [...new Set((bookings ?? []).map((b) => b.created_by).filter(Boolean))] as string[];
   const creators = new Map<string, string>();
@@ -94,9 +107,14 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
     const bookingFareType = (b as { fare_type?: string }).fare_type ?? "adult";
     const bookingAddress = (b as { customer_address?: string | null }).customer_address?.trim() || null;
     const role = b.created_by ? creators.get(b.created_by) : null;
-    const status = (b as { status?: string }).status ?? "confirmed";
-    const checkedInAt = (b as { checked_in_at?: string | null }).checked_in_at ?? null;
-    const boardedAt = (b as { boarded_at?: string | null }).boarded_at ?? null;
+    // Booking-level status as fallback only
+    const bookingStatus = (b as { status?: string }).status ?? "confirmed";
+    const bookingCheckedInAt = (b as { checked_in_at?: string | null }).checked_in_at ?? null;
+    const bookingBoardedAt = (b as { boarded_at?: string | null }).boarded_at ?? null;
+
+    // Get tickets for this booking indexed by passenger_index
+    const bookingTickets = ticketsByBooking.get(b.id) ?? [];
+    const ticketByIndex = new Map(bookingTickets.map((t) => [t.passenger_index, t]));
 
     let source = "Online";
     if (b.is_walk_in) source = role === "ticket_booth" ? "Walk-in (ticket booth)" : role === "admin" ? "Walk-in (admin)" : "Walk-in";
@@ -104,19 +122,32 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
     const contact = (b as { customer_mobile?: string | null }).customer_mobile?.trim() || null;
 
     if (pd.length > 0) {
-      for (const p of pd) {
+      for (let i = 0; i < pd.length; i++) {
+        const p = pd[i]!;
         const name = (p.full_name ?? "—").trim() || "—";
         const fareType = fareTypeLabels[p.fare_type ?? ""] ?? (p.fare_type ?? bookingFareType);
         const address = (p.address && p.address.trim()) ? p.address.trim() : bookingAddress;
-        const ticketNumber = (p.ticket_number && String(p.ticket_number).trim()) ? String(p.ticket_number).trim() : ref;
+
+        // Use per-ticket status if available, fall back to booking status
+        const ticket = ticketByIndex.get(i);
+        const ticketNumber = ticket?.ticket_number ?? (p.ticket_number && String(p.ticket_number).trim() ? String(p.ticket_number).trim() : ref);
+        const status = ticket?.status ?? bookingStatus;
+        const checkedInAt = ticket?.checked_in_at ?? bookingCheckedInAt;
+        const boardedAt = ticket?.boarded_at ?? bookingBoardedAt;
+
         seq += 1;
         passengers.push({ seq, ticketNumber, reference: ref, passengerName: name, fareType, address, contact, source, status, checkedInAt, boardedAt });
       }
     } else {
       const name = b.customer_full_name ?? "—";
       const fareType = fareTypeLabels[bookingFareType] ?? bookingFareType;
+      // Single passenger — use ticket at index 0 if available
+      const ticket = ticketByIndex.get(0);
+      const status = ticket?.status ?? bookingStatus;
+      const checkedInAt = ticket?.checked_in_at ?? bookingCheckedInAt;
+      const boardedAt = ticket?.boarded_at ?? bookingBoardedAt;
       seq += 1;
-      passengers.push({ seq, ticketNumber: ref, reference: ref, passengerName: name, fareType, address: bookingAddress, contact, source, status, checkedInAt, boardedAt });
+      passengers.push({ seq, ticketNumber: ticket?.ticket_number ?? ref, reference: ref, passengerName: name, fareType, address: bookingAddress, contact, source, status, checkedInAt, boardedAt });
     }
   }
 
