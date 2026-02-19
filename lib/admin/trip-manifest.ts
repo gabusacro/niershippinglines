@@ -109,8 +109,6 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
     const role = b.created_by ? creators.get(b.created_by) : null;
     // Booking-level status as fallback only
     const bookingStatus = (b as { status?: string }).status ?? "confirmed";
-    const bookingCheckedInAt = (b as { checked_in_at?: string | null }).checked_in_at ?? null;
-    const bookingBoardedAt = (b as { boarded_at?: string | null }).boarded_at ?? null;
 
     // Get tickets for this booking indexed by passenger_index
     const bookingTickets = ticketsByBooking.get(b.id) ?? [];
@@ -132,8 +130,9 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
         const ticket = ticketByIndex.get(i);
         const ticketNumber = ticket?.ticket_number ?? (p.ticket_number && String(p.ticket_number).trim() ? String(p.ticket_number).trim() : ref);
         const status = ticket?.status ?? bookingStatus;
-        const checkedInAt = ticket?.checked_in_at ?? bookingCheckedInAt;
-        const boardedAt = ticket?.boarded_at ?? bookingBoardedAt;
+        // ✅ FIX: only use THIS ticket's timestamps — never inherit from booking level
+        const checkedInAt = ticket?.checked_in_at ?? null;
+        const boardedAt = ticket?.boarded_at ?? null;
 
         seq += 1;
         passengers.push({ seq, ticketNumber, reference: ref, passengerName: name, fareType, address, contact, source, status, checkedInAt, boardedAt });
@@ -144,8 +143,9 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
       // Single passenger — use ticket at index 0 if available
       const ticket = ticketByIndex.get(0);
       const status = ticket?.status ?? bookingStatus;
-      const checkedInAt = ticket?.checked_in_at ?? bookingCheckedInAt;
-      const boardedAt = ticket?.boarded_at ?? bookingBoardedAt;
+      // ✅ FIX: only use THIS ticket's timestamps — never inherit from booking level
+      const checkedInAt = ticket?.checked_in_at ?? null;
+      const boardedAt = ticket?.boarded_at ?? null;
       seq += 1;
       passengers.push({ seq, ticketNumber: ticket?.ticket_number ?? ref, reference: ref, passengerName: name, fareType, address: bookingAddress, contact, source, status, checkedInAt, boardedAt });
     }
