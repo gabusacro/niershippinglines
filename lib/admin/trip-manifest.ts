@@ -16,6 +16,12 @@ export interface ManifestPassengerRow {
   /** Contact number from booking (customer_mobile). */
   contact: string | null;
   source: string;
+  /** Booking status: confirmed, checked_in, boarded, completed */
+  status: string;
+  /** ISO timestamp when crew checked this passenger in (null if not yet). */
+  checkedInAt: string | null;
+  /** ISO timestamp when crew marked this passenger as boarded (null if not yet). */
+  boardedAt: string | null;
 }
 
 export interface TripManifestData {
@@ -64,7 +70,8 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
 
   const { data: bookings, error: bookError } = await supabase
     .from("bookings")
-    .select("id, reference, customer_full_name, customer_mobile, customer_address, fare_type, passenger_count, passenger_details, is_walk_in, created_by")
+    // Added status, checked_in_at, boarded_at to the select
+    .select("id, reference, customer_full_name, customer_mobile, customer_address, fare_type, passenger_count, passenger_details, is_walk_in, created_by, status, checked_in_at, boarded_at")
     .eq("trip_id", tripId)
     .in("status", [...MANIFEST_STATUSES])
     .order("created_at", { ascending: true });
@@ -81,15 +88,21 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
   let seq = 0;
   const passengers: ManifestPassengerRow[] = [];
   const fareTypeLabels: Record<string, string> = { adult: "Adult", senior: "Senior", pwd: "PWD", child: "Child", infant: "Infant" };
+
   for (const b of bookings ?? []) {
     const pd = (b.passenger_details ?? []) as { fare_type?: string; full_name?: string; address?: string; ticket_number?: string }[];
     const bookingFareType = (b as { fare_type?: string }).fare_type ?? "adult";
     const bookingAddress = (b as { customer_address?: string | null }).customer_address?.trim() || null;
     const role = b.created_by ? creators.get(b.created_by) : null;
+    const status = (b as { status?: string }).status ?? "confirmed";
+    const checkedInAt = (b as { checked_in_at?: string | null }).checked_in_at ?? null;
+    const boardedAt = (b as { boarded_at?: string | null }).boarded_at ?? null;
+
     let source = "Online";
     if (b.is_walk_in) source = role === "ticket_booth" ? "Walk-in (ticket booth)" : role === "admin" ? "Walk-in (admin)" : "Walk-in";
     const ref = b.reference ?? "—";
     const contact = (b as { customer_mobile?: string | null }).customer_mobile?.trim() || null;
+
     if (pd.length > 0) {
       for (const p of pd) {
         const name = (p.full_name ?? "—").trim() || "—";
@@ -97,13 +110,13 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
         const address = (p.address && p.address.trim()) ? p.address.trim() : bookingAddress;
         const ticketNumber = (p.ticket_number && String(p.ticket_number).trim()) ? String(p.ticket_number).trim() : ref;
         seq += 1;
-        passengers.push({ seq, ticketNumber, reference: ref, passengerName: name, fareType, address, contact, source });
+        passengers.push({ seq, ticketNumber, reference: ref, passengerName: name, fareType, address, contact, source, status, checkedInAt, boardedAt });
       }
     } else {
       const name = b.customer_full_name ?? "—";
       const fareType = fareTypeLabels[bookingFareType] ?? bookingFareType;
       seq += 1;
-      passengers.push({ seq, ticketNumber: ref, reference: ref, passengerName: name, fareType, address: bookingAddress, contact, source });
+      passengers.push({ seq, ticketNumber: ref, reference: ref, passengerName: name, fareType, address: bookingAddress, contact, source, status, checkedInAt, boardedAt });
     }
   }
 
