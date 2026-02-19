@@ -38,6 +38,11 @@ export async function POST(request: NextRequest) {
 
   // ── Per-ticket update (ticket_number provided — from QR scanner) ──────────
   const ticketNumber = typeof body.ticket_number === "string" ? body.ticket_number.trim() : "";
+
+  // DEBUG LOG — remove after fixing
+  console.log("[check-in] body received:", JSON.stringify(body));
+  console.log("[check-in] ticketNumber extracted:", ticketNumber);
+
   if (ticketNumber) {
     // Look up the ticket row
     const { data: ticket, error: ticketErr } = await supabase
@@ -45,6 +50,9 @@ export async function POST(request: NextRequest) {
       .select("id, booking_id, status, checked_in_at, boarded_at")
       .eq("ticket_number", ticketNumber)
       .maybeSingle();
+
+    // DEBUG LOG
+    console.log("[check-in] ticket lookup result:", JSON.stringify(ticket), "error:", ticketErr?.message);
 
     if (ticketErr || !ticket) {
       return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
@@ -62,7 +70,6 @@ export async function POST(request: NextRequest) {
     }
     if (action === "boarded") {
       ticketUpdates.boarded_at = now;
-      // Also set checked_in_at if not already set
       if (!ticket.checked_in_at) ticketUpdates.checked_in_at = now;
     }
 
@@ -76,7 +83,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Now update the booking status to reflect the HIGHEST status across all its tickets
-    // Priority: boarded > checked_in > confirmed
     const { data: siblingTickets } = await supabase
       .from("tickets")
       .select("status")
