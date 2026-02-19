@@ -95,6 +95,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     valid: true,
     reference: booking.reference ?? "—",
+    ticket_number: afterNier.match(/^([A-Z0-9]+):(\d+)$/i) ? undefined : afterNier,
     passenger_index: passengerIndex,
     passenger_name: passenger.full_name ?? "",
     status: booking.status,
