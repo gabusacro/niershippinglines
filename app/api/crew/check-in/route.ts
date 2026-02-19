@@ -138,12 +138,5 @@ export async function POST(request: NextRequest) {
     .eq("id", booking.id);
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
-
-  // Also update all tickets under this booking to match
-  await supabase
-    .from("tickets")
-    .update(updates)
-    .eq("booking_id", booking.id);
-
-  return NextResponse.json({ ok: true, status: action });
+      return NextResponse.json({ ok: true, status: action });
 }
