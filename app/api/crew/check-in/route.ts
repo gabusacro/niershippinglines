@@ -39,20 +39,13 @@ export async function POST(request: NextRequest) {
   // ── Per-ticket update (ticket_number provided — from QR scanner) ──────────
   const ticketNumber = typeof body.ticket_number === "string" ? body.ticket_number.trim() : "";
 
-  // DEBUG LOG — remove after fixing
-  console.log("[check-in] body received:", JSON.stringify(body));
-  console.log("[check-in] ticketNumber extracted:", ticketNumber);
-
   if (ticketNumber) {
-    // Look up the ticket row
+    // Look up the ticket row — use ticket_number as the key (no id column)
     const { data: ticket, error: ticketErr } = await supabase
       .from("tickets")
-      .select("id, booking_id, status, checked_in_at, boarded_at")
+      .select("ticket_number, booking_id, status, checked_in_at, boarded_at")
       .eq("ticket_number", ticketNumber)
       .maybeSingle();
-
-    // DEBUG LOG
-    console.log("[check-in] ticket lookup result:", JSON.stringify(ticket), "error:", ticketErr?.message);
 
     if (ticketErr || !ticket) {
       return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
@@ -73,16 +66,17 @@ export async function POST(request: NextRequest) {
       if (!ticket.checked_in_at) ticketUpdates.checked_in_at = now;
     }
 
+    // Update using ticket_number as the key instead of id
     const { error: ticketUpdateErr } = await supabase
       .from("tickets")
       .update(ticketUpdates)
-      .eq("id", ticket.id);
+      .eq("ticket_number", ticketNumber);
 
     if (ticketUpdateErr) {
       return NextResponse.json({ error: ticketUpdateErr.message }, { status: 500 });
     }
 
-    // Now update the booking status to reflect the HIGHEST status across all its tickets
+    // Update booking status to reflect the HIGHEST status across all its tickets
     const { data: siblingTickets } = await supabase
       .from("tickets")
       .select("status")
