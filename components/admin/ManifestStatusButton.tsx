@@ -1,6 +1,6 @@
 "use client";
-
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface ManifestStatusButtonProps {
   reference: string;
@@ -31,6 +31,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export function ManifestStatusButton({ reference, initialStatus }: ManifestStatusButtonProps) {
+  const router = useRouter();
   const [status, setStatus] = useState(initialStatus);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +51,8 @@ export function ManifestStatusButton({ reference, initialStatus }: ManifestStatu
         return;
       }
       setStatus(data.status);
+      // ✅ Tell Next.js to re-fetch server component data so manifest updates live
+      router.refresh();
     } catch {
       setError("Network error");
     } finally {
