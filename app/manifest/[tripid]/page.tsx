@@ -1,19 +1,8 @@
-import { notFound } from "next/navigation";
-import { getTripManifestData } from "@/lib/admin/trip-manifest";
+import { createClient } from "@supabase/supabase-js";
 import { getSiteBranding } from "@/lib/site-branding";
 import { formatTime } from "@/lib/dashboard/format";
 
 export const dynamic = "force-dynamic";
-
-export async function generateMetadata({ params }: { params: Promise<{ tripId: string }> }) {
-  const { tripId } = await params;
-  const data = await getTripManifestData(tripId);
-  if (!data) return { title: "Manifest not found" };
-  return {
-    title: `Passenger Manifest — ${data.vesselName} | ${data.departureDate}`,
-    description: `Official passenger manifest for ${data.vesselName}, ${data.routeName}, ${data.departureDate}.`,
-  };
-}
 
 function formatDate(d: string): string {
   if (!d || d === "—") return "—";
@@ -45,27 +34,121 @@ const statusLabel: Record<string, string> = {
   completed: "Completed",
 };
 
+const MANIFEST_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
+
 export default async function PublicManifestPage({
   params,
 }: {
   params: Promise<{ tripId: string }>;
 }) {
-  const resolvedParams = await params;
-  const tripId = resolvedParams.tripId;
-  const data = await getTripManifestData(tripId);
-  if (!data) {
-    return <div style={{color:"red", padding:"2rem"}}>Data returned null for tripId: {tripId}</div>;
+  const { tripId } = await params;
+
+  // Use service role to bypass RLS for public manifest
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // Fetch trip
+  const { data: trip } = await supabase
+    .from("trips")
+    .select("id, departure_date, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, boat:boats(id, name, capacity), route:routes(display_name, origin, destination)")
+    .eq("id", tripId)
+    .single();
+
+  if (!trip) {
+    return <div className="p-8 text-red-600">Manifest not found for this trip.</div>;
   }
+
+  const boat = (Array.isArray(trip.boat) ? trip.boat[0] : trip.boat) as { name: string; capacity: number } | null;
+  const route = (Array.isArray(trip.route) ? trip.route[0] : trip.route) as { display_name?: string; origin?: string; destination?: string } | null;
+  const capacity = boat?.capacity ?? 0;
+
+  // Fetch bookings
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("id, reference, customer_full_name, customer_mobile, customer_address, fare_type, passenger_count, passenger_details, is_walk_in, status")
+    .eq("trip_id", tripId)
+    .in("status", MANIFEST_STATUSES)
+    .order("created_at", { ascending: true });
+
+  // Fetch tickets
+  const bookingIds = (bookings ?? []).map((b) => b.id);
+  const ticketsByBooking = new Map<string, { ticket_number: string; passenger_index: number; status: string; checked_in_at: string | null; boarded_at: string | null }[]>();
+  if (bookingIds.length > 0) {
+    const { data: tickets } = await supabase
+      .from("tickets")
+      .select("ticket_number, booking_id, passenger_index, status, checked_in_at, boarded_at")
+      .in("booking_id", bookingIds);
+    for (const t of tickets ?? []) {
+      if (!ticketsByBooking.has(t.booking_id)) ticketsByBooking.set(t.booking_id, []);
+      ticketsByBooking.get(t.booking_id)!.push(t);
+    }
+  }
+
+  const fareTypeLabels: Record<string, string> = { adult: "Adult", senior: "Senior", pwd: "PWD", child: "Child", infant: "Infant" };
+  let seq = 0;
+  const passengers: {
+    seq: number; ticketNumber: string; reference: string; passengerName: string;
+    fareType: string; address: string | null; contact: string | null; source: string;
+    status: string; checkedInAt: string | null; boardedAt: string | null;
+  }[] = [];
+
+  for (const b of bookings ?? []) {
+    const pd = (b.passenger_details ?? []) as { fare_type?: string; full_name?: string; address?: string; ticket_number?: string }[];
+    const bookingFareType = b.fare_type ?? "adult";
+    const bookingAddress = b.customer_address?.trim() || null;
+    const bookingStatus = b.status ?? "confirmed";
+    const ref = b.reference ?? "—";
+    const contact = b.customer_mobile?.trim() || null;
+    const source = b.is_walk_in ? "Walk-in" : "Online";
+    const bookingTickets = ticketsByBooking.get(b.id) ?? [];
+    const ticketByIndex = new Map(bookingTickets.map((t) => [t.passenger_index, t]));
+
+    if (pd.length > 0) {
+      for (let i = 0; i < pd.length; i++) {
+        const p = pd[i]!;
+        const ticket = ticketByIndex.get(i);
+        seq += 1;
+        passengers.push({
+          seq,
+          ticketNumber: ticket?.ticket_number ?? ref,
+          reference: ref,
+          passengerName: (p.full_name ?? "—").trim() || "—",
+          fareType: fareTypeLabels[p.fare_type ?? ""] ?? (p.fare_type ?? bookingFareType),
+          address: (p.address && p.address.trim()) ? p.address.trim() : bookingAddress,
+          contact, source,
+          status: ticket?.status ?? bookingStatus,
+          checkedInAt: ticket?.checked_in_at ?? null,
+          boardedAt: ticket?.boarded_at ?? null,
+        });
+      }
+    } else {
+      const ticket = ticketByIndex.get(0);
+      seq += 1;
+      passengers.push({
+        seq,
+        ticketNumber: ticket?.ticket_number ?? ref,
+        reference: ref,
+        passengerName: b.customer_full_name ?? "—",
+        fareType: fareTypeLabels[bookingFareType] ?? bookingFareType,
+        address: bookingAddress, contact, source,
+        status: ticket?.status ?? bookingStatus,
+        checkedInAt: ticket?.checked_in_at ?? null,
+        boardedAt: ticket?.boarded_at ?? null,
+      });
+    }
+  }
+
+  const boardedCount = passengers.filter((p) => p.status === "boarded" || p.status === "completed").length;
+  const checkedInCount = passengers.filter((p) => p.status === "checked_in").length;
+  const confirmedCount = passengers.filter((p) => p.status === "confirmed").length;
+  const totalPassengers = passengers.length;
 
   const branding = await getSiteBranding();
 
-  const boardedCount = data.passengers.filter((p) => p.status === "boarded" || p.status === "completed").length;
-  const checkedInCount = data.passengers.filter((p) => p.status === "checked_in").length;
-  const confirmedCount = data.passengers.filter((p) => p.status === "confirmed").length;
-
   return (
     <div className="min-h-screen bg-white text-black p-6 sm:p-8 max-w-5xl mx-auto">
-      {/* Header */}
       <div className="border-b-2 border-black pb-4 mb-4">
         <p className="text-xs uppercase tracking-wider text-gray-600">Republic of the Philippines</p>
         <h1 className="text-xl sm:text-2xl font-bold mt-1">PASSENGER MANIFEST</h1>
@@ -73,33 +156,23 @@ export default async function PublicManifestPage({
         <p className="text-xs text-gray-500 mt-1">Generated by {branding.site_name} booking system · Live data</p>
       </div>
 
-      {/* Trip info */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
-        <div><span className="font-semibold">Vessel:</span> {data.vesselName}</div>
-        <div><span className="font-semibold">Route:</span> {data.routeName}</div>
-        <div><span className="font-semibold">Origin:</span> {data.origin}</div>
-        <div><span className="font-semibold">Destination:</span> {data.destination}</div>
-        <div><span className="font-semibold">Date of departure:</span> {formatDate(data.departureDate)}</div>
-        <div><span className="font-semibold">Time of departure:</span> {formatTime(data.departureTime)}</div>
-        <div><span className="font-semibold">Total passengers:</span> {data.totalPassengers}</div>
-        <div><span className="font-semibold">Vessel capacity:</span> {data.capacity}</div>
+        <div><span className="font-semibold">Vessel:</span> {boat?.name ?? "—"}</div>
+        <div><span className="font-semibold">Route:</span> {route?.display_name ?? "—"}</div>
+        <div><span className="font-semibold">Origin:</span> {route?.origin ?? "—"}</div>
+        <div><span className="font-semibold">Destination:</span> {route?.destination ?? "—"}</div>
+        <div><span className="font-semibold">Date of departure:</span> {formatDate(trip.departure_date ?? "")}</div>
+        <div><span className="font-semibold">Time of departure:</span> {formatTime(trip.departure_time ?? "")}</div>
+        <div><span className="font-semibold">Total passengers:</span> {totalPassengers}</div>
+        <div><span className="font-semibold">Vessel capacity:</span> {capacity}</div>
       </div>
 
-      {/* Boarding summary */}
       <div className="mb-4 flex flex-wrap gap-4 rounded border border-gray-300 bg-gray-50 px-4 py-3 text-sm">
-        <div>
-          <span className="font-semibold">Confirmed (not yet checked in):</span> {confirmedCount}
-        </div>
-        <div>
-          <span className="font-semibold">Checked in (at pier):</span> {checkedInCount}
-        </div>
-        <div>
-          <span className="font-semibold">Actually boarded:</span>{" "}
-          <span className="font-bold">{boardedCount}</span>
-        </div>
+        <div><span className="font-semibold">Confirmed (not yet checked in):</span> {confirmedCount}</div>
+        <div><span className="font-semibold">Checked in (at pier):</span> {checkedInCount}</div>
+        <div><span className="font-semibold">Actually boarded:</span> <span className="font-bold">{boardedCount}</span></div>
       </div>
 
-      {/* Passenger table */}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse border border-gray-800 text-sm">
           <thead>
@@ -116,14 +189,12 @@ export default async function PublicManifestPage({
             </tr>
           </thead>
           <tbody>
-            {data.passengers.length === 0 ? (
+            {passengers.length === 0 ? (
               <tr>
-                <td colSpan={9} className="border border-gray-800 px-2 py-3 text-center text-gray-600">
-                  No passengers on manifest
-                </td>
+                <td colSpan={9} className="border border-gray-800 px-2 py-3 text-center text-gray-600">No passengers on manifest</td>
               </tr>
             ) : (
-              data.passengers.map((p) => (
+              passengers.map((p) => (
                 <tr key={`${p.ticketNumber}-${p.seq}`}>
                   <td className="border border-gray-800 px-2 py-1">{p.seq}</td>
                   <td className="border border-gray-800 px-2 py-1 font-mono font-semibold">{p.ticketNumber}</td>
@@ -134,19 +205,9 @@ export default async function PublicManifestPage({
                   <td className="border border-gray-800 px-2 py-1">{p.contact ?? "—"}</td>
                   <td className="border border-gray-800 px-2 py-1">{p.source}</td>
                   <td className="border border-gray-800 px-2 py-1 min-w-[120px]">
-                    <div className="font-semibold text-xs">
-                      {statusLabel[p.status] ?? p.status}
-                    </div>
-                    {p.checkedInAt && (
-                      <div className="text-xs text-gray-600">
-                        In: {formatTimestamp(p.checkedInAt)}
-                      </div>
-                    )}
-                    {p.boardedAt && (
-                      <div className="text-xs font-semibold text-black">
-                        ✓ Boarded: {formatTimestamp(p.boardedAt)}
-                      </div>
-                    )}
+                    <div className="font-semibold text-xs">{statusLabel[p.status] ?? p.status}</div>
+                    {p.checkedInAt && <div className="text-xs text-gray-600">In: {formatTimestamp(p.checkedInAt)}</div>}
+                    {p.boardedAt && <div className="text-xs font-semibold text-black">✓ Boarded: {formatTimestamp(p.boardedAt)}</div>}
                   </td>
                 </tr>
               ))
@@ -154,13 +215,6 @@ export default async function PublicManifestPage({
           </tbody>
         </table>
       </div>
-
-      {data.walkInNoNames > 0 && (
-        <p className="mt-4 text-sm text-gray-700">
-          <span className="font-semibold">Walk-in (count only):</span> {data.walkInNoNames} passenger{data.walkInNoNames !== 1 ? "s" : ""} sold at the pier but not listed by name above.
-          Total: {data.totalListed} listed + {data.walkInNoNames} = <strong>{data.totalPassengers} total passengers</strong>.
-        </p>
-      )}
 
       <p className="mt-2 text-xs text-gray-600">
         Source: Online = booked on website; Walk-in = sold at ticket booth.
