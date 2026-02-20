@@ -10,19 +10,16 @@ interface ManifestActionsProps {
   shareUrl: string;
 }
 
-export function ManifestActions({ tripId, vesselName, routeName, departureDate, departureTime, shareUrl }: ManifestActionsProps) {
+export function ManifestActions({ vesselName, routeName, departureDate, departureTime, shareUrl }: ManifestActionsProps) {
   const handlePrint = () => {
     window.print();
   };
 
   const subject = encodeURIComponent(`Passenger Manifest — ${vesselName} — ${departureDate} ${departureTime}`);
   const body = encodeURIComponent(
-    `Passenger manifest for ${vesselName}, ${routeName}, ${departureDate} ${departureTime}.\n\nSee attached PDF or link.`
+    `Passenger manifest for ${vesselName}, ${routeName}, ${departureDate} ${departureTime}.\n\nView live manifest: ${shareUrl}`
   );
   const mailto = `mailto:?subject=${subject}&body=${body}`;
-
-  const shareTitle = encodeURIComponent(`Passenger Manifest: ${vesselName} — ${departureDate}`);
-  const fbShare = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${shareTitle}`;
 
   return (
     <div className="flex flex-wrap gap-3 print:hidden">
@@ -40,14 +37,6 @@ export function ManifestActions({ tripId, vesselName, routeName, departureDate, 
         className="rounded-xl border-2 border-teal-200 px-4 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50"
       >
         Share via email
-      </a>
-      <a
-        href={fbShare}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-xl border-2 border-teal-200 px-4 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50"
-      >
-        Share on Facebook
       </a>
     </div>
   );
