@@ -1,30 +1,34 @@
-import { createClient } from "@supabase/supabase-js";
+import { redirect } from "next/navigation";
+import { getAuthUser } from "@/lib/auth/get-user";
 import { getSiteBranding } from "@/lib/site-branding";
+import { getTripManifestData } from "@/lib/admin/trip-manifest";
 import { formatTime } from "@/lib/dashboard/format";
+import { ROUTES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
+const ALLOWED_ROLES = ["admin", "captain", "crew", "ticket_booth"];
+
 function formatDate(d: string): string {
-  if (!d) return "-";
+  if (!d) return "—";
   try {
     return new Date(d + "Z").toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
-  } catch {
-    return d;
-  }
+  } catch { return d; }
 }
 
 function formatTimestamp(ts: string | null): string {
-  if (!ts) return "-";
+  if (!ts) return "—";
   try {
     return new Date(ts).toLocaleTimeString("en-PH", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-      timeZone: "Asia/Manila",
+      hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Manila",
     });
-  } catch {
-    return "-";
-  }
+  } catch { return "—"; }
+}
+
+function generateSerialNumber(tripId: string, date: string): string {
+  const datePart = date.replace(/-/g, "").slice(0, 8);
+  const idPart = tripId.replace(/-/g, "").slice(0, 6).toUpperCase();
+  return `MAN-${datePart}-${idPart}`;
 }
 
 const statusLabel: Record<string, string> = {
@@ -34,204 +38,157 @@ const statusLabel: Record<string, string> = {
   completed: "Completed",
 };
 
-const MANIFEST_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
-
 type SearchParams = Promise<Record<string, string>> | Record<string, string>;
 
-export default async function PublicManifestPage({
+export default async function ProtectedManifestViewPage({
   searchParams,
 }: {
   searchParams: SearchParams;
 }) {
+  // 🔒 Auth check — only allowed roles can view
+  const user = await getAuthUser();
+  if (!user) redirect(ROUTES.login);
+  if (!ALLOWED_ROLES.includes(user.role ?? "")) redirect(ROUTES.dashboard);
+
   const resolved = searchParams instanceof Promise ? await searchParams : searchParams;
   const tripId = resolved.id ?? "";
 
   if (!tripId) {
-    return (
-      <div className="p-8 text-red-600">
-        Error: No trip ID in URL. Use /manifest/view?id=YOUR_TRIP_ID
-      </div>
-    );
+    return <div className="p-8 text-red-600">Error: No trip ID in URL. Use /manifest/view?id=YOUR_TRIP_ID</div>;
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  const { data: trip } = await supabase
-    .from("trips")
-    .select("id, departure_date, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, boat:boats(id, name, capacity), route:routes(display_name, origin, destination)")
-    .eq("id", tripId)
-    .single();
-
-  if (!trip) {
+  // Reuse the same manifest data fetcher (already secure, uses session client)
+  const data = await getTripManifestData(tripId);
+  if (!data) {
     return <div className="p-8 text-red-600">Manifest not found for trip: {tripId}</div>;
   }
 
-  const boat = (Array.isArray(trip.boat) ? trip.boat[0] : trip.boat) as { name: string; capacity: number } | null;
-  const route = (Array.isArray(trip.route) ? trip.route[0] : trip.route) as { display_name?: string; origin?: string; destination?: string } | null;
-  const capacity = boat?.capacity ?? 0;
-
-  const { data: bookings } = await supabase
-    .from("bookings")
-    .select("id, reference, customer_full_name, customer_mobile, customer_address, fare_type, passenger_count, passenger_details, is_walk_in, status")
-    .eq("trip_id", tripId)
-    .in("status", MANIFEST_STATUSES)
-    .order("created_at", { ascending: true });
-
-  const bookingIds = (bookings ?? []).map((b) => b.id);
-  const ticketsByBooking = new Map<string, { ticket_number: string; passenger_index: number; status: string; checked_in_at: string | null; boarded_at: string | null }[]>();
-  if (bookingIds.length > 0) {
-    const { data: tickets } = await supabase
-      .from("tickets")
-      .select("ticket_number, booking_id, passenger_index, status, checked_in_at, boarded_at")
-      .in("booking_id", bookingIds);
-    for (const t of tickets ?? []) {
-      if (!ticketsByBooking.has(t.booking_id)) ticketsByBooking.set(t.booking_id, []);
-      ticketsByBooking.get(t.booking_id)!.push(t);
-    }
-  }
-
-  const fareTypeLabels: Record<string, string> = { adult: "Adult", senior: "Senior", pwd: "PWD", child: "Child", infant: "Infant" };
-  let seq = 0;
-  const passengers: {
-    seq: number; ticketNumber: string; reference: string; passengerName: string;
-    fareType: string; address: string | null; contact: string | null; source: string;
-    status: string; checkedInAt: string | null; boardedAt: string | null;
-  }[] = [];
-
-  for (const b of bookings ?? []) {
-    const pd = (b.passenger_details ?? []) as { fare_type?: string; full_name?: string; address?: string; ticket_number?: string }[];
-    const bookingFareType = b.fare_type ?? "adult";
-    const bookingAddress = b.customer_address?.trim() || null;
-    const bookingStatus = b.status ?? "confirmed";
-    const ref = b.reference ?? "-";
-    const contact = b.customer_mobile?.trim() || null;
-    const source = b.is_walk_in ? "Walk-in" : "Online";
-    const bookingTickets = ticketsByBooking.get(b.id) ?? [];
-    const ticketByIndex = new Map(bookingTickets.map((t) => [t.passenger_index, t]));
-
-    if (pd.length > 0) {
-      for (let i = 0; i < pd.length; i++) {
-        const p = pd[i]!;
-        const ticket = ticketByIndex.get(i);
-        seq += 1;
-        passengers.push({
-          seq,
-          ticketNumber: ticket?.ticket_number ?? ref,
-          reference: ref,
-          passengerName: (p.full_name ?? "-").trim() || "-",
-          fareType: fareTypeLabels[p.fare_type ?? ""] ?? (p.fare_type ?? bookingFareType),
-          address: (p.address && p.address.trim()) ? p.address.trim() : bookingAddress,
-          contact, source,
-          status: ticket?.status ?? bookingStatus,
-          checkedInAt: ticket?.checked_in_at ?? null,
-          boardedAt: ticket?.boarded_at ?? null,
-        });
-      }
-    } else {
-      const ticket = ticketByIndex.get(0);
-      seq += 1;
-      passengers.push({
-        seq,
-        ticketNumber: ticket?.ticket_number ?? ref,
-        reference: ref,
-        passengerName: b.customer_full_name ?? "-",
-        fareType: fareTypeLabels[bookingFareType] ?? bookingFareType,
-        address: bookingAddress, contact, source,
-        status: ticket?.status ?? bookingStatus,
-        checkedInAt: ticket?.checked_in_at ?? null,
-        boardedAt: ticket?.boarded_at ?? null,
-      });
-    }
-  }
-
-  const boardedCount = passengers.filter((p) => p.status === "boarded" || p.status === "completed").length;
-  const checkedInCount = passengers.filter((p) => p.status === "checked_in").length;
-  const confirmedCount = passengers.filter((p) => p.status === "confirmed").length;
-  const totalPassengers = passengers.length;
-
   const branding = await getSiteBranding();
+  const serialNumber = generateSerialNumber(data.tripId, data.departureDate);
+
+  const boardedCount = data.passengers.filter((p) => p.status === "boarded" || p.status === "completed").length;
+  const checkedInAtPierCount = data.passengers.filter((p) => ["checked_in", "boarded", "completed"].includes(p.status)).length;
+  const confirmedOnlyCount = data.passengers.filter((p) => p.status === "confirmed").length;
+
+  const captainDisplay = data.captainNames.length === 0
+    ? "—"
+    : data.captainNames.length === 1
+    ? data.captainNames[0]
+    : `⚠️ Multiple: ${data.captainNames.join(", ")}`;
 
   return (
-    <div className="min-h-screen bg-white text-black p-6 sm:p-8 max-w-5xl mx-auto">
-      <div className="border-b-2 border-black pb-4 mb-4">
-        <p className="text-xs uppercase tracking-wider text-gray-600">Republic of the Philippines</p>
-        <h1 className="text-xl sm:text-2xl font-bold mt-1">PASSENGER MANIFEST</h1>
-        <p className="text-sm text-gray-700 mt-0.5">For Philippine Coast Guard - Pre-Departure Clearance</p>
-        <p className="text-xs text-gray-500 mt-1">Generated by {branding.site_name} Booking System - Live data</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Auth badge — only visible on screen, hidden on print */}
+      <div className="print:hidden bg-teal-700 text-white text-xs px-4 py-2 flex items-center justify-between">
+        <span>🔒 Secure manifest view — visible to authorized personnel only</span>
+        <span>Logged in as: <strong>{user.role}</strong></span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
-        <div><span className="font-semibold">Vessel:</span> {boat?.name ?? "-"}</div>
-        <div><span className="font-semibold">Route:</span> {route?.display_name ?? "-"}</div>
-        <div><span className="font-semibold">Origin:</span> {route?.origin ?? "-"}</div>
-        <div><span className="font-semibold">Destination:</span> {route?.destination ?? "-"}</div>
-        <div><span className="font-semibold">Date of departure:</span> {formatDate(trip.departure_date ?? "")}</div>
-        <div><span className="font-semibold">Time of departure:</span> {formatTime(trip.departure_time ?? "")}</div>
-        <div><span className="font-semibold">Total passengers:</span> {totalPassengers}</div>
-        <div><span className="font-semibold">Vessel capacity:</span> {capacity}</div>
-      </div>
+      <div className="min-h-screen bg-white text-black p-6 sm:p-8 max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="border-b-2 border-black pb-4 mb-4 flex items-start justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-gray-600">Republic of the Philippines</p>
+            <h1 className="text-xl sm:text-2xl font-bold mt-1">PASSENGER MANIFEST</h1>
+            <p className="text-sm text-gray-700 mt-0.5">For Philippine Coast Guard — Pre-Departure Clearance</p>
+            <p className="text-xs text-gray-500 mt-1">Live data · {branding.site_name} Booking System</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-500">Document Reference No.</p>
+            <p className="font-mono font-bold">{serialNumber}</p>
+          </div>
+        </div>
 
-      <div className="mb-4 flex flex-wrap gap-4 rounded border border-gray-300 bg-gray-50 px-4 py-3 text-sm">
-        <div><span className="font-semibold">Confirmed (not yet checked in):</span> {confirmedCount}</div>
-        <div><span className="font-semibold">Checked in (at pier):</span> {checkedInCount}</div>
-        <div><span className="font-semibold">Actually boarded:</span> <span className="font-bold">{boardedCount}</span></div>
-      </div>
+        {/* Trip details */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
+          <div><span className="font-semibold">Vessel:</span> {data.vesselName}</div>
+          <div><span className="font-semibold">MARINA Reg. No.:</span> {data.marinaNumber ?? "—"}</div>
+          <div><span className="font-semibold">Route:</span> {data.routeName}</div>
+          <div><span className="font-semibold">Date of Departure:</span> {formatDate(data.departureDate)}</div>
+          <div><span className="font-semibold">Origin:</span> {data.origin}</div>
+          <div><span className="font-semibold">Destination:</span> {data.destination}</div>
+          <div><span className="font-semibold">Time of Departure:</span> {formatTime(data.departureTime)}</div>
+          <div><span className="font-semibold">Vessel Capacity:</span> {data.capacity}</div>
+          <div className={data.captainNames.length > 1 ? "text-red-600 font-semibold" : ""}>
+            <span className="font-semibold">Master/Captain:</span> {captainDisplay}
+          </div>
+          <div>
+            <span className="font-semibold">Crew ({data.crewNames.length}):</span>{" "}
+            {data.crewNames.length === 0 ? "None assigned" : data.crewNames.join(", ")}
+          </div>
+        </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-gray-800 text-sm">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">No.</th>
-              <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Ticket #</th>
-              <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Booking ref.</th>
-              <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Passenger name</th>
-              <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Type</th>
-              <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Address</th>
-              <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Contact</th>
-              <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Source</th>
-              <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {passengers.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="border border-gray-800 px-2 py-3 text-center text-gray-600">No passengers on manifest</td>
+        {/* Boarding summary */}
+        <div className="mb-4 flex flex-wrap gap-4 rounded border border-gray-300 bg-gray-50 px-4 py-3 text-sm">
+          <div><span className="font-semibold">Total Passengers:</span> <strong>{data.totalPassengers}</strong></div>
+          <div><span className="font-semibold">Actually Boarded:</span> <strong>{boardedCount}</strong></div>
+          <div><span className="font-semibold">Checked In at Pier:</span> {checkedInAtPierCount}</div>
+          <div><span className="font-semibold">Not Yet at Pier:</span> {confirmedOnlyCount}</div>
+        </div>
+
+        {/* Multiple captains warning */}
+        {data.captainNames.length > 1 && (
+          <div className="mb-4 rounded border border-red-400 bg-red-50 px-4 py-2 text-sm text-red-700">
+            ⚠️ <strong>Multiple captains on this vessel:</strong> {data.captainNames.join(", ")} — please fix in Supabase → boat_assignments.
+          </div>
+        )}
+
+        {/* Passenger table */}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse border border-gray-800 text-sm">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">No.</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Ticket #</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Passenger Name</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Type</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Gender</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Age</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Nationality</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Address</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Contact</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Source</th>
+                <th className="border border-gray-800 px-2 py-1.5 text-left font-semibold">Status</th>
               </tr>
-            ) : (
-              passengers.map((p) => (
-                <tr key={`${p.ticketNumber}-${p.seq}`}>
-                  <td className="border border-gray-800 px-2 py-1">{p.seq}</td>
-                  <td className="border border-gray-800 px-2 py-1 font-mono font-semibold">{p.ticketNumber}</td>
-                  <td className="border border-gray-800 px-2 py-1">{p.reference}</td>
-                  <td className="border border-gray-800 px-2 py-1">{p.passengerName}</td>
-                  <td className="border border-gray-800 px-2 py-1">{p.fareType}</td>
-                  <td className="border border-gray-800 px-2 py-1">{p.address ?? "-"}</td>
-                  <td className="border border-gray-800 px-2 py-1">{p.contact ?? "-"}</td>
-                  <td className="border border-gray-800 px-2 py-1">{p.source}</td>
-                  <td className="border border-gray-800 px-2 py-1 min-w-[120px]">
-                    <div className="font-semibold text-xs">{statusLabel[p.status] ?? p.status}</div>
-                    {p.checkedInAt && <div className="text-xs text-gray-600">In: {formatTimestamp(p.checkedInAt)}</div>}
-                    {p.boardedAt && <div className="text-xs font-semibold text-black">Boarded: {formatTimestamp(p.boardedAt)}</div>}
-                  </td>
+            </thead>
+            <tbody>
+              {data.passengers.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="border border-gray-800 px-2 py-3 text-center text-gray-600">No passengers on manifest</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                data.passengers.map((p) => (
+                  <tr key={`${p.ticketNumber}-${p.seq}`} className={p.seq % 2 === 0 ? "bg-gray-50" : ""}>
+                    <td className="border border-gray-800 px-2 py-1">{p.seq}</td>
+                    <td className="border border-gray-800 px-2 py-1 font-mono font-semibold">{p.ticketNumber}</td>
+                    <td className="border border-gray-800 px-2 py-1">{p.passengerName}</td>
+                    <td className="border border-gray-800 px-2 py-1">{p.fareType}</td>
+                    <td className="border border-gray-800 px-2 py-1">{p.gender ?? "—"}</td>
+                    <td className="border border-gray-800 px-2 py-1">{p.age ?? "—"}</td>
+                    <td className="border border-gray-800 px-2 py-1">{p.nationality ?? "—"}</td>
+                    <td className="border border-gray-800 px-2 py-1">{p.address ?? "—"}</td>
+                    <td className="border border-gray-800 px-2 py-1">{p.contact ?? "—"}</td>
+                    <td className="border border-gray-800 px-2 py-1">{p.source}</td>
+                    <td className="border border-gray-800 px-2 py-1 min-w-[120px]">
+                      <div className="font-semibold text-xs">{statusLabel[p.status] ?? p.status}</div>
+                      {p.checkedInAt && <div className="text-xs text-gray-600">In: {formatTimestamp(p.checkedInAt)}</div>}
+                      {p.boardedAt && <div className="text-xs font-semibold">✓ Boarded: {formatTimestamp(p.boardedAt)}</div>}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      <p className="mt-2 text-xs text-gray-600">
-        Source: Online = booked on website; Walk-in = sold at ticket booth.
-      </p>
-      <p className="mt-1 text-xs text-gray-600">
-        Status: Confirmed = booked but not yet at pier; Checked in = arrived at pier; Boarded = confirmed on vessel. Times are Philippines Standard Time (PST).
-      </p>
-      <p className="mt-4 text-xs text-gray-400 text-center">
-        This is a live public manifest link. Data updates in real time. - {branding.site_name}
-      </p>
+        <p className="mt-2 text-xs text-gray-500">
+          Source: Online = booked on website; Walk-in = sold at ticket booth.
+          Status: Confirmed = not yet at pier; Checked in = at pier; Boarded = on vessel. Times are PST.
+        </p>
+        <p className="mt-3 text-xs text-gray-400 text-center">
+          🔒 Confidential — For authorized personnel only · {branding.site_name}
+        </p>
+      </div>
     </div>
   );
 }

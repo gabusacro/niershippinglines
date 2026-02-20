@@ -1,5 +1,7 @@
 "use client";
 
+import { QRCodeSVG } from "qrcode.react";
+
 import type { TripManifestData } from "@/lib/admin/trip-manifest";
 import { formatTime } from "@/lib/dashboard/format";
 
@@ -45,8 +47,10 @@ const statusLabel: Record<string, string> = {
 export function ManifestDocument({ data, manifestUrl, appName }: ManifestDocumentProps) {
   const hasWalkInNoNames = data.walkInNoNames > 0;
   const boardedCount = data.passengers.filter((p) => p.status === "boarded" || p.status === "completed").length;
-  const checkedInCount = data.passengers.filter((p) => p.status === "checked_in").length;
-  const confirmedCount = data.passengers.filter((p) => p.status === "confirmed").length;
+  // Checked in at pier = arrived at pier (includes those who went on to board)
+  const checkedInAtPierCount = data.passengers.filter((p) => p.status === "checked_in" || p.status === "boarded" || p.status === "completed").length;
+  // Confirmed only = booked but NOT yet at pier at all
+  const confirmedOnlyCount = data.passengers.filter((p) => p.status === "confirmed").length;
   const serialNumber = generateSerialNumber(data.tripId, data.departureDate);
 
   const captainDisplay = data.captainNames.length === 0
@@ -114,8 +118,8 @@ export function ManifestDocument({ data, manifestUrl, appName }: ManifestDocumen
           {/* Passenger counts */}
           <div><span className="font-semibold">Total Passengers:</span> <strong>{data.totalPassengers}</strong></div>
           <div><span className="font-semibold">Actually Boarded:</span> <strong>{boardedCount}</strong></div>
-          <div><span className="font-semibold">Checked In (pier):</span> {checkedInCount}</div>
-          <div><span className="font-semibold">Confirmed Only:</span> {confirmedCount}</div>
+          <div><span className="font-semibold">Checked In at Pier (incl. boarded):</span> {checkedInAtPierCount}</div>
+          <div><span className="font-semibold">Not Yet at Pier:</span> {confirmedOnlyCount}</div>
         </div>
 
         {/* Warning banner if multiple captains */}
@@ -200,18 +204,32 @@ export function ManifestDocument({ data, manifestUrl, appName }: ManifestDocumen
           <div>
             <p className="text-[10px] text-gray-500 mb-5">Prepared by (Ticket Booth / Admin)</p>
             <div className="border-b border-black mb-1 h-8"></div>
-            <p className="text-[10px] text-gray-600">Signature over printed name</p>
+            <p className="text-[10px] text-gray-600">Signature over Printed Name</p>
           </div>
           <div>
             <p className="text-[10px] text-gray-500 mb-5">Received by (Philippine Coast Guard)</p>
             <div className="border-b border-black mb-1 h-8"></div>
-            <p className="text-[10px] text-gray-600">Signature over Printed Name / Date & Time</p>
+            <p className="text-[10px] text-gray-600">Signature over printed name / Date & Time</p>
           </div>
         </div>
 
-        <p className="mt-3 text-[9px] text-gray-400 text-center">
-          Electronic copy generated from {appName} booking system · {manifestUrl}
-        </p>
+        {/* Verification footer with QR — protected URL requires login */}
+        <div className="mt-3 border-t border-gray-200 pt-3 flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <p className="text-[9px] text-gray-500 font-semibold mb-0.5">To verify authenticity:</p>
+            <p className="text-[9px] text-gray-500">
+              Scan the QR code or visit the URL below. Access requires login as admin, captain, crew, or ticket booth.
+              Strangers who scan this QR will be redirected to the login page — passenger data is protected.
+            </p>
+            <p className="text-[9px] text-gray-400 mt-1">
+              Generated from {appName} booking system · For Philippine Coast Guard Pre-Departure Clearance only.
+            </p>
+          </div>
+          <div className="text-right shrink-0 flex flex-col items-end gap-1">
+            <QRCodeSVG value={manifestUrl} size={72} level="M" />
+            <p className="text-[8px] text-gray-400 mt-0.5">Scan to verify</p>
+          </div>
+        </div>
       </div>
     </>
   );
