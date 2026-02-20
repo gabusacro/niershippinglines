@@ -43,6 +43,13 @@ export default async function PublicManifestPage({
 }) {
   const { tripId } = await params;
 
+  // TEMP DEBUG - remove after fix
+  console.log("DEBUG tripId:", tripId);
+  console.log("DEBUG SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log("DEBUG SERVICE_KEY exists:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+
+
   // Use service role to bypass RLS for public manifest
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,9 +63,9 @@ export default async function PublicManifestPage({
     .eq("id", tripId)
     .single();
 
-  if (!trip) {
-    return <div className="p-8 text-red-600">Manifest not found for this trip.</div>;
-  }
+    if (!trip) {
+      return <div className="p-8 text-red-600">Manifest not found. tripId was: {tripId}</div>;
+    }
 
   const boat = (Array.isArray(trip.boat) ? trip.boat[0] : trip.boat) as { name: string; capacity: number } | null;
   const route = (Array.isArray(trip.route) ? trip.route[0] : trip.route) as { display_name?: string; origin?: string; destination?: string } | null;
