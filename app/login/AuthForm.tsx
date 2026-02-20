@@ -57,6 +57,7 @@ export function AuthForm() {
   const [birthdate, setBirthdate] = useState<string>("");
   const [nationality, setNationality] = useState<string>("Filipino");
   const [recoveryEmail, setRecoveryEmail] = useState<string>("");
+  const [mobile, setMobile] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -116,6 +117,7 @@ export function AuthForm() {
             birthdate: birthdate || null,
             nationality: nationality || "Filipino",
             recovery_email: recoveryEmail.trim() || null,
+            mobile: mobile.trim() || null,
           });
         }
         setSuccess(true);
@@ -160,7 +162,7 @@ export function AuthForm() {
             onClick={() => { setMode("login"); setResetSent(false); }}
             className="w-full min-h-[48px] rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors touch-target"
           >
-            Back to sign in
+            Back to Sign In
           </button>
         </div>
       );
@@ -187,22 +189,38 @@ export function AuthForm() {
     <form onSubmit={handleSubmit} className="mt-6 space-y-4">
       {error && <p className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{error}</p>}
 
-      {/* Salutation */}
-      <div>
-        <label htmlFor="salutation" className={labelClass}>Salutation</label>
-        <select id="salutation" value={salutation} onChange={(e) => setSalutation(e.target.value)} className={inputClass}>
-          <option value="">Select (optional)</option>
-          <option value="Mr">Mr.</option>
-          <option value="Mrs">Mrs.</option>
-          <option value="Ms">Ms.</option>
-        </select>
-      </div>
+      {/* Salutation - signup only */}
+      {mode === "signup" && (
+        <div>
+          <label htmlFor="salutation" className={labelClass}>Salutation</label>
+          <select id="salutation" value={salutation} onChange={(e) => setSalutation(e.target.value)} className={inputClass}>
+            <option value="">Select (optional)</option>
+            <option value="Mr">Mr.</option>
+            <option value="Mrs">Mrs.</option>
+            <option value="Ms">Ms.</option>
+          </select>
+        </div>
+      )}
 
       {/* Full Name - signup only */}
       {mode === "signup" && (
         <div>
-          <label htmlFor="fullName" className={labelClass}>Full name <span className="text-red-600">*</span></label>
+          <label htmlFor="fullName" className={labelClass}>Full Name <span className="text-red-600">*</span></label>
           <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" required className={inputClass} />
+        </div>
+      )}
+
+
+      {/* Mobile Number - signup only */}
+      {mode === "signup" && (
+        <div>
+          <label htmlFor="mobile" className={labelClass}>Mobile Number <span className="text-red-600">*</span></label>
+          <input
+            id="mobile" type="tel" value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+            required placeholder="+63 912 345 6789"
+            className={inputClass}
+          />
         </div>
       )}
 
@@ -223,14 +241,14 @@ export function AuthForm() {
       {/* Birthdate - signup only */}
       {mode === "signup" && (
         <div>
-          <label htmlFor="birthdate" className={labelClass}>Date of birth</label>
+          <label htmlFor="birthdate" className={labelClass}>Date of Birth</label>
           <input
             id="birthdate" type="date" value={birthdate}
             onChange={(e) => setBirthdate(e.target.value)}
             max={new Date().toISOString().split("T")[0]}
             className={inputClass}
           />
-          {age !== null && <p className="mt-1 text-xs text-[#0f766e]">Age: {age} years old</p>}
+          {age !== null && <p className="mt-1 text-xs text-[#0f766e]">Age: {age} Years Old</p>}
         </div>
       )}
 
@@ -254,7 +272,7 @@ export function AuthForm() {
       {mode === "signup" && (
         <div>
           <label htmlFor="recoveryEmail" className={labelClass}>
-            Recovery email <span className="text-xs text-[#0f766e] font-normal">(optional)</span>
+            Recovery Email <span className="text-xs text-[#0f766e] font-normal">(optional)</span>
           </label>
           <input
             id="recoveryEmail" type="email" value={recoveryEmail}
@@ -297,11 +315,11 @@ export function AuthForm() {
       <p className="text-center text-sm text-[#0f766e]">
         {mode === "signup" ? (
           <>Already have an account?{" "}
-            <button type="button" onClick={() => setMode("login")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Sign in</button>
+            <button type="button" onClick={() => setMode("login")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Sign In</button>
           </>
         ) : (
           <>Don't have an account?{" "}
-            <button type="button" onClick={() => setMode("signup")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Create one</button>
+            <button type="button" onClick={() => setMode("signup")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Create One</button>
           </>
         )}
       </p>
