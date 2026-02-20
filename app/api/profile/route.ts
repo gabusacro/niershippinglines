@@ -2,13 +2,21 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 
-/** PATCH: Update current user's profile (e.g. full_name for display). */
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { full_name?: string; salutation?: string; address?: string };
+  let body: {
+    full_name?: string;
+    salutation?: string;
+    address?: string;
+    gender?: string;
+    birthdate?: string;
+    nationality?: string;
+    recovery_email?: string;
+    email?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -20,30 +28,36 @@ export async function PATCH(request: NextRequest) {
     ? (["Mr", "Mrs", "Ms"].includes(body.salutation) ? body.salutation : null)
     : undefined;
   const address = typeof body.address === "string" ? body.address.trim() || null : undefined;
+  const gender = typeof body.gender === "string" ? body.gender.trim() || null : undefined;
+  const birthdate = typeof body.birthdate === "string" ? body.birthdate || null : undefined;
+  const nationality = typeof body.nationality === "string" ? body.nationality.trim() || null : undefined;
+  const recoveryEmail = typeof body.recovery_email === "string" ? body.recovery_email.trim() || null : undefined;
+  const newEmail = typeof body.email === "string" ? body.email.trim() || null : undefined;
+
+  // Validate recovery email differs from main email
+  if (recoveryEmail && recoveryEmail === user.email) {
+    return NextResponse.json({ error: "Recovery email must differ from your main email." }, { status: 400 });
+  }
 
   const updatedAt = new Date().toISOString();
-  const updates: Record<string, unknown> = { updated_at: updatedAt };
-  if (fullName !== undefined) updates.full_name = fullName;
-  if (salutation !== undefined) updates.salutation = salutation;
-  if (address !== undefined) updates.address = address;
+  const profileUpdates: Record<string, unknown> = { updated_at: updatedAt };
+  if (fullName !== undefined) profileUpdates.full_name = fullName;
+  if (salutation !== undefined) profileUpdates.salutation = salutation;
+  if (address !== undefined) profileUpdates.address = address;
+  if (gender !== undefined) profileUpdates.gender = gender;
+  if (birthdate !== undefined) profileUpdates.birthdate = birthdate;
+  if (nationality !== undefined) profileUpdates.nationality = nationality;
+  if (recoveryEmail !== undefined) profileUpdates.recovery_email = recoveryEmail;
 
-  // Upsert: handles missing profile (e.g. OAuth/magic-link users) and ensures persistence
   const { error } = await supabase
     .from("profiles")
     .upsert(
-      {
-        id: user.id,
-        full_name: fullName ?? null,
-        salutation: salutation ?? null,
-        address: address ?? null,
-        updated_at: updatedAt,
-      },
+      { id: user.id, ...profileUpdates },
       { onConflict: "id" }
     );
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Sync profile name/salutation to auth.users user_metadata so we can identify users consistently
+  // Sync name/salutation to auth metadata
   if (fullName !== undefined || salutation !== undefined) {
     const meta = (user.user_metadata as Record<string, unknown>) ?? {};
     const newMeta: Record<string, unknown> = { ...meta };
@@ -52,6 +66,15 @@ export async function PATCH(request: NextRequest) {
     await supabase.auth.updateUser({ data: newMeta });
   }
 
+  // Change email in auth if requested
+  if (newEmail && newEmail !== user.email) {
+    const { error: emailError } = await supabase.auth.updateUser({ email: newEmail });
+    if (emailError) return NextResponse.json({ error: emailError.message }, { status: 500 });
+    // Update email in profiles too
+    await supabase.from("profiles").update({ email: newEmail }).eq("id", user.id);
+  }
+
   revalidatePath("/dashboard", "layout");
-  return NextResponse.json({ ok: true, full_name: fullName ?? null, salutation: salutation ?? null, address: address ?? null });
+  revalidatePath("/account", "layout");
+  return NextResponse.json({ ok: true });
 }

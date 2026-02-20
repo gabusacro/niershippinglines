@@ -10,6 +10,10 @@ export interface AuthUser {
   salutation: string | null;
   address: string | null;
   approvedAt: string | null;
+  gender: string | null;
+  birthdate: string | null;
+  nationality: string | null;
+  recoveryEmail: string | null;
 }
 
 export async function getAuthUser(): Promise<AuthUser | null> {
@@ -20,7 +24,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role, full_name, salutation, address, approved_at")
+    .select("role, full_name, salutation, address, approved_at, gender, birthdate, nationality, recovery_email")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -40,39 +44,34 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     salutation: profile?.salutation?.trim() || metaSalutation || null,
     address: profile?.address ?? null,
     approvedAt: profile?.approved_at ?? null,
+    gender: profile?.gender ?? null,
+    birthdate: profile?.birthdate ?? null,
+    nationality: profile?.nationality ?? null,
+    recoveryEmail: profile?.recovery_email ?? null,
   };
 }
 
 export function isAdmin(role: AppRole): boolean {
   return role === "admin";
 }
-
 export function isCrewOrBooth(role: AppRole): boolean {
   return role === "crew" || role === "ticket_booth";
 }
-
 export function canAccessAdmin(role: AppRole): boolean {
   return role === "admin";
 }
-
 export function canAccessCrewDashboard(role: AppRole): boolean {
   return role === "admin" || role === "ticket_booth" || role === "crew";
 }
-
 export function canAccessCaptainDashboard(role: AppRole): boolean {
   return role === "admin" || role === "captain";
 }
-
 export function isPassenger(role: AppRole): boolean {
   return role === "passenger";
 }
-
-/** Staff = admin, captain, crew, ticket_booth (assigned by admin). Passengers are everyone else. */
 export function isStaff(role: AppRole): boolean {
   return role === "admin" || role === "captain" || role === "crew" || role === "ticket_booth";
 }
-
-/** True if at least one admin exists (used to hide first-admin setup link once an admin is set). */
 export async function hasAnyAdmin(): Promise<boolean> {
   const supabase = await createClient();
   const { data, error } = await supabase
