@@ -40,7 +40,6 @@ export function CrewCaptainManifestSection({
   const departureTime = selectedTrip ? formatTime(selectedTrip.departure_time) : "—";
   const passengerCount = manifest?.totalPassengers ?? 0;
 
-  // Summary counts
   const checkedInCount = manifest?.passengers.filter((p) => p.status === "checked_in" || p.status === "boarded" || p.status === "completed").length ?? 0;
   const boardedCount = manifest?.passengers.filter((p) => p.status === "boarded" || p.status === "completed").length ?? 0;
 
@@ -51,7 +50,7 @@ export function CrewCaptainManifestSection({
       </p>
       <p className="text-xs text-[#0f766e]/70">Philippines time: {nowManila}</p>
 
-      {/* Cards: passenger count, departure, vessel, route */}
+      {/* Summary cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border-2 border-teal-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]/80">Passengers</p>
@@ -71,7 +70,7 @@ export function CrewCaptainManifestSection({
         </div>
       </div>
 
-      {/* Check-in / boarded summary badges */}
+      {/* Status badges */}
       {manifest && manifest.passengers.length > 0 && (
         <div className="flex flex-wrap gap-3">
           <span className="rounded-full bg-gray-100 border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700">
@@ -86,7 +85,6 @@ export function CrewCaptainManifestSection({
         </div>
       )}
 
-      {/* Dropdown: today's trips for assigned vessel(s) */}
       <CrewCaptainTripSelect todayTrips={todayTrips} selectedTripId={selectedTripId} />
 
       {/* Manifest table */}
@@ -106,9 +104,8 @@ export function CrewCaptainManifestSection({
                   <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e] sm:px-6">Ticket #</th>
                   <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e] sm:px-6">Name</th>
                   <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e] sm:px-6">Address</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e] sm:px-6">CP number</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e] sm:px-6">CP Number</th>
                   <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e] sm:px-6">Source</th>
-                  {/* New status column */}
                   <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e] sm:px-6">Status</th>
                 </tr>
               </thead>
@@ -124,11 +121,11 @@ export function CrewCaptainManifestSection({
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-[#0f766e] sm:px-6">{p.contact ?? "—"}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-[#0f766e] sm:px-6">{p.source}</td>
                     <td className="px-4 py-3 sm:px-6">
+                      {/* ✅ Now uses ticketNumber — only updates THIS specific passenger */}
                       <ManifestStatusButton
-                        reference={p.reference}
+                        ticketNumber={p.ticketNumber}
                         initialStatus={p.status}
                       />
-                      {/* Show timestamps if already processed */}
                       {p.checkedInAt && (
                         <p className="mt-0.5 text-xs text-gray-400">In: {formatTimestamp(p.checkedInAt)}</p>
                       )}
@@ -142,9 +139,7 @@ export function CrewCaptainManifestSection({
             </table>
           ) : (
             <div className="px-4 py-8 text-center text-sm text-[#0f766e] sm:px-6">
-              {selectedTripId && !manifest
-                ? "Loading manifest…"
-                : "No passengers on this trip yet."}
+              {selectedTripId && !manifest ? "Loading manifest…" : "No passengers on this trip yet."}
             </div>
           )}
         </div>

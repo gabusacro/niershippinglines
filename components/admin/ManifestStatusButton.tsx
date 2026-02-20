@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface ManifestStatusButtonProps {
-  reference: string;
+  ticketNumber: string;  // ✅ per-ticket, not booking reference
   initialStatus: string;
 }
 
@@ -30,7 +30,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export function ManifestStatusButton({ reference, initialStatus }: ManifestStatusButtonProps) {
+export function ManifestStatusButton({ ticketNumber, initialStatus }: ManifestStatusButtonProps) {
   const router = useRouter();
   const [status, setStatus] = useState(initialStatus);
   const [loading, setLoading] = useState(false);
@@ -43,7 +43,7 @@ export function ManifestStatusButton({ reference, initialStatus }: ManifestStatu
       const res = await fetch("/api/crew/check-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reference, action }),
+        body: JSON.stringify({ ticket_number: ticketNumber, action }),  // ✅ per-ticket
       });
       const data = await res.json();
       if (!res.ok) {
@@ -51,7 +51,6 @@ export function ManifestStatusButton({ reference, initialStatus }: ManifestStatu
         return;
       }
       setStatus(data.status);
-      // ✅ Tell Next.js to re-fetch server component data so manifest updates live
       router.refresh();
     } catch {
       setError("Network error");
