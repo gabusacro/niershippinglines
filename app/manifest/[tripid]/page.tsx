@@ -52,7 +52,9 @@ export default async function PublicManifestPage({
 }) {
   const { tripId } = await params;
   const data = await getTripManifestData(tripId);
-  if (!data) notFound();
+  if (!data) {
+    return <div style={{color:"red", padding:"2rem"}}>Data returned null for tripId: {tripId}</div>;
+  }
 
   const branding = await getSiteBranding();
 
