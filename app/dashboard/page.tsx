@@ -335,13 +335,7 @@ export default async function DashboardPage({
             </div>
           )}
 
-          <TripCalendarWrapper
-            loggedInEmail={user.email ?? ""}
-            passengerName={welcomeName ?? undefined}
-            loggedInAddress={user.address ?? ""}
-          />
-
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+<div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Link
               href={ROUTES.book}
               className="group flex flex-col rounded-2xl border-2 border-[#0c7b93] bg-[#0c7b93] p-6 text-white shadow-lg shadow-[#0c7b93]/20 transition-all hover:border-[#0f766e] hover:bg-[#0f766e] hover:shadow-xl hover:shadow-[#0c7b93]/25"
@@ -371,6 +365,16 @@ export default async function DashboardPage({
               <span className="mt-2 text-sm text-[#0f766e]">Profile and password</span>
             </Link>
           </div>
+
+          <TripCalendarWrapper
+
+          <TripCalendarWrapper
+            loggedInEmail={user.email ?? ""}
+            passengerName={welcomeName ?? undefined}
+            loggedInAddress={user.address ?? ""}
+          />
+
+          
         </>
       ) : isAdmin ? (
         <>

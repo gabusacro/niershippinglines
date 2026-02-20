@@ -4,15 +4,14 @@ import { AuthForm } from "./AuthForm";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Sign in",
+  title: "Sign In",
   description: `Sign in or create account — ${APP_NAME}`,
 };
 
 export default function LoginPage() {
   return (
     <div className="mx-auto w-full max-w-md px-4 py-8 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-[#134e4a]">Sign in</h1>
-      
+      <h1 className="text-2xl font-bold text-[#134e4a]">Sign In</h1>
       <Suspense fallback={<div className="mt-6 h-48 animate-pulse rounded-lg bg-teal-100" />}>
         <AuthForm />
       </Suspense>
