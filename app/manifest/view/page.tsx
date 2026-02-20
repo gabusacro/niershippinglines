@@ -36,12 +36,15 @@ const statusLabel: Record<string, string> = {
 
 const MANIFEST_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
 
+type SearchParams = Promise<Record<string, string>> | Record<string, string>;
+
 export default async function PublicManifestPage({
   searchParams,
 }: {
-  searchParams: Record<string, string>;
+  searchParams: SearchParams;
 }) {
-  const tripId = searchParams.id ?? "";
+  const resolved = searchParams instanceof Promise ? await searchParams : searchParams;
+  const tripId = resolved.id ?? "";
 
   if (!tripId) {
     return (
