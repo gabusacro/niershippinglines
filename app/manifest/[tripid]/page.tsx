@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSiteBranding } from "@/lib/site-branding";
 import { formatTime } from "@/lib/dashboard/format";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +42,28 @@ type Props = {
 };
 
 export default async function PublicManifestPage({ params }: Props) {
-  // Handle both Next.js 14 (object) and Next.js 15 (Promise) params
+  // Try params first
   const resolvedParams = params instanceof Promise ? await params : params;
-  const tripId = resolvedParams.tripId;
+  let tripId = resolvedParams?.tripId ?? "";
+
+  // Fallback: extract tripId from the request URL via headers
+  if (!tripId) {
+    const headersList = await headers();
+    const pathname =
+      headersList.get("x-invoke-path") ??
+      headersList.get("x-pathname") ??
+      headersList.get("x-url") ??
+      "";
+    const match = pathname.match(/\/manifest\/([^/?#]+)/);
+    tripId = match?.[1] ?? "";
+  }
 
   if (!tripId) {
-    return <div className="p-8 text-red-600">Error: No trip ID provided.</div>;
+    return (
+      <div className="p-8 text-red-600">
+        Error: Could not determine trip ID from URL.
+      </div>
+    );
   }
 
   const supabase = createClient(
