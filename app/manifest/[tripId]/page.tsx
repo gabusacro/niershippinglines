@@ -41,7 +41,7 @@ export default async function PublicManifestPage({
 }: {
   params: { tripId: string };
 }) {
-  const { tripId } = params;
+  const tripId = (params as Record<string, string>).tripId ?? (params as Record<string, string>).tripid ?? "";
 
   if (!tripId) {
     return <div className="p-8 text-red-600">Error: No trip ID provided.</div>;
