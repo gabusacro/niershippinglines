@@ -5,7 +5,7 @@ import { formatTime } from "@/lib/dashboard/format";
 export const dynamic = "force-dynamic";
 
 function formatDate(d: string): string {
-  if (!d || d === "-") return "-";
+  if (!d) return "-";
   try {
     return new Date(d + "Z").toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
   } catch {
@@ -37,14 +37,18 @@ const statusLabel: Record<string, string> = {
 const MANIFEST_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
 
 export default async function PublicManifestPage({
-  params,
+  searchParams,
 }: {
-  params: Record<string, string>;
+  searchParams: Record<string, string>;
 }) {
-  const tripId = params.tripId ?? params.tripid ?? "";
+  const tripId = searchParams.id ?? "";
 
   if (!tripId) {
-    return <div className="p-8 text-red-600">Error: No trip ID provided.</div>;
+    return (
+      <div className="p-8 text-red-600">
+        Error: No trip ID in URL. Use /manifest/view?id=YOUR_TRIP_ID
+      </div>
+    );
   }
 
   const supabase = createClient(
