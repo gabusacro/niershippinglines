@@ -37,7 +37,7 @@ export default async function TripManifestPage({
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto = h.get("x-forwarded-proto") ?? "https";
   const baseUrl = host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_APP_URL ?? "https://localhost:3000");
-  const manifestUrl = `${baseUrl}/manifest/${tripId}`;
+  const manifestUrl = `${baseUrl}/manifest/view?id=${tripId}`;
 
   return (
     <div className="min-h-screen bg-gray-100">
