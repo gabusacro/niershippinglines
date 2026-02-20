@@ -8,6 +8,39 @@ import { useToast } from "@/components/ui/ActionToast";
 
 type Mode = "login" | "signup" | "forgot";
 
+const COUNTRIES = [
+  "Filipino",
+  "Afghan", "Albanian", "Algerian", "American", "Andorran", "Angolan", "Argentine", "Armenian", "Australian", "Austrian",
+  "Azerbaijani", "Bahamian", "Bahraini", "Bangladeshi", "Barbadian", "Belarusian", "Belgian", "Belizean", "Beninese",
+  "Bhutanese", "Bolivian", "Bosnian", "Botswanan", "Brazilian", "Bruneian", "Bulgarian", "Burkinabe", "Burundian",
+  "Cambodian", "Cameroonian", "Canadian", "Cape Verdean", "Central African", "Chadian", "Chilean", "Chinese",
+  "Colombian", "Comorian", "Congolese", "Costa Rican", "Croatian", "Cuban", "Cypriot", "Czech", "Danish", "Djiboutian",
+  "Dominican", "Dutch", "East Timorese", "Ecuadorian", "Egyptian", "Emirati", "Equatorial Guinean", "Eritrean",
+  "Estonian", "Ethiopian", "Fijian", "Finnish", "French", "Gabonese", "Gambian", "Georgian", "German", "Ghanaian",
+  "Greek", "Grenadian", "Guatemalan", "Guinean", "Guinea-Bissauan", "Guyanese", "Haitian", "Honduran", "Hungarian",
+  "Icelandic", "Indian", "Indonesian", "Iranian", "Iraqi", "Irish", "Israeli", "Italian", "Ivorian", "Jamaican",
+  "Japanese", "Jordanian", "Kazakhstani", "Kenyan", "Korean", "Kuwaiti", "Kyrgyz", "Laotian", "Latvian", "Lebanese",
+  "Liberian", "Libyan", "Liechtenstein", "Lithuanian", "Luxembourgish", "Macedonian", "Malagasy", "Malawian",
+  "Malaysian", "Maldivian", "Malian", "Maltese", "Mauritanian", "Mauritian", "Mexican", "Moldovan", "Monegasque",
+  "Mongolian", "Montenegrin", "Moroccan", "Mozambican", "Namibian", "Nepali", "New Zealander", "Nicaraguan", "Nigerian",
+  "Norwegian", "Omani", "Pakistani", "Palauan", "Panamanian", "Papua New Guinean", "Paraguayan", "Peruvian", "Polish",
+  "Portuguese", "Qatari", "Romanian", "Russian", "Rwandan", "Saint Lucian", "Salvadoran", "Samoan", "Saudi Arabian",
+  "Senegalese", "Serbian", "Sierra Leonean", "Singaporean", "Slovak", "Slovenian", "Somali", "South African",
+  "South Sudanese", "Spanish", "Sri Lankan", "Sudanese", "Surinamese", "Swazi", "Swedish", "Swiss", "Syrian",
+  "Taiwanese", "Tajik", "Tanzanian", "Thai", "Togolese", "Trinidadian", "Tunisian", "Turkish", "Turkmen", "Ugandan",
+  "Ukrainian", "Uruguayan", "Uzbek", "Venezuelan", "Vietnamese", "Yemeni", "Zambian", "Zimbabwean",
+];
+
+function calculateAge(birthdate: string): number | null {
+  if (!birthdate) return null;
+  const today = new Date();
+  const birth = new Date(birthdate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
 export function AuthForm() {
   const router = useRouter();
   const toast = useToast();
@@ -20,11 +53,20 @@ export function AuthForm() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [salutation, setSalutation] = useState<string>("");
+  const [gender, setGender] = useState<string>("");
+  const [birthdate, setBirthdate] = useState<string>("");
+  const [nationality, setNationality] = useState<string>("Filipino");
+  const [recoveryEmail, setRecoveryEmail] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const age = calculateAge(birthdate);
+
+  const inputClass = "mt-1 block w-full rounded-lg border-2 border-teal-200 bg-white px-3 py-2 text-[#134e4a] shadow-sm focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30";
+  const labelClass = "block text-sm font-medium text-[#134e4a]";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +74,7 @@ export function AuthForm() {
     setLoading(true);
     try {
       const supabase = createClient();
+
       if (mode === "forgot") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(`${ROUTES.account}?reset=1`)}` : undefined,
@@ -47,7 +90,12 @@ export function AuthForm() {
         toast.showSuccess("Password reset email sent. Check your inbox.");
         return;
       }
+
       if (mode === "signup") {
+        if (recoveryEmail && recoveryEmail === email) {
+          setError("Recovery email must be different from your main email.");
+          return;
+        }
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -64,6 +112,10 @@ export function AuthForm() {
             salutation: salutation || null,
             email: data.user.email ?? null,
             role: "passenger",
+            gender: gender || null,
+            birthdate: birthdate || null,
+            nationality: nationality || "Filipino",
+            recovery_email: recoveryEmail.trim() || null,
           });
         }
         setSuccess(true);
@@ -101,7 +153,7 @@ export function AuthForm() {
       return (
         <div className="mt-6 space-y-4">
           <p className="rounded-md bg-teal-100 px-3 py-2 text-sm text-teal-800">
-            Check your email for a link to reset your password. If you don’t see it, check spam.
+            Check your email for a link to reset your password. If you don't see it, check spam.
           </p>
           <button
             type="button"
@@ -115,181 +167,141 @@ export function AuthForm() {
     }
     return (
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-        {error && (
-          <p className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{error}</p>
-        )}
-        <p className="text-sm text-[#0f766e]">
-          Enter your email and we’ll send you a link to reset your password.
-        </p>
+        {error && <p className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{error}</p>}
+        <p className="text-sm text-[#0f766e]">Enter your email and we'll send you a link to reset your password.</p>
         <div>
-          <label htmlFor="forgot-email" className="block text-sm font-medium text-[#134e4a]">Email</label>
-          <input
-            id="forgot-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            className="mt-1 block w-full rounded-lg border-2 border-teal-200 bg-white px-3 py-2 text-[#134e4a] shadow-sm focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
-          />
+          <label htmlFor="forgot-email" className={labelClass}>Email</label>
+          <input id="forgot-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" className={inputClass} />
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full min-h-[48px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors touch-target"
-        >
-          {loading ? "Sending…" : "Send reset link"}
+        <button type="submit" disabled={loading} className="w-full min-h-[48px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors touch-target">
+          {loading ? "Sending..." : "Send reset link"}
         </button>
-        <button
-          type="button"
-          onClick={() => setMode("login")}
-          className="w-full text-sm font-semibold text-[#0c7b93] underline hover:text-[#0f766e]"
-        >
-          ← Back to sign in
-        </button>
+        <p className="text-center text-sm text-[#0f766e]">
+          <button type="button" onClick={() => setMode("login")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Back to sign in</button>
+        </p>
       </form>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-      {refParam && mode === "signup" && (
-        <p className="rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Your booking <strong className="font-mono">{refParam}</strong> was created. Create an account with the same email to upload payment proof, get notifications, and manage your trip.
-        </p>
-      )}
-      {error && (
-        <p className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">
-          {error}
-        </p>
-      )}
-      {mode === "signup" && (
-        <>
-          <div>
-            <label htmlFor="salutation" className="block text-sm font-medium text-[#134e4a]">
-              Salutation
-            </label>
-            <select
-              id="salutation"
-              value={salutation}
-              onChange={(e) => setSalutation(e.target.value)}
-              className="mt-1 block w-full rounded-lg border-2 border-teal-200 bg-white px-3 py-2 text-[#134e4a] shadow-sm focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
-            >
-              <option value="">Select (optional)</option>
-              <option value="Mr">Mr.</option>
-              <option value="Mrs">Mrs.</option>
-              <option value="Ms">Ms.</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="fullName" className="block text-sm font-medium text-[#134e4a]">
-              Full name <span className="text-red-600">*</span>
-            </label>
-            <input
-              id="fullName"
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              autoComplete="name"
-              required
-              className="mt-1 block w-full rounded-lg border-2 border-teal-200 bg-white px-3 py-2 text-[#134e4a] shadow-sm focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
-            />
-          </div>
-        </>
-      )}
+      {error && <p className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{error}</p>}
+
+      {/* Salutation */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-[#134e4a]">
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoComplete="email"
-          className="mt-1 block w-full rounded-lg border-2 border-teal-200 bg-white px-3 py-2 text-[#134e4a] shadow-sm focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
-        />
+        <label htmlFor="salutation" className={labelClass}>Salutation</label>
+        <select id="salutation" value={salutation} onChange={(e) => setSalutation(e.target.value)} className={inputClass}>
+          <option value="">Select (optional)</option>
+          <option value="Mr">Mr.</option>
+          <option value="Mrs">Mrs.</option>
+          <option value="Ms">Ms.</option>
+        </select>
       </div>
-      <div>
-        <label htmlFor="password" className="block text-sm font-medium text-[#134e4a]">
-          Password
-        </label>
-        <div className="relative mt-1">
+
+      {/* Full Name - signup only */}
+      {mode === "signup" && (
+        <div>
+          <label htmlFor="fullName" className={labelClass}>Full name <span className="text-red-600">*</span></label>
+          <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" required className={inputClass} />
+        </div>
+      )}
+
+      {/* Gender - signup only */}
+      {mode === "signup" && (
+        <div>
+          <label htmlFor="gender" className={labelClass}>Gender</label>
+          <select id="gender" value={gender} onChange={(e) => setGender(e.target.value)} className={inputClass}>
+            <option value="">Select (optional)</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+            <option value="Prefer not to say">Prefer not to say</option>
+          </select>
+        </div>
+      )}
+
+      {/* Birthdate - signup only */}
+      {mode === "signup" && (
+        <div>
+          <label htmlFor="birthdate" className={labelClass}>Date of birth</label>
           <input
-            id="password"
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            className="block w-full rounded-lg border-2 border-teal-200 bg-white py-2 pl-3 pr-10 text-[#134e4a] shadow-sm focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
+            id="birthdate" type="date" value={birthdate}
+            onChange={(e) => setBirthdate(e.target.value)}
+            max={new Date().toISOString().split("T")[0]}
+            className={inputClass}
           />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-[#0f766e] hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
-            title={showPassword ? "Hide password" : "Show password"}
-            aria-label={showPassword ? "Hide password" : "Show password"}
-          >
-            {showPassword ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            )}
+          {age !== null && <p className="mt-1 text-xs text-[#0f766e]">Age: {age} years old</p>}
+        </div>
+      )}
+
+      {/* Nationality - signup only */}
+      {mode === "signup" && (
+        <div>
+          <label htmlFor="nationality" className={labelClass}>Nationality</label>
+          <select id="nationality" value={nationality} onChange={(e) => setNationality(e.target.value)} className={inputClass}>
+            {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* Email */}
+      <div>
+        <label htmlFor="email" className={labelClass}>Email <span className="text-red-600">*</span></label>
+        <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" className={inputClass} />
+      </div>
+
+      {/* Recovery Email - signup only */}
+      {mode === "signup" && (
+        <div>
+          <label htmlFor="recoveryEmail" className={labelClass}>
+            Recovery email <span className="text-xs text-[#0f766e] font-normal">(optional)</span>
+          </label>
+          <input
+            id="recoveryEmail" type="email" value={recoveryEmail}
+            onChange={(e) => setRecoveryEmail(e.target.value)}
+            className={inputClass} placeholder="Backup email if you lose access"
+          />
+        </div>
+      )}
+
+      {/* Password */}
+      <div>
+        <label htmlFor="password" className={labelClass}>Password <span className="text-red-600">*</span></label>
+        <div className="relative">
+          <input
+            id="password" type={showPassword ? "text" : "password"} value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required minLength={6} autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            className={inputClass}
+          />
+          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0f766e]">
+            {showPassword ? "Hide" : "Show"}
           </button>
         </div>
-        {mode === "signup" && (
-          <p className="mt-1 text-xs text-[#0f766e]/80">At least 6 characters</p>
-        )}
-        {mode === "login" && (
-          <p className="mt-1 text-right">
-            <button
-              type="button"
-              onClick={() => setMode("forgot")}
-              className="text-sm font-semibold text-[#0c7b93] underline hover:text-[#0f766e]"
-            >
-              Forgot password?
-            </button>
-          </p>
-        )}
+        {mode === "signup" && <p className="mt-1 text-xs text-[#0f766e]/80">At least 6 characters</p>}
       </div>
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full min-h-[48px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors touch-target"
-      >
-        {loading
-          ? mode === "signup"
-            ? "Creating account…"
-            : "Signing in…"
-          : mode === "signup"
-            ? "Create account"
-            : "Sign in"}
+
+      {/* Forgot password link */}
+      {mode === "login" && (
+        <p className="text-right text-sm">
+          <button type="button" onClick={() => setMode("forgot")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">
+            Forgot password?
+          </button>
+        </p>
+      )}
+
+      <button type="submit" disabled={loading} className="w-full min-h-[48px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors touch-target">
+        {loading ? (mode === "signup" ? "Creating account..." : "Signing in...") : (mode === "signup" ? "Create account" : "Sign in")}
       </button>
+
       <p className="text-center text-sm text-[#0f766e]">
-        {mode === "login" ? (
-          <>
-            No account?{" "}
-            <button
-              type="button"
-              onClick={() => setMode("signup")}
-              className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]"
-            >
-              Create one
-            </button>
+        {mode === "signup" ? (
+          <>Already have an account?{" "}
+            <button type="button" onClick={() => setMode("login")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Sign in</button>
           </>
         ) : (
-          <>
-            Already have an account?{" "}
-            <button
-              type="button"
-              onClick={() => setMode("login")}
-              className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]"
-            >
-              Sign in
-            </button>
+          <>Don't have an account?{" "}
+            <button type="button" onClick={() => setMode("signup")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Create one</button>
           </>
         )}
       </p>
