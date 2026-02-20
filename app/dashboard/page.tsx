@@ -366,7 +366,6 @@ export default async function DashboardPage({
             </Link>
           </div>
 
-          <TripCalendarWrapper
 
           <TripCalendarWrapper
             loggedInEmail={user.email ?? ""}
