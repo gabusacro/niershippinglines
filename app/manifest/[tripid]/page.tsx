@@ -36,42 +36,38 @@ const statusLabel: Record<string, string> = {
 
 const MANIFEST_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
 
-export default async function PublicManifestPage({
-  params,
-}: {
-  params: Promise<{ tripId: string }>;
-}) {
-  const { tripId } = await params;
+type Props = {
+  params: Promise<{ tripId: string }> | { tripId: string };
+};
 
-  // TEMP DEBUG - remove after fix
-  console.log("DEBUG tripId:", tripId);
-  console.log("DEBUG SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
-  console.log("DEBUG SERVICE_KEY exists:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+export default async function PublicManifestPage({ params }: Props) {
+  // Handle both Next.js 14 (object) and Next.js 15 (Promise) params
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const tripId = resolvedParams.tripId;
 
+  if (!tripId) {
+    return <div className="p-8 text-red-600">Error: No trip ID provided.</div>;
+  }
 
-
-  // Use service role to bypass RLS for public manifest
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Fetch trip
   const { data: trip } = await supabase
     .from("trips")
     .select("id, departure_date, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, boat:boats(id, name, capacity), route:routes(display_name, origin, destination)")
     .eq("id", tripId)
     .single();
 
-    if (!trip) {
-      return <div className="p-8 text-red-600">Manifest not found. tripId was: {tripId}</div>;
-    }
+  if (!trip) {
+    return <div className="p-8 text-red-600">Manifest not found for trip: {tripId}</div>;
+  }
 
   const boat = (Array.isArray(trip.boat) ? trip.boat[0] : trip.boat) as { name: string; capacity: number } | null;
   const route = (Array.isArray(trip.route) ? trip.route[0] : trip.route) as { display_name?: string; origin?: string; destination?: string } | null;
   const capacity = boat?.capacity ?? 0;
 
-  // Fetch bookings
   const { data: bookings } = await supabase
     .from("bookings")
     .select("id, reference, customer_full_name, customer_mobile, customer_address, fare_type, passenger_count, passenger_details, is_walk_in, status")
@@ -79,7 +75,6 @@ export default async function PublicManifestPage({
     .in("status", MANIFEST_STATUSES)
     .order("created_at", { ascending: true });
 
-  // Fetch tickets
   const bookingIds = (bookings ?? []).map((b) => b.id);
   const ticketsByBooking = new Map<string, { ticket_number: string; passenger_index: number; status: string; checked_in_at: string | null; boarded_at: string | null }[]>();
   if (bookingIds.length > 0) {
