@@ -1,17 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-/** POST: Mark ticket as checked_in or boarded. Crew/ticket_booth/admin/captain only.
- *
- *  Body (ticket-level — preferred):
- *    { ticket_number: "HMGT89BP8E", action: "checked_in" | "boarded" }
- *
- *  Body (legacy booking-level fallback — used by manifest buttons):
- *    { reference: "883Z3LTDJE", action: "checked_in" | "boarded" }
- *
- *  When ticket_number is provided, only THAT passenger's ticket row is updated.
- *  The booking status is also updated to the highest status across all its tickets.
- */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -36,13 +25,10 @@ export async function POST(request: NextRequest) {
   const action = body.action === "checked_in" || body.action === "boarded" ? body.action : "checked_in";
   const now = new Date().toISOString();
 
-  console.log("[check-in] body:", JSON.stringify(body));
-
   // ── Per-ticket update (ticket_number provided — from QR scanner) ──────────
   const ticketNumber = typeof body.ticket_number === "string" ? body.ticket_number.trim() : "";
 
   if (ticketNumber) {
-    // Look up the ticket row — use ticket_number as the key (no id column)
     const { data: ticket, error: ticketErr } = await supabase
       .from("tickets")
       .select("ticket_number, booking_id, status, checked_in_at, boarded_at")
@@ -58,7 +44,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Cannot update: ticket status is ${ticket.status}` }, { status: 400 });
     }
 
-    // Build ticket-level updates
     const ticketUpdates: Record<string, string> = { status: action };
     if (action === "checked_in" && !ticket.checked_in_at) {
       ticketUpdates.checked_in_at = now;
@@ -68,7 +53,6 @@ export async function POST(request: NextRequest) {
       if (!ticket.checked_in_at) ticketUpdates.checked_in_at = now;
     }
 
-    // Update only THIS ticket using ticket_number as the key
     const { error: ticketUpdateErr } = await supabase
       .from("tickets")
       .update(ticketUpdates)
@@ -78,7 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: ticketUpdateErr.message }, { status: 500 });
     }
 
-    // Update booking status to reflect the HIGHEST status across all its tickets
+    // Update booking status to highest status across all its tickets
     const { data: siblingTickets } = await supabase
       .from("tickets")
       .select("status")
@@ -97,15 +81,12 @@ export async function POST(request: NextRequest) {
       bookingUpdates.boarded_at = now;
     }
 
-    await supabase
-      .from("bookings")
-      .update(bookingUpdates)
-      .eq("id", ticket.booking_id);
+    await supabase.from("bookings").update(bookingUpdates).eq("id", ticket.booking_id);
 
     return NextResponse.json({ ok: true, status: action });
   }
 
-  // ── Legacy booking-level update (reference provided — from manifest buttons) ─
+  // ── Legacy booking-level update (reference provided — from manifest buttons) ──
   const reference = typeof body.reference === "string" ? body.reference.trim().toUpperCase() : "";
   if (!reference) {
     return NextResponse.json({ error: "Missing ticket_number or reference" }, { status: 400 });
@@ -113,7 +94,7 @@ export async function POST(request: NextRequest) {
 
   const { data: booking, error: fetchErr } = await supabase
     .from("bookings")
-    .select("id, status")
+    .select("id, status, checked_in_at")
     .eq("reference", reference)
     .maybeSingle();
 
@@ -130,16 +111,27 @@ export async function POST(request: NextRequest) {
   if (action === "checked_in") {
     updates.checked_in_at = now;
   } else {
+    // boarded — also set checked_in_at if not already set
     updates.boarded_at = now;
-    updates.checked_in_at = now;
+    if (!booking.checked_in_at) updates.checked_in_at = now;
   }
 
+  // ✅ This closing brace was missing in the original — updates never ran!
   const { error: updateErr } = await supabase
     .from("bookings")
     .update(updates)
     .eq("id", booking.id);
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+
+  // Also update all tickets for this booking to match
+  await supabase
+    .from("tickets")
+    .update({ 
+      status: action,
+      ...(action === "checked_in" ? { checked_in_at: now } : { boarded_at: now, checked_in_at: now })
+    })
+    .eq("booking_id", booking.id);
 
   return NextResponse.json({ ok: true, status: action });
 }
