@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSiteBranding } from "@/lib/site-branding";
 import { formatTime } from "@/lib/dashboard/format";
-import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -37,33 +36,15 @@ const statusLabel: Record<string, string> = {
 
 const MANIFEST_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
 
-type Props = {
-  params: Promise<{ tripId: string }> | { tripId: string };
-};
-
-export default async function PublicManifestPage({ params }: Props) {
-  // Try params first
-  const resolvedParams = params instanceof Promise ? await params : params;
-  let tripId = resolvedParams?.tripId ?? "";
-
-  // Fallback: extract tripId from the request URL via headers
-  if (!tripId) {
-    const headersList = await headers();
-    const pathname =
-      headersList.get("x-invoke-path") ??
-      headersList.get("x-pathname") ??
-      headersList.get("x-url") ??
-      "";
-    const match = pathname.match(/\/manifest\/([^/?#]+)/);
-    tripId = match?.[1] ?? "";
-  }
+export default async function PublicManifestPage({
+  params,
+}: {
+  params: { tripId: string };
+}) {
+  const { tripId } = params;
 
   if (!tripId) {
-    return (
-      <div className="p-8 text-red-600">
-        Error: Could not determine trip ID from URL.
-      </div>
-    );
+    return <div className="p-8 text-red-600">Error: No trip ID provided.</div>;
   }
 
   const supabase = createClient(
