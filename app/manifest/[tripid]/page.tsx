@@ -50,7 +50,8 @@ export default async function PublicManifestPage({
 }: {
   params: Promise<{ tripId: string }>;
 }) {
-  const { tripId } = await params;
+  const resolvedParams = await params;
+  const tripId = resolvedParams.tripId;
   const data = await getTripManifestData(tripId);
   if (!data) {
     return <div style={{color:"red", padding:"2rem"}}>Data returned null for tripId: {tripId}</div>;
