@@ -66,7 +66,7 @@ export function Header({ siteName }: HeaderProps = {}) {
           className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2.5 text-white drop-shadow-sm hover:text-[#fef9e7] transition-colors duration-200 touch-target md:flex-initial md:min-w-0"
           onClick={() => setMenuOpen(false)}
         >
-          <Boat size={24} className="shrink-0 text-[#fef9e7] sm:w-7 sm:h-7" />
+          <img src="/favicon.png" alt="logo" className="shrink-0 h-6 w-6 sm:h-7 sm:w-7 rounded-full" />
           <span className="text-sm font-semibold leading-tight tracking-tight text-white line-clamp-2 min-w-0 sm:text-base md:text-lg md:font-bold md:leading-normal md:line-clamp-none md:truncate md:max-w-[200px] lg:max-w-none">
             {displayName}
           </span>
