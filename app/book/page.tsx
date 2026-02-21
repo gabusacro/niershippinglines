@@ -24,6 +24,10 @@ export default async function BookPage({
   ]);
   const loggedInEmail = (user?.email ?? "").trim();
   const loggedInAddress = (user?.address ?? "").trim();
+  const loggedInName = (user?.fullName ?? "").trim();
+  const loggedInGender = (user?.gender ?? "").trim();
+  const loggedInBirthdate = (user?.birthdate ?? "").trim();
+  const loggedInNationality = (user?.nationality ?? "").trim();
   const initialRouteId = typeof params.route_id === "string" ? params.route_id.trim() : undefined;
   const initialDate = typeof params.date === "string" ? params.date.trim() : undefined;
 
@@ -75,9 +79,13 @@ export default async function BookPage({
 
       {/* Booking form — connected to Supabase. Pre-fill email when logged in so booking appears in My bookings. */}
       <section className="mb-8 sm:mb-10">
-        <BookingForm
+      <BookingForm
           loggedInEmail={loggedInEmail}
           loggedInAddress={loggedInAddress}
+          loggedInName={loggedInName}
+          loggedInGender={loggedInGender}
+          loggedInBirthdate={loggedInBirthdate}
+          loggedInNationality={loggedInNationality}
           initialRouteId={initialRouteId}
           initialDate={initialDate}
         />

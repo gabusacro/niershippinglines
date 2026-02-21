@@ -38,10 +38,16 @@ async function TripCalendarWrapper({
   loggedInEmail,
   passengerName,
   loggedInAddress,
+  loggedInGender,
+  loggedInBirthdate,
+  loggedInNationality,
 }: {
   loggedInEmail: string;
   passengerName?: string;
   loggedInAddress?: string;
+  loggedInGender?: string;
+  loggedInBirthdate?: string;
+  loggedInNationality?: string;
 }) {
   const trips = await getUpcomingTrips();
   return (
@@ -50,6 +56,9 @@ async function TripCalendarWrapper({
       loggedInEmail={loggedInEmail}
       passengerName={passengerName}
       loggedInAddress={loggedInAddress ?? ""}
+      loggedInGender={loggedInGender ?? ""}
+      loggedInBirthdate={loggedInBirthdate ?? ""}
+      loggedInNationality={loggedInNationality ?? ""}
     />
   );
 }
@@ -80,6 +89,9 @@ export default async function DashboardPage({
   };
   const yourRoleLabel = roleLabel[user.role] ?? user.role;
   const isPassenger = user.role === "passenger";
+  const loggedInEmail = user.email ?? "";
+  const passengerName = user.fullName ?? "";
+  const loggedInAddress = user.address ?? "";
   const isAdmin = false; // admin is redirected above
 
   const displayName = user.fullName?.trim() || null;
@@ -368,9 +380,12 @@ export default async function DashboardPage({
 
 
           <TripCalendarWrapper
-            loggedInEmail={user.email ?? ""}
-            passengerName={welcomeName ?? undefined}
-            loggedInAddress={user.address ?? ""}
+          loggedInEmail={user.email ?? ""}
+          passengerName={user.fullName ?? ""}
+         loggedInAddress={user.address ?? ""}
+         loggedInGender={user?.gender ?? ""}
+         loggedInBirthdate={user?.birthdate ?? ""}
+         loggedInNationality={user?.nationality ?? ""}
           />
 
           

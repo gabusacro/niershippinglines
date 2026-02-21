@@ -5,7 +5,6 @@ import type { UpcomingTripRow } from "@/lib/dashboard/get-upcoming-trips";
 import { getDayLabel, getDayOfMonth, parseDateString, formatTime } from "@/lib/dashboard/format";
 import { BookingModal } from "@/app/dashboard/BookingModal";
 
-/** Unique valid dates from trips (YYYY-MM-DD, sorted). Filters out invalid/malformed dates. */
 function getTripDates(trips: UpcomingTripRow[]): string[] {
   const dates = [...new Set(trips.map((t) => t.departure_date).filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}/.test(d)))];
   return dates.sort();
@@ -16,11 +15,17 @@ export function TripCalendar({
   loggedInEmail = "",
   passengerName,
   loggedInAddress = "",
+  loggedInGender = "",
+  loggedInBirthdate = "",
+  loggedInNationality = "",
 }: {
   trips: UpcomingTripRow[];
   loggedInEmail?: string;
   passengerName?: string;
   loggedInAddress?: string;
+  loggedInGender?: string;
+  loggedInBirthdate?: string;
+  loggedInNationality?: string;
 }) {
   const tripDates = useMemo(() => getTripDates(trips), [trips]);
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
@@ -38,7 +43,6 @@ export function TripCalendar({
     return map;
   }, [trips]);
 
-  /** Direction label per trip: same logic as Book form and manual booking — group by route+date, sort by time; first = origin→destination, second = destination→origin. */
   const getDirectionLabel = useMemo(() => {
     const groupKey = (t: UpcomingTripRow) => `${t.route?.id ?? ""}-${t.departure_date ?? ""}`;
     const byGroup = new Map<string, UpcomingTripRow[]>();
@@ -82,34 +86,18 @@ export function TripCalendar({
       <h2 className="text-lg font-semibold text-[#134e4a]">Scheduled trips</h2>
       <p className="mt-1 text-sm text-[#0f766e]">Click a day to see times and seats. Swipe or use arrows to browse dates.</p>
 
-      {/* Date carousel — 3 cards visible, swipe/scroll for more */}
       <div className="relative mt-4">
         {canGoPrev && (
-          <button
-            type="button"
-            onClick={() => scrollToIndex(safeIndex - 1)}
-            className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/95 p-2 shadow-md border border-teal-200 text-[#0c7b93] hover:bg-[#0c7b93]/10"
-            aria-label="Previous date"
-          >
+          <button type="button" onClick={() => scrollToIndex(safeIndex - 1)} className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/95 p-2 shadow-md border border-teal-200 text-[#0c7b93] hover:bg-[#0c7b93]/10" aria-label="Previous date">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
         )}
         {canGoNext && (
-          <button
-            type="button"
-            onClick={() => scrollToIndex(safeIndex + 1)}
-            className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/95 p-2 shadow-md border border-teal-200 text-[#0c7b93] hover:bg-[#0c7b93]/10"
-            aria-label="Next date"
-          >
+          <button type="button" onClick={() => scrollToIndex(safeIndex + 1)} className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/95 p-2 shadow-md border border-teal-200 text-[#0c7b93] hover:bg-[#0c7b93]/10" aria-label="Next date">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
           </button>
         )}
-        <div
-          ref={scrollRef}
-          className="flex gap-2 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory scroll-smooth scrollbar-hide"
-          role="region"
-          aria-label="Date selection"
-        >
+        <div ref={scrollRef} className="flex gap-2 overflow-x-auto overflow-y-hidden pb-2 snap-x snap-mandatory scroll-smooth scrollbar-hide" role="region" aria-label="Date selection">
           {tripDates.map((dateStr) => {
             const dayTrips = byDate.get(dateStr) ?? [];
             const label = getDayLabel(dateStr);
@@ -122,17 +110,13 @@ export function TripCalendar({
                 type="button"
                 onClick={() => setSelectedDate((prev) => (prev === dateStr ? null : dateStr))}
                 className={`flex flex-shrink-0 flex-[0_0_calc(33.333%-6px)] min-w-[96px] max-w-[130px] flex-col items-center rounded-xl border-2 px-2 py-3 text-center transition-all snap-center touch-manipulation min-h-[44px] sm:py-4 ${
-                  isSelected
-                    ? "border-[#0c7b93] bg-[#0c7b93] text-white shadow-md"
-                    : isToday
-                    ? "border-[#0c7b93] bg-[#0c7b93]/10 text-[#134e4a] hover:bg-[#0c7b93]/20"
-                    : "border-teal-200 bg-white text-[#134e4a] hover:border-[#0c7b93] hover:bg-[#0c7b93]/5"
+                  isSelected ? "border-[#0c7b93] bg-[#0c7b93] text-white shadow-md"
+                  : isToday ? "border-[#0c7b93] bg-[#0c7b93]/10 text-[#134e4a] hover:bg-[#0c7b93]/20"
+                  : "border-teal-200 bg-white text-[#134e4a] hover:border-[#0c7b93] hover:bg-[#0c7b93]/5"
                 }`}
               >
                 <span className="text-xs font-medium opacity-90 sm:text-sm">{label}</span>
-                <span className="mt-1 text-lg font-bold sm:text-xl">
-                  {getDayOfMonth(dateStr) ?? "—"}
-                </span>
+                <span className="mt-1 text-lg font-bold sm:text-xl">{getDayOfMonth(dateStr) ?? "—"}</span>
                 {tripCount > 0 && (
                   <span className={`mt-1 text-xs ${isSelected ? "opacity-90" : "text-[#0f766e]"}`}>
                     {tripCount} trip{tripCount !== 1 ? "s" : ""}
@@ -144,7 +128,6 @@ export function TripCalendar({
         </div>
       </div>
 
-      {/* Selected day — times and seats (only after a date is clicked) */}
       {tripDates.length === 0 ? (
         <div className="mt-6 rounded-2xl border-2 border-dashed border-teal-200 bg-teal-50/30 p-8 text-center">
           <p className="text-sm font-medium text-[#134e4a]">No scheduled trips in the next 60 days</p>
@@ -159,13 +142,7 @@ export function TripCalendar({
         <div className="mt-6 rounded-2xl border-2 border-teal-200 bg-white p-4 shadow-sm sm:p-5">
           <h3 className="text-base font-bold text-[#134e4a]">{selectedLabel}</h3>
           <p className="text-xs text-[#0f766e] sm:text-sm">
-            {parseDateString(selectedDate)?.toLocaleDateString("en-PH", {
-              timeZone: "Asia/Manila",
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            }) ?? selectedDate}
+            {parseDateString(selectedDate)?.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", weekday: "long", month: "long", day: "numeric", year: "numeric" }) ?? selectedDate}
           </p>
           {selectedTrips.length === 0 ? (
             <p className="mt-4 text-sm text-[#0f766e]">No scheduled trips on this day.</p>
@@ -179,27 +156,14 @@ export function TripCalendar({
                 const directionLabel = getDirectionLabel(t);
                 const vesselName = t.boat?.name ?? "—";
                 return (
-                  <li
-                    key={t.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-[#fef9e7]/30 px-4 py-3"
-                  >
+                  <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-[#fef9e7]/30 px-4 py-3">
                     <div className="min-w-0">
                       <p className="font-semibold text-[#134e4a]">{formatTime(t.departure_time)}</p>
-                      <p className="text-sm text-[#0f766e]">
-                        {vesselName} · {directionLabel}
-                      </p>
+                      <p className="text-sm text-[#0f766e]">{vesselName} · {directionLabel}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="rounded-full bg-teal-100 px-3 py-1 text-sm font-medium text-[#0f766e]">
-                        {available} seat{available !== 1 ? "s" : ""} left
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setBookingTrip(t)}
-                        className="rounded-lg bg-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0f766e]"
-                      >
-                        Book
-                      </button>
+                      <span className="rounded-full bg-teal-100 px-3 py-1 text-sm font-medium text-[#0f766e]">{available} seat{available !== 1 ? "s" : ""} left</span>
+                      <button type="button" onClick={() => setBookingTrip(t)} className="rounded-lg bg-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0f766e]">Book</button>
                     </div>
                   </li>
                 );
@@ -216,6 +180,9 @@ export function TripCalendar({
           loggedInEmail={loggedInEmail}
           passengerName={passengerName}
           loggedInAddress={loggedInAddress}
+          loggedInGender={loggedInGender}
+          loggedInBirthdate={loggedInBirthdate}
+          loggedInNationality={loggedInNationality}
         />
       )}
     </section>

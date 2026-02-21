@@ -209,14 +209,14 @@ export function ManifestDocument({ data, manifestUrl, appName }: ManifestDocumen
           <div>
             <p className="text-[10px] text-gray-500 mb-5">Received by (Philippine Coast Guard)</p>
             <div className="border-b border-black mb-1 h-8"></div>
-            <p className="text-[10px] text-gray-600">Signature over printed name / Date & Time</p>
+            <p className="text-[10px] text-gray-600">Signature over Printed Name / Date & Time</p>
           </div>
         </div>
 
         {/* Verification footer with QR — protected URL requires login */}
         <div className="mt-3 border-t border-gray-200 pt-3 flex items-start justify-between gap-4">
           <div className="flex-1">
-            <p className="text-[9px] text-gray-500 font-semibold mb-0.5">To verify authenticity:</p>
+            <p className="text-[9px] text-gray-500 font-semibold mb-0.5">TO VERIFY AUTHENTICITY:</p>
             <p className="text-[9px] text-gray-500">
               Scan the QR code or visit the URL below. Access requires login as admin, captain, crew, or ticket booth.
               Strangers who scan this QR will be redirected to the login page — passenger data is protected.
@@ -227,7 +227,7 @@ export function ManifestDocument({ data, manifestUrl, appName }: ManifestDocumen
           </div>
           <div className="text-right shrink-0 flex flex-col items-end gap-1">
             <QRCodeSVG value={manifestUrl} size={72} level="M" />
-            <p className="text-[8px] text-gray-400 mt-0.5">Scan to verify</p>
+            <p className="text-[8px] text-gray-400 mt-0.5">Scan to Verify</p>
           </div>
         </div>
       </div>
