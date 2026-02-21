@@ -110,9 +110,10 @@ export function AuthForm() {
   if (mode === "forgot") {
     if (resetSent) {
       return (
-        <div className="mt-6 space-y-4">
+        <div className="space-y-4">
+          <h1 className="text-2xl font-bold text-[#134e4a]">Reset Password</h1>
           <p className="rounded-md bg-teal-100 px-3 py-2 text-sm text-teal-800">
-            Check your email for a link to reset your password. If you don't see it, check spam.
+            Check your email for a link to reset your password. If you don&apos;t see it, check spam.
           </p>
           <button
             type="button"
@@ -125,9 +126,10 @@ export function AuthForm() {
       );
     }
     return (
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <h1 className="text-2xl font-bold text-[#134e4a]">Reset Password</h1>
         {error && <p className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{error}</p>}
-        <p className="text-sm text-[#0f766e]">Enter your email and we'll send you a link to reset your password.</p>
+        <p className="text-sm text-[#0f766e]">Enter your email and we&apos;ll send you a link to reset your password.</p>
         <div>
           <label htmlFor="forgot-email" className={labelClass}>Email</label>
           <input id="forgot-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" className={inputClass} />
@@ -143,7 +145,11 @@ export function AuthForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <h1 className="text-2xl font-bold text-[#134e4a]">
+        {mode === "signup" ? "Create Account" : "Sign In"}
+      </h1>
+
       {error && <p className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{error}</p>}
 
       {/* Full Name - signup only */}
@@ -241,7 +247,7 @@ export function AuthForm() {
             <button type="button" onClick={() => setMode("login")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Sign In</button>
           </>
         ) : (
-          <>Don't have an account?{" "}
+          <>Don&apos;t have an account?{" "}
             <button type="button" onClick={() => setMode("signup")} className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Create One</button>
           </>
         )}
