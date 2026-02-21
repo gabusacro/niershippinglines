@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/auth/get-user";
 import { ROUTES } from "@/lib/constants";
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
 import { ProfileForm } from "@/components/account/ProfileForm";
+import { SavedTravelersForm } from "@/components/account/SavedTravelersForm";
 
 export const metadata = {
   title: "Account",
@@ -42,7 +43,7 @@ export default async function AccountPage({ searchParams }: Props) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-[#134e4a]">Account settings</h1>
-      <p className="mt-2 text-[#0f766e]">Manage your profile, email, and password.</p>
+      <p className="mt-2 text-[#0f766e]">Manage your profile, saved travelers, and password.</p>
 
       <div className="mt-8">
         <ProfileForm
@@ -60,7 +61,11 @@ export default async function AccountPage({ searchParams }: Props) {
         />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-10">
+        <SavedTravelersForm />
+      </div>
+
+      <div className="mt-10">
         <ChangePasswordForm />
       </div>
     </div>
