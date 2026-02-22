@@ -11,6 +11,7 @@ import {
   getFuelSettings,
   getAnnualMonthlyStatsWithVessels,
   getDailyReportForMonth,
+  getMonthlyExpenses,
 } from "@/lib/admin/reports-stats";
 import { getWeekStartEndInManila } from "@/lib/admin/ph-time";
 import { formatTime } from "@/lib/dashboard/format";
@@ -97,7 +98,7 @@ export default async function AdminReportsPage({
       ? getDailyReportForMonth(supabase, monthParam)
       : Promise.resolve([]);
 
-  const [tripRows, monthly, weekly, weeklyByVessel, monthlyByVessel, fuelSettings, annualData, dailyCalendar] =
+  const [tripRows, monthly, weekly, weeklyByVessel, monthlyByVessel, fuelSettings, annualData, dailyCalendar, monthlyExpenses] =
     await Promise.all([
       getReportsTodayPerTrip(),
       getMonthlySummary(),
@@ -107,6 +108,7 @@ export default async function AdminReportsPage({
       getFuelSettings(supabase),
       annualDataPromise,
       dailyCalendarPromise,
+      getMonthlyExpenses(supabase, currentYear, currentMonth),
     ]);
 
   const { monthly: annualMonthly, byMonthVessel } = annualData;
@@ -417,13 +419,57 @@ export default async function AdminReportsPage({
           </div>
           {showFees && (
             <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-              <p className="text-sm font-semibold text-emerald-800">💰 Platform Revenue (Your Earnings)</p>
-              <p className="mt-1 text-xs text-emerald-700">Total Admin Fees + GCash Fees this month. Gross platform revenue before operational expenses.</p>
-              <p className="mt-3 text-2xl font-bold text-emerald-800">{peso(monthly.totalAdminFeeCents + monthly.totalGcashFeeCents)}</p>
-              <div className="mt-2 flex gap-4 text-xs text-emerald-700">
-                <span>Admin fees: {peso(monthly.totalAdminFeeCents)}</span>
-                <span>·</span>
-                <span>GCash fees: {peso(monthly.totalGcashFeeCents)}</span>
+              <p className="text-sm font-semibold text-emerald-800">💰 Platform Revenue — {MONTH_NAMES[currentMonth - 1]} {currentYear}</p>
+              <p className="mt-1 text-xs text-emerald-700">Admin + GCash fees collected, minus operational expenses.</p>
+
+              {/* Gross */}
+              <div className="mt-4 space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-emerald-700">Gross Platform Revenue</span>
+                  <span className="font-semibold text-emerald-800">{peso(monthly.totalAdminFeeCents + monthly.totalGcashFeeCents)}</span>
+                </div>
+                <div className="ml-4 flex items-center justify-between text-xs text-emerald-600">
+                  <span>Admin fees</span>
+                  <span>{peso(monthly.totalAdminFeeCents)}</span>
+                </div>
+                <div className="ml-4 flex items-center justify-between text-xs text-emerald-600">
+                  <span>GCash fees</span>
+                  <span>{peso(monthly.totalGcashFeeCents)}</span>
+                </div>
+              </div>
+
+              {/* Expenses */}
+              <div className="mt-3 space-y-1.5 border-t border-emerald-200 pt-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-rose-600">Monthly Expenses</span>
+                  <span className="font-semibold text-rose-600">−{peso(monthlyExpenses.totalCents)}</span>
+                </div>
+                {monthlyExpenses.items.map((item) => (
+                  <div key={item.id} className="ml-4 flex items-center justify-between text-xs text-rose-500">
+                    <span>{item.name}{item.is_recurring ? "" : " (one-time)"}</span>
+                    <span>−{peso(item.amount_cents)}</span>
+                  </div>
+                ))}
+                {monthlyExpenses.items.length === 0 && (
+                  <div className="ml-4 text-xs text-rose-400">No expenses recorded — <Link href="/admin/expenses" className="underline">add expenses</Link></div>
+                )}
+              </div>
+
+              {/* Net */}
+              <div className="mt-3 border-t-2 border-emerald-300 pt-3">
+                {(() => {
+                  const net = (monthly.totalAdminFeeCents + monthly.totalGcashFeeCents) - monthlyExpenses.totalCents;
+                  return (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-emerald-900">Net Platform Revenue</span>
+                      <span className={`text-xl font-bold ${net < 0 ? "text-red-600" : "text-emerald-800"}`}>{peso(net)}</span>
+                    </div>
+                  );
+                })()}
+                <p className="mt-1 text-xs text-emerald-600">This is the pool distributed to investors, vessel owners, and admin.</p>
+                <Link href="/admin/expenses" className="mt-2 inline-block text-xs font-semibold text-[#0c7b93] hover:underline">
+                  Manage expenses →
+                </Link>
               </div>
             </div>
           )}

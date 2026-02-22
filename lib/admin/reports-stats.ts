@@ -729,3 +729,67 @@ export async function getAnnualMonthlyStatsWithVessels(
 
   return { monthly, byMonthVessel: byMonthVesselRows };
 }
+
+// ---------------------------------------------------------------------------
+// Operational Expenses
+// ---------------------------------------------------------------------------
+
+export interface MonthlyExpenseSummary {
+  totalRecurringCents: number;
+  totalOneTimeCents: number;
+  totalCents: number;
+  items: {
+    id: string;
+    name: string;
+    amount_cents: number;
+    is_recurring: boolean;
+  }[];
+}
+
+/**
+ * Fetches operational expenses for a given month+year.
+ * Includes all recurring expenses + one-time expenses that match the month/year.
+ */
+export async function getMonthlyExpenses(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  year: number,
+  month: number
+): Promise<MonthlyExpenseSummary> {
+  const { data, error } = await supabase
+    .from("operational_expenses")
+    .select("id, name, amount_cents, is_recurring, applies_month, applies_year")
+    .order("is_recurring", { ascending: false })
+    .order("name");
+
+  if (error || !data) {
+    return { totalRecurringCents: 0, totalOneTimeCents: 0, totalCents: 0, items: [] };
+  }
+
+  const applicable = data.filter((e) => {
+    if (e.is_recurring) return true;
+    // One-time: must match month and year if specified
+    const monthMatch = e.applies_month == null || e.applies_month === month;
+    const yearMatch = e.applies_year == null || e.applies_year === year;
+    return monthMatch && yearMatch;
+  });
+
+  const totalRecurringCents = applicable
+    .filter((e) => e.is_recurring)
+    .reduce((s, e) => s + e.amount_cents, 0);
+
+  const totalOneTimeCents = applicable
+    .filter((e) => !e.is_recurring)
+    .reduce((s, e) => s + e.amount_cents, 0);
+
+  return {
+    totalRecurringCents,
+    totalOneTimeCents,
+    totalCents: totalRecurringCents + totalOneTimeCents,
+    items: applicable.map((e) => ({
+      id: e.id,
+      name: e.name,
+      amount_cents: e.amount_cents,
+      is_recurring: e.is_recurring,
+    })),
+  };
+}
