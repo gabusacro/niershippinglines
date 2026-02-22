@@ -49,14 +49,14 @@ export default async function ReportsTripsPage({
   const isTicketBooth = user.role === "ticket_booth";
   if (!isAdmin && !isTicketBooth) redirect(ROUTES.dashboard);
 
+  // Only admin sees admin fee and gcash fee columns
+  const showFees = isAdmin;
+
   const params = await searchParams;
   const supabase = await createClient();
   const fuelSettings = await getFuelSettings(supabase);
 
-  // ── MODE A: single date (from daily calendar "View →")
-  const dateParam = params.date ?? null; // e.g. "2026-02-22"
-
-  // ── MODE B: vessel + month (from monthly/yearly manifest links)
+  const dateParam = params.date ?? null;
   const year = params.year ? parseInt(params.year, 10) : null;
   const month = params.month ? parseInt(params.month, 10) : null;
   const boatId = params.boatId ?? null;
@@ -65,11 +65,10 @@ export default async function ReportsTripsPage({
   const isSingleDate = !!dateParam;
   const isVesselMonth = !isSingleDate && year != null && month != null;
 
-  // Build query date range
   let start = "";
   let end = "";
   let pageTitle = "";
-  let backHref: string = ROUTES.adminReports;
+  let backHref = ROUTES.adminReports as string;
 
   if (isSingleDate) {
     start = dateParam!;
@@ -89,17 +88,12 @@ export default async function ReportsTripsPage({
   } else {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12">
-        <Link href={ROUTES.adminReports} className="text-sm font-semibold text-[#0c7b93] hover:underline">
-          ← Back to Reports
-        </Link>
-        <p className="mt-4 text-[#134e4a]">
-          Missing or invalid parameters. Go back to Reports and click a date or vessel manifest link.
-        </p>
+        <Link href={ROUTES.adminReports} className="text-sm font-semibold text-[#0c7b93] hover:underline">← Back to Reports</Link>
+        <p className="mt-4 text-[#134e4a]">Missing or invalid parameters. Go back to Reports and click a date or vessel manifest link.</p>
       </div>
     );
   }
 
-  // Fetch trips
   let query = supabase
     .from("trips")
     .select("id, departure_date, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, boarded_count, boat:boats(id, name), route:routes(display_name, origin, destination)")
@@ -108,9 +102,7 @@ export default async function ReportsTripsPage({
     .order("departure_date")
     .order("departure_time");
 
-  if (boatId) {
-    query = query.eq("boat_id", boatId);
-  }
+  if (boatId) query = query.eq("boat_id", boatId);
 
   const { data: trips, error } = await query;
 
@@ -123,14 +115,8 @@ export default async function ReportsTripsPage({
     );
   }
 
-  // Fetch bookings for all trips
   const tripIds = (trips ?? []).map((t) => t.id);
-  const bookingsByTrip = new Map<string, {
-    passengers: number;
-    revenueCents: number;
-    adminFeeCents: number;
-    gcashFeeCents: number;
-  }>();
+  const bookingsByTrip = new Map<string, { passengers: number; revenueCents: number; adminFeeCents: number; gcashFeeCents: number }>();
 
   if (tripIds.length > 0) {
     const { data: bookings } = await supabase
@@ -149,20 +135,19 @@ export default async function ReportsTripsPage({
     }
   }
 
-  // Compute totals
+  const fuelCostPerTrip = Math.round(fuelSettings.defaultFuelLitersPerTrip * fuelSettings.fuelPesosPerLiter * 100);
+
   let totPassengers = 0, totRevenue = 0, totAdmin = 0, totGcash = 0, totFuelCost = 0;
   for (const t of trips ?? []) {
     const b = bookingsByTrip.get(t.id) ?? { passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 };
-    const fuelCost = Math.round(fuelSettings.defaultFuelLitersPerTrip * fuelSettings.fuelPesosPerLiter * 100);
     totPassengers += b.passengers;
     totRevenue += b.revenueCents;
     totAdmin += b.adminFeeCents;
     totGcash += b.gcashFeeCents;
-    totFuelCost += fuelCost;
+    totFuelCost += fuelCostPerTrip;
   }
   const totNet = totRevenue - totFuelCost;
 
-  // Group by date if showing multiple dates (vessel+month mode)
   const dateGroups = new Map<string, typeof trips>();
   for (const t of trips ?? []) {
     const d = t.departure_date ?? "";
@@ -172,14 +157,14 @@ export default async function ReportsTripsPage({
   }
   const sortedDates = [...dateGroups.keys()].sort();
 
+  // colSpan helper
+  const baseColsSingle = showFees ? 12 : 10;
+  const baseColsGrouped = showFees ? 9 : 7;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-
-      {/* Back + title */}
       <div className="flex flex-wrap items-center gap-3">
-        <Link href={backHref} className="rounded-lg border border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50">
-          ← Back
-        </Link>
+        <Link href={backHref} className="rounded-lg border border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50">← Back</Link>
         <div>
           <h1 className="text-xl font-bold text-[#134e4a]">{pageTitle}</h1>
           <p className="text-xs text-[#0f766e]/70">Click a vessel name to open the full passenger manifest.</p>
@@ -189,19 +174,34 @@ export default async function ReportsTripsPage({
       {/* Summary cards */}
       {(trips ?? []).length > 0 && (
         <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {[
-            { label: "Trips", value: String(trips?.length ?? 0) },
-            { label: "Passengers", value: totPassengers.toLocaleString() },
-            { label: "Gross Fare", value: peso(totRevenue) },
-            { label: "Admin Fees", value: peso(totAdmin), color: "text-emerald-700" },
-            { label: "GCash Fees", value: peso(totGcash), color: "text-blue-700" },
-            { label: "Net (Fare−Fuel)", value: peso(totNet), color: totNet < 0 ? "text-red-600" : "text-[#134e4a]" },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">{label}</p>
-              <p className={`mt-1.5 text-lg font-bold ${color ?? "text-[#134e4a]"}`}>{value}</p>
+          <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">Trips</p>
+            <p className="mt-1.5 text-lg font-bold text-[#134e4a]">{trips?.length ?? 0}</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">Passengers</p>
+            <p className="mt-1.5 text-lg font-bold text-[#134e4a]">{totPassengers.toLocaleString()}</p>
+          </div>
+          <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">Gross Fare</p>
+            <p className="mt-1.5 text-lg font-bold text-[#134e4a]">{peso(totRevenue)}</p>
+          </div>
+          {showFees && (
+            <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">Admin Fees</p>
+              <p className="mt-1.5 text-lg font-bold text-emerald-700">{peso(totAdmin)}</p>
             </div>
-          ))}
+          )}
+          {showFees && (
+            <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">GCash Fees</p>
+              <p className="mt-1.5 text-lg font-bold text-blue-700">{peso(totGcash)}</p>
+            </div>
+          )}
+          <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">Net (Fare−Fuel)</p>
+            <p className={`mt-1.5 text-lg font-bold ${totNet < 0 ? "text-red-600" : "text-[#134e4a]"}`}>{peso(totNet)}</p>
+          </div>
         </div>
       )}
 
@@ -209,13 +209,11 @@ export default async function ReportsTripsPage({
       {(trips ?? []).length === 0 && (
         <div className="mt-8 rounded-xl border border-teal-100 bg-white p-8 text-center shadow-sm">
           <p className="text-sm text-[#0f766e]">No trips found for this period.</p>
-          <Link href={ROUTES.adminVessels} className="mt-3 inline-block text-sm font-semibold text-[#0c7b93] hover:underline">
-            Go to Vessels → Add trips
-          </Link>
+          <Link href={ROUTES.adminVessels} className="mt-3 inline-block text-sm font-semibold text-[#0c7b93] hover:underline">Go to Vessels → Add trips</Link>
         </div>
       )}
 
-      {/* SINGLE DATE MODE — flat table */}
+      {/* SINGLE DATE — flat table */}
       {isSingleDate && (trips ?? []).length > 0 && (
         <div className="mt-6 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
           <table className="min-w-full divide-y divide-teal-100 text-sm">
@@ -227,8 +225,8 @@ export default async function ReportsTripsPage({
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Avail</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Boarded</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>
+                {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
+                {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel (L)</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
@@ -242,44 +240,38 @@ export default async function ReportsTripsPage({
                 const routeName = route?.display_name ?? [route?.origin, route?.destination].filter(Boolean).join(" → ") ?? "—";
                 const b = bookingsByTrip.get(t.id) ?? { passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 };
                 const fuelL = fuelSettings.defaultFuelLitersPerTrip;
-                const fuelCost = Math.round(fuelL * fuelSettings.fuelPesosPerLiter * 100);
-                const netRev = b.revenueCents - fuelCost;
+                const netRev = b.revenueCents - fuelCostPerTrip;
                 const avail = Math.max(0, (t.online_quota ?? 0) - (t.online_booked ?? 0) + (t.walk_in_quota ?? 0) - (t.walk_in_booked ?? 0));
                 return (
                   <tr key={t.id} className="hover:bg-teal-50/40">
                     <td className="px-4 py-3 font-semibold">
-                      <Link href={`/admin/reports/trip/${t.id}`} className="text-[#0c7b93] hover:underline">
-                        {boat?.name ?? "—"}
-                      </Link>
+                      <Link href={`/admin/reports/trip/${t.id}`} className="text-[#0c7b93] hover:underline">{boat?.name ?? "—"}</Link>
                     </td>
                     <td className="px-4 py-3 text-[#134e4a]">{formatTime(t.departure_time)}</td>
                     <td className="px-4 py-3 text-[#134e4a]">{routeName}</td>
                     <td className="px-4 py-3 text-right text-[#134e4a]">{avail}</td>
                     <td className="px-4 py-3 text-right text-[#134e4a]">{b.passengers}</td>
                     <td className="px-4 py-3 text-right text-[#134e4a]">{b.revenueCents > 0 ? peso(b.revenueCents) : <span className="text-gray-300">—</span>}</td>
-                    <td className="px-4 py-3 text-right font-medium text-emerald-700">{b.adminFeeCents > 0 ? peso(b.adminFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>
-                    <td className="px-4 py-3 text-right font-medium text-blue-700">{b.gcashFeeCents > 0 ? peso(b.gcashFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>
+                    {showFees && <td className="px-4 py-3 text-right font-medium text-emerald-700">{b.adminFeeCents > 0 ? peso(b.adminFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>}
+                    {showFees && <td className="px-4 py-3 text-right font-medium text-blue-700">{b.gcashFeeCents > 0 ? peso(b.gcashFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>}
                     <td className="px-4 py-3 text-right text-[#134e4a]">{fuelL} L</td>
-                    <td className="px-4 py-3 text-right text-red-600">{peso(fuelCost)}</td>
+                    <td className="px-4 py-3 text-right text-red-600">{peso(fuelCostPerTrip)}</td>
                     <td className={`px-4 py-3 text-right font-semibold ${netRev < 0 ? "text-red-600" : "text-[#134e4a]"}`}>{peso(netRev)}</td>
                     <td className="px-4 py-3 text-center">
-                      <Link href={`/admin/reports/trip/${t.id}`} className="rounded-lg bg-[#0c7b93] px-3 py-1 text-xs font-semibold text-white hover:bg-[#0f766e]">
-                        Manifest
-                      </Link>
+                      <Link href={`/admin/reports/trip/${t.id}`} className="rounded-lg bg-[#0c7b93] px-3 py-1 text-xs font-semibold text-white hover:bg-[#0f766e]">Manifest</Link>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
-            {/* Totals row */}
             <tfoot>
               <tr className="bg-[#134e4a]/5 font-semibold text-sm">
                 <td className="px-4 py-3 text-[#134e4a]">Total</td>
                 <td colSpan={3} />
                 <td className="px-4 py-3 text-right text-[#134e4a]">{totPassengers}</td>
                 <td className="px-4 py-3 text-right text-[#134e4a]">{peso(totRevenue)}</td>
-                <td className="px-4 py-3 text-right text-emerald-700">{peso(totAdmin)}</td>
-                <td className="px-4 py-3 text-right text-blue-700">{peso(totGcash)}</td>
+                {showFees && <td className="px-4 py-3 text-right text-emerald-700">{peso(totAdmin)}</td>}
+                {showFees && <td className="px-4 py-3 text-right text-blue-700">{peso(totGcash)}</td>}
                 <td className="px-4 py-3 text-right text-[#134e4a]">{(trips ?? []).length * fuelSettings.defaultFuelLitersPerTrip} L</td>
                 <td className="px-4 py-3 text-right text-red-600">{peso(totFuelCost)}</td>
                 <td className={`px-4 py-3 text-right ${totNet < 0 ? "text-red-600" : "text-[#134e4a]"}`}>{peso(totNet)}</td>
@@ -290,14 +282,13 @@ export default async function ReportsTripsPage({
         </div>
       )}
 
-      {/* VESSEL+MONTH MODE — grouped by date */}
+      {/* VESSEL+MONTH — grouped by date */}
       {!isSingleDate && sortedDates.length > 0 && (
         <div className="mt-6 space-y-6">
           {sortedDates.map((date) => {
             const dayTrips = dateGroups.get(date) ?? [];
             const jsDate = new Date(date + "T00:00:00");
             const dateLabel = jsDate.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric" });
-
             return (
               <div key={date} className="overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
                 <div className="border-b border-teal-100 bg-[#0c7b93]/5 px-4 py-2.5">
@@ -311,8 +302,8 @@ export default async function ReportsTripsPage({
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Route</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Boarded</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
                       <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-[#134e4a]">Manifest</th>
                     </tr>
@@ -323,26 +314,21 @@ export default async function ReportsTripsPage({
                       const route = (t as { route?: { display_name?: string; origin?: string; destination?: string } | null }).route;
                       const routeName = route?.display_name ?? [route?.origin, route?.destination].filter(Boolean).join(" → ") ?? "—";
                       const b = bookingsByTrip.get(t.id) ?? { passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 };
-                      const fuelCost = Math.round(fuelSettings.defaultFuelLitersPerTrip * fuelSettings.fuelPesosPerLiter * 100);
-                      const netRev = b.revenueCents - fuelCost;
+                      const netRev = b.revenueCents - fuelCostPerTrip;
                       return (
                         <tr key={t.id} className="hover:bg-teal-50/40">
                           <td className="px-4 py-2.5 font-semibold">
-                            <Link href={`/admin/reports/trip/${t.id}`} className="text-[#0c7b93] hover:underline">
-                              {boat?.name ?? "—"}
-                            </Link>
+                            <Link href={`/admin/reports/trip/${t.id}`} className="text-[#0c7b93] hover:underline">{boat?.name ?? "—"}</Link>
                           </td>
                           <td className="px-4 py-2.5 text-[#134e4a]">{formatTime(t.departure_time)}</td>
                           <td className="px-4 py-2.5 text-[#134e4a]">{routeName}</td>
                           <td className="px-4 py-2.5 text-right text-[#134e4a]">{b.passengers}</td>
                           <td className="px-4 py-2.5 text-right text-[#134e4a]">{b.revenueCents > 0 ? peso(b.revenueCents) : <span className="text-gray-300">—</span>}</td>
-                          <td className="px-4 py-2.5 text-right font-medium text-emerald-700">{b.adminFeeCents > 0 ? peso(b.adminFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>
-                          <td className="px-4 py-2.5 text-right font-medium text-blue-700">{b.gcashFeeCents > 0 ? peso(b.gcashFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>
+                          {showFees && <td className="px-4 py-2.5 text-right font-medium text-emerald-700">{b.adminFeeCents > 0 ? peso(b.adminFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>}
+                          {showFees && <td className="px-4 py-2.5 text-right font-medium text-blue-700">{b.gcashFeeCents > 0 ? peso(b.gcashFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>}
                           <td className={`px-4 py-2.5 text-right font-semibold ${netRev < 0 ? "text-red-600" : "text-[#134e4a]"}`}>{peso(netRev)}</td>
                           <td className="px-4 py-2.5 text-center">
-                            <Link href={`/admin/reports/trip/${t.id}`} className="rounded-lg bg-[#0c7b93] px-3 py-1 text-xs font-semibold text-white hover:bg-[#0f766e]">
-                              Manifest
-                            </Link>
+                            <Link href={`/admin/reports/trip/${t.id}`} className="rounded-lg bg-[#0c7b93] px-3 py-1 text-xs font-semibold text-white hover:bg-[#0f766e]">Manifest</Link>
                           </td>
                         </tr>
                       );
@@ -355,14 +341,9 @@ export default async function ReportsTripsPage({
         </div>
       )}
 
-      {/* Bottom nav */}
       <div className="mt-8 flex flex-wrap gap-3">
-        <Link href={backHref} className="rounded-xl border-2 border-teal-200 px-4 py-2 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-          ← Back to Reports
-        </Link>
-        <Link href={ROUTES.adminReports} className="rounded-xl border-2 border-[#0c7b93] px-4 py-2 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5">
-          All Reports
-        </Link>
+        <Link href={backHref} className="rounded-xl border-2 border-teal-200 px-4 py-2 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">← Back to Reports</Link>
+        <Link href={ROUTES.adminReports} className="rounded-xl border-2 border-[#0c7b93] px-4 py-2 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5">All Reports</Link>
       </div>
     </div>
   );

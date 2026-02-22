@@ -58,6 +58,9 @@ export default async function AdminReportsPage({
   const isTicketBooth = user.role === "ticket_booth";
   if (!isAdmin && !isTicketBooth) redirect(ROUTES.dashboard);
 
+  // Only admin sees platform financial data (admin fee, gcash fee, platform revenue)
+  const showFees = isAdmin;
+
   const params = await searchParams;
   const period: Period =
     params?.period === "weekly" || params?.period === "monthly" || params?.period === "yearly"
@@ -75,7 +78,6 @@ export default async function AdminReportsPage({
       ? yearParam
       : currentYear;
 
-  // Daily calendar month — default to current month
   const monthParam = params?.month ?? `${currentYear}-${String(currentMonth).padStart(2, "0")}`;
   const [calYear, calMonth] = monthParam.split("-").map(Number);
 
@@ -85,7 +87,10 @@ export default async function AdminReportsPage({
   const annualDataPromise =
     period === "yearly"
       ? getAnnualMonthlyStatsWithVessels(supabase, selectedYear)
-      : Promise.resolve({ monthly: MONTH_NAMES.map((monthName, i) => ({ month: i + 1, monthName, passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 })), byMonthVessel: [] });
+      : Promise.resolve({
+          monthly: MONTH_NAMES.map((monthName, i) => ({ month: i + 1, monthName, passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 })),
+          byMonthVessel: [],
+        });
 
   const dailyCalendarPromise =
     period === "daily"
@@ -107,7 +112,6 @@ export default async function AdminReportsPage({
   const { monthly: annualMonthly, byMonthVessel } = annualData;
   const fuelPriceLabel = fuelSettings.fuelPesosPerLiter;
 
-  // Chart for yearly
   const peakMonth = annualMonthly.length
     ? annualMonthly.reduce((a, b) => (b.passengers > a.passengers ? b : a), annualMonthly[0])
     : null;
@@ -151,7 +155,6 @@ export default async function AdminReportsPage({
     .map(([vesselName, v]) => ({ vesselName, ...v }))
     .sort((a, b) => a.vesselName.localeCompare(b.vesselName));
 
-  // Navigation helpers for daily month picker
   const prevMonthDate = new Date(calYear, calMonth - 2, 1);
   const nextMonthDate = new Date(calYear, calMonth, 1);
   const prevMonthParam = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}`;
@@ -159,7 +162,6 @@ export default async function AdminReportsPage({
   const currentMonthParam = `${currentYear}-${String(currentMonth).padStart(2, "0")}`;
   const calMonthLabel = `${MONTH_NAMES[calMonth - 1]} ${calYear}`;
 
-  // Daily summary totals from calendar
   const dailyTotals = dailyCalendar.reduce(
     (acc, d) => ({
       passengers: acc.passengers + d.totalPassengers,
@@ -177,96 +179,58 @@ export default async function AdminReportsPage({
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-[#134e4a]">Reports</h1>
       <p className="mt-2 text-sm text-[#0f766e]">
-        View daily departures, monthly and annual summaries, passengers and revenue per vessel, fuel and net revenue, and trip manifests for operations and planning.
+        View daily departures, monthly and annual summaries, passengers and revenue per vessel, fuel and net revenue, and trip manifests.
       </p>
 
-      {/* Top nav */}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link href={ROUTES.adminSchedule} className="rounded-lg bg-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0f766e]">
-          Schedule
-        </Link>
-        <Link href={ROUTES.adminVessels} className="rounded-lg border-2 border-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5">
-          Vessels
-        </Link>
-        <Link href={`${ROUTES.adminReports}/trips?year=${currentYear}&month=${currentMonth}`} className="rounded-lg border-2 border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-          Passengers per vessel &amp; manifests
-        </Link>
+        <Link href={ROUTES.adminSchedule} className="rounded-lg bg-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0f766e]">Schedule</Link>
+        <Link href={ROUTES.adminVessels} className="rounded-lg border-2 border-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5">Vessels</Link>
+        <Link href={`${ROUTES.adminReports}/trips?year=${currentYear}&month=${currentMonth}`} className="rounded-lg border-2 border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">Passengers per vessel &amp; manifests</Link>
       </div>
 
-      {/* Period tabs */}
       <div className="mt-6 flex flex-wrap gap-2">
         {(["daily", "weekly", "monthly", "yearly"] as Period[]).map((p) => (
-          <Link
-            key={p}
-            href={`${ROUTES.adminReports}?period=${p}${p === "yearly" ? `&year=${selectedYear}` : ""}`}
-            className={
-              period === p
-                ? "rounded-lg bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white"
-                : "rounded-lg border-2 border-[#0c7b93] px-4 py-2 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5"
-            }
-          >
+          <Link key={p} href={`${ROUTES.adminReports}?period=${p}${p === "yearly" ? `&year=${selectedYear}` : ""}`}
+            className={period === p ? "rounded-lg bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white" : "rounded-lg border-2 border-[#0c7b93] px-4 py-2 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5"}>
             {p.charAt(0).toUpperCase() + p.slice(1)}
           </Link>
         ))}
       </div>
 
-      {/* ──────────────── DAILY ──────────────── */}
+      {/* ── DAILY ── */}
       {period === "daily" && (
         <>
-          <div className="mt-8">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-[#134e4a]">Daily — {calMonthLabel}</h2>
-                <p className="mt-0.5 text-sm text-[#0f766e]/80">
-                  Click any date to see individual trips. Click a vessel name to open the manifest.
-                </p>
-              </div>
-              {/* Month picker */}
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`${ROUTES.adminReports}?period=daily&month=${prevMonthParam}`}
-                  className="rounded-lg border border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50"
-                >
-                  ←
-                </Link>
-                <span className="text-sm font-medium text-[#134e4a]">{calMonthLabel}</span>
-                <Link
-                  href={`${ROUTES.adminReports}?period=daily&month=${nextMonthParam}`}
-                  className="rounded-lg border border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50"
-                >
-                  →
-                </Link>
-                {monthParam !== currentMonthParam && (
-                  <Link
-                    href={`${ROUTES.adminReports}?period=daily&month=${currentMonthParam}`}
-                    className="rounded-lg bg-teal-50 px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-100"
-                  >
-                    Today
-                  </Link>
-                )}
-              </div>
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-[#134e4a]">Daily — {calMonthLabel}</h2>
+              <p className="mt-0.5 text-sm text-[#0f766e]/80">Click any date to see individual trips. Click a vessel name to open the manifest.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href={`${ROUTES.adminReports}?period=daily&month=${prevMonthParam}`} className="rounded-lg border border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50">←</Link>
+              <span className="text-sm font-medium text-[#134e4a]">{calMonthLabel}</span>
+              <Link href={`${ROUTES.adminReports}?period=daily&month=${nextMonthParam}`} className="rounded-lg border border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50">→</Link>
+              {monthParam !== currentMonthParam && (
+                <Link href={`${ROUTES.adminReports}?period=daily&month=${currentMonthParam}`} className="rounded-lg bg-teal-50 px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-100">Today</Link>
+              )}
             </div>
           </div>
 
-          {/* Fuel settings */}
           {isAdmin && (
             <div className="mt-4 rounded-xl border border-teal-200 bg-white p-5 shadow-sm">
               <FuelSettingsForm />
             </div>
           )}
 
-          {/* Month summary cards */}
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard label="Passengers" value={dailyTotals.passengers.toLocaleString()} />
             <SummaryCard label="Gross Fare" value={peso(dailyTotals.revenue)} />
-            <SummaryCard label="Admin Fees" value={peso(dailyTotals.adminFee)} />
-            <SummaryCard label="GCash Fees" value={peso(dailyTotals.gcashFee)} />
-            <SummaryCard label="Platform Rev" value={peso(dailyTotals.adminFee + dailyTotals.gcashFee)} sub="Admin + GCash" />
+            {showFees && <SummaryCard label="Admin Fees" value={peso(dailyTotals.adminFee)} />}
+            {showFees && <SummaryCard label="GCash Fees" value={peso(dailyTotals.gcashFee)} />}
+            {showFees && <SummaryCard label="Platform Rev" value={peso(dailyTotals.adminFee + dailyTotals.gcashFee)} sub="Admin + GCash" />}
             <SummaryCard label="Fuel Cost" value={peso(dailyTotals.fuelCost)} sub={`${fuelPriceLabel} ₱/L`} />
             <SummaryCard label="Net (Fare−Fuel)" value={peso(dailyTotals.net)} />
           </div>
 
-          {/* Daily calendar table */}
           <div className="mt-6 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
             <table className="min-w-full divide-y divide-teal-100">
               <thead>
@@ -275,8 +239,8 @@ export default async function AdminReportsPage({
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-[#134e4a]">Trips</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>
+                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
+                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-[#134e4a]">Manifest</th>
@@ -287,74 +251,40 @@ export default async function AdminReportsPage({
                   const isToday = day.date === todayManila;
                   const isFuture = day.date > todayManila;
                   return (
-                    <tr
-                      key={day.date}
-                      className={`${isToday ? "bg-teal-50/70" : "hover:bg-gray-50/50"} ${isFuture ? "opacity-40" : ""}`}
-                    >
+                    <tr key={day.date} className={`${isToday ? "bg-teal-50/70" : "hover:bg-gray-50/50"} ${isFuture ? "opacity-40" : ""}`}>
                       <td className="px-4 py-3 text-sm">
-                        <span className={`font-semibold ${isToday ? "text-[#0c7b93]" : "text-[#134e4a]"}`}>
-                          {isToday ? "Today — " : ""}{day.label}
-                        </span>
+                        <span className={`font-semibold ${isToday ? "text-[#0c7b93]" : "text-[#134e4a]"}`}>{isToday ? "Today — " : ""}{day.label}</span>
                         <span className="ml-1.5 text-xs text-[#0f766e]/60">{day.dayOfWeek}</span>
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-[#134e4a]">
-                        {day.tripCount > 0 ? (
-                          <Link
-                            href={`${ROUTES.adminReports}/trips?year=${calYear}&month=${calMonth}&date=${day.date}`}
-                            className="inline-flex items-center gap-1 rounded-full bg-[#0c7b93]/10 px-2.5 py-0.5 text-xs font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/20"
-                          >
-                            {day.tripCount} trip{day.tripCount !== 1 ? "s" : ""}
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-gray-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-[#134e4a]">
-                        {day.totalPassengers > 0 ? day.totalPassengers.toLocaleString() : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-[#134e4a]">
-                        {day.totalRevenueCents > 0 ? peso(day.totalRevenueCents) : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-emerald-700 font-medium">
-                        {day.totalAdminFeeCents > 0 ? peso(day.totalAdminFeeCents) : <span className="text-gray-300 font-normal">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-blue-700 font-medium">
-                        {day.totalGcashFeeCents > 0 ? peso(day.totalGcashFeeCents) : <span className="text-gray-300 font-normal">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-red-600">
-                        {day.totalFuelCostCents > 0 ? peso(day.totalFuelCostCents) : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className={`px-4 py-3 text-right text-sm font-semibold ${day.netRevenueCents < 0 ? "text-red-600" : "text-[#134e4a]"}`}>
-                        {day.totalRevenueCents > 0 ? peso(day.netRevenueCents) : <span className="text-gray-300 font-normal">—</span>}
-                      </td>
                       <td className="px-4 py-3 text-center">
-                        {day.tripCount > 0 ? (
-                          <Link
-                            href={`${ROUTES.adminReports}/trips?year=${calYear}&month=${calMonth}&date=${day.date}`}
-                            className="text-xs font-semibold text-[#0c7b93] hover:underline"
-                          >
-                            View →
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-gray-300">—</span>
-                        )}
+                        {day.tripCount > 0
+                          ? <Link href={`${ROUTES.adminReports}/trips?year=${calYear}&month=${calMonth}&date=${day.date}`} className="inline-flex items-center rounded-full bg-[#0c7b93]/10 px-2.5 py-0.5 text-xs font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/20">{day.tripCount} trip{day.tripCount !== 1 ? "s" : ""}</Link>
+                          : <span className="text-xs text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-[#134e4a]">{day.totalPassengers > 0 ? day.totalPassengers.toLocaleString() : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-right text-sm text-[#134e4a]">{day.totalRevenueCents > 0 ? peso(day.totalRevenueCents) : <span className="text-gray-300">—</span>}</td>
+                      {showFees && <td className="px-4 py-3 text-right text-sm font-medium text-emerald-700">{day.totalAdminFeeCents > 0 ? peso(day.totalAdminFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>}
+                      {showFees && <td className="px-4 py-3 text-right text-sm font-medium text-blue-700">{day.totalGcashFeeCents > 0 ? peso(day.totalGcashFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>}
+                      <td className="px-4 py-3 text-right text-sm text-red-600">{day.totalFuelCostCents > 0 ? peso(day.totalFuelCostCents) : <span className="text-gray-300">—</span>}</td>
+                      <td className={`px-4 py-3 text-right text-sm font-semibold ${day.netRevenueCents < 0 ? "text-red-600" : "text-[#134e4a]"}`}>{day.totalRevenueCents > 0 ? peso(day.netRevenueCents) : <span className="text-gray-300 font-normal">—</span>}</td>
+                      <td className="px-4 py-3 text-center">
+                        {day.tripCount > 0
+                          ? <Link href={`${ROUTES.adminReports}/trips?year=${calYear}&month=${calMonth}&date=${day.date}`} className="text-xs font-semibold text-[#0c7b93] hover:underline">View →</Link>
+                          : <span className="text-xs text-gray-300">—</span>}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
-              {/* Totals row */}
               {dailyTotals.passengers > 0 && (
                 <tfoot>
                   <tr className="bg-[#134e4a]/5 font-semibold">
                     <td className="px-4 py-3 text-sm text-[#134e4a]">Month Total</td>
-                    <td className="px-4 py-3 text-center text-sm text-[#134e4a]">
-                      {dailyCalendar.reduce((s, d) => s + d.tripCount, 0)} trips
-                    </td>
+                    <td className="px-4 py-3 text-center text-sm text-[#134e4a]">{dailyCalendar.reduce((s, d) => s + d.tripCount, 0)} trips</td>
                     <td className="px-4 py-3 text-right text-sm text-[#134e4a]">{dailyTotals.passengers.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right text-sm text-[#134e4a]">{peso(dailyTotals.revenue)}</td>
-                    <td className="px-4 py-3 text-right text-sm text-emerald-700">{peso(dailyTotals.adminFee)}</td>
-                    <td className="px-4 py-3 text-right text-sm text-blue-700">{peso(dailyTotals.gcashFee)}</td>
+                    {showFees && <td className="px-4 py-3 text-right text-sm text-emerald-700">{peso(dailyTotals.adminFee)}</td>}
+                    {showFees && <td className="px-4 py-3 text-right text-sm text-blue-700">{peso(dailyTotals.gcashFee)}</td>}
                     <td className="px-4 py-3 text-right text-sm text-red-600">{peso(dailyTotals.fuelCost)}</td>
                     <td className={`px-4 py-3 text-right text-sm ${dailyTotals.net < 0 ? "text-red-600" : "text-[#134e4a]"}`}>{peso(dailyTotals.net)}</td>
                     <td />
@@ -364,12 +294,10 @@ export default async function AdminReportsPage({
             </table>
           </div>
 
-          {/* Today's per-trip breakdown */}
+          {/* Today per-trip */}
           <div className="mt-10">
             <h3 className="text-base font-semibold text-[#134e4a]">Today&apos;s trips — per departure</h3>
-            <p className="mt-0.5 text-sm text-[#0f766e]/80">
-              {todayManila} · Click a vessel name to open the manifest.
-            </p>
+            <p className="mt-0.5 text-sm text-[#0f766e]/80">{todayManila} · Click a vessel name to open the manifest.</p>
           </div>
           <div className="mt-4 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
             <table className="min-w-full divide-y divide-teal-100">
@@ -381,8 +309,8 @@ export default async function AdminReportsPage({
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Seats</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Boarded</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>
+                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
+                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel (L)</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
@@ -391,41 +319,25 @@ export default async function AdminReportsPage({
               <tbody className="divide-y divide-teal-100">
                 {tripRows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-6 text-center text-sm text-[#0f766e]">
+                    <td colSpan={showFees ? 11 : 9} className="px-4 py-6 text-center text-sm text-[#0f766e]">
                       <p>No trips found for <strong>{todayManila}</strong>.</p>
-                      <p className="mt-2">
-                        Trips are created in{" "}
-                        <Link href={ROUTES.adminVessels} className="font-semibold text-[#0c7b93] hover:underline">
-                          Vessels
-                        </Link>{" "}
-                        → pick a vessel → <strong>Add trips</strong>.
-                      </p>
+                      <p className="mt-2">Trips are created in <Link href={ROUTES.adminVessels} className="font-semibold text-[#0c7b93] hover:underline">Vessels</Link> → pick a vessel → <strong>Add trips</strong>.</p>
                     </td>
                   </tr>
                 ) : (
                   tripRows.map((r) => (
                     <tr key={r.tripId} className="hover:bg-teal-50/50">
-                      <td className="px-4 py-3 text-sm font-medium">
-                        <Link href={`/admin/reports/trip/${r.tripId}`} className="font-semibold text-[#0c7b93] hover:underline">
-                          {r.vesselName}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[#134e4a]">
-                        <Link href={`/admin/reports/trip/${r.tripId}`} className="text-[#0c7b93] hover:underline">
-                          {formatTime(r.departureTime)}
-                        </Link>
-                      </td>
+                      <td className="px-4 py-3 text-sm font-medium"><Link href={`/admin/reports/trip/${r.tripId}`} className="font-semibold text-[#0c7b93] hover:underline">{r.vesselName}</Link></td>
+                      <td className="px-4 py-3 text-sm text-[#134e4a]"><Link href={`/admin/reports/trip/${r.tripId}`} className="text-[#0c7b93] hover:underline">{formatTime(r.departureTime)}</Link></td>
                       <td className="px-4 py-3 text-sm text-[#134e4a]">{r.routeName}</td>
                       <td className="px-4 py-3 text-right text-sm text-[#134e4a]">{r.availableSeats}</td>
                       <td className="px-4 py-3 text-right text-sm text-[#134e4a]">{r.passengerBoard}</td>
                       <td className="px-4 py-3 text-right text-sm text-[#134e4a]">{peso(r.revenueCents)}</td>
-                      <td className="px-4 py-3 text-right text-sm font-medium text-emerald-700">{peso(r.adminFeeCents)}</td>
-                      <td className="px-4 py-3 text-right text-sm font-medium text-blue-700">{peso(r.gcashFeeCents)}</td>
+                      {showFees && <td className="px-4 py-3 text-right text-sm font-medium text-emerald-700">{peso(r.adminFeeCents)}</td>}
+                      {showFees && <td className="px-4 py-3 text-right text-sm font-medium text-blue-700">{peso(r.gcashFeeCents)}</td>}
                       <td className="px-4 py-3 text-right text-sm text-[#134e4a]">{r.fuelLiters} L</td>
                       <td className="px-4 py-3 text-right text-sm text-red-600">{peso(r.fuelCostCents)}</td>
-                      <td className={`px-4 py-3 text-right text-sm font-semibold ${r.netRevenueCents < 0 ? "text-red-600" : "text-[#134e4a]"}`}>
-                        {peso(r.netRevenueCents)}
-                      </td>
+                      <td className={`px-4 py-3 text-right text-sm font-semibold ${r.netRevenueCents < 0 ? "text-red-600" : "text-[#134e4a]"}`}>{peso(r.netRevenueCents)}</td>
                     </tr>
                   ))
                 )}
@@ -435,25 +347,22 @@ export default async function AdminReportsPage({
         </>
       )}
 
-      {/* ──────────────── WEEKLY ──────────────── */}
+      {/* ── WEEKLY ── */}
       {period === "weekly" && (
         <>
           <div className="mt-8">
             <h2 className="text-lg font-semibold text-[#134e4a]">This week</h2>
-            <p className="mt-0.5 text-sm text-[#0f766e]/80">
-              {weekRange.start} to {weekRange.end} (Philippines, Mon–Sun)
-            </p>
+            <p className="mt-0.5 text-sm text-[#0f766e]/80">{weekRange.start} to {weekRange.end} (Philippines, Mon–Sun)</p>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard label="Passengers" value={weekly.totalPassengers.toLocaleString()} />
             <SummaryCard label="Gross Fare" value={peso(weekly.totalRevenueCents)} />
-            <SummaryCard label="Admin Fees" value={peso(weekly.totalAdminFeeCents)} />
-            <SummaryCard label="GCash Fees" value={peso(weekly.totalGcashFeeCents)} />
-            <SummaryCard label="Platform Rev" value={peso(weekly.totalAdminFeeCents + weekly.totalGcashFeeCents)} sub="Admin + GCash" />
+            {showFees && <SummaryCard label="Admin Fees" value={peso(weekly.totalAdminFeeCents)} />}
+            {showFees && <SummaryCard label="GCash Fees" value={peso(weekly.totalGcashFeeCents)} />}
+            {showFees && <SummaryCard label="Platform Rev" value={peso(weekly.totalAdminFeeCents + weekly.totalGcashFeeCents)} sub="Admin + GCash" />}
             <SummaryCard label="Fuel Cost" value={peso(weekly.totalFuelCostCents)} sub={`${fuelPriceLabel} ₱/L`} />
             <SummaryCard label="Net (Fare−Fuel)" value={peso(weekly.netRevenueCents)} />
           </div>
-
           {weeklyByVessel.length > 0 && (
             <div className="mt-8">
               <p className="text-sm font-semibold text-[#134e4a]">Week breakdown per vessel</p>
@@ -464,8 +373,8 @@ export default async function AdminReportsPage({
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Vessel</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
                     </tr>
@@ -476,8 +385,8 @@ export default async function AdminReportsPage({
                         <td className="px-4 py-2 font-medium text-[#134e4a]">{v.vesselName}</td>
                         <td className="px-4 py-2 text-right text-[#134e4a]">{v.passengers.toLocaleString()}</td>
                         <td className="px-4 py-2 text-right text-[#134e4a]">{peso(v.revenueCents)}</td>
-                        <td className="px-4 py-2 text-right font-medium text-emerald-700">{peso(v.adminFeeCents)}</td>
-                        <td className="px-4 py-2 text-right font-medium text-blue-700">{peso(v.gcashFeeCents)}</td>
+                        {showFees && <td className="px-4 py-2 text-right font-medium text-emerald-700">{peso(v.adminFeeCents)}</td>}
+                        {showFees && <td className="px-4 py-2 text-right font-medium text-blue-700">{peso(v.gcashFeeCents)}</td>}
                         <td className="px-4 py-2 text-right text-red-600">{peso(v.fuelCostCents)}</td>
                         <td className={`px-4 py-2 text-right font-semibold ${v.netRevenueCents < 0 ? "text-red-600" : "text-[#134e4a]"}`}>{peso(v.netRevenueCents)}</td>
                       </tr>
@@ -490,47 +399,37 @@ export default async function AdminReportsPage({
         </>
       )}
 
-      {/* ──────────────── MONTHLY ──────────────── */}
+      {/* ── MONTHLY ── */}
       {period === "monthly" && (
         <>
           <div className="mt-8">
             <h2 className="text-lg font-semibold text-[#134e4a]">This month</h2>
             <p className="mt-0.5 text-sm text-[#0f766e]/80">Current month totals (Philippines).</p>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard label="Passengers" value={monthly.totalPassengers.toLocaleString()} />
             <SummaryCard label="Gross Fare" value={peso(monthly.totalRevenueCents)} />
-            <SummaryCard label="Admin Fees" value={peso(monthly.totalAdminFeeCents)} />
-            <SummaryCard label="GCash Fees" value={peso(monthly.totalGcashFeeCents)} />
-            <SummaryCard
-              label="Platform Rev"
-              value={peso(monthly.totalAdminFeeCents + monthly.totalGcashFeeCents)}
-              sub="Admin + GCash"
-            />
+            {showFees && <SummaryCard label="Admin Fees" value={peso(monthly.totalAdminFeeCents)} />}
+            {showFees && <SummaryCard label="GCash Fees" value={peso(monthly.totalGcashFeeCents)} />}
+            {showFees && <SummaryCard label="Platform Rev" value={peso(monthly.totalAdminFeeCents + monthly.totalGcashFeeCents)} sub="Admin + GCash" />}
             <SummaryCard label="Fuel Cost" value={peso(monthly.totalFuelCostCents)} sub={`${fuelPriceLabel} ₱/L`} />
             <SummaryCard label="Net (Fare−Fuel)" value={peso(monthly.netRevenueCents)} />
           </div>
-
-          {/* Platform revenue highlight box */}
-          <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-            <p className="text-sm font-semibold text-emerald-800">💰 Platform Revenue (Your Earnings)</p>
-            <p className="mt-1 text-xs text-emerald-700">
-              Total Admin Fees + Total GCash Fees collected this month. This is your gross platform revenue before operational expenses.
-            </p>
-            <p className="mt-3 text-2xl font-bold text-emerald-800">
-              {peso(monthly.totalAdminFeeCents + monthly.totalGcashFeeCents)}
-            </p>
-            <div className="mt-2 flex gap-4 text-xs text-emerald-700">
-              <span>Admin fees: {peso(monthly.totalAdminFeeCents)}</span>
-              <span>·</span>
-              <span>GCash fees: {peso(monthly.totalGcashFeeCents)}</span>
+          {showFees && (
+            <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+              <p className="text-sm font-semibold text-emerald-800">💰 Platform Revenue (Your Earnings)</p>
+              <p className="mt-1 text-xs text-emerald-700">Total Admin Fees + GCash Fees this month. Gross platform revenue before operational expenses.</p>
+              <p className="mt-3 text-2xl font-bold text-emerald-800">{peso(monthly.totalAdminFeeCents + monthly.totalGcashFeeCents)}</p>
+              <div className="mt-2 flex gap-4 text-xs text-emerald-700">
+                <span>Admin fees: {peso(monthly.totalAdminFeeCents)}</span>
+                <span>·</span>
+                <span>GCash fees: {peso(monthly.totalGcashFeeCents)}</span>
+              </div>
             </div>
-          </div>
-
+          )}
           {monthlyByVessel.length > 0 && (
             <div className="mt-8">
               <p className="text-sm font-semibold text-[#134e4a]">Month breakdown per vessel</p>
-              <p className="mt-0.5 text-xs text-[#0f766e]/80">Total passengers, fares, fees, and net per vessel this month.</p>
               <div className="mt-3 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
                 <table className="min-w-full divide-y divide-teal-100 text-sm">
                   <thead>
@@ -538,8 +437,8 @@ export default async function AdminReportsPage({
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Vessel</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
                       <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-[#134e4a]">Manifest</th>
@@ -551,19 +450,12 @@ export default async function AdminReportsPage({
                         <td className="px-4 py-2 font-medium text-[#134e4a]">{v.vesselName}</td>
                         <td className="px-4 py-2 text-right text-[#134e4a]">{v.passengers.toLocaleString()}</td>
                         <td className="px-4 py-2 text-right text-[#134e4a]">{peso(v.revenueCents)}</td>
-                        <td className="px-4 py-2 text-right font-medium text-emerald-700">{peso(v.adminFeeCents)}</td>
-                        <td className="px-4 py-2 text-right font-medium text-blue-700">{peso(v.gcashFeeCents)}</td>
+                        {showFees && <td className="px-4 py-2 text-right font-medium text-emerald-700">{peso(v.adminFeeCents)}</td>}
+                        {showFees && <td className="px-4 py-2 text-right font-medium text-blue-700">{peso(v.gcashFeeCents)}</td>}
                         <td className="px-4 py-2 text-right text-red-600">{peso(v.fuelCostCents)}</td>
                         <td className={`px-4 py-2 text-right font-semibold ${v.netRevenueCents < 0 ? "text-red-600" : "text-[#134e4a]"}`}>{peso(v.netRevenueCents)}</td>
                         <td className="px-4 py-2 text-center">
-                          {v.boatId ? (
-                            <Link
-                              href={`${ROUTES.adminReports}/trips?year=${currentYear}&month=${currentMonth}&boatId=${v.boatId}&vessel=${encodeURIComponent(v.vesselName)}`}
-                              className="text-xs font-semibold text-[#0c7b93] hover:underline"
-                            >
-                              View →
-                            </Link>
-                          ) : "—"}
+                          {v.boatId ? <Link href={`${ROUTES.adminReports}/trips?year=${currentYear}&month=${currentMonth}&boatId=${v.boatId}&vessel=${encodeURIComponent(v.vesselName)}`} className="text-xs font-semibold text-[#0c7b93] hover:underline">View →</Link> : "—"}
                         </td>
                       </tr>
                     ))}
@@ -575,96 +467,37 @@ export default async function AdminReportsPage({
         </>
       )}
 
-      {/* ──────────────── YEARLY ──────────────── */}
+      {/* ── YEARLY ── */}
       {period === "yearly" && (
         <div className="mt-8">
-          {/* Year picker */}
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-lg font-semibold text-[#134e4a]">Annual analytics — {selectedYear}</h2>
             <div className="flex items-center gap-2">
-              {selectedYear > YEAR_MIN && (
-                <Link href={`${ROUTES.adminReports}?period=yearly&year=${selectedYear - 1}`} className="rounded-lg border border-teal-200 px-3 py-1 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50">
-                  ← {selectedYear - 1}
-                </Link>
-              )}
-              {selectedYear < yearMax && (
-                <Link href={`${ROUTES.adminReports}?period=yearly&year=${selectedYear + 1}`} className="rounded-lg border border-teal-200 px-3 py-1 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50">
-                  {selectedYear + 1} →
-                </Link>
-              )}
+              {selectedYear > YEAR_MIN && <Link href={`${ROUTES.adminReports}?period=yearly&year=${selectedYear - 1}`} className="rounded-lg border border-teal-200 px-3 py-1 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50">← {selectedYear - 1}</Link>}
+              {selectedYear < yearMax && <Link href={`${ROUTES.adminReports}?period=yearly&year=${selectedYear + 1}`} className="rounded-lg border border-teal-200 px-3 py-1 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50">{selectedYear + 1} →</Link>}
             </div>
           </div>
-
-          {/* Year summary cards */}
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <SummaryCard
-              label="Total Passengers"
-              value={annualMonthly.reduce((s, r) => s + r.passengers, 0).toLocaleString()}
-            />
-            <SummaryCard
-              label="Gross Fare"
-              value={peso(annualMonthly.reduce((s, r) => s + r.revenueCents, 0))}
-            />
-            <SummaryCard
-              label="Admin Fees"
-              value={peso(annualMonthly.reduce((s, r) => s + r.adminFeeCents, 0))}
-            />
-            <SummaryCard
-              label="GCash Fees"
-              value={peso(annualMonthly.reduce((s, r) => s + r.gcashFeeCents, 0))}
-            />
-            <SummaryCard
-              label="Platform Rev"
-              value={peso(annualMonthly.reduce((s, r) => s + r.adminFeeCents + r.gcashFeeCents, 0))}
-              sub="Admin + GCash"
-            />
-            {peakMonth && peakMonth.passengers > 0 && (
-              <SummaryCard
-                label="Peak Month"
-                value={peakMonth.monthName}
-                sub={`${peakMonth.passengers.toLocaleString()} passengers`}
-              />
-            )}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <SummaryCard label="Total Passengers" value={annualMonthly.reduce((s, r) => s + r.passengers, 0).toLocaleString()} />
+            <SummaryCard label="Gross Fare" value={peso(annualMonthly.reduce((s, r) => s + r.revenueCents, 0))} />
+            {showFees && <SummaryCard label="Admin Fees" value={peso(annualMonthly.reduce((s, r) => s + r.adminFeeCents, 0))} />}
+            {showFees && <SummaryCard label="GCash Fees" value={peso(annualMonthly.reduce((s, r) => s + r.gcashFeeCents, 0))} />}
+            {showFees && <SummaryCard label="Platform Rev" value={peso(annualMonthly.reduce((s, r) => s + r.adminFeeCents + r.gcashFeeCents, 0))} sub="Admin + GCash" />}
+            {peakMonth && peakMonth.passengers > 0 && <SummaryCard label="Peak Month" value={peakMonth.monthName} sub={`${peakMonth.passengers.toLocaleString()} passengers`} />}
           </div>
 
-          {/* SVG Line Chart */}
           <div className="mt-6 overflow-x-auto rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#0f766e]">
-              Monthly passenger trend — {selectedYear}
-            </p>
-            <svg
-              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="w-full max-w-2xl"
-              style={{ minWidth: "360px" }}
-            >
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Monthly passenger trend — {selectedYear}</p>
+            <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full max-w-2xl" style={{ minWidth: "360px" }}>
               <g transform={`translate(${pad.left},${pad.top})`}>
-                {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
-                  <line
-                    key={pct}
-                    x1={0} x2={innerW}
-                    y1={innerH * pct} y2={innerH * pct}
-                    stroke="#e2f2f1" strokeWidth={1}
-                  />
-                ))}
-                {annualMonthly.map((row, i) => {
-                  const x = (i + 0.5) * (innerW / 12);
-                  return (
-                    <text key={row.month} x={x} y={innerH + 20} textAnchor="middle" fontSize={9} fill="#5eada5">
-                      {row.monthName.slice(0, 3)}
-                    </text>
-                  );
-                })}
+                {[0, 0.25, 0.5, 0.75, 1].map((pct) => <line key={pct} x1={0} x2={innerW} y1={innerH * pct} y2={innerH * pct} stroke="#e2f2f1" strokeWidth={1} />)}
+                {annualMonthly.map((row, i) => <text key={row.month} x={(i + 0.5) * (innerW / 12)} y={innerH + 20} textAnchor="middle" fontSize={9} fill="#5eada5">{row.monthName.slice(0, 3)}</text>)}
                 <path d={chartPathD} fill="none" stroke="#0c7b93" strokeWidth={2} strokeLinecap="round" />
-                {chartPoints.map((pt, i) => (
-                  annualMonthly[i].passengers > 0 && (
-                    <circle key={i} cx={pt.x} cy={pt.y} r={3.5} fill="#0c7b93" />
-                  )
-                ))}
+                {chartPoints.map((pt, i) => annualMonthly[i].passengers > 0 && <circle key={i} cx={pt.x} cy={pt.y} r={3.5} fill="#0c7b93" />)}
               </g>
             </svg>
           </div>
 
-          {/* Monthly breakdown table */}
           <div className="mt-6 overflow-x-auto rounded-xl border border-teal-200 bg-white shadow-sm">
             <table className="min-w-full divide-y divide-teal-100 text-sm">
               <thead>
@@ -672,46 +505,24 @@ export default async function AdminReportsPage({
                   <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Month</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Rev</th>
+                  {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
+                  {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                  {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Rev</th>}
                   <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-[#134e4a]">Manifests</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-teal-100">
                 {annualMonthly.map((row) => {
-                  const platformRev = row.adminFeeCents + row.gcashFeeCents;
                   const isPeak = peakMonth?.month === row.month && row.passengers > 0;
                   return (
-                    <tr key={row.month} className={`${isPeak ? "bg-teal-50/60" : "hover:bg-gray-50/50"}`}>
-                      <td className="px-4 py-2 font-medium text-[#134e4a]">
-                        {row.monthName} {isPeak && <span className="ml-1 rounded-full bg-[#0c7b93]/10 px-1.5 py-0.5 text-xs text-[#0c7b93]">peak</span>}
-                      </td>
-                      <td className="px-4 py-2 text-right text-[#134e4a]">
-                        {row.passengers > 0 ? row.passengers.toLocaleString() : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-2 text-right text-[#134e4a]">
-                        {row.revenueCents > 0 ? peso(row.revenueCents) : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-2 text-right font-medium text-emerald-700">
-                        {row.adminFeeCents > 0 ? peso(row.adminFeeCents) : <span className="text-gray-300 font-normal">—</span>}
-                      </td>
-                      <td className="px-4 py-2 text-right font-medium text-blue-700">
-                        {row.gcashFeeCents > 0 ? peso(row.gcashFeeCents) : <span className="text-gray-300 font-normal">—</span>}
-                      </td>
-                      <td className="px-4 py-2 text-right font-semibold text-[#134e4a]">
-                        {platformRev > 0 ? peso(platformRev) : <span className="text-gray-300 font-normal">—</span>}
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        {row.passengers > 0 ? (
-                          <Link
-                            href={`${ROUTES.adminReports}/trips?year=${selectedYear}&month=${row.month}`}
-                            className="text-xs font-semibold text-[#0c7b93] hover:underline"
-                          >
-                            View →
-                          </Link>
-                        ) : <span className="text-gray-300 text-xs">—</span>}
-                      </td>
+                    <tr key={row.month} className={isPeak ? "bg-teal-50/60" : "hover:bg-gray-50/50"}>
+                      <td className="px-4 py-2 font-medium text-[#134e4a]">{row.monthName} {isPeak && <span className="ml-1 rounded-full bg-[#0c7b93]/10 px-1.5 py-0.5 text-xs text-[#0c7b93]">peak</span>}</td>
+                      <td className="px-4 py-2 text-right text-[#134e4a]">{row.passengers > 0 ? row.passengers.toLocaleString() : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-2 text-right text-[#134e4a]">{row.revenueCents > 0 ? peso(row.revenueCents) : <span className="text-gray-300">—</span>}</td>
+                      {showFees && <td className="px-4 py-2 text-right font-medium text-emerald-700">{row.adminFeeCents > 0 ? peso(row.adminFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>}
+                      {showFees && <td className="px-4 py-2 text-right font-medium text-blue-700">{row.gcashFeeCents > 0 ? peso(row.gcashFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>}
+                      {showFees && <td className="px-4 py-2 text-right font-semibold text-[#134e4a]">{(row.adminFeeCents + row.gcashFeeCents) > 0 ? peso(row.adminFeeCents + row.gcashFeeCents) : <span className="text-gray-300 font-normal">—</span>}</td>}
+                      <td className="px-4 py-2 text-center">{row.passengers > 0 ? <Link href={`${ROUTES.adminReports}/trips?year=${selectedYear}&month=${row.month}`} className="text-xs font-semibold text-[#0c7b93] hover:underline">View →</Link> : <span className="text-gray-300 text-xs">—</span>}</td>
                     </tr>
                   );
                 })}
@@ -719,7 +530,6 @@ export default async function AdminReportsPage({
             </table>
           </div>
 
-          {/* Vessel breakdown for the year */}
           {yearRecordPerVessel.length > 0 && (
             <div className="mt-8">
               <p className="text-sm font-semibold text-[#134e4a]">Year record per vessel — {selectedYear}</p>
@@ -730,9 +540,9 @@ export default async function AdminReportsPage({
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Vessel</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Rev</th>
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Rev</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-teal-100">
@@ -741,9 +551,9 @@ export default async function AdminReportsPage({
                         <td className="px-4 py-2 font-medium text-[#134e4a]">{v.vesselName}</td>
                         <td className="px-4 py-2 text-right text-[#134e4a]">{v.passengers.toLocaleString()}</td>
                         <td className="px-4 py-2 text-right text-[#134e4a]">{peso(v.revenueCents)}</td>
-                        <td className="px-4 py-2 text-right font-medium text-emerald-700">{peso(v.adminFeeCents)}</td>
-                        <td className="px-4 py-2 text-right font-medium text-blue-700">{peso(v.gcashFeeCents)}</td>
-                        <td className="px-4 py-2 text-right font-semibold text-[#134e4a]">{peso(v.adminFeeCents + v.gcashFeeCents)}</td>
+                        {showFees && <td className="px-4 py-2 text-right font-medium text-emerald-700">{peso(v.adminFeeCents)}</td>}
+                        {showFees && <td className="px-4 py-2 text-right font-medium text-blue-700">{peso(v.gcashFeeCents)}</td>}
+                        {showFees && <td className="px-4 py-2 text-right font-semibold text-[#134e4a]">{peso(v.adminFeeCents + v.gcashFeeCents)}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -752,17 +562,10 @@ export default async function AdminReportsPage({
             </div>
           )}
 
-          {/* Bottom nav */}
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href={ROUTES.admin} className="rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e]">
-              ← Admin dashboard
-            </Link>
-            <Link href={ROUTES.adminVessels} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-              Vessels
-            </Link>
-            <Link href={ROUTES.adminSchedule} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-              Schedule
-            </Link>
+            <Link href={ROUTES.admin} className="rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e]">← Admin dashboard</Link>
+            <Link href={ROUTES.adminVessels} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">Vessels</Link>
+            <Link href={ROUTES.adminSchedule} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">Schedule</Link>
           </div>
         </div>
       )}
