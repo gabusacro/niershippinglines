@@ -44,7 +44,14 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(booking);
 }
 
-type PassengerDetail = { fare_type: string; full_name: string; address?: string };
+type PassengerDetail = {
+  fare_type: string;
+  full_name: string;
+  address?: string;
+  gender?: string;
+  birthdate?: string;
+  nationality?: string;
+};
 
 function isValidPassengerDetail(x: unknown): x is PassengerDetail {
   return (
@@ -72,7 +79,6 @@ export async function POST(request: NextRequest) {
   const customerAddressRaw = b.customer_address;
   const notifyAlsoEmailRaw = b.notify_also_email;
   const passengerDetailsRaw = b.passenger_details;
-
   if (!tripId || typeof customerEmail !== "string" || !customerEmail.trim()) {
     return NextResponse.json({ error: "Missing or invalid: trip_id, customer_email" }, { status: 400 });
   }
@@ -257,7 +263,15 @@ export async function POST(request: NextRequest) {
   if (passengerDetails && passengerDetails.length > 0) {
     insertPayload.passenger_details = passengerDetails.map((p) => {
       const addr = typeof p.address === "string" && p.address.trim() ? p.address.trim() : customerAddress;
-      return { fare_type: p.fare_type, full_name: p.full_name.trim(), address: addr };
+      // ✅ Now includes gender, birthdate, nationality for Coast Guard manifest
+      return {
+        fare_type: p.fare_type,
+        full_name: p.full_name.trim(),
+        address: addr,
+        gender: p.gender || null,
+        birthdate: p.birthdate || null,
+        nationality: p.nationality || null,
+      };
     });
   }
 
