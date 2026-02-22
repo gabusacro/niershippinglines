@@ -94,12 +94,38 @@ export default async function AdminDashboardPage() {
           >
             Site branding
           </Link>
+       
           <Link
             href={ROUTES.adminFees}
             className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >
             Fees & charges
           </Link>
+          <Link
+            href="/admin/profit-distribution"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-emerald-400 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+          >
+            💰 Profit Distribution
+          </Link>
+          <Link
+            href="/admin/expenses"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
+          >
+            Expenses
+          </Link>
+          <Link
+            href="/admin/investor-shares"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
+          >
+            Investor Shares
+          </Link>
+          <Link
+            href="/admin/vessel-owners"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
+          >
+            Vessel Owners
+          </Link>
+
           <Link
             href={ROUTES.adminFlagged}
             className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
