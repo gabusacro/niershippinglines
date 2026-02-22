@@ -69,7 +69,7 @@ export default async function ReportsTripsPage({
   let start = "";
   let end = "";
   let pageTitle = "";
-  let backHref = ROUTES.adminReports;
+  let backHref: string = ROUTES.adminReports;
 
   if (isSingleDate) {
     start = dateParam!;
