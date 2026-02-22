@@ -1,6 +1,5 @@
 // Types aligned with Supabase schema (001_initial_schema.sql)
-
-export type AppRole = "admin" | "captain" | "crew" | "ticket_booth" | "passenger";
+export type AppRole = "admin" | "captain" | "crew" | "ticket_booth" | "passenger" | "vessel_owner";
 export type BoatStatus = "running" | "maintenance";
 export type TripStatus = "scheduled" | "boarding" | "departed" | "arrived" | "cancelled";
 export type BookingStatus =
@@ -13,7 +12,6 @@ export type BookingStatus =
   | "changed"
   | "refunded";
 export type FareType = "adult" | "senior" | "pwd" | "child" | "infant";
-
 export interface Profile {
   id: string;
   role: AppRole;
@@ -24,7 +22,6 @@ export interface Profile {
   created_at: string;
   updated_at: string;
 }
-
 export interface Boat {
   id: string;
   name: string;
@@ -35,7 +32,6 @@ export interface Boat {
   created_at: string;
   updated_at: string;
 }
-
 export interface Route {
   id: string;
   origin: string;
@@ -44,7 +40,6 @@ export interface Route {
   created_at: string;
   updated_at: string;
 }
-
 export interface FareRule {
   id: string;
   route_id: string;
@@ -55,7 +50,6 @@ export interface FareRule {
   created_at: string;
   updated_at: string;
 }
-
 export interface ScheduleSlot {
   id: string;
   route_id: string;
@@ -64,7 +58,6 @@ export interface ScheduleSlot {
   created_at: string;
   updated_at: string;
 }
-
 export interface Trip {
   id: string;
   boat_id: string;
@@ -82,9 +75,7 @@ export interface Trip {
   boat?: Boat;
   route?: Route;
 }
-
 export type PassengerDetail = { fare_type: FareType; full_name: string };
-
 export interface Booking {
   id: string;
   trip_id: string;
@@ -106,7 +97,6 @@ export interface Booking {
   updated_at: string;
   trip?: Trip;
 }
-
 export interface Attraction {
   id: string;
   title: string;
@@ -118,7 +108,6 @@ export interface Attraction {
   created_at: string;
   updated_at: string;
 }
-
 export interface TideEntry {
   id: string;
   entry_date: string;
@@ -128,7 +117,6 @@ export interface TideEntry {
   created_at: string;
   updated_at: string;
 }
-
 export interface VesselAnnouncement {
   id: string;
   vessel_id: string | null;
