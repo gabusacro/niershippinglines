@@ -1,5 +1,5 @@
 // Types aligned with Supabase schema (001_initial_schema.sql)
-export type AppRole = "admin" | "captain" | "crew" | "ticket_booth" | "passenger" | "vessel_owner";
+export type AppRole = "admin" | "captain" | "crew" | "ticket_booth" | "passenger" | "vessel_owner" | "investor";
 export type BoatStatus = "running" | "maintenance";
 export type TripStatus = "scheduled" | "boarding" | "departed" | "arrived" | "cancelled";
 export type BookingStatus =
