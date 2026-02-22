@@ -36,66 +36,86 @@ function fuelCostCentsFromLiters(liters: number, fuelPesosPerLiter: number): num
   return Math.round(liters * fuelPesosPerLiter * 100);
 }
 
-/** Per-trip report row for today (one row per departure time). */
+/** Per-trip report row — shared for daily and date-range views. */
 export interface TripReportRow {
   tripId: string;
   vesselName: string;
   departureTime: string;
+  departureDate: string;
   routeName: string;
   availableSeats: number;
   passengerBoard: number;
   revenueCents: number;
+  adminFeeCents: number;
+  gcashFeeCents: number;
   fuelLiters: number;
-  /** Fuel cost in centavos (fuelLiters × 61.4 PHP/L). */
   fuelCostCents: number;
   netRevenueCents: number;
 }
 
-/** Monthly totals (passengers, revenue, fuel, net). */
-export interface MonthlySummary {
+/** Summary totals for any period. */
+export interface PeriodSummary {
   totalPassengers: number;
   totalRevenueCents: number;
+  totalAdminFeeCents: number;
+  totalGcashFeeCents: number;
   totalFuelLiters: number;
-  /** Fuel cost in centavos (totalFuelLiters × 61.4 PHP/L). */
   totalFuelCostCents: number;
   netRevenueCents: number;
 }
 
-/** Today's trips with per-trip available seats and stats. Uses Philippines date. */
+/** Monthly totals (passengers, revenue, fuel, net) — kept for backward compat. */
+export type MonthlySummary = PeriodSummary;
+
+// ---------------------------------------------------------------------------
+// Daily – one row per trip for a given date
+// ---------------------------------------------------------------------------
+
+/** Today's trips with per-trip stats. Uses Philippines date. */
 export async function getReportsTodayPerTrip(): Promise<TripReportRow[]> {
   const today = getTodayInManila();
+  return getReportsForDatePerTrip(today);
+}
+
+/** Trips for a specific date (YYYY-MM-DD). */
+export async function getReportsForDatePerTrip(date: string): Promise<TripReportRow[]> {
   const supabase = await createClient();
   const fuelSettings = await getFuelSettings(supabase);
 
   const { data: trips, error: tripsError } = await supabase
     .from("trips")
     .select(
-      "id, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, boarded_count, boat:boats(name), route:routes(display_name, origin, destination)"
+      "id, departure_time, departure_date, online_quota, online_booked, walk_in_quota, walk_in_booked, boarded_count, boat:boats(name), route:routes(display_name, origin, destination)"
     )
-    .eq("departure_date", today)
+    .eq("departure_date", date)
     .order("departure_time");
 
   if (tripsError) {
-    console.error("[getReportsTodayPerTrip]", tripsError.message, { today });
+    console.error("[getReportsForDatePerTrip]", tripsError.message, { date });
     return [];
   }
   if (!trips?.length) return [];
 
-  const tripIds = (trips ?? []).map((t) => t.id);
+  const tripIds = trips.map((t) => t.id);
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("trip_id, passenger_count, total_amount_cents")
+    .select("trip_id, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents")
     .in("trip_id", tripIds)
     .in("status", PAYMENT_STATUSES);
 
   const passengersByTrip = new Map<string, number>();
   const revenueByTrip = new Map<string, number>();
+  const adminFeeByTrip = new Map<string, number>();
+  const gcashFeeByTrip = new Map<string, number>();
+
   for (const b of bookings ?? []) {
     passengersByTrip.set(b.trip_id, (passengersByTrip.get(b.trip_id) ?? 0) + (b.passenger_count ?? 0));
     revenueByTrip.set(b.trip_id, (revenueByTrip.get(b.trip_id) ?? 0) + (b.total_amount_cents ?? 0));
+    adminFeeByTrip.set(b.trip_id, (adminFeeByTrip.get(b.trip_id) ?? 0) + (b.admin_fee_cents ?? 0));
+    gcashFeeByTrip.set(b.trip_id, (gcashFeeByTrip.get(b.trip_id) ?? 0) + (b.gcash_fee_cents ?? 0));
   }
 
-  return (trips ?? []).map((t) => {
+  return trips.map((t) => {
     const oq = t.online_quota ?? 0;
     const ob = t.online_booked ?? 0;
     const wq = t.walk_in_quota ?? 0;
@@ -108,15 +128,20 @@ export async function getReportsTodayPerTrip(): Promise<TripReportRow[]> {
     const boatName = boat?.name ?? "—";
     const fuelL = fuelSettings.defaultFuelLitersPerTrip;
     const revenue = revenueByTrip.get(t.id) ?? 0;
+    const adminFee = adminFeeByTrip.get(t.id) ?? 0;
+    const gcashFee = gcashFeeByTrip.get(t.id) ?? 0;
     const fuelCost = fuelCostCentsFromLiters(fuelL, fuelSettings.fuelPesosPerLiter);
     return {
       tripId: t.id,
       vesselName: boatName,
       departureTime: t.departure_time ?? "—",
+      departureDate: t.departure_date ?? date,
       routeName,
       availableSeats,
       passengerBoard: passengersByTrip.get(t.id) ?? t.boarded_count ?? 0,
       revenueCents: revenue,
+      adminFeeCents: adminFee,
+      gcashFeeCents: gcashFee,
       fuelLiters: fuelL,
       fuelCostCents: fuelCost,
       netRevenueCents: revenue - fuelCost,
@@ -124,49 +149,139 @@ export async function getReportsTodayPerTrip(): Promise<TripReportRow[]> {
   });
 }
 
-/** Current month (Philippines) summary from Supabase. */
-export async function getMonthlySummary(): Promise<MonthlySummary> {
-  const { start, end } = getMonthStartEndInManila();
-  const supabase = await createClient();
+// ---------------------------------------------------------------------------
+// Daily calendar – one row per date for a given month
+// ---------------------------------------------------------------------------
+
+export interface DayReportRow {
+  date: string; // YYYY-MM-DD
+  label: string; // e.g. "Feb 1"
+  dayOfWeek: string; // e.g. "Sat"
+  tripCount: number;
+  totalPassengers: number;
+  totalRevenueCents: number;
+  totalAdminFeeCents: number;
+  totalGcashFeeCents: number;
+  totalFuelLiters: number;
+  totalFuelCostCents: number;
+  netRevenueCents: number;
+}
+
+/** Per-day summary for a given month (YYYY-MM format). */
+export async function getDailyReportForMonth(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  yearMonth: string // "YYYY-MM"
+): Promise<DayReportRow[]> {
+  const [year, month] = yearMonth.split("-").map(Number);
+  const start = `${yearMonth}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const end = `${yearMonth}-${String(lastDay).padStart(2, "0")}`;
+
   const fuelSettings = await getFuelSettings(supabase);
 
   const { data: trips } = await supabase
     .from("trips")
-    .select("id")
+    .select("id, departure_date")
     .gte("departure_date", start)
     .lte("departure_date", end);
 
-  const tripIds = (trips ?? []).map((t) => t.id);
-  if (tripIds.length === 0) {
-    return { totalPassengers: 0, totalRevenueCents: 0, totalFuelLiters: 0, totalFuelCostCents: 0, netRevenueCents: 0 };
+  if (!trips?.length) return buildEmptyDays(year, month, fuelSettings.defaultFuelLitersPerTrip, fuelSettings.fuelPesosPerLiter);
+
+  const tripIds = trips.map((t) => t.id);
+  const tripToDate = new Map<string, string>();
+  for (const t of trips) {
+    if (t.departure_date) tripToDate.set(t.id, t.departure_date);
   }
 
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("trip_id, passenger_count, total_amount_cents")
+    .select("trip_id, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents")
     .in("trip_id", tripIds)
     .in("status", PAYMENT_STATUSES);
 
-  let totalPassengers = 0;
-  let totalRevenueCents = 0;
+  const byDate = new Map<string, {
+    tripIds: Set<string>;
+    passengers: number;
+    revenue: number;
+    adminFee: number;
+    gcashFee: number;
+  }>();
+
   for (const b of bookings ?? []) {
-    totalPassengers += b.passenger_count ?? 0;
-    totalRevenueCents += b.total_amount_cents ?? 0;
+    const date = tripToDate.get(b.trip_id);
+    if (!date) continue;
+    const cur = byDate.get(date) ?? { tripIds: new Set(), passengers: 0, revenue: 0, adminFee: 0, gcashFee: 0 };
+    cur.tripIds.add(b.trip_id);
+    cur.passengers += b.passenger_count ?? 0;
+    cur.revenue += b.total_amount_cents ?? 0;
+    cur.adminFee += b.admin_fee_cents ?? 0;
+    cur.gcashFee += b.gcash_fee_cents ?? 0;
+    byDate.set(date, cur);
   }
 
-  const totalFuelLiters = tripIds.length * fuelSettings.defaultFuelLitersPerTrip;
-  const totalFuelCostCents = fuelCostCentsFromLiters(totalFuelLiters, fuelSettings.fuelPesosPerLiter);
+  // Also count trips with no bookings
+  for (const t of trips) {
+    if (!t.departure_date) continue;
+    const cur = byDate.get(t.departure_date) ?? { tripIds: new Set(), passengers: 0, revenue: 0, adminFee: 0, gcashFee: 0 };
+    cur.tripIds.add(t.id);
+    byDate.set(t.departure_date, cur);
+  }
 
-  return {
-    totalPassengers,
-    totalRevenueCents,
-    totalFuelLiters,
-    totalFuelCostCents,
-    netRevenueCents: totalRevenueCents - totalFuelCostCents,
-  };
+  const days: DayReportRow[] = [];
+  for (let d = 1; d <= lastDay; d++) {
+    const dateStr = `${yearMonth}-${String(d).padStart(2, "0")}`;
+    const jsDate = new Date(year, month - 1, d);
+    const label = jsDate.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+    const dayOfWeek = jsDate.toLocaleDateString("en-PH", { weekday: "short" });
+    const data = byDate.get(dateStr);
+    const tripCount = data?.tripIds.size ?? 0;
+    const fuelLiters = tripCount * fuelSettings.defaultFuelLitersPerTrip;
+    const fuelCostCents = fuelCostCentsFromLiters(fuelLiters, fuelSettings.fuelPesosPerLiter);
+    const revenue = data?.revenue ?? 0;
+    days.push({
+      date: dateStr,
+      label,
+      dayOfWeek,
+      tripCount,
+      totalPassengers: data?.passengers ?? 0,
+      totalRevenueCents: revenue,
+      totalAdminFeeCents: data?.adminFee ?? 0,
+      totalGcashFeeCents: data?.gcashFee ?? 0,
+      totalFuelLiters: fuelLiters,
+      totalFuelCostCents: fuelCostCents,
+      netRevenueCents: revenue - fuelCostCents,
+    });
+  }
+  return days;
 }
 
-/** Weekly summary (same shape as MonthlySummary) for current week (Mon–Sun) in Philippines. */
+function buildEmptyDays(year: number, month: number, fuelLitersPerTrip: number, fuelPesosPerLiter: number): DayReportRow[] {
+  const lastDay = new Date(year, month, 0).getDate();
+  const days: DayReportRow[] = [];
+  for (let d = 1; d <= lastDay; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const jsDate = new Date(year, month - 1, d);
+    days.push({
+      date: dateStr,
+      label: jsDate.toLocaleDateString("en-PH", { month: "short", day: "numeric" }),
+      dayOfWeek: jsDate.toLocaleDateString("en-PH", { weekday: "short" }),
+      tripCount: 0,
+      totalPassengers: 0,
+      totalRevenueCents: 0,
+      totalAdminFeeCents: 0,
+      totalGcashFeeCents: 0,
+      totalFuelLiters: 0,
+      totalFuelCostCents: 0,
+      netRevenueCents: 0,
+    });
+  }
+  return days;
+}
+
+// ---------------------------------------------------------------------------
+// Weekly summary
+// ---------------------------------------------------------------------------
+
 export async function getWeeklySummary(): Promise<MonthlySummary> {
   const { start, end } = getWeekStartEndInManila();
   const supabase = await createClient();
@@ -180,20 +295,24 @@ export async function getWeeklySummary(): Promise<MonthlySummary> {
 
   const tripIds = (trips ?? []).map((t) => t.id);
   if (tripIds.length === 0) {
-    return { totalPassengers: 0, totalRevenueCents: 0, totalFuelLiters: 0, totalFuelCostCents: 0, netRevenueCents: 0 };
+    return { totalPassengers: 0, totalRevenueCents: 0, totalAdminFeeCents: 0, totalGcashFeeCents: 0, totalFuelLiters: 0, totalFuelCostCents: 0, netRevenueCents: 0 };
   }
 
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("trip_id, passenger_count, total_amount_cents")
+    .select("trip_id, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents")
     .in("trip_id", tripIds)
     .in("status", PAYMENT_STATUSES);
 
   let totalPassengers = 0;
   let totalRevenueCents = 0;
+  let totalAdminFeeCents = 0;
+  let totalGcashFeeCents = 0;
   for (const b of bookings ?? []) {
     totalPassengers += b.passenger_count ?? 0;
     totalRevenueCents += b.total_amount_cents ?? 0;
+    totalAdminFeeCents += b.admin_fee_cents ?? 0;
+    totalGcashFeeCents += b.gcash_fee_cents ?? 0;
   }
 
   const totalFuelLiters = tripIds.length * fuelSettings.defaultFuelLitersPerTrip;
@@ -202,16 +321,79 @@ export async function getWeeklySummary(): Promise<MonthlySummary> {
   return {
     totalPassengers,
     totalRevenueCents,
+    totalAdminFeeCents,
+    totalGcashFeeCents,
     totalFuelLiters,
     totalFuelCostCents,
     netRevenueCents: totalRevenueCents - totalFuelCostCents,
   };
 }
 
+// ---------------------------------------------------------------------------
+// Monthly summary
+// ---------------------------------------------------------------------------
+
+export async function getMonthlySummary(): Promise<MonthlySummary> {
+  const { start, end } = getMonthStartEndInManila();
+  const supabase = await createClient();
+  const fuelSettings = await getFuelSettings(supabase);
+
+  const { data: trips } = await supabase
+    .from("trips")
+    .select("id")
+    .gte("departure_date", start)
+    .lte("departure_date", end);
+
+  const tripIds = (trips ?? []).map((t) => t.id);
+  if (tripIds.length === 0) {
+    return { totalPassengers: 0, totalRevenueCents: 0, totalAdminFeeCents: 0, totalGcashFeeCents: 0, totalFuelLiters: 0, totalFuelCostCents: 0, netRevenueCents: 0 };
+  }
+
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("trip_id, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents")
+    .in("trip_id", tripIds)
+    .in("status", PAYMENT_STATUSES);
+
+  let totalPassengers = 0;
+  let totalRevenueCents = 0;
+  let totalAdminFeeCents = 0;
+  let totalGcashFeeCents = 0;
+  for (const b of bookings ?? []) {
+    totalPassengers += b.passenger_count ?? 0;
+    totalRevenueCents += b.total_amount_cents ?? 0;
+    totalAdminFeeCents += b.admin_fee_cents ?? 0;
+    totalGcashFeeCents += b.gcash_fee_cents ?? 0;
+  }
+
+  const totalFuelLiters = tripIds.length * fuelSettings.defaultFuelLitersPerTrip;
+  const totalFuelCostCents = fuelCostCentsFromLiters(totalFuelLiters, fuelSettings.fuelPesosPerLiter);
+
+  return {
+    totalPassengers,
+    totalRevenueCents,
+    totalAdminFeeCents,
+    totalGcashFeeCents,
+    totalFuelLiters,
+    totalFuelCostCents,
+    netRevenueCents: totalRevenueCents - totalFuelCostCents,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Per-vessel breakdowns
+// ---------------------------------------------------------------------------
+
 export interface VesselPeriodRow {
   vesselName: string;
+  boatId?: string;
   passengers: number;
   revenueCents: number;
+  adminFeeCents: number;
+  gcashFeeCents: number;
+  fuelLiters: number;
+  fuelCostCents: number;
+  netRevenueCents: number;
 }
 
 /** Per-vessel totals for the current week (Mon–Sun), Philippines. */
@@ -219,47 +401,23 @@ export async function getWeeklySummaryByVessel(): Promise<VesselPeriodRow[]> {
   const { start, end } = getWeekStartEndInManila();
   const supabase = await createClient();
   const fuelSettings = await getFuelSettings(supabase);
-
-  const { data: trips } = await supabase
-    .from("trips")
-    .select("id, boat_id, boat:boats(name)")
-    .gte("departure_date", start)
-    .lte("departure_date", end);
-
-  if (!trips?.length) return [];
-
-  const tripIds = trips.map((t) => t.id);
-  const tripToVessel = new Map<string, string>();
-  for (const t of trips) {
-    const boat = (t as { boat?: { name?: string } | null }).boat;
-    tripToVessel.set(t.id, boat?.name?.trim() ?? "—");
-  }
-
-  const { data: bookings } = await supabase
-    .from("bookings")
-    .select("trip_id, passenger_count, total_amount_cents")
-    .in("trip_id", tripIds)
-    .in("status", PAYMENT_STATUSES);
-
-  const byVessel = new Map<string, { passengers: number; revenueCents: number }>();
-  for (const b of bookings ?? []) {
-    const vessel = tripToVessel.get(b.trip_id) ?? "—";
-    const cur = byVessel.get(vessel) ?? { passengers: 0, revenueCents: 0 };
-    cur.passengers += b.passenger_count ?? 0;
-    cur.revenueCents += b.total_amount_cents ?? 0;
-    byVessel.set(vessel, cur);
-  }
-
-  return [...byVessel.entries()]
-    .map(([vesselName, v]) => ({ vesselName, passengers: v.passengers, revenueCents: v.revenueCents }))
-    .sort((a, b) => a.vesselName.localeCompare(b.vesselName));
+  return getVesselSummaryForRange(supabase, start, end, fuelSettings);
 }
 
 /** Per-vessel totals for the current month, Philippines. */
 export async function getMonthlySummaryByVessel(): Promise<VesselPeriodRow[]> {
   const { start, end } = getMonthStartEndInManila();
   const supabase = await createClient();
+  const fuelSettings = await getFuelSettings(supabase);
+  return getVesselSummaryForRange(supabase, start, end, fuelSettings);
+}
 
+async function getVesselSummaryForRange(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  start: string,
+  end: string,
+  fuelSettings: FuelSettings
+): Promise<VesselPeriodRow[]> {
   const { data: trips } = await supabase
     .from("trips")
     .select("id, boat_id, boat:boats(name)")
@@ -270,30 +428,69 @@ export async function getMonthlySummaryByVessel(): Promise<VesselPeriodRow[]> {
 
   const tripIds = trips.map((t) => t.id);
   const tripToVessel = new Map<string, string>();
+  const tripToBoatId = new Map<string, string>();
   for (const t of trips) {
     const boat = (t as { boat?: { name?: string } | null }).boat;
     tripToVessel.set(t.id, boat?.name?.trim() ?? "—");
+    const bid = (t as { boat_id?: string }).boat_id;
+    if (bid) tripToBoatId.set(t.id, bid);
   }
 
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("trip_id, passenger_count, total_amount_cents")
+    .select("trip_id, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents")
     .in("trip_id", tripIds)
     .in("status", PAYMENT_STATUSES);
 
-  const byVessel = new Map<string, { passengers: number; revenueCents: number }>();
+  const byVessel = new Map<string, {
+    boatId: string | undefined;
+    tripCount: number;
+    passengers: number;
+    revenueCents: number;
+    adminFeeCents: number;
+    gcashFeeCents: number;
+  }>();
+
+  // Count trips per vessel for fuel calculation
+  for (const t of trips) {
+    const vessel = tripToVessel.get(t.id) ?? "—";
+    const cur = byVessel.get(vessel) ?? { boatId: tripToBoatId.get(t.id), tripCount: 0, passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 };
+    cur.tripCount += 1;
+    byVessel.set(vessel, cur);
+  }
+
   for (const b of bookings ?? []) {
     const vessel = tripToVessel.get(b.trip_id) ?? "—";
-    const cur = byVessel.get(vessel) ?? { passengers: 0, revenueCents: 0 };
+    const cur = byVessel.get(vessel) ?? { boatId: undefined, tripCount: 0, passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 };
     cur.passengers += b.passenger_count ?? 0;
     cur.revenueCents += b.total_amount_cents ?? 0;
+    cur.adminFeeCents += b.admin_fee_cents ?? 0;
+    cur.gcashFeeCents += b.gcash_fee_cents ?? 0;
     byVessel.set(vessel, cur);
   }
 
   return [...byVessel.entries()]
-    .map(([vesselName, v]) => ({ vesselName, passengers: v.passengers, revenueCents: v.revenueCents }))
+    .map(([vesselName, v]) => {
+      const fuelLiters = v.tripCount * fuelSettings.defaultFuelLitersPerTrip;
+      const fuelCostCents = fuelCostCentsFromLiters(fuelLiters, fuelSettings.fuelPesosPerLiter);
+      return {
+        vesselName,
+        boatId: v.boatId,
+        passengers: v.passengers,
+        revenueCents: v.revenueCents,
+        adminFeeCents: v.adminFeeCents,
+        gcashFeeCents: v.gcashFeeCents,
+        fuelLiters,
+        fuelCostCents,
+        netRevenueCents: v.revenueCents - fuelCostCents,
+      };
+    })
     .sort((a, b) => a.vesselName.localeCompare(b.vesselName));
 }
+
+// ---------------------------------------------------------------------------
+// Yearly / Annual analytics
+// ---------------------------------------------------------------------------
 
 export interface VesselDayReport {
   boatId: string;
@@ -302,7 +499,6 @@ export interface VesselDayReport {
   availableSeats: number;
   revenueCents: number;
   fuelLiters: number;
-  /** Fuel cost in centavos (fuelLiters × 61.4 PHP/L). */
   fuelCostCents: number;
   netRevenueCents: number;
 }
@@ -343,30 +539,19 @@ export async function getVesselReportsToday(): Promise<VesselDayReport[]> {
 
   const revenueByTrip2 = new Map<string, number>();
   (bookings ?? []).forEach((b) => {
-    const tid = b.trip_id;
-    revenueByTrip2.set(tid, (revenueByTrip2.get(tid) ?? 0) + (b.total_amount_cents ?? 0));
+    revenueByTrip2.set(b.trip_id, (revenueByTrip2.get(b.trip_id) ?? 0) + (b.total_amount_cents ?? 0));
   });
 
-  const byBoat = new Map<
-    string,
-    { board: number; available: number; revenue: number; fuel: number }
-  >();
+  const byBoat = new Map<string, { board: number; available: number; revenue: number; fuel: number }>();
 
   for (const t of todayTrips) {
     const bid = t.boat_id;
     const cur = byBoat.get(bid) ?? { board: 0, available: 0, revenue: 0, fuel: 0 };
     cur.board += t.boarded_count ?? 0;
-    const oq = t.online_quota ?? 0;
-    const ob = t.online_booked ?? 0;
-    const wq = t.walk_in_quota ?? 0;
-    const wb = t.walk_in_booked ?? 0;
-    cur.available += oq + wq - ob - wb;
+    cur.available += (t.online_quota ?? 0) + (t.walk_in_quota ?? 0) - (t.online_booked ?? 0) - (t.walk_in_booked ?? 0);
     cur.revenue += revenueByTrip2.get(t.id) ?? 0;
     const tripFuel = (t as { fuel_liters_used?: number | null }).fuel_liters_used;
-    cur.fuel +=
-      typeof tripFuel === "number" && tripFuel >= 0
-        ? tripFuel
-        : fuelByBoat.get(bid) ?? fuelSettings.defaultFuelLitersPerTrip;
+    cur.fuel += typeof tripFuel === "number" && tripFuel >= 0 ? tripFuel : fuelByBoat.get(bid) ?? fuelSettings.defaultFuelLitersPerTrip;
     byBoat.set(bid, cur);
   }
 
@@ -393,9 +578,10 @@ export interface MonthStat {
   monthName: string;
   passengers: number;
   revenueCents: number;
+  adminFeeCents: number;
+  gcashFeeCents: number;
 }
 
-/** Annual analytics: passengers and revenue per month for a given year. Used for peak travel (tourist) by month. */
 export async function getAnnualMonthlyStats(
   supabase: Awaited<ReturnType<typeof createClient>>,
   year: number
@@ -419,13 +605,13 @@ export async function getAnnualMonthlyStats(
     }
   }
 
-  const byMonth = new Map<number, { passengers: number; revenueCents: number }>();
-  for (let m = 1; m <= 12; m++) byMonth.set(m, { passengers: 0, revenueCents: 0 });
+  const byMonth = new Map<number, { passengers: number; revenueCents: number; adminFeeCents: number; gcashFeeCents: number }>();
+  for (let m = 1; m <= 12; m++) byMonth.set(m, { passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 });
 
   if (tripIds.length > 0) {
     const { data: bookings } = await supabase
       .from("bookings")
-      .select("trip_id, passenger_count, total_amount_cents")
+      .select("trip_id, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents")
       .in("trip_id", tripIds)
       .in("status", PAYMENT_STATUSES);
 
@@ -435,13 +621,15 @@ export async function getAnnualMonthlyStats(
       const cur = byMonth.get(month)!;
       cur.passengers += b.passenger_count ?? 0;
       cur.revenueCents += b.total_amount_cents ?? 0;
+      cur.adminFeeCents += b.admin_fee_cents ?? 0;
+      cur.gcashFeeCents += b.gcash_fee_cents ?? 0;
     }
   }
 
   return MONTH_NAMES.map((monthName, i) => {
     const m = i + 1;
-    const cur = byMonth.get(m) ?? { passengers: 0, revenueCents: 0 };
-    return { month: m, monthName, passengers: cur.passengers, revenueCents: cur.revenueCents };
+    const cur = byMonth.get(m) ?? { passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 };
+    return { month: m, monthName, passengers: cur.passengers, revenueCents: cur.revenueCents, adminFeeCents: cur.adminFeeCents, gcashFeeCents: cur.gcashFeeCents };
   });
 }
 
@@ -449,13 +637,13 @@ export interface MonthVesselRow {
   month: number;
   monthName: string;
   vesselName: string;
-  /** Boat UUID for linking to trip list / manifests. */
   boatId: string | null;
   passengers: number;
   revenueCents: number;
+  adminFeeCents: number;
+  gcashFeeCents: number;
 }
 
-/** Annual monthly stats plus per-month-per-vessel breakdown (which vessel in each month). */
 export async function getAnnualMonthlyStatsWithVessels(
   supabase: Awaited<ReturnType<typeof createClient>>,
   year: number
@@ -480,21 +668,18 @@ export async function getAnnualMonthlyStatsWithVessels(
       if (m >= 1 && m <= 12) tripIdToMonth.set(t.id, m);
     }
     const boat = (t as { boat?: { name?: string } | null }).boat;
-    const vesselName = boat?.name?.trim() || "—";
-    tripIdToVessel.set(t.id, vesselName);
+    tripIdToVessel.set(t.id, boat?.name?.trim() || "—");
     const bid = (t as { boat_id?: string }).boat_id;
     if (bid) tripIdToBoatId.set(t.id, bid);
   }
 
-  const byMonthVessel = new Map<string, { passengers: number; revenueCents: number; boatId: string | null }>();
-  function key(m: number, v: string) {
-    return `${m}:${v}`;
-  }
+  const byMonthVessel = new Map<string, { passengers: number; revenueCents: number; adminFeeCents: number; gcashFeeCents: number; boatId: string | null }>();
+  function key(m: number, v: string) { return `${m}:${v}`; }
 
   if (tripIds.length > 0) {
     const { data: bookings } = await supabase
       .from("bookings")
-      .select("trip_id, passenger_count, total_amount_cents")
+      .select("trip_id, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents")
       .in("trip_id", tripIds)
       .in("status", PAYMENT_STATUSES);
 
@@ -503,17 +688,19 @@ export async function getAnnualMonthlyStatsWithVessels(
       const vessel = tripIdToVessel.get(b.trip_id) ?? "—";
       if (month == null) continue;
       const k = key(month, vessel);
-      const cur = byMonthVessel.get(k) ?? { passengers: 0, revenueCents: 0, boatId: null };
+      const cur = byMonthVessel.get(k) ?? { passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0, boatId: null };
       cur.passengers += b.passenger_count ?? 0;
       cur.revenueCents += b.total_amount_cents ?? 0;
+      cur.adminFeeCents += b.admin_fee_cents ?? 0;
+      cur.gcashFeeCents += b.gcash_fee_cents ?? 0;
       if (cur.boatId == null) cur.boatId = tripIdToBoatId.get(b.trip_id) ?? null;
       byMonthVessel.set(k, cur);
     }
   }
 
   const byMonthVesselRows: MonthVesselRow[] = [];
-  const byMonthAgg = new Map<number, { passengers: number; revenueCents: number }>();
-  for (let m = 1; m <= 12; m++) byMonthAgg.set(m, { passengers: 0, revenueCents: 0 });
+  const byMonthAgg = new Map<number, { passengers: number; revenueCents: number; adminFeeCents: number; gcashFeeCents: number }>();
+  for (let m = 1; m <= 12; m++) byMonthAgg.set(m, { passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 });
 
   for (let m = 1; m <= 12; m++) {
     const monthName = MONTH_NAMES[m - 1];
@@ -522,26 +709,22 @@ export async function getAnnualMonthlyStatsWithVessels(
       const vesselName = k.slice(String(m).length + 1);
       const cur = byMonthVessel.get(k)!;
       if (cur.passengers > 0 || cur.revenueCents > 0) {
-        byMonthVesselRows.push({
-          month: m,
-          monthName,
-          vesselName,
-          boatId: cur.boatId ?? null,
-          passengers: cur.passengers,
-          revenueCents: cur.revenueCents,
-        });
+        byMonthVesselRows.push({ month: m, monthName, vesselName, boatId: cur.boatId ?? null, passengers: cur.passengers, revenueCents: cur.revenueCents, adminFeeCents: cur.adminFeeCents, gcashFeeCents: cur.gcashFeeCents });
         const agg = byMonthAgg.get(m)!;
         agg.passengers += cur.passengers;
         agg.revenueCents += cur.revenueCents;
+        agg.adminFeeCents += cur.adminFeeCents;
+        agg.gcashFeeCents += cur.gcashFeeCents;
       }
     }
   }
+
   byMonthVesselRows.sort((a, b) => a.month - b.month || a.vesselName.localeCompare(b.vesselName));
 
   const monthly: MonthStat[] = MONTH_NAMES.map((monthName, i) => {
     const m = i + 1;
-    const agg = byMonthAgg.get(m) ?? { passengers: 0, revenueCents: 0 };
-    return { month: m, monthName, passengers: agg.passengers, revenueCents: agg.revenueCents };
+    const agg = byMonthAgg.get(m) ?? { passengers: 0, revenueCents: 0, adminFeeCents: 0, gcashFeeCents: 0 };
+    return { month: m, monthName, passengers: agg.passengers, revenueCents: agg.revenueCents, adminFeeCents: agg.adminFeeCents, gcashFeeCents: agg.gcashFeeCents };
   });
 
   return { monthly, byMonthVessel: byMonthVesselRows };
