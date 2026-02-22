@@ -86,6 +86,7 @@ export default async function DashboardPage({
     ticket_booth: "Ticket booth",
     crew: "Deck crew",
     passenger: "Passenger",
+    vessel_owner: "Vessel Owner",  
   };
   const yourRoleLabel = roleLabel[user.role] ?? user.role;
   const isPassenger = user.role === "passenger";
@@ -524,6 +525,28 @@ export default async function DashboardPage({
             <Link
               href={ROUTES.account}
               className="inline-flex rounded-xl border-2 border-teal-200 bg-white px-5 py-4 text-left transition-colors hover:border-[#0c7b93] hover:bg-[#0c7b93]/5"
+            >
+              <h2 className="font-semibold text-[#134e4a]">Account</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Your profile and password.</p>
+            </Link>
+          </div>
+        </>
+      ) : user.role === "vessel_owner" ? (
+        <>
+          <p className="mt-1 text-sm text-[#0f766e]/80">
+            View your vessel&apos;s earnings, passengers, fuel costs, and your patronage bonus from the platform revenue pool.
+          </p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              href="/vessel-owner"
+              className="rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93]/5 p-5 text-left transition-colors hover:bg-[#0c7b93]/10"
+            >
+              <h2 className="font-semibold text-[#134e4a]">🚢 Vessel Dashboard</h2>
+              <p className="mt-1 text-sm text-[#0f766e]">Your vessel&apos;s trips, passengers, fare revenue, fuel costs, net earnings, and patronage bonus.</p>
+            </Link>
+            <Link
+              href={ROUTES.account}
+              className="rounded-xl border-2 border-teal-200 p-5 text-left transition-colors hover:bg-teal-50"
             >
               <h2 className="font-semibold text-[#134e4a]">Account</h2>
               <p className="mt-1 text-sm text-[#0f766e]">Your profile and password.</p>
