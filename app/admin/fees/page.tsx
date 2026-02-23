@@ -28,6 +28,8 @@ export default async function AdminFeesPage() {
     gcash_fee_cents: Number(data?.gcash_fee_cents) || GCASH_FEE_CENTS,
     admin_fee_label: data?.admin_fee_label ?? "Admin Fee",
     gcash_fee_label: data?.gcash_fee_label ?? "GCash Fee",
+    admin_fee_applies_walkin: data?.admin_fee_applies_walkin ?? true,   
+    gcash_fee_show_breakdown: data?.gcash_fee_show_breakdown ?? true,   
     child_min_age: data?.child_min_age ?? 3,
     child_max_age: data?.child_max_age ?? 10,
     child_discount_percent: Number(data?.child_discount_percent ?? 50),

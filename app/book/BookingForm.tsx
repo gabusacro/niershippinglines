@@ -25,6 +25,9 @@ type FareRow = {
   discount_percent: number;
   admin_fee_cents_per_passenger?: number;
   gcash_fee_cents?: number;
+  admin_fee_label?: string;
+  gcash_fee_label?: string;
+  gcash_fee_show_breakdown?: boolean;
 };
 type SavedTraveler = {
   id: string;
@@ -242,7 +245,10 @@ export default function BookingForm({
       passenger_details?: { fare_type: string; full_name: string; per_person_cents: number }[];
       fare_subtotal_cents?: number;
       gcash_fee_cents?: number;
+      gcash_fee_label?: string;
+      gcash_fee_show_breakdown?: boolean;
       admin_fee_cents?: number;
+      admin_fee_label?: string;
       total_cents?: number;
     };
   } | null>(null);
@@ -530,8 +536,12 @@ export default function BookingForm({
                   {result.fare_breakdown.fare_subtotal_cents != null && (
                     <>
                       <p className="mt-2 text-sm text-[#134e4a]">Fare: ₱{(result.fare_breakdown.fare_subtotal_cents / 100).toLocaleString()}</p>
-                      <p className="text-sm text-[#134e4a]">Admin Fee (₱20/pax): ₱{((result.fare_breakdown.admin_fee_cents ?? 0) / 100).toLocaleString()}</p>
-                      <p className="text-sm text-[#134e4a]">GCash Fee: ₱{((result.fare_breakdown.gcash_fee_cents ?? 0) / 100).toLocaleString()}</p>
+                      {(result.fare_breakdown.admin_fee_cents ?? 0) > 0 && (
+                        <p className="text-sm text-[#134e4a]">{result.fare_breakdown.admin_fee_label ?? "Admin Fee"}: ₱{((result.fare_breakdown.admin_fee_cents ?? 0) / 100).toLocaleString()}</p>
+                      )}
+                      {(result.fare_breakdown.gcash_fee_cents ?? 0) > 0 && result.fare_breakdown.gcash_fee_show_breakdown !== false && (
+                        <p className="text-sm text-[#134e4a]">{result.fare_breakdown.gcash_fee_label ?? "GCash Fee"}: ₱{((result.fare_breakdown.gcash_fee_cents ?? 0) / 100).toLocaleString()}</p>
+                      )}
                     </>
                   )}
                   <p className="mt-2 pt-2 border-t border-teal-200 text-sm font-semibold text-[#134e4a]">Total: ₱{(result.total_amount_cents / 100).toLocaleString()}</p>
