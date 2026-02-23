@@ -349,6 +349,9 @@ export default function BookingForm({
           discount_percent: data.discount_percent ?? 20,
           admin_fee_cents_per_passenger: data.admin_fee_cents_per_passenger,
           gcash_fee_cents: data.gcash_fee_cents,
+          admin_fee_label: data.admin_fee_label,
+          gcash_fee_label: data.gcash_fee_label,
+          gcash_fee_show_breakdown: data.gcash_fee_show_breakdown,
         } : null);
         setLoadingFare(false);
       })
