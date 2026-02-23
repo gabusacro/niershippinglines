@@ -171,7 +171,7 @@ export default async function BookingTicketsPage({
                 <p>
                   <span className="text-xs font-semibold uppercase text-[#0f766e]">Total paid (booking)</span>
                   <span className="ml-2 font-bold text-[#134e4a]">₱{(((booking as { total_amount_cents?: number }).total_amount_cents ?? 0) / 100).toLocaleString()}</span>
-                  <span className="ml-2 text-xs text-[#0f766e]">(includes admin fee ₱20/pax{((booking as { gcash_fee_cents?: number }).gcash_fee_cents ?? 0) > 0 ? ", GCash fee ₱15" : ""})</span>
+                  <span className="ml-2 text-xs text-[#0f766e]">(includes Platform Service Fee ₱20/pax{((booking as { gcash_fee_cents?: number }).gcash_fee_cents ?? 0) > 0 ? ", Payment Processing Fee ₱15" : ""})</span>
                 </p>
               )}
             </div>

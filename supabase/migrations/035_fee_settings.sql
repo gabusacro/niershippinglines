@@ -1,4 +1,4 @@
--- Admin-editable fees: admin fee per passenger and GCash fee per transaction.
+-- Admin-editable fees: Platform Service Fee per passenger and Payment Processing Fee per transaction.
 -- Single row (id=1). Used by booking, manual booking, and fare API. Fallback to app constants if not set.
 
 CREATE TABLE public.fee_settings (
@@ -8,7 +8,7 @@ CREATE TABLE public.fee_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-COMMENT ON TABLE public.fee_settings IS 'Admin fee (₱/pax) and GCash fee (₱/transaction). Editable from Admin → Fees & charges.';
+COMMENT ON TABLE public.fee_settings IS 'Platform Service Fee (₱/pax) and Payment Processing Fee (₱/transaction). Editable from Admin → Fees & charges.';
 
 INSERT INTO public.fee_settings (id, admin_fee_cents_per_passenger, gcash_fee_cents)
 VALUES (1, 2000, 1500)

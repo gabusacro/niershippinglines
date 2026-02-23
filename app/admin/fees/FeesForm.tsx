@@ -65,7 +65,7 @@ export function FeesForm({ initial }: { initial: FeeSettingsFull }) {
         <p className="mt-1 text-xs text-[#0f766e]">Fees added on top of the base fare. You can rename them and control where they apply.</p>
 
         <div className="mt-5 grid gap-6 sm:grid-cols-2">
-          {/* Admin Fee */}
+          {/* Platform Service Fee */}
           <div className="space-y-3">
             <label className="block text-xs font-semibold uppercase tracking-wide text-[#134e4a]">Service Fee (per passenger)</label>
             <div>
@@ -104,7 +104,7 @@ export function FeesForm({ initial }: { initial: FeeSettingsFull }) {
             </label>
           </div>
 
-          {/* GCash Fee */}
+          {/* Payment Processing Fee */}
           <div className="space-y-3">
             <label className="block text-xs font-semibold uppercase tracking-wide text-[#134e4a]">Online Payment Fee (per booking)</label>
             <div>

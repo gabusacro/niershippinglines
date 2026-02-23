@@ -51,7 +51,7 @@ export default async function AdminVesselOwnersPage() {
       <div className="mt-6 rounded-xl border border-teal-200 bg-teal-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">How Patronage Bonus works</p>
         <div className="mt-2 space-y-1 text-xs text-[#134e4a]">
-          <p>1. <strong>Net Platform Revenue</strong> = Admin + GCash Fees − Monthly Expenses</p>
+          <p>1. <strong>Net Platform Revenue</strong> = Admin + Payment Processing Fees − Monthly Expenses</p>
           <p>2. Each vessel owner receives their <strong>Patronage Bonus %</strong> of the Net Platform Revenue</p>
           <p>3. Vessel owners also keep <strong>100% of their vessel&apos;s fare revenue</strong> (minus fuel)</p>
           <p>4. The patronage bonus is their share of the platform fees pool — a reward for bringing passengers</p>

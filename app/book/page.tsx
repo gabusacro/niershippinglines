@@ -70,7 +70,7 @@ export default async function BookPage({
           </div>
         </div>
         <p className="mt-4 text-sm text-[#0f766e]">
-          Same base fare for Siargao and Dinagat routes. Reschedule: 10% + ₱15 (24+ hours before departure only). No seat numbers—first-come seating at the pier. Fee breakdown: Fare + Admin fee (₱15/pax) + GCash fee (₱15 per transaction).
+          Same base fare for Siargao and Dinagat routes. Reschedule: 10% + ₱15 (24+ hours before departure only). No seat numbers—first-come seating at the pier. Fee breakdown: Fare + Platform Service Fee (₱15/pax) + Payment Processing Fee (₱15 per transaction).
         </p>
         <p className="mt-2 text-sm font-medium text-amber-800">
           For a smooth trip, please arrive at the port <strong>30 min–1 hour</strong> before boarding. Once the vessel has departed, we’re unable to offer refunds or rebooking.

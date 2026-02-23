@@ -40,7 +40,7 @@ export default async function AdminInvestorSharesPage() {
       <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">How Investor Shares work</p>
         <div className="mt-2 space-y-1 text-xs text-amber-800">
-          <p>1. <strong>Net Platform Revenue</strong> = Admin + GCash Fees − Monthly Expenses</p>
+          <p>1. <strong>Net Platform Revenue</strong> = Admin + Payment Processing Fees − Monthly Expenses</p>
           <p>2. Each investor receives their <strong>Share %</strong> of the Net Platform Revenue monthly</p>
           <p>3. Vessel owners also receive their patronage bonus % from the same pool</p>
           <p>4. <strong>Admin keeps the remainder</strong> after all investor + vessel owner shares are paid out</p>

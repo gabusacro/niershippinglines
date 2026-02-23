@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    message: "Booking rescheduled. 10% reschedule fee + ₱15 GCash fee applies. Pay the difference (₱" + (rescheduleFeeCents / 100).toFixed(0) + ") at the ticket booth before boarding.",
+    message: "Booking rescheduled. 10% reschedule fee + ₱15 Payment Processing Fee applies. Pay the difference (₱" + (rescheduleFeeCents / 100).toFixed(0) + ") at the ticket booth before boarding.",
     additional_fee_cents: rescheduleFeeCents,
     new_total_cents: newTotalCents,
   });

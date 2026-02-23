@@ -121,7 +121,7 @@ export default async function VesselOwnerDashboard() {
   const todayTrips = (trips ?? []).filter((t) => t.departure_date === todayManila);
 
   // Platform revenue for patronage bonus calculation
-  // Get all platform admin+gcash fees this month (from all vessels, not just owner's)
+  // Get all platform admin+Payment Processing Fees this month (from all vessels, not just owner's)
   const { data: allTripsThisMonth } = await supabase
     .from("trips")
     .select("id")

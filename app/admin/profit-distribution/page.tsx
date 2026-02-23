@@ -185,11 +185,11 @@ export default async function AdminProfitDistributionPage() {
           {/* Revenue waterfall */}
           <div className="mt-4 space-y-1.5 text-sm">
             <div className="flex justify-between border-b border-teal-100 pb-2">
-              <span className="text-[#134e4a] font-medium">Admin Fees ({totalPassengers} pax × ₱20)</span>
+              <span className="text-[#134e4a] font-medium">Platform Service Fee ({totalPassengers} pax × ₱20)</span>
               <span className="font-semibold text-emerald-700">{peso(totalAdminFeeCents)}</span>
             </div>
             <div className="flex justify-between border-b border-teal-100 pb-2">
-              <span className="text-[#134e4a] font-medium">GCash Fees ({totalPassengers} pax × ₱15)</span>
+              <span className="text-[#134e4a] font-medium">Payment Processing Fees ({totalPassengers} pax × ₱15)</span>
               <span className="font-semibold text-blue-700">{peso(totalGcashFeeCents)}</span>
             </div>
             <div className="flex justify-between border-b-2 border-teal-200 pb-2 font-semibold">

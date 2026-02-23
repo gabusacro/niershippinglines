@@ -104,11 +104,11 @@ export default async function InvestorBreakdownPage() {
           </div>
 
           <div className="flex justify-between border-b border-teal-100 pb-2">
-            <span className="text-[#134e4a]">Admin Fees ({totalPassengers} pax × ₱20)</span>
+            <span className="text-[#134e4a]">Platform Service Fees ({totalPassengers} pax × ₱20)</span>
             <span className="font-semibold text-emerald-700">{peso(totalAdminFeeCents)}</span>
           </div>
           <div className="flex justify-between border-b-2 border-teal-200 pb-2">
-            <span className="text-[#134e4a]">GCash Fees ({totalPassengers} pax × ₱15)</span>
+            <span className="text-[#134e4a]">Payment Processing Fees ({totalPassengers} pax × ₱15)</span>
             <span className="font-semibold text-blue-700">{peso(totalGcashFeeCents)}</span>
           </div>
           <div className="flex justify-between font-semibold pb-2 border-b border-teal-100">

@@ -59,7 +59,7 @@ export default async function AdminReportsPage({
   const isTicketBooth = user.role === "ticket_booth";
   if (!isAdmin && !isTicketBooth) redirect(ROUTES.dashboard);
 
-  // Only admin sees platform financial data (admin fee, gcash fee, platform revenue)
+  // Only admin sees platform financial data (Platform Service Fee, Payment Processing Fee, platform revenue)
   const showFees = isAdmin;
 
   const params = await searchParams;
@@ -226,8 +226,8 @@ export default async function AdminReportsPage({
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard label="Passengers" value={dailyTotals.passengers.toLocaleString()} />
             <SummaryCard label="Gross Fare" value={peso(dailyTotals.revenue)} />
-            {showFees && <SummaryCard label="Admin Fees" value={peso(dailyTotals.adminFee)} />}
-            {showFees && <SummaryCard label="GCash Fees" value={peso(dailyTotals.gcashFee)} />}
+            {showFees && <SummaryCard label="Platform Service Fee" value={peso(dailyTotals.adminFee)} />}
+            {showFees && <SummaryCard label="Payment Processing Fee" value={peso(dailyTotals.gcashFee)} />}
             {showFees && <SummaryCard label="Platform Rev" value={peso(dailyTotals.adminFee + dailyTotals.gcashFee)} sub="Admin + GCash" />}
             <SummaryCard label="Fuel Cost" value={peso(dailyTotals.fuelCost)} sub={`${fuelPriceLabel} ₱/L`} />
             <SummaryCard label="Net (Fare−Fuel)" value={peso(dailyTotals.net)} />
@@ -241,8 +241,8 @@ export default async function AdminReportsPage({
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-[#134e4a]">Trips</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
-                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Service Fee</th>}
+                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Payment Processing Fee</th>}
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-[#134e4a]">Manifest</th>
@@ -311,8 +311,8 @@ export default async function AdminReportsPage({
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Seats</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Boarded</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
-                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Service Fee</th>}
+                  {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Payment Processing Fee</th>}
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel (L)</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
@@ -359,8 +359,8 @@ export default async function AdminReportsPage({
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard label="Passengers" value={weekly.totalPassengers.toLocaleString()} />
             <SummaryCard label="Gross Fare" value={peso(weekly.totalRevenueCents)} />
-            {showFees && <SummaryCard label="Admin Fees" value={peso(weekly.totalAdminFeeCents)} />}
-            {showFees && <SummaryCard label="GCash Fees" value={peso(weekly.totalGcashFeeCents)} />}
+            {showFees && <SummaryCard label="Platform Service Fees" value={peso(weekly.totalAdminFeeCents)} />}
+            {showFees && <SummaryCard label="Payment Processing Fees" value={peso(weekly.totalGcashFeeCents)} />}
             {showFees && <SummaryCard label="Platform Rev" value={peso(weekly.totalAdminFeeCents + weekly.totalGcashFeeCents)} sub="Admin + GCash" />}
             <SummaryCard label="Fuel Cost" value={peso(weekly.totalFuelCostCents)} sub={`${fuelPriceLabel} ₱/L`} />
             <SummaryCard label="Net (Fare−Fuel)" value={peso(weekly.netRevenueCents)} />
@@ -375,8 +375,8 @@ export default async function AdminReportsPage({
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Vessel</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
-                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Service Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Payment Processing Fee</th>}
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
                     </tr>
@@ -411,8 +411,8 @@ export default async function AdminReportsPage({
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard label="Passengers" value={monthly.totalPassengers.toLocaleString()} />
             <SummaryCard label="Gross Fare" value={peso(monthly.totalRevenueCents)} />
-            {showFees && <SummaryCard label="Admin Fees" value={peso(monthly.totalAdminFeeCents)} />}
-            {showFees && <SummaryCard label="GCash Fees" value={peso(monthly.totalGcashFeeCents)} />}
+            {showFees && <SummaryCard label="Platform Service Fees" value={peso(monthly.totalAdminFeeCents)} />}
+            {showFees && <SummaryCard label="Payment Processing Fees" value={peso(monthly.totalGcashFeeCents)} />}
             {showFees && <SummaryCard label="Platform Rev" value={peso(monthly.totalAdminFeeCents + monthly.totalGcashFeeCents)} sub="Admin + GCash" />}
             <SummaryCard label="Fuel Cost" value={peso(monthly.totalFuelCostCents)} sub={`${fuelPriceLabel} ₱/L`} />
             <SummaryCard label="Net (Fare−Fuel)" value={peso(monthly.netRevenueCents)} />
@@ -420,7 +420,7 @@ export default async function AdminReportsPage({
           {showFees && (
             <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
               <p className="text-sm font-semibold text-emerald-800">💰 Platform Revenue — {MONTH_NAMES[currentMonth - 1]} {currentYear}</p>
-              <p className="mt-1 text-xs text-emerald-700">Admin + GCash fees collected, minus operational expenses.</p>
+              <p className="mt-1 text-xs text-emerald-700">Admin + Payment Processing Fees collected, minus operational expenses.</p>
 
               {/* Gross */}
               <div className="mt-4 space-y-1.5">
@@ -429,11 +429,11 @@ export default async function AdminReportsPage({
                   <span className="font-semibold text-emerald-800">{peso(monthly.totalAdminFeeCents + monthly.totalGcashFeeCents)}</span>
                 </div>
                 <div className="ml-4 flex items-center justify-between text-xs text-emerald-600">
-                  <span>Admin fees</span>
+                  <span>Platform Service Fees</span>
                   <span>{peso(monthly.totalAdminFeeCents)}</span>
                 </div>
                 <div className="ml-4 flex items-center justify-between text-xs text-emerald-600">
-                  <span>GCash fees</span>
+                  <span>Payment Processing Fees</span>
                   <span>{peso(monthly.totalGcashFeeCents)}</span>
                 </div>
               </div>
@@ -483,8 +483,8 @@ export default async function AdminReportsPage({
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Vessel</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
-                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Service Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Payment Processing Fee</th>}
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
                       <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-[#134e4a]">Manifest</th>
@@ -526,8 +526,8 @@ export default async function AdminReportsPage({
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <SummaryCard label="Total Passengers" value={annualMonthly.reduce((s, r) => s + r.passengers, 0).toLocaleString()} />
             <SummaryCard label="Gross Fare" value={peso(annualMonthly.reduce((s, r) => s + r.revenueCents, 0))} />
-            {showFees && <SummaryCard label="Admin Fees" value={peso(annualMonthly.reduce((s, r) => s + r.adminFeeCents, 0))} />}
-            {showFees && <SummaryCard label="GCash Fees" value={peso(annualMonthly.reduce((s, r) => s + r.gcashFeeCents, 0))} />}
+            {showFees && <SummaryCard label="Platform Service Fees" value={peso(annualMonthly.reduce((s, r) => s + r.adminFeeCents, 0))} />}
+            {showFees && <SummaryCard label="Payment Processing Fees" value={peso(annualMonthly.reduce((s, r) => s + r.gcashFeeCents, 0))} />}
             {showFees && <SummaryCard label="Platform Rev" value={peso(annualMonthly.reduce((s, r) => s + r.adminFeeCents + r.gcashFeeCents, 0))} sub="Admin + GCash" />}
             {peakMonth && peakMonth.passengers > 0 && <SummaryCard label="Peak Month" value={peakMonth.monthName} sub={`${peakMonth.passengers.toLocaleString()} passengers`} />}
           </div>
@@ -551,8 +551,8 @@ export default async function AdminReportsPage({
                   <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Month</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                  {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
-                  {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                  {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Service Fee</th>}
+                  {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Payment Processing Fee</th>}
                   {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Rev</th>}
                   <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-[#134e4a]">Manifests</th>
                 </tr>
@@ -586,8 +586,8 @@ export default async function AdminReportsPage({
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Vessel</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Passengers</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
-                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Service Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Payment Processing Fee</th>}
                       {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Rev</th>}
                     </tr>
                   </thead>

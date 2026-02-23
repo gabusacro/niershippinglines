@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
   }
   const fareSubtotalCents = totalCents;
   const feeSettings = await getFeeSettings();
-  const gcashFeeCents = 0; // Walk-in pays at booth; no GCash fee
+  const gcashFeeCents = 0; // Walk-in pays at booth; no Payment Processing Fee
   const adminFeeCents = passengerCount * feeSettings.admin_fee_cents_per_passenger;
   totalCents = fareSubtotalCents + gcashFeeCents + adminFeeCents;
 

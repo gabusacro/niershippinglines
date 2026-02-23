@@ -4,12 +4,12 @@ Prices may vary over time. Here is where each value lives and how to change it.
 
 ---
 
-## 1. Admin fee and GCash fee (code)
+## 1. Platform Service Fee and Payment Processing Fee (code)
 
 **Location:** `lib/constants.ts`
 
-- **`ADMIN_FEE_CENTS_PER_PASSENGER`** — Admin fee per passenger (e.g. ₱15 = 1500 cents). Used for **all** bookings (online and walk-in).
-- **`GCASH_FEE_CENTS`** — GCash fee per **transaction** (e.g. ₱15 = 1500 cents). Used only for **online/GCash** bookings; walk-in at the booth has no GCash fee (₱0).
+- **`ADMIN_FEE_CENTS_PER_PASSENGER`** — Platform Service Fee per passenger (e.g. ₱15 = 1500 cents). Used for **all** bookings (online and walk-in).
+- **`GCASH_FEE_CENTS`** — Payment Processing Fee per **transaction** (e.g. ₱15 = 1500 cents). Used only for **online/GCash** bookings; walk-in at the booth has no Payment Processing Fee (₱0).
 
 **How to change:** Edit the numbers in `lib/constants.ts`, then redeploy. These are **not** stored in Supabase.
 
@@ -51,9 +51,9 @@ Used when a passenger requests a reschedule (MARINA-style: 10% + ₱15). Edit in
 
 | What              | Where              | How to change                    |
 |-------------------|--------------------|-----------------------------------|
-| Admin fee (₱/pax) | `lib/constants.ts` | Edit `ADMIN_FEE_CENTS_PER_PASSENGER` |
-| GCash fee (₱)     | `lib/constants.ts` | Edit `GCASH_FEE_CENTS`            |
+| Platform Service Fee (₱/pax) | `lib/constants.ts` | Edit `ADMIN_FEE_CENTS_PER_PASSENGER` |
+| Payment Processing Fee (₱)     | `lib/constants.ts` | Edit `GCASH_FEE_CENTS`            |
 | Base fare, discount | Supabase `fare_rules` | Table Editor or SQL            |
 
 The **total** shown in Manual Booking (and on Book A Trip) is:  
-**base fare (from `fare_rules`) + admin fee (from constants) + GCash fee (constants; 0 for walk-in).**
+**base fare (from `fare_rules`) + Platform Service Fee (from constants) + Payment Processing Fee (constants; 0 for walk-in).**

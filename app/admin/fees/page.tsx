@@ -7,7 +7,7 @@ import { FeesForm } from "./FeesForm";
 
 export const metadata = {
   title: "Fees & charges",
-  description: "Set admin fee, GCash fee, and passenger fare discounts — Admin",
+  description: "Set Platform Service Fee, Payment Processing Fee, and passenger fare discounts — Admin",
 };
 
 export const dynamic = "force-dynamic";
@@ -26,8 +26,8 @@ export default async function AdminFeesPage() {
   const settings = {
     admin_fee_cents_per_passenger: Number(data?.admin_fee_cents_per_passenger) || ADMIN_FEE_CENTS_PER_PASSENGER,
     gcash_fee_cents: Number(data?.gcash_fee_cents) || GCASH_FEE_CENTS,
-    admin_fee_label: data?.admin_fee_label ?? "Admin Fee",
-    gcash_fee_label: data?.gcash_fee_label ?? "GCash Fee",
+    admin_fee_label: data?.admin_fee_label ?? "Platform Service Fee",
+    gcash_fee_label: data?.gcash_fee_label ?? "Payment Processing Fee",
     admin_fee_applies_walkin: data?.admin_fee_applies_walkin ?? true,   
     gcash_fee_show_breakdown: data?.gcash_fee_show_breakdown ?? true,   
     child_min_age: data?.child_min_age ?? 3,

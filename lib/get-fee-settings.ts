@@ -33,8 +33,8 @@ export async function getFeeSettings(): Promise<FeeSettings> {
   return {
     admin_fee_cents_per_passenger: Number(data.admin_fee_cents_per_passenger) || ADMIN_FEE_CENTS_PER_PASSENGER,
     gcash_fee_cents: Number(data.gcash_fee_cents) || GCASH_FEE_CENTS,
-    admin_fee_label: data.admin_fee_label ?? "Admin Fee",
-    gcash_fee_label: data.gcash_fee_label ?? "GCash Fee",
+    admin_fee_label: data.admin_fee_label ?? "Platform Service Fee",
+    gcash_fee_label: data.gcash_fee_label ?? "Payment Processing Fee",
     admin_fee_applies_walkin: data.admin_fee_applies_walkin ?? true,
     gcash_fee_show_breakdown: data.gcash_fee_show_breakdown ?? true,
     child_min_age: data.child_min_age ?? 3,
@@ -51,8 +51,8 @@ function defaults(): FeeSettings {
   return {
     admin_fee_cents_per_passenger: ADMIN_FEE_CENTS_PER_PASSENGER,
     gcash_fee_cents: GCASH_FEE_CENTS,
-    admin_fee_label: "Admin Fee",
-    gcash_fee_label: "GCash Fee",
+    admin_fee_label: "Platform Service Fee",
+    gcash_fee_label: "Payment Processing Fee",
     admin_fee_applies_walkin: true,
     gcash_fee_show_breakdown: true,
     child_min_age: 3,

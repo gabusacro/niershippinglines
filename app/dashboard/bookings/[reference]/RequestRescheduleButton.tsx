@@ -131,7 +131,7 @@ export function RequestRescheduleButton({
         <div className="rounded-xl border-2 border-teal-200 bg-teal-50/30 p-5">
           <h2 className="text-base font-semibold text-[#134e4a]">Change schedule</h2>
           <p className="mt-2 text-sm text-[#0f766e]">
-            Reschedule only allowed <strong>24+ hours</strong> before departure. Fee: <strong>{RESCHEDULE_FEE_PERCENT}%</strong> of fare + <strong>₱{RESCHEDULE_GCASH_FEE_CENTS / 100}</strong> GCash fee (₱{(rescheduleFeeCents / 100).toFixed(0)} for this booking). Pay at the ticket booth.
+            Reschedule only allowed <strong>24+ hours</strong> before departure. Fee: <strong>{RESCHEDULE_FEE_PERCENT}%</strong> of fare + <strong>₱{RESCHEDULE_GCASH_FEE_CENTS / 100}</strong> Payment Processing Fee (₱{(rescheduleFeeCents / 100).toFixed(0)} for this booking). Pay at the ticket booth.
           </p>
           <p className="mt-1 text-xs text-[#0f766e]">Subject to seat availability. Same route only.</p>
           {loading ? (

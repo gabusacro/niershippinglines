@@ -49,7 +49,7 @@ export default async function ReportsTripsPage({
   const isTicketBooth = user.role === "ticket_booth";
   if (!isAdmin && !isTicketBooth) redirect(ROUTES.dashboard);
 
-  // Only admin sees admin fee and gcash fee columns
+  // Only admin sees Platform Service Fee and Payment Processing Fee columns
   const showFees = isAdmin;
 
   const params = await searchParams;
@@ -188,13 +188,13 @@ export default async function ReportsTripsPage({
           </div>
           {showFees && (
             <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">Admin Fees</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">Platform Service Fee</p>
               <p className="mt-1.5 text-lg font-bold text-emerald-700">{peso(totAdmin)}</p>
             </div>
           )}
           {showFees && (
             <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">GCash Fees</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-[#0f766e]">Payment Processing Fees</p>
               <p className="mt-1.5 text-lg font-bold text-blue-700">{peso(totGcash)}</p>
             </div>
           )}
@@ -225,8 +225,8 @@ export default async function ReportsTripsPage({
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Avail</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Boarded</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
-                {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Service Fee</th>}
+                {showFees && <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Payment Processing Fee</th>}
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel (L)</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Fuel Cost</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
@@ -302,8 +302,8 @@ export default async function ReportsTripsPage({
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-[#134e4a]">Route</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Boarded</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Gross Fare</th>
-                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Admin Fee</th>}
-                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">GCash Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Platform Service Fee</th>}
+                      {showFees && <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Payment Processing Fee</th>}
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-[#134e4a]">Net Rev</th>
                       <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-[#134e4a]">Manifest</th>
                     </tr>
