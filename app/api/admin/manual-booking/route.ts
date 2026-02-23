@@ -148,7 +148,9 @@ export async function POST(request: NextRequest) {
   const fareSubtotalCents = totalCents;
   const feeSettings = await getFeeSettings();
   const gcashFeeCents = 0; // Walk-in pays at booth; no Payment Processing Fee
-  const adminFeeCents = passengerCount * feeSettings.admin_fee_cents_per_passenger;
+  const adminFeeCents = feeSettings.admin_fee_applies_walkin
+  ? passengerCount * feeSettings.admin_fee_cents_per_passenger
+  : 0;
   totalCents = fareSubtotalCents + gcashFeeCents + adminFeeCents;
 
   const { data: ref, error: refError } = await supabase.rpc("generate_booking_reference");
