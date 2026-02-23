@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
-import { getFeeSettings } from "@/lib/get-fee-settings";
-import { ROUTES } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/server";
+import { ROUTES, ADMIN_FEE_CENTS_PER_PASSENGER, GCASH_FEE_CENTS } from "@/lib/constants";
 import { FeesForm } from "./FeesForm";
 
 export const metadata = {
   title: "Fees & charges",
-  description: "Set admin fee and GCash fee — Admin",
+  description: "Set admin fee, GCash fee, and passenger fare discounts — Admin",
 };
 
 export const dynamic = "force-dynamic";
@@ -16,16 +16,35 @@ export default async function AdminFeesPage() {
   const user = await getAuthUser();
   if (!user || user.role !== "admin") redirect(ROUTES.dashboard);
 
-  const settings = await getFeeSettings();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("fee_settings")
+    .select("*")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const settings = {
+    admin_fee_cents_per_passenger: Number(data?.admin_fee_cents_per_passenger) || ADMIN_FEE_CENTS_PER_PASSENGER,
+    gcash_fee_cents: Number(data?.gcash_fee_cents) || GCASH_FEE_CENTS,
+    admin_fee_label: data?.admin_fee_label ?? "Admin Fee",
+    gcash_fee_label: data?.gcash_fee_label ?? "GCash Fee",
+    child_min_age: data?.child_min_age ?? 3,
+    child_max_age: data?.child_max_age ?? 10,
+    child_discount_percent: Number(data?.child_discount_percent ?? 50),
+    infant_max_age: data?.infant_max_age ?? 2,
+    infant_is_free: data?.infant_is_free ?? true,
+    senior_discount_percent: Number(data?.senior_discount_percent ?? 20),
+    pwd_discount_percent: Number(data?.pwd_discount_percent ?? 20),
+  };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       <Link href={ROUTES.admin} className="text-sm font-semibold text-[#0c7b93] hover:underline">
         ← Admin dashboard
       </Link>
-      <h1 className="mt-4 text-2xl font-bold text-[#134e4a]">Fees & charges</h1>
-      <p className="mt-2 text-sm text-[#0f766e]">
-        Set the admin fee (per passenger) and GCash fee (per online transaction). These apply to Book a Trip and manual bookings. Base fare per route is set in Supabase <strong>fare_rules</strong> or via Schedule.
+      <h1 className="mt-4 text-2xl font-bold text-[#134e4a]">Fees & Charges</h1>
+      <p className="mt-1 text-sm text-[#0f766e]">
+        Configure platform fees, fee label names, and passenger fare discount rules (senior, PWD, child, infant).
       </p>
       <FeesForm initial={settings} />
     </div>
