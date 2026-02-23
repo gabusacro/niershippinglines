@@ -641,8 +641,12 @@ export default function BookingForm({
         <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 space-y-1">
           <p className="text-xs font-semibold uppercase text-[#0f766e]">Amount breakdown</p>
           <p className="text-sm text-[#134e4a]">Fare: ₱{(fareSubtotalCents / 100).toLocaleString()}</p>
-          <p className="text-sm text-[#134e4a]">Admin Fee (₱{(adminFeePerPax / 100).toLocaleString()}/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
-          <p className="text-sm text-[#134e4a]">GCash Fee: ₱{(gcashFee / 100).toLocaleString()}</p>
+          {adminFeeCents > 0 && (
+            <p className="text-sm text-[#134e4a]">{fare.admin_fee_label ?? "Admin Fee"} (₱{(adminFeePerPax / 100).toLocaleString()}/pax): ₱{(adminFeeCents / 100).toLocaleString()}</p>
+          )}
+          {gcashFee > 0 && fare.gcash_fee_show_breakdown !== false && (
+            <p className="text-sm text-[#134e4a]">{fare.gcash_fee_label ?? "GCash Fee"}: ₱{(gcashFee / 100).toLocaleString()}</p>
+          )}
           <p className="text-sm font-semibold text-[#134e4a] pt-1 border-t border-teal-200">Total: ₱{(totalCents / 100).toLocaleString()} ({totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""})</p>
         </div>
       )}
