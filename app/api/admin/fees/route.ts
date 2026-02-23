@@ -36,7 +36,7 @@ export async function PATCH(request: NextRequest) {
   const textFields = ["admin_fee_label", "gcash_fee_label"];
   const integerFields = ["child_min_age", "child_max_age", "infant_max_age"];
   const decimalFields = ["child_discount_percent", "senior_discount_percent", "pwd_discount_percent"];
-  const boolFields = ["infant_is_free"];
+  const boolFields = ["infant_is_free", "admin_fee_applies_walkin", "gcash_fee_show_breakdown"];
 
   for (const f of intFields) {
     if (typeof body[f] === "number") updates[f] = Math.round(body[f] as number);
