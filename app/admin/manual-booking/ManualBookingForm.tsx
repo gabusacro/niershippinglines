@@ -116,6 +116,7 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
             discount_percent: data.discount_percent ?? 20,
             admin_fee_cents_per_passenger: data.admin_fee_cents_per_passenger ?? ADMIN_FEE_CENTS_PER_PASSENGER,
             gcash_fee_cents: 0,
+            admin_fee_label: data.admin_fee_label,
           });
         } else {
           setFarePreview(null);
@@ -341,13 +342,13 @@ export function ManualBookingForm({ trips }: { trips: TripForManualBooking[] }) 
               <>
                 <p className="font-medium">Fare calculation</p>
                 <p className="mt-0.5">
-                Base fare: ₱{(fareBreakdown.fareSubtotalCents / 100).toLocaleString()} · {farePreview?.admin_fee_label ?? "Admin fee"} (₱{((fareBreakdown.adminFeeCents / totalPassengers) / 100).toLocaleString()}/pax): ₱{(fareBreakdown.adminFeeCents / 100).toLocaleString()} · Online payment fee (walk-in): ₱0
+                Base fare: ₱{(fareBreakdown.fareSubtotalCents / 100).toLocaleString()} · {farePreview?.admin_fee_label ?? "Platform Service Fee"} (₱{((fareBreakdown.adminFeeCents / totalPassengers) / 100).toLocaleString()}/pax): ₱{(fareBreakdown.adminFeeCents / 100).toLocaleString()} · Online payment fee (walk-in): ₱0
                 </p>
                 <p className="mt-1 font-semibold">Total: ₱{(fareBreakdown.totalCents / 100).toLocaleString()}</p>
               </>
             ) : (
               <p>
-                {totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""} · {farePreview?.admin_fee_label ?? "Admin fee"} (₱{(ADMIN_FEE_CENTS_PER_PASSENGER / 100).toLocaleString()}/pax): ₱{(adminFeeCents / 100).toLocaleString()}. No online payment fee for walk-in.
+                {totalPassengers} passenger{totalPassengers !== 1 ? "s" : ""} · {farePreview?.admin_fee_label ?? "Platform Service Fee"} (₱{(ADMIN_FEE_CENTS_PER_PASSENGER / 100).toLocaleString()}/pax): ₱{(adminFeeCents / 100).toLocaleString()}. No online payment fee for walk-in.
               </p>
             )}
           </div>
