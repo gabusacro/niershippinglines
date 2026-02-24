@@ -26,6 +26,7 @@ import { getTripManifestData } from "@/lib/admin/trip-manifest";
 import { getPassengerRestrictions, isBlockedNow } from "@/lib/dashboard/get-passenger-restrictions";
 import { CrewCaptainManifestSection } from "@/app/dashboard/CrewCaptainManifestSection";
 import { DiscoverSiargao } from "@/components/dashboard/DiscoverSiargao";
+import { getDiscoverItems } from "@/lib/dashboard/get-discover-items";
 
 export async function generateMetadata() {
   const branding = await getSiteBranding();
@@ -108,13 +109,14 @@ export default async function DashboardPage({
     : null;
   const showWelcomeName = welcomeName ?? (user.email ? null : "User");
 
-  const [branding, passengerRestriction, allPending, recentlyConfirmed, refundedBookings, pendingPreviewBooth] = await Promise.all([
+  const [branding, passengerRestriction, allPending, recentlyConfirmed, refundedBookings, pendingPreviewBooth, discoverItems] = await Promise.all([
     getSiteBranding(),
     isPassenger ? getPassengerRestrictions(user.id) : Promise.resolve(null),
     isPassenger ? getPendingPaymentBookings(user.id) : Promise.resolve([]),
     isPassenger ? getRecentlyConfirmedBookings(user.id) : Promise.resolve([]),
     isPassenger ? getRefundedBookings(user.id) : Promise.resolve([]),
     user.role === "ticket_booth" ? getPendingPaymentsPreview() : Promise.resolve({ count: 0, items: [] }),
+    isPassenger ? getDiscoverItems() : Promise.resolve([]),
   ]);
 
   const awaitingPayment = allPending.filter((b) => !b.payment_proof_path);
@@ -462,8 +464,8 @@ export default async function DashboardPage({
             />
           </div>
 
-          {/* ⑥ DISCOVER SIARGAO */}
-          <DiscoverSiargao />
+          {/* ⑥ DISCOVER SIARGAO — hidden automatically when no items */}
+          <DiscoverSiargao items={discoverItems} />
 
           {/* ⑦ FIND BOOKING BY REFERENCE — utility, moved to bottom */}
           <div className="rounded-2xl border-2 border-teal-100 bg-white p-5 shadow-sm">

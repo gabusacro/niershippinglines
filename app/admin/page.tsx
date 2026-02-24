@@ -38,7 +38,8 @@ export default async function AdminDashboardPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <DashboardAutoRefresh intervalSeconds={90} />
-      {/* Header with welcome */}
+
+      {/* Header */}
       <div className="rounded-2xl bg-gradient-to-br from-[#0c7b93] to-[#0f766e] px-6 py-8 text-white shadow-lg sm:px-8">
         <p className="text-sm font-medium uppercase tracking-wider text-white/80">Admin dashboard</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
@@ -49,7 +50,7 @@ export default async function AdminDashboardPage() {
         </p>
       </div>
 
-      {/* Admin nav — reports, vessels, schedule, payments, bookings, branding, flagged, account */}
+      {/* Admin nav */}
       <div className="mt-6">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <Link
@@ -94,7 +95,6 @@ export default async function AdminDashboardPage() {
           >
             Site branding
           </Link>
-       
           <Link
             href={ROUTES.adminFees}
             className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
@@ -125,13 +125,21 @@ export default async function AdminDashboardPage() {
           >
             Vessel Owners
           </Link>
-
           <Link
             href={ROUTES.adminFlagged}
             className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
           >
             Flagged accounts
           </Link>
+
+          {/* ── NEW: Discover Siargao content manager ── */}
+          <Link
+            href="/admin/discover"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-400 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100"
+          >
+            🌊 Discover Content
+          </Link>
+
           <Link
             href={ROUTES.account}
             className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
@@ -141,7 +149,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Pending payments — confirm fast so passengers get tickets */}
+      {/* Pending payments */}
       {pendingPreview.count > 0 && (
         <div className="mt-8 rounded-2xl border-2 border-amber-400 bg-amber-50 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -151,7 +159,7 @@ export default async function AdminDashboardPage() {
             </div>
             <Link
               href={ROUTES.adminPendingPayments}
-              className="rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
             >
               View all →
             </Link>
@@ -167,7 +175,7 @@ export default async function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Live analytics: passengers today per vessel (from Supabase) */}
+      {/* Live passengers by vessel */}
       <div className="mt-10">
         <h2 className="text-lg font-semibold text-[#134e4a]">Live today — Passengers by vessel</h2>
         <p className="mt-0.5 text-sm text-[#0f766e]/80">From Supabase: booked passengers (confirmed/boarded) on today&apos;s trips. Refresh to update.</p>
@@ -214,7 +222,6 @@ export default async function AdminDashboardPage() {
           ))}
         </div>
       </div>
-
     </div>
   );
 }

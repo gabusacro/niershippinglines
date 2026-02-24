@@ -2,142 +2,45 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import type { DiscoverItem } from "@/lib/dashboard/get-discover-items";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = "all" | "videos" | "attractions" | "partners";
+type Tab = "all" | "video" | "attraction" | "partner";
 
-type DiscoverItem = {
-  id: string;
-  type: "video" | "attraction" | "partner";
-  title: string;
-  tag: string;
-  emoji: string;
-  featured?: boolean;
-  href?: string;
-  isAdSlot?: boolean;
-};
-
-// ─── Route constant (matches your ROUTES.attractions path) ───────────────────
-const ROUTES_ATTRACTIONS = "/attractions";
-
-// ─── Curated content (edit freely, or wire to Supabase later) ────────────────
-const CURATED_ITEMS: DiscoverItem[] = [
-  {
-    id: "cloud9",
-    type: "video",
-    title: "Cloud 9 — World-Class Surfing",
-    tag: "📹 Video Tour",
-    emoji: "🏄",
-    featured: true,
-    href: ROUTES_ATTRACTIONS,
-  },
-  {
-    id: "sugba",
-    type: "attraction",
-    title: "Sugba Lagoon",
-    tag: "🗺️ Attraction",
-    emoji: "🏝️",
-    href: ROUTES_ATTRACTIONS,
-  },
-  {
-    id: "naked-island",
-    type: "video",
-    title: "Naked Island Day Trip",
-    tag: "📹 Vlog",
-    emoji: "🌅",
-    href: ROUTES_ATTRACTIONS,
-  },
-  {
-    id: "turtle-island",
-    type: "attraction",
-    title: "Turtle Island",
-    tag: "🗺️ Attraction",
-    emoji: "🐢",
-    href: ROUTES_ATTRACTIONS,
-  },
-  {
-    id: "magpupungko",
-    type: "attraction",
-    title: "Magpupungko Rock Pools",
-    tag: "🗺️ Attraction",
-    emoji: "🌊",
-    href: ROUTES_ATTRACTIONS,
-  },
-  {
-    id: "siargao-island-tour",
-    type: "video",
-    title: "Island Hopping Guide",
-    tag: "📹 Travel Guide",
-    emoji: "⛵",
-    href: ROUTES_ATTRACTIONS,
-  },
+const TABS: { key: Tab; label: string }[] = [
+  { key: "all",        label: "All" },
+  { key: "video",      label: "📹 Videos" },
+  { key: "attraction", label: "🗺️ Attractions" },
+  { key: "partner",    label: "🤝 Partners" },
 ];
 
-// ─── Partner / advertiser slots (admin would manage these via Supabase later) ─
-const PARTNER_ITEMS: DiscoverItem[] = [
-  {
-    id: "partner-kermit",
-    type: "partner",
-    title: "Kermit Surf & Dine",
-    tag: "🍽️ Restaurant",
-    emoji: "🍹",
-  },
-  {
-    id: "partner-bleu",
-    type: "partner",
-    title: "Siargao Bleu Resort",
-    tag: "🏨 Hotel",
-    emoji: "🏨",
-  },
-  {
-    id: "ad-slot",
-    type: "partner",
-    title: "Your business here",
-    tag: "📢 Advertise",
-    emoji: "＋",
-    isAdSlot: true,
-  },
-];
-
-// ─── Component ────────────────────────────────────────────────────────────────
-export function DiscoverSiargao() {
+// ─── Props come from server component (page.tsx fetches & passes items) ───────
+export function DiscoverSiargao({ items }: { items: DiscoverItem[] }) {
   const [activeTab, setActiveTab] = useState<Tab>("all");
 
-  const allItems = [...CURATED_ITEMS, ...PARTNER_ITEMS];
+  // Section completely hidden if no active items exist
+  if (!items || items.length === 0) return null;
 
-  const filtered = allItems.filter((item) => {
-    if (activeTab === "all") return true;
-    if (activeTab === "videos") return item.type === "video";
-    if (activeTab === "attractions") return item.type === "attraction";
-    if (activeTab === "partners") return item.type === "partner";
-    return true;
-  });
+  const filtered = items.filter(
+    (item) => activeTab === "all" || item.type === activeTab
+  );
 
-  // Featured item is always the first video when showing "all" or "videos"
-  const featured = filtered.find((i) => i.featured) ?? filtered[0];
-  const rest = filtered.filter((i) => i.id !== featured?.id);
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "videos", label: "📹 Videos" },
-    { key: "attractions", label: "🗺️ Attractions" },
-    { key: "partners", label: "🤝 Partners" },
-  ];
+  // Featured = first item marked is_featured, fallback to first item overall
+  const featured = filtered.find((i) => i.is_featured) ?? filtered[0];
+  const rest      = filtered.filter((i) => i.id !== featured?.id);
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#085C52] to-[#0c7b93] p-6 shadow-lg">
-      {/* Subtle radial glow */}
+      {/* Radial glow overlay */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_80%_20%,rgba(26,181,163,0.2)_0%,transparent_60%)]" />
 
-      {/* Header */}
+      {/* Header + tabs */}
       <div className="relative mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-bold text-2xl text-white leading-tight">🌊 Discover Siargao</h2>
+          <h2 className="text-2xl font-bold leading-tight text-white">🌊 Discover Siargao</h2>
           <p className="mt-0.5 text-sm text-white/55">Curated places, travel videos &amp; featured partners</p>
         </div>
-        {/* Tabs */}
         <div className="flex flex-wrap gap-1.5">
-          {tabs.map((tab) => (
+          {TABS.map((tab) => (
             <button
               key={tab.key}
               type="button"
@@ -154,17 +57,12 @@ export function DiscoverSiargao() {
         </div>
       </div>
 
-      {/* Grid */}
+      {/* Content grid */}
       {filtered.length === 0 ? (
-        <p className="text-center text-white/50 py-10 text-sm">No items in this category yet.</p>
+        <p className="py-10 text-center text-sm text-white/50">No items in this category yet.</p>
       ) : (
         <div className="relative space-y-3">
-          {/* Featured card (large) */}
-          {featured && (
-            <CardLarge item={featured} />
-          )}
-
-          {/* Rest — responsive grid */}
+          {featured && <CardLarge item={featured} />}
           {rest.length > 0 && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {rest.map((item) => (
@@ -175,10 +73,13 @@ export function DiscoverSiargao() {
         </div>
       )}
 
-      {/* Footer note */}
+      {/* Footer CTA */}
       <p className="relative mt-4 text-center text-xs text-white/30">
         Want to feature your Siargao business here?{" "}
-        <a href="mailto:gabu.sacro@gmail.com" className="text-white/50 underline hover:text-white/80 transition-colors">
+        <a
+          href="mailto:gabu.sacro@gmail.com"
+          className="text-white/50 underline transition-colors hover:text-white/80"
+        >
           Contact us
         </a>
       </p>
@@ -186,66 +87,63 @@ export function DiscoverSiargao() {
   );
 }
 
+// ─── Shared link wrapper logic ────────────────────────────────────────────────
+function CardWrapper({
+  href,
+  className,
+  children,
+}: {
+  href?: string | null;
+  className: string;
+  children: React.ReactNode;
+}) {
+  if (!href) return <div className={className}>{children}</div>;
+  if (href.startsWith("http"))
+    return <a href={href} target="_blank" rel="noopener noreferrer" className={className}>{children}</a>;
+  return <Link href={href} className={className}>{children}</Link>;
+}
+
 // ─── Large featured card ──────────────────────────────────────────────────────
 function CardLarge({ item }: { item: DiscoverItem }) {
-  const Wrapper = item.href ? Link : "div";
   return (
-    <Wrapper
-      href={item.href as string}
-      className="group relative flex aspect-video w-full cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-white/8 transition-transform hover:scale-[1.01]"
+    <CardWrapper
+      href={item.href}
+      className="group relative flex aspect-video w-full cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-white/[0.08] transition-transform hover:scale-[1.01]"
     >
-      {/* BG emoji */}
       <span className="pointer-events-none select-none text-[6rem] opacity-15 transition-transform duration-500 group-hover:scale-110">
         {item.emoji}
       </span>
 
-      {/* Badges */}
-      {item.featured && (
+      {item.is_featured && (
         <span className="absolute left-3 top-3 rounded-lg bg-amber-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow">
           ✨ Featured
         </span>
       )}
-      {item.type === "partner" && !item.isAdSlot && (
+      {item.type === "partner" && (
         <span className="absolute right-3 top-3 rounded border border-white/20 bg-white/15 px-2 py-0.5 text-[10px] text-white/60">
           Partner Ad
         </span>
       )}
-
-      {/* Play button for videos */}
       {item.type === "video" && (
         <span className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-xl shadow-xl transition-all group-hover:scale-110 group-hover:bg-white">
           ▶
         </span>
       )}
 
-      {/* Bottom overlay */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-4">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-white/65">{item.tag}</p>
-        <p className="mt-0.5 text-lg font-bold text-white leading-snug">{item.title}</p>
+        <p className="mt-0.5 text-lg font-bold leading-snug text-white">{item.title}</p>
       </div>
-    </Wrapper>
+    </CardWrapper>
   );
 }
 
 // ─── Small card ───────────────────────────────────────────────────────────────
 function CardSmall({ item }: { item: DiscoverItem }) {
-  if (item.isAdSlot) {
-    return (
-      <a
-        href="mailto:gabu.sacro@gmail.com"
-        className="group flex aspect-[4/3] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/20 bg-white/5 text-center transition-all hover:border-white/40 hover:bg-white/10"
-      >
-        <span className="text-2xl text-white/30 group-hover:text-white/50 transition-colors">＋</span>
-        <span className="mt-1 text-[11px] text-white/35 group-hover:text-white/55 transition-colors">Advertise here</span>
-      </a>
-    );
-  }
-
-  const Wrapper = item.href ? Link : "div";
   return (
-    <Wrapper
-      href={item.href as string}
-      className="group relative flex aspect-[4/3] cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-white/8 transition-transform hover:scale-[1.03]"
+    <CardWrapper
+      href={item.href}
+      className="group relative flex aspect-[4/3] cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-white/[0.08] transition-transform hover:scale-[1.03]"
     >
       <span className="pointer-events-none select-none text-[3rem] opacity-20 transition-transform duration-500 group-hover:scale-110">
         {item.emoji}
@@ -264,8 +162,8 @@ function CardSmall({ item }: { item: DiscoverItem }) {
 
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/65 to-transparent p-2.5">
         <p className="text-[9px] font-semibold uppercase tracking-wider text-white/60">{item.tag}</p>
-        <p className="mt-0.5 text-xs font-bold text-white leading-snug line-clamp-2">{item.title}</p>
+        <p className="mt-0.5 line-clamp-2 text-xs font-bold leading-snug text-white">{item.title}</p>
       </div>
-    </Wrapper>
+    </CardWrapper>
   );
 }
