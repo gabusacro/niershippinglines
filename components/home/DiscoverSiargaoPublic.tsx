@@ -194,7 +194,7 @@ function NetflixCard({ item, onClick }: { item: DiscoverItem; onClick: () => voi
         )}
 
         {/* Top badges */}
-        {item.is_featured && !item.type_partner && (
+        {item.is_featured && item.type !== "partner" && (
           <span className="absolute left-2 top-2 rounded-lg bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow">✨</span>
         )}
         {item.type === "partner" && (
