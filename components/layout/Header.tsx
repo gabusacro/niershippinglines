@@ -11,9 +11,42 @@ import { createClient } from "@/lib/supabase/client";
 
 type HeaderProps = { siteName?: string };
 
+// Schedule link: on homepage scroll to #schedule, elsewhere go to home#schedule
+function ScheduleLink({ pathname, onClick }: { pathname: string; onClick?: () => void }) {
+  const isHome = pathname === "/";
+  const href = isHome ? "#schedule" : "/#schedule";
+  const isActive = isHome; // highlight on home page
+  return (
+    <a
+      href={href}
+      onClick={onClick}
+      className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+        isActive ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+      }`}
+    >
+      Schedule
+    </a>
+  );
+}
+
+function ScheduleLinkMobile({ pathname, onClick }: { pathname: string; onClick?: () => void }) {
+  const isHome = pathname === "/";
+  const href = isHome ? "#schedule" : "/#schedule";
+  return (
+    <a
+      href={href}
+      onClick={onClick}
+      className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+        isHome ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+      }`}
+    >
+      Schedule
+    </a>
+  );
+}
+
 const BASE_NAV_LINKS = [
   { href: ROUTES.home, label: "Home" },
-  { href: ROUTES.schedule, label: "Schedule" },
   { href: ROUTES.book, label: "Book A Trip" },
   { href: ROUTES.attractions, label: "Attractions" },
 ];
@@ -72,17 +105,28 @@ export function Header({ siteName }: HeaderProps = {}) {
           </span>
         </Link>
 
-        {/* Official time (Philippines) — reference for boarding */}
         <div className="hidden sm:block shrink-0">
           <OfficialTime />
         </div>
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1 lg:gap-2 text-sm font-medium">
-          {BASE_NAV_LINKS.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
+          {/* Home */}
+          <Link
+            href={ROUTES.home}
+            className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+              pathname === ROUTES.home ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+            }`}
+          >
+            Home
+          </Link>
+
+          {/* Schedule — scroll anchor instead of separate page */}
+          
+
+          {/* Book A Trip, Attractions */}
+          {BASE_NAV_LINKS.filter(l => l.href !== ROUTES.home).map(({ href, label }) => (
+            <Link key={href} href={href}
               className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
                 pathname === href ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
               }`}
@@ -90,47 +134,39 @@ export function Header({ siteName }: HeaderProps = {}) {
               {label}
             </Link>
           ))}
+
           {user ? (
             <>
               {role && ["crew", "captain", "ticket_booth", "admin"].includes(role) && (
-                <Link
-                  href={ROUTES.crewScan}
+                <Link href={ROUTES.crewScan}
                   className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
                     pathname === ROUTES.crewScan ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
-                  }`}
-                >
+                  }`}>
                   Scan ticket
                 </Link>
               )}
-              <Link
-                href={ROUTES.dashboard}
+              <Link href={ROUTES.dashboard}
                 className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
                   pathname === ROUTES.dashboard ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
-                }`}
-              >
+                }`}>
                 Dashboard
               </Link>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="min-h-[44px] flex items-center px-3 py-2 rounded-xl text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98] transition-all duration-200 touch-target"
-              >
+              <button type="button" onClick={handleSignOut}
+                className="min-h-[44px] flex items-center px-3 py-2 rounded-xl text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98] transition-all duration-200 touch-target">
                 Sign out
               </button>
             </>
           ) : (
-            <Link
-              href={ROUTES.login}
+            <Link href={ROUTES.login}
               className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
                 pathname === ROUTES.login ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
-              }`}
-            >
+              }`}>
               Login / Sign up
             </Link>
           )}
         </nav>
 
-        {/* Mobile: time + hamburger */}
+        {/* Mobile time + hamburger */}
         <div className="flex sm:hidden shrink-0 items-center gap-2">
           <OfficialTime />
         </div>
@@ -154,23 +190,24 @@ export function Header({ siteName }: HeaderProps = {}) {
       </div>
 
       {/* Mobile nav drawer */}
-      <div
-        className={`md:hidden overflow-hidden transition-[height] duration-200 ease-out ${
-          menuOpen ? "h-auto" : "h-0"
-        }`}
-        aria-hidden={!menuOpen}
-      >
+      <div className={`md:hidden overflow-hidden transition-[height] duration-200 ease-out ${menuOpen ? "h-auto" : "h-0"}`} aria-hidden={!menuOpen}>
         <nav className="border-t border-white/15 bg-[#0f766e]/98 backdrop-blur-md px-4 py-3">
           <ul className="flex flex-col gap-0.5">
-            {BASE_NAV_LINKS.map(({ href, label }) => (
+            <li>
+              <Link href={ROUTES.home} onClick={() => setMenuOpen(false)}
+                className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                  pathname === ROUTES.home ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                }`}>
+                Home
+              </Link>
+            </li>
+            
+            {BASE_NAV_LINKS.filter(l => l.href !== ROUTES.home).map(({ href, label }) => (
               <li key={href}>
-                <Link
-                  href={href}
-                  onClick={() => setMenuOpen(false)}
+                <Link href={href} onClick={() => setMenuOpen(false)}
                   className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
                     pathname === href ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
-                  }`}
-                >
+                  }`}>
                   {label}
                 </Link>
               </li>
@@ -179,47 +216,35 @@ export function Header({ siteName }: HeaderProps = {}) {
               <>
                 {role && ["crew", "captain", "ticket_booth", "admin"].includes(role) && (
                   <li>
-                    <Link
-                      href={ROUTES.crewScan}
-                      onClick={() => setMenuOpen(false)}
+                    <Link href={ROUTES.crewScan} onClick={() => setMenuOpen(false)}
                       className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
                         pathname === ROUTES.crewScan ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
-                      }`}
-                    >
+                      }`}>
                       Scan ticket
                     </Link>
                   </li>
                 )}
                 <li>
-                  <Link
-                    href={ROUTES.dashboard}
-                    onClick={() => setMenuOpen(false)}
+                  <Link href={ROUTES.dashboard} onClick={() => setMenuOpen(false)}
                     className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
                       pathname === ROUTES.dashboard ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
-                    }`}
-                  >
+                    }`}>
                     Dashboard
                   </Link>
                 </li>
                 <li>
-                  <button
-                    type="button"
-                    onClick={() => { handleSignOut(); }}
-                    className="flex min-h-[48px] w-full items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] hover:bg-white/10 active:bg-white/15 text-left"
-                  >
+                  <button type="button" onClick={() => { handleSignOut(); }}
+                    className="flex min-h-[48px] w-full items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] hover:bg-white/10 active:bg-white/15 text-left">
                     Sign out
                   </button>
                 </li>
               </>
             ) : (
               <li>
-                <Link
-                  href={ROUTES.login}
-                  onClick={() => setMenuOpen(false)}
+                <Link href={ROUTES.login} onClick={() => setMenuOpen(false)}
                   className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
                     pathname === ROUTES.login ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
-                  }`}
-                >
+                  }`}>
                   Login / Sign up
                 </Link>
               </li>
