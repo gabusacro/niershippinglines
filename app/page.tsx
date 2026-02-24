@@ -3,12 +3,17 @@ import { ROUTES } from "@/lib/constants";
 import { getSiteBranding } from "@/lib/site-branding";
 import { PalmTree, Wave, Sun, Boat } from "@/components/icons";
 import { WeatherWidget } from "@/components/weather/WeatherWidget";
+import { DiscoverSiargaoPublic } from "@/components/home/DiscoverSiargaoPublic";
+import { getDiscoverItems } from "@/lib/dashboard/get-discover-items";
 
 export default async function HomePage() {
-  const branding = await getSiteBranding();
+  const [branding, discoverItems] = await Promise.all([
+    getSiteBranding(),
+    getDiscoverItems(),
+  ]);
+
   return (
     <div className="min-h-[calc(100vh-8rem)]">
-      {/* Hero: island vibe with icons */}
       <section className="relative overflow-hidden bg-gradient-to-b from-[#0d9488]/25 via-[#99d6d4]/15 to-transparent pt-8 pb-14 sm:pt-14 sm:pb-20 md:pt-18 md:pb-24">
         <div className="absolute inset-0 flex justify-between pointer-events-none opacity-20">
           <PalmTree size={56} className="text-[#0f766e] -ml-2 mt-16 rotate-12 sm:w-16 sm:h-16 md:w-20 md:h-20 md:mt-20" />
@@ -26,17 +31,13 @@ export default async function HomePage() {
             {branding.tagline}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
-            <Link
-              href={ROUTES.book}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[#0c7b93] px-6 py-4 text-base font-semibold text-white shadow-lg shadow-[#0c7b93]/25 hover:bg-[#0f766e] transition-all duration-200 touch-target active:scale-[0.98] sm:min-h-0"
-            >
+            <Link href={ROUTES.book}
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[#0c7b93] px-6 py-4 text-base font-semibold text-white shadow-lg shadow-[#0c7b93]/25 hover:bg-[#0f766e] transition-all duration-200 touch-target active:scale-[0.98] sm:min-h-0">
               <Boat size={20} />
               Book a Trip
             </Link>
-            <Link
-              href={ROUTES.schedule}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[#f59e0b] px-6 py-4 text-base font-semibold text-[#134e4a] shadow-lg shadow-[#f59e0b]/25 hover:bg-[#fbbf24] transition-all duration-200 touch-target active:scale-[0.98] sm:min-h-0"
-            >
+            <Link href={ROUTES.schedule}
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[#f59e0b] px-6 py-4 text-base font-semibold text-[#134e4a] shadow-lg shadow-[#f59e0b]/25 hover:bg-[#fbbf24] transition-all duration-200 touch-target active:scale-[0.98] sm:min-h-0">
               <Sun size={20} />
               View Schedule
             </Link>
@@ -44,7 +45,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Weather (Siargao) - uses NEXT_PUBLIC_OPENWEATHER_API_KEY */}
       <section className="border-t border-teal-200/50 bg-[#fef9e7]/50 py-8 sm:py-10">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <div className="max-w-sm md:max-w-4xl mx-auto">
@@ -56,7 +56,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Feel the island */}
+      {/* ── Discover Siargao — Netflix-style horizontal scroll ── */}
+      <DiscoverSiargaoPublic items={discoverItems} />
+
       <section className="border-t border-teal-200/50 bg-white/60 py-10 sm:py-16">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <h2 className="text-center text-xl font-bold text-[#134e4a] tracking-tight sm:text-2xl md:text-3xl">
@@ -85,19 +87,18 @@ export default async function HomePage() {
                 <PalmTree size={28} className="text-[#0d9488] sm:w-8 sm:h-8" />
               </div>
               <h3 className="mt-2 font-semibold text-[#134e4a] sm:mt-3">Island gateway</h3>
-              <p className="mt-1 text-sm text-[#0f766e]">Your first step to Siargao’s surf, beaches, and sunsets.</p>
+              <p className="mt-1 text-sm text-[#0f766e]">Your first step to Siargao&apos;s surf, beaches, and sunsets.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Trust line */}
       <section className="border-t border-teal-200/50 py-6 sm:py-8">
         <div className="mx-auto max-w-4xl px-4 text-center text-[#0f766e] text-xs sm:text-sm sm:px-6">
           Easy online booking &middot; E-ticket with QR code &middot; Siargao &amp; Dinagat routes &middot; Senior, PWD &amp; child discounts
         </div>
         <div className="mx-auto max-w-4xl px-4 mt-3 text-center text-amber-800 text-xs sm:text-sm sm:px-6">
-          Arrive 30 min–1 hour before boarding so you don’t miss your sailing
+          Arrive 30 min–1 hour before boarding so you don&apos;t miss your sailing
         </div>
       </section>
     </div>
