@@ -3,7 +3,7 @@ import { APP_NAME, ROUTES } from "@/lib/constants";
 
 export const metadata = {
   title: "Terms and Conditions",
-  description: `Terms of service, booking policy, refunds, and reschedule — ${APP_NAME}`,
+  description: `Terms of service, booking policy, liability, refunds — ${APP_NAME}`,
 };
 
 export default function TermsPage() {
@@ -12,75 +12,125 @@ export default function TermsPage() {
       <Link href={ROUTES.home} className="text-sm font-semibold text-[#0c7b93] hover:underline">
         ← Home
       </Link>
-      <h1 className="mt-6 text-2xl font-bold text-[#134e4a]">Terms and Conditions</h1>
+
+      <h1 className="mt-6 text-2xl font-bold text-[#134e4a]">
+        Terms and Conditions
+      </h1>
       <p className="mt-2 text-sm text-[#0f766e]">Last updated: February 2026</p>
 
       <div className="mt-8 space-y-8 text-[#134e4a]">
+
+        {/* 1 */}
         <section>
-          <h2 className="text-lg font-semibold text-[#134e4a]">1. Acceptance of Terms</h2>
+          <h2 className="text-lg font-semibold">1. Platform Nature</h2>
           <p className="mt-2 text-sm leading-relaxed">
-            By accessing or using {APP_NAME} website and services, you agree to be bound by these Terms and Conditions,
-            our <Link href={ROUTES.privacy} className="text-[#0c7b93] underline hover:no-underline">Privacy Policy</Link>,
-            and our booking, refund, and reschedule policies outlined below. If you do not agree, please do not use our website.
+            {APP_NAME} is a digital booking and ticketing platform that facilitates reservations 
+            between passengers and independent vessel operators. We are not a vessel owner, 
+            not a maritime transport provider, and not a common carrier.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed">
+            The transportation contract exists solely between the passenger and the vessel operator.
           </p>
         </section>
 
+        {/* 2 */}
         <section>
-          <h2 className="text-lg font-semibold text-[#134e4a]">2. Booking Policy</h2>
+          <h2 className="text-lg font-semibold">2. Independent Vessel Operators</h2>
           <p className="mt-2 text-sm leading-relaxed">
-            Bookings are confirmed upon payment verification. You must provide accurate passenger details. Port or terminal
-            fees are not included in the fare. Excess baggage (over 30 kg) shall be subject to crew assessment.
+            All trips listed on {APP_NAME} are operated by independent vessel operators 
+            regulated by Philippine maritime authorities.
           </p>
-        </section>
-
-        <section>
-          <h2 className="text-lg font-semibold text-[#134e4a]">3. Refund Policy</h2>
           <p className="mt-2 text-sm leading-relaxed">
-            <strong>No refunds</strong> unless due to weather disturbance or vessel cancellation initiated by {APP_NAME}.
-            In such cases, refunds will be processed in accordance with our procedures. For all other circumstances,
-            tickets are non-refundable.
-          </p>
-          <p className="mt-3 text-sm leading-relaxed">
-            <strong>How to request a refund.</strong> If your trip qualifies (weather disturbance or vessel cancellation),
-            go to <Link href={ROUTES.myBookings} className="text-[#0c7b93] underline hover:no-underline">My Bookings</Link>,
-            open your booking details, and use the <strong>Request refund</strong> button. Select the reason and submit.
-            Our team will review and process valid requests. Refunds are sent via GCash to the original payment method.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="text-lg font-semibold text-[#134e4a]">4. Reschedule and Schedule Change (Passenger-Initiated)</h2>
-          <p className="mt-2 text-sm leading-relaxed">
-            Per MARINA and maritime regulations, passenger-initiated rebooking is allowed subject to penalties. Carrier-initiated changes (weather, technical) are free.
+            Vessel operators are solely responsible for:
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed">
-            <li>
-              Reschedule is <strong>only allowed at least 24 hours before</strong> the scheduled departure.
-            </li>
-            <li>
-              <strong>Within 24 hours of departure:</strong> no changes or reschedules are permitted.
-            </li>
-            <li>
-              <strong>After departure:</strong> we’re unable to offer refunds or rebooking. We kindly ask that you arrive at the port <strong>30 minutes to 1 hour</strong> before boarding so you don’t miss your sailing. We’ll do our best to notify you of any schedule changes.
-            </li>
-            <li>
-              Passenger-initiated reschedule fee: <strong>10%</strong> of the fare plus <strong>₱15</strong> GCash transaction fee. Subject to seat availability; fare difference may apply if rates have changed.
-            </li>
-            <li>
-              <strong>How to change schedule.</strong> Go to <Link href={ROUTES.myBookings} className="text-[#0c7b93] underline hover:no-underline">My Bookings</Link>, open your booking, and use <strong>Change schedule</strong>. Select the new date and time (same route only). Pay the fee at the ticket booth before boarding.
-            </li>
-            <li>
-              Carrier-initiated (weather disturbance, vessel cancellation, technical issues): rebooking <strong>free of charge</strong> or full refund per our refund policy.
-            </li>
+            <li>Vessel seaworthiness and safety equipment</li>
+            <li>Crew licensing and competence</li>
+            <li>Navigation and weather decisions</li>
+            <li>Passenger safety onboard</li>
+            <li>Compliance with maritime laws and regulations</li>
           </ul>
         </section>
 
+        {/* 3 */}
         <section>
-          <h2 className="text-lg font-semibold text-[#134e4a]">5. Contact</h2>
+          <h2 className="text-lg font-semibold">3. Limitation of Liability</h2>
           <p className="mt-2 text-sm leading-relaxed">
-            For questions about these terms or your booking, contact us at the ticket booth or through our official channels.
+            {APP_NAME} shall not be liable for maritime accidents, delays, weather-related 
+            disruptions, mechanical failures, passenger injury, loss of baggage, or 
+            incidents occurring during boarding, transport, or disembarkation.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed">
+            Any claim arising from transport must be directed to the vessel operator.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed">
+            To the maximum extent permitted by law, our liability is limited to the booking 
+            service fee paid through this platform.
           </p>
         </section>
+
+        {/* 4 */}
+        <section>
+          <h2 className="text-lg font-semibold">4. Booking Policy</h2>
+          <p className="mt-2 text-sm leading-relaxed">
+            Bookings are confirmed upon payment verification. You must provide accurate 
+            passenger information. Incorrect details may result in denied boarding.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed">
+            Sea travel involves inherent risks. By booking, you acknowledge and accept 
+            these risks.
+          </p>
+        </section>
+
+        {/* 5 */}
+        <section>
+          <h2 className="text-lg font-semibold">5. Refund Policy</h2>
+          <p className="mt-2 text-sm leading-relaxed">
+            Refunds may be granted only for eligible cases such as weather disturbance 
+            or vessel cancellation initiated by the operator.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed">
+            For all other circumstances, tickets are non-refundable unless otherwise stated.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed">
+            Refund requests must be submitted via{" "}
+            <Link href={ROUTES.myBookings} className="text-[#0c7b93] underline hover:no-underline">
+              My Bookings
+            </Link>.
+          </p>
+        </section>
+
+        {/* 6 */}
+        <section>
+          <h2 className="text-lg font-semibold">6. Reschedule Policy</h2>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed">
+            <li>Reschedule allowed at least 24 hours before departure.</li>
+            <li>No changes within 24 hours of departure.</li>
+            <li>Missed trips are non-refundable.</li>
+            <li>Reschedule fees may apply.</li>
+            <li>Carrier-initiated changes are free of charge.</li>
+          </ul>
+        </section>
+
+        {/* 7 */}
+        <section>
+          <h2 className="text-lg font-semibold">7. Indemnification</h2>
+          <p className="mt-2 text-sm leading-relaxed">
+            You agree to indemnify and hold harmless {APP_NAME} from claims arising 
+            from maritime incidents, passenger injury during transport, or disputes 
+            with vessel operators.
+          </p>
+        </section>
+
+        {/* 8 */}
+        <section>
+          <h2 className="text-lg font-semibold">8. Amendments</h2>
+          <p className="mt-2 text-sm leading-relaxed">
+            We may update these Terms at any time. Continued use of the platform 
+            constitutes acceptance of the updated Terms.
+          </p>
+        </section>
+
       </div>
     </div>
   );
