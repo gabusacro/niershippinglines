@@ -3,37 +3,29 @@ import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { getTodayDashboardStats } from "@/lib/admin/dashboard-stats";
 import { DashboardAutoRefresh } from "@/components/dashboard/DashboardAutoRefresh";
-import { getTodayPassengersByVessel } from "@/lib/admin/today-passengers-by-vessel";
 import { getPendingPaymentsPreview } from "@/lib/admin/pending-payments-preview";
+import { getTodayLiveOperations } from "@/lib/admin/today-live-operations";
+import { LiveOperationsTable } from "@/components/admin/LiveOperationsTable";
 import { ROUTES } from "@/lib/constants";
 
 export const metadata = {
   title: "Admin dashboard",
-  description: "Manage Nier Shipping Lines — reports, vessels, manual booking",
+  description: "Manage Travela Siargao — reports, vessels, manual booking",
 };
+
+function fmtPeso(cents: number) {
+  return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
+}
 
 export default async function AdminDashboardPage() {
   const user = await getAuthUser();
-  if (!user || user.role !== "admin") {
-    redirect(ROUTES.dashboard);
-  }
+  if (!user || user.role !== "admin") redirect(ROUTES.dashboard);
 
-  const [stats, vesselPassengers, pendingPreview] = await Promise.all([
+  const [stats, pendingPreview, liveOps] = await Promise.all([
     getTodayDashboardStats(),
-    getTodayPassengersByVessel(),
     getPendingPaymentsPreview(),
+    getTodayLiveOperations(),
   ]);
-
-  const maxPassengers = Math.max(1, ...vesselPassengers.map((v) => v.passenger_count));
-
-  const statCards = [
-    { label: "Passengers boarded (today)", value: stats.totalPassengerBoard, unit: "", accent: "teal" },
-    { label: "Vessels active", value: stats.vesselsActive, unit: "", accent: "blue" },
-    { label: "Siargao–Surigao revenue", value: stats.revenueSiargaoSurigao, unit: "₱", cents: true, accent: "emerald" },
-    { label: "Dinagat–Surigao revenue", value: stats.revenueSurigaoDinagat, unit: "₱", cents: true, accent: "emerald" },
-    { label: "Fuel (L today)", value: stats.totalFuelLiters, unit: "", accent: "amber" },
-    { label: "Total revenue (today)", value: stats.totalRevenue, unit: "₱", cents: true, accent: "teal" },
-  ];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
@@ -51,105 +43,45 @@ export default async function AdminDashboardPage() {
       </div>
 
       {/* Admin nav */}
-      <div className="mt-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <Link
-            href={ROUTES.adminReports}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Reports (per vessel)
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {[
+          { href: ROUTES.adminReports, label: "Reports (per vessel)" },
+          { href: ROUTES.adminVessels, label: "Vessels & Fleet" },
+          { href: ROUTES.adminSchedule, label: "Schedule (routes & times)" },
+          { href: ROUTES.adminPendingPayments, label: "Pending payments" },
+          { href: ROUTES.adminBookings, label: "Booking history" },
+          { href: ROUTES.adminBranding, label: "Site branding" },
+          { href: ROUTES.adminFees, label: "Fees & charges" },
+          { href: "/admin/expenses", label: "Expenses" },
+          { href: "/admin/investor-shares", label: "Investor Shares" },
+          { href: "/admin/vessel-owners", label: "Vessel Owners" },
+          { href: ROUTES.adminFlagged, label: "Flagged accounts" },
+          { href: ROUTES.account, label: "My Profile" },
+        ].map(({ href, label }) => (
+          <Link key={href} href={href}
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 text-center">
+            {label}
           </Link>
-          <Link
-            href={ROUTES.adminVessels}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Vessels
-          </Link>
-          <Link
-            href={ROUTES.adminSchedule}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Schedule (routes & times)
-          </Link>
-          <Link
-            href={ROUTES.adminPendingPayments}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Pending payments
-          </Link>
-          <Link
-            href={ROUTES.adminBookings}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Booking history
-          </Link>
-          <Link
-            href={ROUTES.adminManualBooking}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f766e]"
-          >
-            Manual Booking
-          </Link>
-          <Link
-            href={ROUTES.adminBranding}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Site branding
-          </Link>
-          <Link
-            href={ROUTES.adminFees}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Fees & charges
-          </Link>
-          <Link
-            href="/admin/profit-distribution"
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-emerald-400 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
-          >
-            💰 Profit Distribution
-          </Link>
-          <Link
-            href="/admin/expenses"
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Expenses
-          </Link>
-          <Link
-            href="/admin/investor-shares"
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Investor Shares
-          </Link>
-          <Link
-            href="/admin/vessel-owners"
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Vessel Owners
-          </Link>
-          <Link
-            href={ROUTES.adminFlagged}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Flagged accounts
-          </Link>
-
-          {/* ── NEW: Discover Siargao content manager ── */}
-          <Link
-            href="/admin/discover"
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-400 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100"
-          >
-            🌊 Discover Content
-          </Link>
-
-          <Link
-            href={ROUTES.account}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50"
-          >
-            Account
-          </Link>
-        </div>
+        ))}
+        <Link href={ROUTES.adminManualBooking}
+          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f766e]">
+          Manual Booking
+        </Link>
+        <Link href="/admin/profit-distribution"
+          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-emerald-400 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100">
+          💰 Profit Distribution
+        </Link>
+        <Link href="/admin/discover"
+          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-400 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100">
+          🌊 Discover Content
+        </Link>
+        <Link href="/admin/accounts"
+          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-800 transition-colors hover:bg-purple-100">
+          👥 Users
+        </Link>
       </div>
 
-      {/* Pending payments */}
+      {/* Pending payments alert */}
       {pendingPreview.count > 0 && (
         <div className="mt-8 rounded-2xl border-2 border-amber-400 bg-amber-50 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -157,10 +89,8 @@ export default async function AdminDashboardPage() {
               <h2 className="text-lg font-bold text-amber-900">Pending payments ({pendingPreview.count})</h2>
               <p className="mt-0.5 text-sm text-amber-800">Confirm payments so passengers receive tickets on time.</p>
             </div>
-            <Link
-              href={ROUTES.adminPendingPayments}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
-            >
+            <Link href={ROUTES.adminPendingPayments}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700">
               View all →
             </Link>
           </div>
@@ -175,52 +105,94 @@ export default async function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Live passengers by vessel */}
-      <div className="mt-10">
-        <h2 className="text-lg font-semibold text-[#134e4a]">Live today — Passengers by vessel</h2>
-        <p className="mt-0.5 text-sm text-[#0f766e]/80">From Supabase: booked passengers (confirmed/boarded) on today&apos;s trips. Refresh to update.</p>
-        {vesselPassengers.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-teal-100 bg-white p-5 text-sm text-[#0f766e]">No vessel activity today yet.</p>
-        ) : (
-          <div className="mt-4 space-y-4">
-            {vesselPassengers.map((v) => (
-              <div key={v.vessel_id} className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-[#134e4a]">{v.vessel_name}</span>
-                  <span className="text-lg font-bold text-[#0c7b93]">{v.passenger_count}</span>
-                </div>
-                <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-teal-100">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#0c7b93] to-[#0f766e] transition-all"
-                    style={{ width: `${Math.round((v.passenger_count / maxPassengers) * 100)}%` }}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-[#0f766e]/80">{v.trip_count} trip{v.trip_count !== 1 ? "s" : ""} today</p>
-              </div>
-            ))}
+      {/* ── TODAY'S SNAPSHOT ── */}
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-[#134e4a]">📊 Today&apos;s snapshot</h2>
+        <p className="mt-0.5 text-sm text-[#0f766e]/80">Live totals for {new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
+
+        {/* Top row — key operational numbers */}
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* Total revenue — most important */}
+          <div className="col-span-2 sm:col-span-2 rounded-2xl bg-gradient-to-br from-[#0c7b93] to-[#0f766e] p-5 text-white shadow-sm">
+            <p className="text-sm font-medium text-white/80">Total revenue today</p>
+            <p className="mt-1 text-3xl font-bold">{fmtPeso(stats.totalRevenue)}</p>
+            <div className="mt-3 flex gap-4 text-xs text-white/70">
+              <span>Siargao–Surigao: <strong className="text-white">{fmtPeso(stats.revenueSiargaoSurigao)}</strong></span>
+              <span>Dinagat–Surigao: <strong className="text-white">{fmtPeso(stats.revenueSurigaoDinagat)}</strong></span>
+            </div>
           </div>
-        )}
+
+          {/* Passengers boarded */}
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+            <p className="text-xs font-medium text-emerald-700">Boarded</p>
+            <p className="mt-1 text-3xl font-bold text-emerald-800">{stats.totalPassengerBoard}</p>
+            <p className="mt-1 text-xs text-emerald-600">
+              +{stats.totalPassengerConfirmed} confirmed
+            </p>
+          </div>
+
+          {/* Vessels & trips */}
+          <div className="rounded-2xl border border-teal-200 bg-teal-50 p-5">
+            <p className="text-xs font-medium text-[#0f766e]">Vessels active</p>
+            <p className="mt-1 text-3xl font-bold text-[#134e4a]">{stats.vesselsActive}</p>
+            <p className="mt-1 text-xs text-[#0f766e]">
+              {stats.totalTripsToday} trip{stats.totalTripsToday !== 1 ? "s" : ""} today
+            </p>
+          </div>
+        </div>
+
+        {/* Bottom row — admin-specific metrics */}
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* Pending payments */}
+          <Link href={ROUTES.adminPendingPayments}
+            className={`rounded-2xl border p-4 transition-colors hover:shadow-md ${stats.pendingPayments > 0 ? "border-amber-300 bg-amber-50 hover:bg-amber-100" : "border-teal-100 bg-white"}`}>
+            <p className="text-xs font-medium text-[#0f766e]">Pending Payments</p>
+            <p className={`mt-1 text-2xl font-bold ${stats.pendingPayments > 0 ? "text-amber-700" : "text-gray-400"}`}>
+              {stats.pendingPayments}
+            </p>
+            <p className="mt-1 text-xs text-[#0f766e]/60">
+              {stats.pendingPayments > 0 ? "Needs verification →" : "All clear ✓"}
+            </p>
+          </Link>
+
+          {/* Refund requests */}
+          <div className={`rounded-2xl border p-4 ${stats.refundRequests > 0 ? "border-red-200 bg-red-50" : "border-teal-100 bg-white"}`}>
+            <p className="text-xs font-medium text-[#0f766e]">Refund <R></R>equests</p>
+            <p className={`mt-1 text-2xl font-bold ${stats.refundRequests > 0 ? "text-red-700" : "text-gray-400"}`}>
+              {stats.refundRequests}
+            </p>
+            <p className="mt-1 text-xs text-[#0f766e]/60">
+              {stats.refundRequests > 0 ? "Action needed" : "None pending ✓"}
+            </p>
+          </div>
+
+          {/* Online bookings */}
+          <div className="rounded-2xl border border-teal-100 bg-white p-4">
+            <p className="text-xs font-medium text-[#0f766e]">Online Bookings</p>
+            <p className="mt-1 text-2xl font-bold text-[#134e4a]">{stats.onlineBookingsToday}</p>
+            <p className="mt-1 text-xs text-[#0f766e]/60">GCash / Online</p>
+          </div>
+
+          {/* Walk-in bookings */}
+          <div className="rounded-2xl border border-teal-100 bg-white p-4">
+            <p className="text-xs font-medium text-[#0f766e]">Walk-in Bookings</p>
+            <p className="mt-1 text-2xl font-bold text-[#134e4a]">{stats.walkinBookingsToday}</p>
+            <p className="mt-1 text-xs text-[#0f766e]/60">Cash / Ticket Booth</p>
+          </div>
+        </div>
       </div>
 
-      {/* Today's stats */}
+      {/* ── LIVE OPERATIONS TABLE ── */}
       <div className="mt-10">
-        <h2 className="text-lg font-semibold text-[#134e4a]">Today&apos;s snapshot</h2>
-        <p className="mt-0.5 text-sm text-[#0f766e]/80">Current day totals</p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {statCards.map((c) => (
-            <div
-              key={c.label}
-              className="rounded-xl border border-teal-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <p className="text-sm font-medium text-[#0f766e]">{c.label}</p>
-              <p className="mt-2 text-2xl font-bold text-[#134e4a]">
-                {c.unit}
-                {c.cents ? ((c.value as number) / 100).toLocaleString() : (c.value as number).toLocaleString()}
-                {c.unit === "₱" ? "" : c.unit}
-              </p>
-            </div>
-          ))}
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[#134e4a]">🛳️ Live Operations — Today</h2>
+            <p className="mt-0.5 text-sm text-[#0f766e]/80">
+              All trips today with live passenger counts. Click a row for details · Click passengers to see who · Click vessel name to manage.
+            </p>
+          </div>
         </div>
+        <LiveOperationsTable trips={liveOps} />
       </div>
     </div>
   );
