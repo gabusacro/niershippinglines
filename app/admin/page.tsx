@@ -157,7 +157,9 @@ export default async function AdminDashboardPage() {
 
           {/* Refund requests */}
           <div className={`rounded-2xl border p-4 ${stats.refundRequests > 0 ? "border-red-200 bg-red-50" : "border-teal-100 bg-white"}`}>
-            <p className="text-xs font-medium text-[#0f766e]">Refund <R></R>equests</p>
+          <p className="text-xs font-medium text-[#0f766e]">
+             Refund Requests
+          </p>
             <p className={`mt-1 text-2xl font-bold ${stats.refundRequests > 0 ? "text-red-700" : "text-gray-400"}`}>
               {stats.refundRequests}
             </p>
