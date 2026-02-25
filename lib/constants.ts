@@ -1,6 +1,6 @@
 // App-wide constants
 
-export const APP_NAME = "Nier Shipping Lines";
+export const APP_NAME = "Travela Siargao";
 
 export const ROUTES = {
   home: "/",
