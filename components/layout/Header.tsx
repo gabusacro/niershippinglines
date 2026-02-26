@@ -11,17 +11,15 @@ import { createClient } from "@/lib/supabase/client";
 
 type HeaderProps = { siteName?: string };
 
-// Schedule link: on homepage scroll to #schedule, elsewhere go to home#schedule
 function ScheduleLink({ pathname, onClick }: { pathname: string; onClick?: () => void }) {
   const isHome = pathname === "/";
   const href = isHome ? "#schedule" : "/#schedule";
-  const isActive = isHome; // highlight on home page
   return (
     <a
       href={href}
       onClick={onClick}
       className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
-        isActive ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+        isHome ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
       }`}
     >
       Schedule
@@ -44,12 +42,6 @@ function ScheduleLinkMobile({ pathname, onClick }: { pathname: string; onClick?:
     </a>
   );
 }
-
-const BASE_NAV_LINKS = [
-  { href: ROUTES.home, label: "Home" },
-  { href: ROUTES.book, label: "Book A Trip" },
-  { href: ROUTES.attractions, label: "Attractions" },
-];
 
 export function Header({ siteName }: HeaderProps = {}) {
   const displayName = siteName ?? APP_NAME;
@@ -91,6 +83,9 @@ export function Header({ siteName }: HeaderProps = {}) {
     router.push(ROUTES.home);
   }
 
+  // Only show Book A Trip to logged-out visitors
+  const showBookATrip = !user;
+
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0c7b93] shadow-sm safe-area-pad md:bg-[#0c7b93]/95 md:backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
@@ -111,7 +106,6 @@ export function Header({ siteName }: HeaderProps = {}) {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1 lg:gap-2 text-sm font-medium">
-          {/* Home */}
           <Link
             href={ROUTES.home}
             className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
@@ -121,19 +115,25 @@ export function Header({ siteName }: HeaderProps = {}) {
             Home
           </Link>
 
-          {/* Schedule — scroll anchor instead of separate page */}
-          
-
-          {/* Book A Trip, Attractions */}
-          {BASE_NAV_LINKS.filter(l => l.href !== ROUTES.home).map(({ href, label }) => (
-            <Link key={href} href={href}
+          {showBookATrip && (
+            <Link
+              href={ROUTES.book}
               className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
-                pathname === href ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+                pathname === ROUTES.book ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
               }`}
             >
-              {label}
+              Book A Trip
             </Link>
-          ))}
+          )}
+
+          <Link
+            href={ROUTES.attractions}
+            className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+              pathname === ROUTES.attractions ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+            }`}
+          >
+            Attractions
+          </Link>
 
           {user ? (
             <>
@@ -201,17 +201,27 @@ export function Header({ siteName }: HeaderProps = {}) {
                 Home
               </Link>
             </li>
-            
-            {BASE_NAV_LINKS.filter(l => l.href !== ROUTES.home).map(({ href, label }) => (
-              <li key={href}>
-                <Link href={href} onClick={() => setMenuOpen(false)}
+
+            {showBookATrip && (
+              <li>
+                <Link href={ROUTES.book} onClick={() => setMenuOpen(false)}
                   className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
-                    pathname === href ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                    pathname === ROUTES.book ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
                   }`}>
-                  {label}
+                  Book A Trip
                 </Link>
               </li>
-            ))}
+            )}
+
+            <li>
+              <Link href={ROUTES.attractions} onClick={() => setMenuOpen(false)}
+                className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                  pathname === ROUTES.attractions ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                }`}>
+                Attractions
+              </Link>
+            </li>
+
             {user ? (
               <>
                 {role && ["crew", "captain", "ticket_booth", "admin"].includes(role) && (
