@@ -75,6 +75,10 @@ export default async function AdminDashboardPage() {
           className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-400 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100">
           🌊 Discover Content
         </Link>
+        <Link href="/admin/announcements"
+           className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 transition-colors hover:bg-blue-100">
+           📢 Announcements
+        </Link>
         <Link href="/admin/accounts"
           className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-800 transition-colors hover:bg-purple-100">
           👥 Users

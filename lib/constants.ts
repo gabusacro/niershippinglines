@@ -22,6 +22,7 @@ export const ROUTES = {
   adminBookings: "/admin/bookings",
   adminManualBooking: "/admin/manual-booking",
   adminBranding: "/admin/branding",
+  adminAnnouncements: "/admin/announcements",
   adminFlagged: "/admin/flagged",
   adminFees: "/admin/fees",
   crew: "/crew",
