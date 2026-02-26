@@ -83,6 +83,11 @@ export default async function AdminDashboardPage() {
           className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-800 transition-colors hover:bg-purple-100">
           👥 Users
         </Link>
+
+        <Link href="/admin/refunds"
+        className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100">
+        💸 Refunds
+        </Link>
       </div>
 
       {/* Pending payments alert */}
