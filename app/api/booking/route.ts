@@ -257,6 +257,8 @@ export async function POST(request: NextRequest) {
     admin_fee_cents: adminFeeCents,
     status: "pending_payment",
     is_walk_in: false,
+    booking_source: "online",
+    payment_method: "gcash",
     created_by: createdBy,
   };
   if (notifyAlsoEmail) insertPayload.notify_also_email = notifyAlsoEmail;

@@ -190,6 +190,8 @@ export async function POST(request: NextRequest) {
     admin_fee_cents: adminFeeCents,
     status: "confirmed",
     is_walk_in: true,
+    booking_source: user.role === "admin" ? "admin" : "walk_in",
+    payment_method: "cash",
     created_by: createdBy,
     trip_snapshot_vessel_name: t.boat?.name ?? null,
     trip_snapshot_route_name: t.route?.display_name ?? null,
