@@ -85,6 +85,10 @@ export default async function DashboardPage({
     redirect("/investor");
   }
 
+  if (role === "vessel_owner") {
+    redirect("/vessel-owner");
+  }
+
   const params = await searchParams;
   const roleLabel: Record<string, string> = {
     admin: "Admin",

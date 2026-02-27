@@ -13,10 +13,12 @@ import { VesselAnnouncementsSection } from "./VesselAnnouncementsSection";
 
 export const metadata = {
   title: "Edit vessel",
-  description: "Edit vessel — Nier Shipping Lines",
+  description: "Edit vessel — Travela Siargao",
 };
 
 export const dynamic = "force-dynamic";
+
+const CONFIRMED_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
 
 export default async function AdminVesselEditPage({
   params,
@@ -29,6 +31,7 @@ export default async function AdminVesselEditPage({
   const { id } = await params;
   const today = new Date().toISOString().slice(0, 10);
   const supabase = await createClient();
+
   const { data: boat, error } = await supabase
     .from("boats")
     .select("id, name, capacity, online_quota, status, image_url")
@@ -55,6 +58,16 @@ export default async function AdminVesselEditPage({
     redirect(ROUTES.dashboard);
   }
 
+  // Fuel settings for net revenue calculation
+  const { data: appSettings } = await supabase
+    .from("app_settings")
+    .select("default_fuel_liters_per_trip, fuel_pesos_per_liter")
+    .eq("id", 1)
+    .maybeSingle();
+  const fuelLitersPerTrip = appSettings?.default_fuel_liters_per_trip ?? 50;
+  const fuelPesosPerLiter = Number(appSettings?.fuel_pesos_per_liter ?? 61.40);
+  const fuelCostPerTrip = Math.round(fuelLitersPerTrip * fuelPesosPerLiter * 100);
+
   const { data: upcomingTrips } = await supabase
     .from("trips")
     .select("id, departure_date, departure_time, status, online_quota, online_booked, walk_in_quota, walk_in_booked, route:routes(id, display_name, origin, destination)")
@@ -73,18 +86,6 @@ export default async function AdminVesselEditPage({
     .order("departure_time", { ascending: false })
     .limit(30);
 
-  const pastTrips: PastTrip[] = (pastTripsRaw ?? []).map((t) => {
-    const route = Array.isArray((t as { route?: unknown }).route)
-      ? ((t as { route: unknown[] }).route[0] as { display_name?: string } | null)
-      : ((t as { route?: { display_name?: string } | null }).route ?? null);
-    return {
-      id: t.id,
-      departure_date: t.departure_date,
-      departure_time: t.departure_time ?? null,
-      route: route && typeof route === "object" ? { display_name: route.display_name } : null,
-    };
-  });
-
   const { data: routes } = await supabase
     .from("routes")
     .select("id, display_name, origin, destination")
@@ -95,19 +96,65 @@ export default async function AdminVesselEditPage({
     const res = await supabase.from("ports").select("id, name").order("name");
     ports = res.data ?? [];
   } catch {
-    // ports table may not exist until migration 010
+    // ports table may not exist
   }
 
-  const allTripIds = [...(upcomingTrips ?? []).map((t) => t.id), ...pastTrips.map((t) => t.id)];
+  // Get all trip IDs
+  const pastTripIds = (pastTripsRaw ?? []).map((t) => t.id);
+  const allTripIds = [...(upcomingTrips ?? []).map((t) => t.id), ...pastTripIds];
+
+  // Booking aggregates for ALL trips (confirmed passengers count)
   const confirmedByTrip = new Map<string, number>();
+
+  // Financial aggregates for PAST trips only
+  type TripFinancials = {
+    passengers: number;
+    grossFareCents: number;
+    platformFeeCents: number;
+    paymentProcessingCents: number;
+  };
+  const financialsByTrip = new Map<string, TripFinancials>();
+
   if (allTripIds.length > 0) {
     const { data: confirmedBookings } = await supabase
       .from("bookings")
-      .select("trip_id, passenger_count")
+      .select("trip_id, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents")
       .in("trip_id", allTripIds)
-      .in("status", ["confirmed", "checked_in", "boarded", "completed"]);
+      .in("status", CONFIRMED_STATUSES);
+
     for (const b of confirmedBookings ?? []) {
+      // Confirmed count for all trips
       confirmedByTrip.set(b.trip_id, (confirmedByTrip.get(b.trip_id) ?? 0) + (b.passenger_count ?? 0));
+
+      // Financials for past trips
+      if (pastTripIds.includes(b.trip_id)) {
+        const cur = financialsByTrip.get(b.trip_id) ?? { passengers: 0, grossFareCents: 0, platformFeeCents: 0, paymentProcessingCents: 0 };
+        cur.passengers += b.passenger_count ?? 0;
+        cur.grossFareCents += b.total_amount_cents ?? 0;
+        cur.platformFeeCents += b.admin_fee_cents ?? 0;
+        cur.paymentProcessingCents += b.gcash_fee_cents ?? 0;
+        financialsByTrip.set(b.trip_id, cur);
+      }
+    }
+  }
+
+  // Fetch payment status for past trips from trip_fare_payments
+  const paymentStatusByTrip = new Map<string, { status: "pending" | "paid" | "failed"; reference: string | null }>();
+  if (pastTripIds.length > 0) {
+    try {
+      const { data: farePayments } = await supabase
+        .from("trip_fare_payments")
+        .select("trip_id, status, payment_reference")
+        .in("trip_id", pastTripIds);
+
+      for (const p of farePayments ?? []) {
+        paymentStatusByTrip.set(p.trip_id, {
+          status: p.status as "pending" | "paid" | "failed",
+          reference: p.payment_reference ?? null,
+        });
+      }
+    } catch {
+      // trip_fare_payments may not exist yet — run migration first
     }
   }
 
@@ -121,10 +168,33 @@ export default async function AdminVesselEditPage({
     return `${h12}:${m ?? "00"} ${am ? "AM" : "PM"}`;
   }
 
-  const totalConfirmed = [...(upcomingTrips ?? []), ...(pastTrips ?? [])].reduce((s, t) => s + (confirmedByTrip.get(t.id) ?? 0), 0);
-  const futureConfirmed = (upcomingTrips ?? []).reduce((s, t) => s + (confirmedByTrip.get(t.id) ?? 0), 0);
+  // Build past trips with financial data
+  const pastTrips: PastTrip[] = (pastTripsRaw ?? []).map((t) => {
+    const route = Array.isArray((t as { route?: unknown }).route)
+      ? ((t as { route: unknown[] }).route[0] as { display_name?: string } | null)
+      : ((t as { route?: { display_name?: string } | null }).route ?? null);
 
-  const tripCount = (upcomingTrips?.length ?? 0) + (pastTrips?.length ?? 0);
+    const fin = financialsByTrip.get(t.id) ?? { passengers: 0, grossFareCents: 0, platformFeeCents: 0, paymentProcessingCents: 0 };
+    const payment = paymentStatusByTrip.get(t.id) ?? { status: "pending" as const, reference: null };
+
+    return {
+      id: t.id,
+      departure_date: t.departure_date,
+      departure_time: t.departure_time ?? null,
+      route: route && typeof route === "object" ? { display_name: route.display_name } : null,
+      passengers: fin.passengers,
+      grossFareCents: fin.grossFareCents,
+      platformFeeCents: fin.platformFeeCents,
+      paymentProcessingCents: fin.paymentProcessingCents,
+      fuelCostCents: fuelCostPerTrip,
+      paymentStatus: payment.status,
+      paymentReference: payment.reference,
+    };
+  });
+
+  const totalConfirmed = [...(upcomingTrips ?? []), ...pastTrips].reduce((s, t) => s + (confirmedByTrip.get(t.id) ?? 0), 0);
+  const futureConfirmed = (upcomingTrips ?? []).reduce((s, t) => s + (confirmedByTrip.get(t.id) ?? 0), 0);
+  const tripCount = (upcomingTrips?.length ?? 0) + pastTrips.length;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
@@ -145,30 +215,30 @@ export default async function AdminVesselEditPage({
         )}
       </div>
 
-      {/* Upcoming trips — shown first so admin sees trip count and confirmed passengers */}
+      {/* Upcoming trips */}
       <section className="mt-6">
         <h2 className="text-lg font-semibold text-[#134e4a]">Upcoming trips</h2>
         <p className="mt-1 text-sm text-[#0f766e]">
-          Trips with 0 confirmed passengers can be removed. Trips with confirmed passengers cannot be deleted—reassign those bookings first.
+          Trips with 0 confirmed passengers can be removed.
         </p>
-        {(upcomingTrips?.length ?? 0) + (pastTrips?.length ?? 0) > 0 && (
+        {tripCount > 0 && (
           <p className="mt-2 text-sm font-medium text-amber-800">
-            {(upcomingTrips?.length ?? 0) + (pastTrips?.length ?? 0)} trip{((upcomingTrips?.length ?? 0) + (pastTrips?.length ?? 0)) !== 1 ? "s" : ""} total
-            {pastTrips && pastTrips.length > 0 && ` (${pastTrips.length} past)`}
+            {tripCount} trip{tripCount !== 1 ? "s" : ""} total
+            {pastTrips.length > 0 && ` (${pastTrips.length} past)`}
             {" · "}
-            {futureConfirmed} confirmed on future trips — {futureConfirmed > 0 ? "reassign/refund to delete vessel" : "vessel can be deleted"}
+            {futureConfirmed} confirmed on future trips —{" "}
+            {futureConfirmed > 0 ? "reassign/refund to delete vessel" : "vessel can be deleted"}
           </p>
         )}
-        {upcomingTrips && upcomingTrips.length > 0 ? (
+        {(upcomingTrips?.length ?? 0) > 0 ? (
           <TripsTableWithBulkActions
             boatId={boat.id}
-            trips={upcomingTrips.map((t) => {
+            trips={upcomingTrips!.map((t) => {
               const route = t.route as { display_name?: string } | null;
               const ob = t.online_booked ?? 0;
               const wb = t.walk_in_booked ?? 0;
               const capacity = boat.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
               const avail = Math.max(0, capacity - ob - wb);
-              const confirmedCount = confirmedByTrip.get(t.id) ?? 0;
               return {
                 id: t.id,
                 routeLabel: route?.display_name ?? "—",
@@ -179,19 +249,21 @@ export default async function AdminVesselEditPage({
                 totalBooked: ob + wb,
                 capacity,
                 onlineQuota: t.online_quota ?? 0,
-                confirmedCount,
+                confirmedCount: confirmedByTrip.get(t.id) ?? 0,
               };
             })}
             totalConfirmed={totalConfirmed}
           />
         ) : (
-          <p className="mt-4 text-sm text-[#0f766e]">No upcoming trips. Use the form below to assign a route and date range.</p>
+          <p className="mt-4 text-sm text-[#0f766e]">No upcoming trips. Use the form below to add trips.</p>
         )}
+
+        {/* Past trips with payment tracking */}
         {pastTrips.length > 0 && (
           <div className="mt-8">
-            <h3 className="text-sm font-semibold text-[#134e4a]">Past trips</h3>
+            <h3 className="text-sm font-semibold text-[#134e4a]">Past trips & fare payments</h3>
             <p className="mt-0.5 text-xs text-[#0f766e]">
-              Past trips can be removed even with no-show passengers. Only current/future confirmed tickets block vessel delete.
+              Mark each trip as paid after transferring the gross fare to the vessel owner. Platform fees are deducted from the payout shown.
             </p>
             <PastTripsTable
               boatId={boat.id}
@@ -204,7 +276,7 @@ export default async function AdminVesselEditPage({
 
       <CollapsibleSection
         title="Announcements & updates"
-        description="Post schedule or trip updates for passengers. They appear on the Schedule and Book pages."
+        description="Post schedule or trip updates for passengers."
       >
         <VesselAnnouncementsSection
           boatId={boat.id}
@@ -218,7 +290,7 @@ export default async function AdminVesselEditPage({
         <>
           <CollapsibleSection
             title="Vessel details & assign schedule"
-            description="Assign this vessel to one route for a date range. It cannot be on another route for the same dates."
+            description="Assign this vessel to one route for a date range."
           >
             <VesselEditForm
               boatId={boat.id}
@@ -235,7 +307,7 @@ export default async function AdminVesselEditPage({
 
           <CollapsibleSection
             title="Add more trips"
-            description="Add another route and date range—e.g. the return leg (Siargao → Surigao) for the same period, or a different period. One vessel can have multiple blocks (outbound + return, or different dates). Vessel cannot overlap with another route on the same dates."
+            description="Add another route and date range."
           >
             <VesselAddTripsForm boatId={boat.id} routes={routes ?? []} ports={ports} />
           </CollapsibleSection>
