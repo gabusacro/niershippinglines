@@ -189,17 +189,22 @@ export default async function BookingDetailPage({
   };
   const routeName = b.trip_snapshot_route_name ?? "—";
 
-  // Fetch GCash reference for refunded bookings
+  // Fetch refund details (GCash reference + admin notes) for refunded or in-progress refund bookings
   let gcashRef: string | null = null;
-  if (booking.status === "refunded") {
+  let refundAdminNotes: string | null = null;
+  const hasRefund = booking.status === "refunded" || !!(booking.refund_status && booking.refund_status !== "none");
+  if (hasRefund) {
     const adminClient = (await import("@/lib/supabase/admin")).createAdminClient();
     if (adminClient) {
       const { data: refund } = await adminClient
         .from("refunds")
-        .select("gcash_reference")
+        .select("gcash_reference, admin_notes")
         .eq("booking_id", booking.id)
+        .order("requested_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
       gcashRef = refund?.gcash_reference ?? null;
+      refundAdminNotes = refund?.admin_notes ?? null;
     }
   }
 
@@ -346,6 +351,7 @@ export default async function BookingDetailPage({
             reference={booking.reference}
             refundRequestedAt={booking.refund_requested_at ?? null}
             refundStatus={mappedRefundStatus}
+            refundAdminNotes={refundAdminNotes}
           />
         )}
 

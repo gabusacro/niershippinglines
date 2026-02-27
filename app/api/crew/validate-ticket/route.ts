@@ -23,12 +23,13 @@ export async function GET(request: NextRequest) {
     id: string;
     reference: string | null;
     status: string | null;
+    refund_status: string | null;
     customer_full_name: string | null;
     passenger_details: unknown;
     trip: unknown;
   } | null = null;
   let passengerIndex: number;
-  let ticketStatus: string | null = null; // individual ticket status
+  let ticketStatus: string | null = null;
   let resolvedTicketNumber: string | undefined;
 
   const legacyMatch = afterNier.match(/^([A-Z0-9]+):(\d+)$/i);
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     const { data: b, error } = await supabase
       .from("bookings")
-      .select("id, reference, status, customer_full_name, passenger_details, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
+      .select("id, reference, status, refund_status, customer_full_name, passenger_details, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
       .eq("reference", ref!.toUpperCase())
       .maybeSingle();
 
@@ -49,7 +50,6 @@ export async function GET(request: NextRequest) {
     }
     booking = b;
 
-    // For legacy QR, find the ticket row to get individual status
     const { data: legacyTicket } = await supabase
       .from("tickets")
       .select("ticket_number, status")
@@ -78,12 +78,12 @@ export async function GET(request: NextRequest) {
     }
 
     passengerIndex = ticket.passenger_index;
-    ticketStatus = ticket.status; // ← individual ticket status
+    ticketStatus = ticket.status;
     resolvedTicketNumber = ticket.ticket_number;
 
     const { data: b, error: bookError } = await supabase
       .from("bookings")
-      .select("id, reference, status, customer_full_name, passenger_details, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
+      .select("id, reference, status, refund_status, customer_full_name, passenger_details, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
       .eq("id", ticket.booking_id)
       .single();
 
@@ -95,6 +95,59 @@ export async function GET(request: NextRequest) {
 
   if (!booking) {
     return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+  }
+
+  // ⭐ Fetch refund details (admin_notes) from refunds table if there's an active refund
+  let refundNote: string | null = null;
+  let refundGcashReference: string | null = null;
+  const activeRefundStatuses = ["pending", "under_review", "approved", "processed"];
+  if (booking.refund_status && activeRefundStatuses.includes(booking.refund_status)) {
+    const { data: refundRow } = await supabase
+      .from("refunds")
+      .select("admin_notes, gcash_reference, status")
+      .eq("booking_id", booking.id)
+      .order("requested_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    refundNote = refundRow?.admin_notes ?? null;
+    refundGcashReference = refundRow?.gcash_reference ?? null;
+  }
+
+  // ⭐ Block refunded bookings — return early with full refund info for scanner display
+  if (booking.status === "refunded" || booking.refund_status === "processed") {
+    return NextResponse.json({
+      valid: false,
+      refunded: true,
+      reference: booking.reference ?? "—",
+      ticket_number: resolvedTicketNumber,
+      passenger_name: (() => {
+        const details = (booking.passenger_details ?? []) as { full_name?: string }[];
+        const passengers = details.length > 0 ? details : [{ full_name: booking.customer_full_name ?? "" }];
+        return passengers[passengerIndex]?.full_name ?? "";
+      })(),
+      refund_status: booking.refund_status,
+      refund_note: refundNote,
+      refund_gcash_reference: refundGcashReference,
+      status: booking.status,
+    }, { status: 400 });
+  }
+
+  // ⭐ Block bookings with active refund requests (pending/under_review/approved)
+  if (booking.refund_status && ["pending", "under_review", "approved"].includes(booking.refund_status)) {
+    return NextResponse.json({
+      valid: false,
+      refund_blocked: true,
+      reference: booking.reference ?? "—",
+      ticket_number: resolvedTicketNumber,
+      passenger_name: (() => {
+        const details = (booking.passenger_details ?? []) as { full_name?: string }[];
+        const passengers = details.length > 0 ? details : [{ full_name: booking.customer_full_name ?? "" }];
+        return passengers[passengerIndex]?.full_name ?? "";
+      })(),
+      refund_status: booking.refund_status,
+      refund_note: refundNote,
+      status: booking.status,
+    }, { status: 400 });
   }
 
   const validStatuses = ["confirmed", "checked_in", "boarded", "completed"];
@@ -122,10 +175,10 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     valid: true,
     reference: booking.reference ?? "—",
-    ticket_number: resolvedTicketNumber,   // always returned if available
+    ticket_number: resolvedTicketNumber,
     passenger_index: passengerIndex,
     passenger_name: passenger.full_name ?? "",
-    status: ticketStatus,                  // ← individual ticket status, not booking status
+    status: ticketStatus,
     trip: trip ? {
       date: trip.departure_date,
       time: trip.departure_time,

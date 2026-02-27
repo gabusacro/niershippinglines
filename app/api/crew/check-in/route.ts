@@ -44,6 +44,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Cannot update: ticket status is ${ticket.status}` }, { status: 400 });
     }
 
+    // ⭐ REFUND BLOCK: Check if the booking has an active refund before allowing boarding
+    const { data: bookingForRefundCheck } = await supabase
+      .from("bookings")
+      .select("refund_status, status")
+      .eq("id", ticket.booking_id)
+      .maybeSingle();
+
+    if (bookingForRefundCheck?.status === "refunded") {
+      return NextResponse.json({
+        error: "❌ This ticket has been refunded and is no longer valid for boarding."
+      }, { status: 400 });
+    }
+
+    const activeRefundStatuses = ["pending", "under_review", "approved"];
+    if (bookingForRefundCheck?.refund_status && activeRefundStatuses.includes(bookingForRefundCheck.refund_status)) {
+      return NextResponse.json({
+        error: `❌ This booking has an active refund request (${bookingForRefundCheck.refund_status}). Passenger cannot board until refund is resolved.`
+      }, { status: 400 });
+    }
+
     const ticketUpdates: Record<string, string> = { status: action };
     if (action === "checked_in" && !ticket.checked_in_at) {
       ticketUpdates.checked_in_at = now;
@@ -94,12 +114,26 @@ export async function POST(request: NextRequest) {
 
   const { data: booking, error: fetchErr } = await supabase
     .from("bookings")
-    .select("id, status, checked_in_at")
+    .select("id, status, checked_in_at, refund_status")
     .eq("reference", reference)
     .maybeSingle();
 
   if (fetchErr || !booking) {
     return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+  }
+
+  // ⭐ REFUND BLOCK: Check refund status before allowing check-in/boarding
+  if (booking.status === "refunded") {
+    return NextResponse.json({
+      error: "❌ This booking has been refunded and is no longer valid for boarding."
+    }, { status: 400 });
+  }
+
+  const activeRefundStatuses = ["pending", "under_review", "approved"];
+  if (booking.refund_status && activeRefundStatuses.includes(booking.refund_status)) {
+    return NextResponse.json({
+      error: `❌ This booking has an active refund request (${booking.refund_status}). Passenger cannot board until refund is resolved.`
+    }, { status: 400 });
   }
 
   const validStatuses = ["confirmed", "checked_in", "boarded"];
@@ -111,12 +145,10 @@ export async function POST(request: NextRequest) {
   if (action === "checked_in") {
     updates.checked_in_at = now;
   } else {
-    // boarded — also set checked_in_at if not already set
     updates.boarded_at = now;
     if (!booking.checked_in_at) updates.checked_in_at = now;
   }
 
-  // ✅ This closing brace was missing in the original — updates never ran!
   const { error: updateErr } = await supabase
     .from("bookings")
     .update(updates)
@@ -127,7 +159,7 @@ export async function POST(request: NextRequest) {
   // Also update all tickets for this booking to match
   await supabase
     .from("tickets")
-    .update({ 
+    .update({
       status: action,
       ...(action === "checked_in" ? { checked_in_at: now } : { boarded_at: now, checked_in_at: now })
     })

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { useToast } from "@/components/ui/ActionToast";
 
-// Detect if getUserMedia is available (blocked in iOS Chrome/Firefox)
 function hasGetUserMedia() {
   return !!(
     typeof navigator !== "undefined" &&
@@ -13,18 +12,33 @@ function hasGetUserMedia() {
   );
 }
 
+type ScanResult = {
+  valid: boolean;
+  refunded?: boolean;
+  refund_blocked?: boolean;
+  reference: string;
+  ticket_number?: string;
+  passenger_index?: number;
+  passenger_name: string;
+  status: string;
+  refund_status?: string;
+  refund_note?: string | null;
+  refund_gcash_reference?: string | null;
+  trip: { date?: string; time?: string; vessel?: string; route?: string } | null;
+};
+
+const REFUND_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending review",
+  under_review: "Under review",
+  approved: "Approved — awaiting GCash transfer",
+  processed: "Processed — GCash sent",
+  rejected: "Rejected",
+};
+
 export function CrewTicketScanner() {
   const [scanning, setScanning] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [result, setResult] = useState<{
-    valid: boolean;
-    reference: string;
-    ticket_number?: string;   // individual ticket number — used for per-passenger check-in
-    passenger_index?: number; // legacy fallback
-    passenger_name: string;
-    status: string;
-    trip: { date?: string; time?: string; vessel?: string; route?: string } | null;
-  } | null>(null);
+  const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -36,6 +50,13 @@ export function CrewTicketScanner() {
     try {
       const res = await fetch(`/api/crew/validate-ticket?payload=${encodeURIComponent(payload)}`);
       const data = await res.json();
+
+      // ⭐ Refunded or refund-blocked — show the void card instead of a toast
+      if (!res.ok && (data.refunded || data.refund_blocked)) {
+        setResult(data as ScanResult);
+        return;
+      }
+
       if (!res.ok) {
         toast.showError(data.error ?? "Invalid ticket");
         return;
@@ -52,8 +73,6 @@ export function CrewTicketScanner() {
     if (!result?.reference) return;
     setLoading(true);
     try {
-      // KEY FIX: use ticket_number for per-passenger update if available
-      // This means scanning passenger A's QR only updates passenger A, not the whole booking
       const body = result.ticket_number
         ? { ticket_number: result.ticket_number, action }
         : { reference: result.reference, passenger_index: result.passenger_index ?? 0, action };
@@ -77,7 +96,6 @@ export function CrewTicketScanner() {
     }
   }, [result, toast]);
 
-  // ── File input fallback (iOS Chrome) ─────────────────────────────────────
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -108,7 +126,6 @@ export function CrewTicketScanner() {
     }
   }, [validateTicket, toast]);
 
-  // ── Live camera scanner ───────────────────────────────────────────────────
   const initScanner = useCallback(() => {
     Html5Qrcode.getCameras()
       .then((cameras) => {
@@ -178,7 +195,6 @@ export function CrewTicketScanner() {
 
   return (
     <div className="space-y-4">
-      {/* Hidden file input for iOS Chrome fallback */}
       <input
         ref={fileInputRef}
         type="file"
@@ -222,7 +238,88 @@ export function CrewTicketScanner() {
         </div>
       )}
 
-      {result && (
+      {/* ⭐ REFUNDED — Void card */}
+      {result && result.refunded && (
+        <div className="rounded-xl border-2 border-red-400 bg-red-50 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-2xl">🚫</span>
+            <div>
+              <h3 className="text-lg font-bold text-red-900">TICKET VOID — REFUNDED</h3>
+              <p className="text-xs font-medium text-red-700">Do not allow boarding</p>
+            </div>
+          </div>
+          <div className="space-y-1 text-sm">
+            <p className="font-mono font-bold text-red-800">{result.reference}</p>
+            {result.ticket_number && (
+              <p className="text-xs font-mono text-red-700">Ticket #: {result.ticket_number}</p>
+            )}
+            <p className="text-red-900"><span className="font-semibold">Passenger:</span> {result.passenger_name}</p>
+            {result.refund_status && (
+              <p className="text-red-800"><span className="font-semibold">Refund status:</span> {REFUND_STATUS_LABELS[result.refund_status] ?? result.refund_status}</p>
+            )}
+            {result.refund_gcash_reference && (
+              <p className="text-red-800"><span className="font-semibold">GCash ref:</span> <span className="font-mono">{result.refund_gcash_reference}</span></p>
+            )}
+            {result.refund_note && (
+              <div className="mt-2 rounded-lg border border-red-300 bg-red-100 px-3 py-2">
+                <p className="text-xs font-semibold text-red-800 uppercase tracking-wide">Admin note</p>
+                <p className="mt-0.5 text-sm text-red-900">{result.refund_note}</p>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setResult(null)}
+            className="mt-4 w-full rounded-xl border-2 border-red-300 px-4 py-2 font-semibold text-red-700 hover:bg-red-100 touch-manipulation"
+          >
+            Scan another
+          </button>
+        </div>
+      )}
+
+      {/* ⭐ REFUND IN PROGRESS — Cannot board yet */}
+      {result && result.refund_blocked && (
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-2xl">⛔</span>
+            <div>
+              <h3 className="text-lg font-bold text-amber-900">BOARDING BLOCKED</h3>
+              <p className="text-xs font-medium text-amber-700">Active refund request on this booking</p>
+            </div>
+          </div>
+          <div className="space-y-1 text-sm">
+            <p className="font-mono font-bold text-amber-800">{result.reference}</p>
+            {result.ticket_number && (
+              <p className="text-xs font-mono text-amber-700">Ticket #: {result.ticket_number}</p>
+            )}
+            <p className="text-amber-900"><span className="font-semibold">Passenger:</span> {result.passenger_name}</p>
+            {result.refund_status && (
+              <p className="text-amber-800">
+                <span className="font-semibold">Refund status:</span> {REFUND_STATUS_LABELS[result.refund_status] ?? result.refund_status}
+              </p>
+            )}
+            {result.refund_note && (
+              <div className="mt-2 rounded-lg border border-amber-300 bg-amber-100 px-3 py-2">
+                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Admin note</p>
+                <p className="mt-0.5 text-sm text-amber-900">{result.refund_note}</p>
+              </div>
+            )}
+          </div>
+          <p className="mt-3 text-xs text-amber-700">
+            Contact admin to resolve the refund before this passenger can board.
+          </p>
+          <button
+            type="button"
+            onClick={() => setResult(null)}
+            className="mt-3 w-full rounded-xl border-2 border-amber-300 px-4 py-2 font-semibold text-amber-800 hover:bg-amber-100 touch-manipulation"
+          >
+            Scan another
+          </button>
+        </div>
+      )}
+
+      {/* ✅ Valid ticket */}
+      {result && result.valid && (
         <div className="rounded-xl border-2 border-teal-200 bg-teal-50/50 p-4">
           <h3 className="text-lg font-semibold text-[#134e4a]">Ticket validated</h3>
           <p className="mt-1 font-mono font-bold text-[#0c7b93]">{result.reference}</p>
@@ -262,7 +359,7 @@ export function CrewTicketScanner() {
           )}
           <button
             type="button"
-            onClick={() => { setResult(null); }}
+            onClick={() => setResult(null)}
             className="mt-3 text-sm font-semibold text-[#0c7b93] hover:underline"
           >
             Scan another
