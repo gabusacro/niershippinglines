@@ -349,8 +349,8 @@ export default async function DashboardPage({
                   </div>
                 )}
 
-                {/* Confirmed / tickets ready */}
-                {recentlyConfirmed.length > 0 && (
+                                {/* Confirmed / tickets ready */}
+                                {recentlyConfirmed.length > 0 && (
                   <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
                       <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(5,150,105,0.2)]" />
@@ -359,15 +359,49 @@ export default async function DashboardPage({
                       </span>
                     </div>
                     <ul className="space-y-2">
-                      {recentlyConfirmed.map((b) => (
-                        <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-sm">
-                          <span className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</span>
-                          <PrintTicketsTrigger reference={b.reference} siteName={branding.site_name} />
-                        </li>
-                      ))}
+                      {recentlyConfirmed.map((b) => {
+                        // Determine refund badge
+                        const refundBadge =
+                          b.refund_status === "pending" ? { emoji: "⏳", label: "Refund pending", color: "bg-amber-100 text-amber-800" } :
+                          b.refund_status === "under_review" ? { emoji: "🔍", label: "Refund under review", color: "bg-blue-100 text-blue-800" } :
+                          b.refund_status === "approved" ? { emoji: "✅", label: "Refund approved", color: "bg-emerald-100 text-emerald-800" } :
+                          b.refund_status === "processed" ? { emoji: "💸", label: "Refunded", color: "bg-teal-100 text-teal-800" } :
+                          b.refund_status === "rejected" ? { emoji: "❌", label: "Refund rejected", color: "bg-red-100 text-red-800" } :
+                          null;
+                        const hasReschedule = !!b.reschedule_requested_at;
+                        return (
+                          <li key={b.id} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</span>
+                                {refundBadge && (
+                                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${refundBadge.color}`}>
+                                    {refundBadge.emoji} {refundBadge.label}
+                                  </span>
+                                )}
+                                {hasReschedule && !refundBadge && (
+                                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800">
+                                    🔄 Reschedule requested
+                                  </span>
+                                )}
+                              </div>
+                              {!refundBadge && (
+                                <PrintTicketsTrigger reference={b.reference} siteName={branding.site_name} />
+                              )}
+                              {refundBadge && (
+                                <Link href={`/dashboard/bookings/${b.reference}`}
+                                  className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-[#0c7b93] hover:bg-emerald-50">
+                                  View →
+                                </Link>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
+
 
                 {/* Refunded */}
                 {refundedBookings.length > 0 && (

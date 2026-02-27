@@ -7,6 +7,9 @@ export type RecentlyConfirmedRow = {
   updated_at: string;
   trip_snapshot_departure_date?: string | null;
   trip_snapshot_departure_time?: string | null;
+  refund_status?: string | null;
+  refund_requested_at?: string | null;
+  reschedule_requested_at?: string | null;
 };
 
 /** Bookings owned by this profile (created_by) with status confirmed, shown in "Payment confirmed — tickets ready" until
@@ -22,7 +25,7 @@ export async function getRecentlyConfirmedBookings(
 
   const { data, error } = await supabase
     .from("bookings")
-    .select("id, reference, updated_at, trip_snapshot_departure_date, trip_snapshot_departure_time")
+    .select("id, reference, updated_at, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_status, refund_requested_at, reschedule_requested_at")
     .eq("created_by", profileId)
     .eq("status", "confirmed")
     .order("updated_at", { ascending: false })
