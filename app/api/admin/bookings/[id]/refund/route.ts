@@ -49,14 +49,22 @@ export async function POST(
     booking_id: id,
     amount_cents: booking.total_amount_cents ?? 0,
     reason,
+    status: "processed",       // Direct admin refund = already processed
+    refund_type: "full",
     processed_by: user.id,
+    processed_at: new Date().toISOString(),
     gcash_reference: gcashReference,
   });
   if (refundErr) return NextResponse.json({ error: refundErr.message }, { status: 500 });
 
+  // Update booking: status = refunded (voids ticket) + refund_status = processed
   const { error: statusErr } = await supabase
     .from("bookings")
-    .update({ status: "refunded" })
+    .update({
+      status: "refunded",          // ⭐ Crew scan will see this and block boarding
+      refund_status: "processed",  // ⭐ Passenger sees correct status
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id);
   if (statusErr) return NextResponse.json({ error: statusErr.message }, { status: 500 });
 

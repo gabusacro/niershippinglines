@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient();
   const email = (user.email ?? "").trim().toLowerCase();
+
   const { data: booking, error: bookErr } = await supabase
     .from("bookings")
     .select("id, trip_id, passenger_count, is_walk_in, status")
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
     .select("id, route_id, departure_date, departure_time")
     .eq("id", tripId)
     .single();
+
   if (tripErr || !currentTrip)
     return NextResponse.json({ error: "Current trip not found" }, { status: 404 });
 
@@ -72,13 +74,18 @@ export async function GET(request: NextRequest) {
     .map(({ trip }) => {
       const boat = trip.boat as { name?: string } | null;
       const route = trip.route as { display_name?: string; origin?: string; destination?: string } | null;
+      const seatsAvail = Math.max(
+        0,
+        (Number((trip as Record<string, unknown>)[quotaCol]) || 0) -
+        (Number((trip as Record<string, unknown>)[col]) || 0)
+      );
       return {
         id: trip.id,
         departure_date: trip.departure_date,
         departure_time: String(trip.departure_time ?? "").slice(0, 5),
         boat_name: boat?.name ?? "—",
-        route_label: route?.display_name ?? `${route?.origin ?? ""} → ${route?.destination ?? ""}`,
-        seats_available: Math.max(0, (Number((trip as Record<string, unknown>)[quotaCol]) || 0) - (Number((trip as Record<string, unknown>)[col]) || 0)),
+        route_label: route?.display_name ?? [route?.origin, route?.destination].filter(Boolean).join(" → ") ?? "—",
+        seats_available: seatsAvail,
       };
     });
 

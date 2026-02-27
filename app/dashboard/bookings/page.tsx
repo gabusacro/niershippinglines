@@ -50,6 +50,7 @@ type TripRow = {
   departure_time?: string;
   route?: { display_name?: string; origin?: string; destination?: string } | null;
 };
+
 type Row = {
   id: string;
   reference: string;
@@ -58,6 +59,7 @@ type Row = {
   total_amount_cents: number;
   status: string;
   created_at: string;
+  refund_status?: string | null;
   trip?: TripRow | null;
   trip_snapshot_vessel_name?: string | null;
   trip_snapshot_route_name?: string | null;
@@ -74,7 +76,7 @@ export default async function MyBookingsPage() {
   const fullRes = await supabase
     .from("bookings")
     .select(
-      "id, reference, passenger_count, fare_type, total_amount_cents, status, created_at, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
+      "id, reference, passenger_count, fare_type, total_amount_cents, status, created_at, refund_status, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
     )
     .eq("created_by", user.id)
     .order("created_at", { ascending: false })
@@ -166,6 +168,19 @@ export default async function MyBookingsPage() {
               "—";
             const depDate = b.trip?.departure_date ?? b.trip_snapshot_departure_date;
             const depTime = b.trip?.departure_time ?? b.trip_snapshot_departure_time;
+
+            // Refund status badge label and color
+            const refundBadge: Record<string, { label: string; color: string }> = {
+              pending:      { label: "⏳ Refund pending review",        color: "border-amber-200 bg-amber-50 text-amber-800" },
+              under_review: { label: "🔍 Refund under review",          color: "border-blue-200 bg-blue-50 text-blue-800" },
+              approved:     { label: "✅ Refund approved — GCash coming", color: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+              processed:    { label: "💸 Refund sent — check GCash",     color: "border-teal-200 bg-teal-50 text-teal-800" },
+              rejected:     { label: "❌ Refund rejected — contact us",   color: "border-red-200 bg-red-50 text-red-800" },
+            };
+            const refundBadgeInfo = b.refund_status && b.status !== "refunded"
+              ? refundBadge[b.refund_status] ?? null
+              : null;
+
             return (
               <li key={b.id}>
                 <Link
@@ -196,11 +211,21 @@ export default async function MyBookingsPage() {
                       {statusLabel[b.status] ?? b.status}
                     </span>
                   </div>
+
                   <p className="mt-3 text-sm text-[#134e4a]">
                     {b.passenger_count} passenger{b.passenger_count !== 1 ? "s" : ""} · {passengerTypeLabel(b.fare_type)} ·{" "}
                     <strong>₱{(b.total_amount_cents / 100).toLocaleString()}</strong>
                   </p>
-                  {b.status === "pending_payment" && (
+
+                  {/* Refund status badge — shown on any booking with an active refund request */}
+                  {refundBadgeInfo && (
+                    <div className={`mt-2 rounded-lg border px-3 py-2 ${refundBadgeInfo.color}`}>
+                      <p className="text-xs font-semibold">{refundBadgeInfo.label}</p>
+                      <p className="text-xs mt-0.5">Click to view details →</p>
+                    </div>
+                  )}
+
+                  {b.status === "pending_payment" && !refundBadgeInfo && (
                     <div className="mt-2 text-xs text-[#0f766e]">
                       <p>Pay at the ticket booth and present this reference, or send payment via GCash.</p>
                       {GCASH_NUMBER && (
@@ -211,11 +236,13 @@ export default async function MyBookingsPage() {
                       <p className="mt-1 text-[#0c7b93] font-medium">Click to view details and upload payment proof →</p>
                     </div>
                   )}
-                  {(b.status === "confirmed" || b.status === "checked_in" || b.status === "boarded" || b.status === "completed") && (
+
+                  {(b.status === "confirmed" || b.status === "checked_in" || b.status === "boarded" || b.status === "completed") && !refundBadgeInfo && (
                     <p className="mt-3 text-sm font-medium text-[#0c7b93]">
                       Click to view details and print tickets →
                     </p>
                   )}
+
                   {b.status === "refunded" && (
                     <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
                       <p className="text-sm font-semibold text-amber-900">

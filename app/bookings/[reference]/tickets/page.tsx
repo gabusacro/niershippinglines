@@ -9,6 +9,7 @@ import { TicketQRCode } from "@/components/tickets/TicketQRCode";
 
 type PassengerForTicket = { full_name: string; fare_type: string; address: string; ticket_number?: string };
 
+
 export default async function BookingTicketsPage({
   params,
 }: {

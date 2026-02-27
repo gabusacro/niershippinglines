@@ -9,12 +9,105 @@ const REASON_OPTIONS = [
   { value: "vessel_cancellation", label: "Vessel cancellation" },
 ] as const;
 
+type RefundStatus = "pending" | "under_review" | "approved" | "rejected" | "processed" | null | undefined;
+
+function RefundStatusBanner({ refundStatus }: { refundStatus: RefundStatus }) {
+  if (refundStatus === "pending") {
+    return (
+      <div className="mt-6 rounded-xl border-2 border-amber-200 bg-amber-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">⏳</span>
+          <h2 className="text-base font-semibold text-amber-900">Refund request submitted</h2>
+        </div>
+        <p className="mt-2 text-sm text-amber-800">
+          We have received your refund request and our team will review it shortly.
+        </p>
+        <p className="mt-2 text-xs font-medium text-amber-700">
+          Status: Waiting for review
+        </p>
+      </div>
+    );
+  }
+
+  if (refundStatus === "under_review") {
+    return (
+      <div className="mt-6 rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🔍</span>
+          <h2 className="text-base font-semibold text-blue-900">Refund under review</h2>
+        </div>
+        <p className="mt-2 text-sm text-blue-800">
+          Our team is currently reviewing your refund request. We will update you once a decision has been made.
+        </p>
+        <p className="mt-2 text-xs font-medium text-blue-700">
+          Status: Under review
+        </p>
+      </div>
+    );
+  }
+
+  if (refundStatus === "approved") {
+    return (
+      <div className="mt-6 rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">✅</span>
+          <h2 className="text-base font-semibold text-emerald-900">Refund approved</h2>
+        </div>
+        <p className="mt-2 text-sm text-emerald-800">
+          Your refund has been approved and will be sent to you via GCash soon.
+        </p>
+        <p className="mt-2 text-xs font-medium text-emerald-700">
+          Status: Approved — awaiting GCash transfer
+        </p>
+      </div>
+    );
+  }
+
+  if (refundStatus === "processed") {
+    return (
+      <div className="mt-6 rounded-xl border-2 border-teal-200 bg-teal-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">💸</span>
+          <h2 className="text-base font-semibold text-teal-900">Refund sent</h2>
+        </div>
+        <p className="mt-2 text-sm text-teal-800">
+          Your refund has been processed and sent via GCash. Please check your GCash account.
+        </p>
+        <p className="mt-2 text-xs font-medium text-teal-700">
+          Status: Processed — check your GCash
+        </p>
+      </div>
+    );
+  }
+
+  if (refundStatus === "rejected") {
+    return (
+      <div className="mt-6 rounded-xl border-2 border-red-200 bg-red-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">❌</span>
+          <h2 className="text-base font-semibold text-red-900">Refund request rejected</h2>
+        </div>
+        <p className="mt-2 text-sm text-red-800">
+          Unfortunately your refund request was not approved. Please visit the ticket booth or contact us for more information.
+        </p>
+        <p className="mt-2 text-xs font-medium text-red-700">
+          Status: Rejected
+        </p>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export function RequestRefundButton({
   reference,
   refundRequestedAt,
+  refundStatus,
 }: {
   reference: string;
   refundRequestedAt: string | null | undefined;
+  refundStatus?: RefundStatus;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -25,19 +118,9 @@ export function RequestRefundButton({
 
   const requested = !!refundRequestedAt;
 
+  // If refund already requested, show status banner instead of button
   if (requested) {
-    return (
-      <div className="mt-6 rounded-xl border-2 border-amber-200 bg-amber-50 p-4">
-        <h2 className="text-base font-semibold text-amber-900">Refund request submitted</h2>
-        <p className="mt-2 text-sm text-amber-800">
-          We have received your refund request and will review it. Refunds are processed only for weather disturbance or
-          vessel cancellation. Check this page for updates.
-        </p>
-        <p className="mt-2 text-xs text-amber-700">
-          If you have questions, contact us at the ticket booth or through our official channels.
-        </p>
-      </div>
-    );
+    return <RefundStatusBanner refundStatus={refundStatus} />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

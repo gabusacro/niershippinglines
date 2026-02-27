@@ -61,7 +61,8 @@ export default async function BookingDetailPage({
 }) {
   const user = await getAuthUser();
   if (!user) redirect(ROUTES.login);
-  if (user.role !== "passenger") redirect(ROUTES.dashboard);
+  const STAFF_ROLES = ["admin", "captain", "crew", "ticket_booth"];
+  if (STAFF_ROLES.includes(user.role)) redirect(ROUTES.dashboard);
 
   const { reference } = await params;
   const refNormalized = reference.trim().toUpperCase();
@@ -93,13 +94,14 @@ export default async function BookingDetailPage({
     refund_requested_at?: string | null;
     refund_request_reason?: string | null;
     refund_request_notes?: string | null;
+    refund_status?: string | null;
   };
   let booking: BookingRow | null = null;
 
   const fullRes = await supabase
     .from("bookings")
     .select(
-      "id, reference, created_by, customer_full_name, customer_email, customer_mobile, passenger_names, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, proof_resend_requested_at, gcash_transaction_reference, created_at, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_acknowledged_at, refund_requested_at, refund_request_reason, refund_request_notes"
+      "id, reference, created_by, customer_full_name, customer_email, customer_mobile, passenger_names, passenger_count, fare_type, total_amount_cents, status, payment_proof_path, proof_resend_requested_at, gcash_transaction_reference, created_at, trip_snapshot_vessel_name, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_acknowledged_at, refund_requested_at, refund_request_reason, refund_request_notes, refund_status"
     )
     .eq("reference", refNormalized)
     .eq("created_by", user.id)
@@ -174,10 +176,20 @@ export default async function BookingDetailPage({
     notFound();
   }
 
-  const b = booking as { trip_snapshot_route_name?: string | null; trip_snapshot_vessel_name?: string | null; trip_snapshot_departure_date?: string | null; trip_snapshot_departure_time?: string | null; refund_acknowledged_at?: string | null; customer_full_name?: string; customer_email?: string; customer_mobile?: string | null; passenger_names?: string[] };
+  const b = booking as {
+    trip_snapshot_route_name?: string | null;
+    trip_snapshot_vessel_name?: string | null;
+    trip_snapshot_departure_date?: string | null;
+    trip_snapshot_departure_time?: string | null;
+    refund_acknowledged_at?: string | null;
+    customer_full_name?: string;
+    customer_email?: string;
+    customer_mobile?: string | null;
+    passenger_names?: string[];
+  };
   const routeName = b.trip_snapshot_route_name ?? "—";
 
-  // Fetch GCash reference for refunded bookings (refunds table is admin-only; we use admin client after verifying ownership)
+  // Fetch GCash reference for refunded bookings
   let gcashRef: string | null = null;
   if (booking.status === "refunded") {
     const adminClient = (await import("@/lib/supabase/admin")).createAdminClient();
@@ -200,6 +212,16 @@ export default async function BookingDetailPage({
   const canReschedule =
     ["confirmed", "checked_in", "boarded", "pending_payment"].includes(booking.status) &&
     isDepartureAtLeast24HoursFromNow(b.trip_snapshot_departure_date ?? "", b.trip_snapshot_departure_time ?? "");
+
+  // Map bookings.refund_status to the refunds table status values for the banner
+  const refundStatusMap: Record<string, "pending" | "under_review" | "approved" | "rejected" | "processed"> = {
+    pending: "pending",
+    under_review: "under_review",
+    approved: "approved",
+    rejected: "rejected",
+    processed: "processed",
+  };
+  const mappedRefundStatus = booking.refund_status ? refundStatusMap[booking.refund_status] ?? undefined : undefined;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
@@ -322,7 +344,8 @@ export default async function BookingDetailPage({
         {["confirmed", "checked_in", "boarded", "pending_payment", "completed"].includes(booking.status) && (
           <RequestRefundButton
             reference={booking.reference}
-            refundRequestedAt={(booking as { refund_requested_at?: string | null }).refund_requested_at ?? null}
+            refundRequestedAt={booking.refund_requested_at ?? null}
+            refundStatus={mappedRefundStatus}
           />
         )}
 
