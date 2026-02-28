@@ -41,5 +41,13 @@ export async function GET(request: NextRequest) {
     // Toggles
     admin_fee_applies_walkin: feeSettings.admin_fee_applies_walkin,
     gcash_fee_show_breakdown: feeSettings.gcash_fee_show_breakdown,
+    child_min_age: feeSettings.child_min_age,
+    child_max_age: feeSettings.child_max_age,
+    child_discount_percent: feeSettings.child_discount_percent,
+    infant_max_age: feeSettings.infant_max_age,
+    infant_is_free: feeSettings.infant_is_free,
+    senior_min_age: 60,
+    senior_discount_percent: feeSettings.senior_discount_percent,
+    pwd_discount_percent: feeSettings.pwd_discount_percent,
   });
 }

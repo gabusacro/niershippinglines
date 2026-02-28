@@ -35,6 +35,15 @@ type FareRow = {
   discount_percent: number;
   admin_fee_cents_per_passenger?: number;
   gcash_fee_cents?: number;
+  // Age bracket rules from fee_settings
+  child_min_age?: number;
+  child_max_age?: number;
+  child_discount_percent?: number;
+  infant_max_age?: number;
+  infant_is_free?: boolean;
+  senior_min_age?: number;
+  senior_discount_percent?: number;
+  pwd_discount_percent?: number;
 };
 type SavedTraveler = {
   id: string;
@@ -50,6 +59,13 @@ type IdUploadState = {
   waived: boolean;
   fileName: string;
   error: string;
+};
+
+// What fare type should this age be?
+type FareSuggestion = {
+  suggestedType: "infant" | "child" | "senior" | null;
+  label: string;
+  discountLabel: string;
 };
 
 function ensureLength(arr: string[], len: number): string[] {
@@ -71,6 +87,27 @@ function calcAge(birthdate: string): number | null {
   const m = today.getMonth() - dob.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
   return age >= 0 ? age : null;
+}
+
+function getSuggestion(age: number | null, currentFareType: string, fare: FareRow | null): FareSuggestion | null {
+  if (age === null || !fare) return null;
+  const infantMax = fare.infant_max_age ?? 2;
+  const childMin = fare.child_min_age ?? 3;
+  const childMax = fare.child_max_age ?? 10;
+  const seniorMin = fare.senior_min_age ?? 60;
+  const childDiscount = fare.child_discount_percent ?? 50;
+  const seniorDiscount = fare.senior_discount_percent ?? 20;
+
+  if (age <= infantMax && currentFareType !== "infant") {
+    return { suggestedType: "infant", label: "Infant", discountLabel: "FREE (100% off)" };
+  }
+  if (age >= childMin && age <= childMax && currentFareType !== "child") {
+    return { suggestedType: "child", label: "Child", discountLabel: `${childDiscount}% off` };
+  }
+  if (age >= seniorMin && currentFareType !== "senior" && currentFareType !== "pwd") {
+    return { suggestedType: "senior", label: "Senior Citizen", discountLabel: `${seniorDiscount}% off` };
+  }
+  return null;
 }
 
 function PassengerExtraFields({ extra, onChange, savedTravelers, onSelectTraveler, isLoggedIn }: {
@@ -130,20 +167,29 @@ export function BookingModal({
   const toast = useToast();
   const isLoggedIn = !!loggedInEmail?.trim();
 
-  // ── Auto-senior: if user is 60+, default their slot to Senior ───────────
+  const [fare, setFare] = useState<FareRow | null>(null);
+
+  // Determine logged-in user's default fare type from their age
   const loggedInAge = loggedInBirthdate ? calcAge(loggedInBirthdate) : null;
-  const defaultAutoSenior = loggedInAge !== null && loggedInAge >= 60;
+  function getAutoFareType(age: number | null, f: FareRow | null): "adult" | "senior" | "child" | "infant" {
+    if (age === null || !f) return "adult";
+    if (age <= (f.infant_max_age ?? 2)) return "infant";
+    if (age >= (f.child_min_age ?? 3) && age <= (f.child_max_age ?? 10)) return "child";
+    if (age >= (f.senior_min_age ?? 60)) return "senior";
+    return "adult";
+  }
 
   const firstExtra: PassengerExtra = { gender: loggedInGender, birthdate: loggedInBirthdate, nationality: loggedInNationality };
 
-  const [fare, setFare] = useState<FareRow | null>(null);
-  const [countAdult, setCountAdult] = useState(defaultAutoSenior ? 0 : 1);
-  const [countSenior, setCountSenior] = useState(defaultAutoSenior ? 1 : 0);
+  // We'll set initial counts after fare loads if user has a birthdate
+  const [autoFareApplied, setAutoFareApplied] = useState(false);
+  const [countAdult, setCountAdult] = useState(1);
+  const [countSenior, setCountSenior] = useState(0);
   const [countPwd, setCountPwd] = useState(0);
   const [countChild, setCountChild] = useState(0);
   const [countInfant, setCountInfant] = useState(0);
-  const [adultNames, setAdultNames] = useState<string[]>(defaultAutoSenior ? [] : [passengerName ?? ""]);
-  const [seniorNames, setSeniorNames] = useState<string[]>(defaultAutoSenior ? [passengerName ?? ""] : []);
+  const [adultNames, setAdultNames] = useState<string[]>([passengerName ?? ""]);
+  const [seniorNames, setSeniorNames] = useState<string[]>([]);
   const [pwdNames, setPwdNames] = useState<string[]>([]);
   const [childNames, setChildNames] = useState<string[]>([]);
   const [infantNames, setInfantNames] = useState<string[]>([]);
@@ -156,8 +202,8 @@ export function BookingModal({
   const [pwdAddresses, setPwdAddresses] = useState<string[]>([]);
   const [childAddresses, setChildAddresses] = useState<string[]>([]);
   const [infantAddresses, setInfantAddresses] = useState<string[]>([]);
-  const [adultExtras, setAdultExtras] = useState<PassengerExtra[]>(defaultAutoSenior ? [] : [firstExtra]);
-  const [seniorExtras, setSeniorExtras] = useState<PassengerExtra[]>(defaultAutoSenior ? [firstExtra] : []);
+  const [adultExtras, setAdultExtras] = useState<PassengerExtra[]>([firstExtra]);
+  const [seniorExtras, setSeniorExtras] = useState<PassengerExtra[]>([]);
   const [pwdExtras, setPwdExtras] = useState<PassengerExtra[]>([]);
   const [childExtras, setChildExtras] = useState<PassengerExtra[]>([]);
   const [infantExtras, setInfantExtras] = useState<PassengerExtra[]>([]);
@@ -170,11 +216,8 @@ export function BookingModal({
   const [proofError, setProofError] = useState("");
   const paymentProofInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-
-  // Per-passenger ID state
   const [idStates, setIdStates] = useState<Record<string, IdUploadState>>({});
   const idFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
-
   const [result, setResult] = useState<{
     reference: string; total_amount_cents: number;
     fare_breakdown?: { base_fare_cents?: number; discount_percent?: number; passenger_details?: { fare_type: string; full_name: string; per_person_cents: number }[]; fare_subtotal_cents?: number; gcash_fee_cents?: number; admin_fee_cents?: number; total_cents?: number; };
@@ -188,8 +231,49 @@ export function BookingModal({
   const routeId = trip.route?.id;
   useEffect(() => {
     if (!routeId) return;
-    fetch(`/api/booking/fare?route_id=${encodeURIComponent(routeId)}`).then((r) => r.json()).then((data) => { if (data?.base_fare_cents != null) setFare({ base_fare_cents: data.base_fare_cents, discount_percent: data.discount_percent ?? 20, admin_fee_cents_per_passenger: data.admin_fee_cents_per_passenger, gcash_fee_cents: data.gcash_fee_cents }); }).catch(() => {});
+    fetch(`/api/booking/fare?route_id=${encodeURIComponent(routeId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.base_fare_cents != null) {
+          const f: FareRow = {
+            base_fare_cents: data.base_fare_cents,
+            discount_percent: data.discount_percent ?? 20,
+            admin_fee_cents_per_passenger: data.admin_fee_cents_per_passenger,
+            gcash_fee_cents: data.gcash_fee_cents,
+            child_min_age: data.child_min_age ?? 3,
+            child_max_age: data.child_max_age ?? 10,
+            child_discount_percent: data.child_discount_percent ?? 50,
+            infant_max_age: data.infant_max_age ?? 2,
+            infant_is_free: data.infant_is_free ?? true,
+            senior_min_age: data.senior_min_age ?? 60,
+            senior_discount_percent: data.senior_discount_percent ?? 20,
+            pwd_discount_percent: data.pwd_discount_percent ?? 20,
+          };
+          setFare(f);
+        }
+      }).catch(() => {});
   }, [routeId]);
+
+  // Once fare loads, auto-set the logged-in user's fare type based on their age
+  useEffect(() => {
+    if (!fare || autoFareApplied || !loggedInBirthdate) return;
+    const autoType = getAutoFareType(loggedInAge, fare);
+    if (autoType === "adult") { setAutoFareApplied(true); return; }
+    // Move first passenger from adult slot to correct slot
+    const name = passengerName ?? "";
+    if (autoType === "senior") {
+      setCountAdult(0); setAdultNames([]); setAdultExtras([]);
+      setCountSenior(1); setSeniorNames([name]); setSeniorExtras([firstExtra]);
+    } else if (autoType === "child") {
+      setCountAdult(0); setAdultNames([]); setAdultExtras([]);
+      setCountChild(1); setChildNames([name]); setChildExtras([firstExtra]);
+    } else if (autoType === "infant") {
+      setCountAdult(0); setAdultNames([]); setAdultExtras([]);
+      setCountInfant(1); setInfantNames([name]); setInfantExtras([firstExtra]);
+    }
+    setAutoFareApplied(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fare]);
 
   useEffect(() => { setAdultNames((p) => ensureLength(p, countAdult)); setAdultAddresses((p) => ensureLength(p, countAdult)); setAdultExtras((p) => ensureExtraLength(p, countAdult)); }, [countAdult]);
   useEffect(() => { setSeniorNames((p) => ensureLength(p, countSenior)); setSeniorAddresses((p) => ensureLength(p, countSenior)); setSeniorExtras((p) => ensureExtraLength(p, countSenior)); }, [countSenior]);
@@ -224,21 +308,31 @@ export function BookingModal({
   const adminFeeCents = totalPassengers * adminFeePerPax;
   const totalCents = fareSubtotalCents + gcashFee + adminFeeCents;
 
-  // Passengers requiring ID (senior + pwd only)
+  // Build fare advisories: passengers whose age doesn't match their fare type slot
+  const fareAdvisories = useMemo(() => {
+    if (!fare) return [];
+    const advisories: { name: string; currentType: string; suggestion: FareSuggestion }[] = [];
+    const check = (count: number, fareType: string, names: string[], extras: PassengerExtra[]) => {
+      for (let i = 0; i < count; i++) {
+        const age = extras[i]?.birthdate ? calcAge(extras[i].birthdate) : null;
+        const s = getSuggestion(age, fareType, fare);
+        if (s) advisories.push({ name: names[i] || `${fareType} ${i + 1}`, currentType: fareType, suggestion: s });
+      }
+    };
+    check(countAdult, "adult", adultNames, adultExtras);
+    check(countSenior, "senior", seniorNames, seniorExtras);
+    check(countChild, "child", childNames, childExtras);
+    check(countInfant, "infant", infantNames, infantExtras);
+    return advisories;
+  }, [fare, countAdult, countSenior, countChild, countInfant, adultNames, seniorNames, childNames, infantNames, adultExtras, seniorExtras, childExtras, infantExtras]);
+
+  // Passengers requiring ID
   const idRequiredPassengers = useMemo(() => {
     const list: { key: string; fareType: "senior" | "pwd"; name: string; passengerIndex: number }[] = [];
     seniorNames.forEach((name, i) => list.push({ key: `senior-${i}`, fareType: "senior", name: name || `Senior ${i + 1}`, passengerIndex: countAdult + i }));
     pwdNames.forEach((name, i) => list.push({ key: `pwd-${i}`, fareType: "pwd", name: name || `PWD ${i + 1}`, passengerIndex: countAdult + countSenior + i }));
     return list;
   }, [seniorNames, pwdNames, countAdult, countSenior]);
-
-  // Adults 60+ still in adult slot → advisory
-  const seniorAdvisory = useMemo(() =>
-    adultNames.map((name, i) => {
-      const age = adultExtras[i]?.birthdate ? calcAge(adultExtras[i].birthdate) : null;
-      return age !== null && age >= 60 ? { name: name || `Adult ${i + 1}`, age } : null;
-    }).filter(Boolean) as { name: string; age: number }[]
-  , [adultNames, adultExtras]);
 
   const allIdsSatisfied = idRequiredPassengers.length === 0 || idRequiredPassengers.every((p) => {
     const s = idStates[p.key];
@@ -344,6 +438,21 @@ export function BookingModal({
     );
   };
 
+  // Auto-fare banner info
+  const autoFareType = fare ? getAutoFareType(loggedInAge, fare) : "adult";
+  const autoFareBanner = autoFareApplied && autoFareType !== "adult" ? (
+    <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+      <p className="text-sm font-semibold text-blue-900">
+        {autoFareType === "infant" ? "👶" : autoFareType === "child" ? "🧒" : "👴"} {autoFareType.charAt(0).toUpperCase() + autoFareType.slice(1)} fare applied
+      </p>
+      <p className="text-xs text-blue-700 mt-1">
+        Based on your profile (age {loggedInAge}), your passenger slot is set to <strong>{autoFareType}</strong>
+        {autoFareType === "infant" ? " — FREE" : autoFareType === "child" ? ` — ${fare?.child_discount_percent ?? 50}% off` : ` — ${fare?.senior_discount_percent ?? 20}% off`}.
+        You can change this below if needed.
+      </p>
+    </div>
+  ) : null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title" onClick={onClose}>
       <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border-2 border-teal-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -355,23 +464,15 @@ export function BookingModal({
         </div>
 
         <div className="p-4">
-          {/* Trip info */}
           <div className="rounded-xl border border-teal-200 bg-[#fef9e7]/50 px-4 py-3 mb-4">
             <p className="font-semibold text-[#134e4a]">{formatTime(trip.departure_time)} · {vesselName}</p>
             <p className="text-sm text-[#0f766e]">{routeName}</p>
             <p className="text-xs text-[#0f766e] mt-1">{new Date(trip.departure_date + "Z").toLocaleDateString("en-PH", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}</p>
           </div>
 
-          {/* Auto-senior banner */}
-          {defaultAutoSenior && (
-            <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-              <p className="text-sm font-semibold text-blue-900">👴 Senior Citizen fare applied</p>
-              <p className="text-xs text-blue-700 mt-1">Based on your profile (age {loggedInAge}), your passenger slot has been set to <strong>Senior</strong> with the 20% discount. You can change this below if needed.</p>
-            </div>
-          )}
+          {autoFareBanner}
 
           {result ? (
-            /* ── POST-BOOKING: payment + ID upload ─────────────────── */
             <div className="space-y-4">
               <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4">
                 <p className="font-semibold text-[#134e4a]">Booking created</p>
@@ -379,7 +480,6 @@ export function BookingModal({
                 <p className="font-mono text-xl font-bold text-[#0c7b93] mt-2">Ref: {result.reference}</p>
               </div>
 
-              {/* Fare breakdown */}
               <div className="rounded-lg border border-teal-200 bg-white p-3">
                 <p className="text-xs font-semibold uppercase text-[#0f766e] mb-2">Fare breakdown</p>
                 {result.fare_breakdown?.passenger_details?.map((p, i) => {
@@ -415,62 +515,36 @@ export function BookingModal({
                 </div>
               )}
 
-              {/* ── Senior/PWD ID upload ────────────────────────────── */}
+              {/* Senior/PWD ID upload */}
               {idRequiredPassengers.length > 0 && (
                 <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 space-y-3">
                   <p className="text-sm font-bold text-blue-900">🪪 Senior Citizen / PWD ID</p>
-                  <p className="text-xs text-blue-800">Upload a valid ID for each Senior/PWD passenger to avail the 20% discount upon boarding. If you prefer not to, you may waive the discount.</p>
+                  <p className="text-xs text-blue-800">Upload a valid ID for each Senior/PWD passenger to avail the 20% discount upon boarding. Or choose to waive the discount.</p>
                   {idRequiredPassengers.map((pax) => {
                     const s = getIdState(pax.key);
                     return (
                       <div key={pax.key} className={`rounded-lg border p-3 space-y-2 bg-white ${s.uploaded ? "border-green-300" : s.waived ? "border-amber-300" : "border-blue-200"}`}>
                         <p className="text-xs font-semibold text-blue-900">{pax.fareType === "pwd" ? "PWD" : "Senior"}: {pax.name}</p>
-
-                        {/* Upload area — hidden if waived or uploaded */}
                         {!s.waived && !s.uploaded && (
                           <div className="space-y-2">
                             <div className="flex items-center gap-2 flex-wrap">
                               <label className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 cursor-pointer">
-                                <input
-                                  type="file"
-                                  accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-                                  className="sr-only"
-                                  ref={(el) => { idFileRefs.current[pax.key] = el; }}
-                                  onChange={() => patchIdState(pax.key, { error: "" })}
-                                  disabled={s.uploading}
-                                />
+                                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="sr-only" ref={(el) => { idFileRefs.current[pax.key] = el; }} onChange={() => patchIdState(pax.key, { error: "" })} disabled={s.uploading} />
                                 📎 Choose ID photo or PDF
                               </label>
-                              <button
-                                type="button"
-                                onClick={() => handleIdUpload(pax, result.reference)}
-                                disabled={s.uploading}
-                                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                              >
+                              <button type="button" onClick={() => handleIdUpload(pax, result.reference)} disabled={s.uploading} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
                                 {s.uploading ? "Uploading…" : "Upload ID"}
                               </button>
                             </div>
-                            {idFileRefs.current[pax.key]?.files?.[0] && (
-                              <p className="text-xs text-slate-600">Selected: {idFileRefs.current[pax.key]!.files![0].name}</p>
-                            )}
+                            {idFileRefs.current[pax.key]?.files?.[0] && <p className="text-xs text-slate-600">Selected: {idFileRefs.current[pax.key]!.files![0].name}</p>}
                             {s.error && <p className="text-xs text-red-600 font-semibold">⚠ {s.error}</p>}
                           </div>
                         )}
-
                         {s.uploaded && <p className="text-xs text-green-700 font-semibold">✓ ID uploaded: {s.fileName}</p>}
-
-                        {/* Waiver — available if not yet uploaded */}
                         {!s.uploaded && (
-                          <label className={`flex items-start gap-2 cursor-pointer pt-1 ${s.waived ? "" : "border-t border-blue-100 mt-1"}`}>
-                            <input
-                              type="checkbox"
-                              checked={s.waived}
-                              onChange={(e) => patchIdState(pax.key, { waived: e.target.checked, error: "" })}
-                              className="mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-600"
-                            />
-                            <span className="text-xs text-amber-800">
-                              I prefer to <strong>waive the Senior/PWD discount</strong> — no ID needed, regular fare applies.
-                            </span>
+                          <label className="flex items-start gap-2 cursor-pointer pt-1 border-t border-blue-100 mt-1">
+                            <input type="checkbox" checked={s.waived} onChange={(e) => patchIdState(pax.key, { waived: e.target.checked, error: "" })} className="mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-600" />
+                            <span className="text-xs text-amber-800">I prefer to <strong>waive the discount</strong> — no ID needed, regular fare applies.</span>
                           </label>
                         )}
                         {s.waived && !s.uploaded && (
@@ -482,15 +556,11 @@ export function BookingModal({
                       </div>
                     );
                   })}
-
-                  {/* Summary status */}
-                  {!allIdsSatisfied && (
-                    <p className="text-xs text-red-600 font-semibold">⚠ Please upload or waive the ID for all Senior/PWD passengers to continue.</p>
-                  )}
+                  {!allIdsSatisfied && <p className="text-xs text-red-600 font-semibold">⚠ Please upload or waive the ID for all Senior/PWD passengers to continue.</p>}
                 </div>
               )}
 
-              {/* ── Payment proof ───────────────────────────────────── */}
+              {/* Payment proof */}
               <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 space-y-2">
                 <p className="text-sm font-semibold text-amber-900">📎 Upload Payment Proof <span className="text-red-600">*</span></p>
                 <p className="text-xs text-amber-700"><strong>Required.</strong> Upload a screenshot of your GCash payment showing the reference number.</p>
@@ -498,9 +568,7 @@ export function BookingModal({
                   <input ref={paymentProofInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="sr-only" onChange={() => setProofError("")} disabled={uploadingProof || proofUploaded} />
                   {uploadingProof ? "Uploading…" : proofUploaded ? "✓ Proof submitted" : "Choose screenshot or PDF"}
                 </label>
-                {paymentProofInputRef.current?.files?.[0] && !proofUploaded && (
-                  <p className="text-xs text-green-700">Selected: {paymentProofInputRef.current.files[0].name}</p>
-                )}
+                {paymentProofInputRef.current?.files?.[0] && !proofUploaded && <p className="text-xs text-green-700">Selected: {paymentProofInputRef.current.files[0].name}</p>}
               </div>
 
               {proofError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2"><p className="text-sm font-semibold text-red-700">⚠ {proofError}</p></div>}
@@ -512,9 +580,7 @@ export function BookingModal({
                 {proofUploaded ? "Close" : "I'll upload later (booking stays pending)"}
               </button>
             </div>
-
           ) : (
-            /* ── BOOKING FORM ──────────────────────────────────────── */
             <form onSubmit={handleSubmit} className="space-y-4">
               <p className="text-sm font-medium text-[#134e4a]">Number of passengers by type</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -562,12 +628,15 @@ export function BookingModal({
               {renderPassengerBlock("Child", countChild, childNames, setChildNames, childAddresses, setChildAddresses, childExtras, setChildExtras)}
               {renderPassengerBlock("Infant (<7)", countInfant, infantNames, setInfantNames, infantAddresses, setInfantAddresses, infantExtras, setInfantExtras)}
 
-              {/* Adults 60+ advisory */}
-              {seniorAdvisory.length > 0 && (
-                <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
-                  <p className="text-xs font-bold text-amber-900 mb-1">⚠️ Senior Citizen discount available</p>
-                  {seniorAdvisory.map((a, i) => (
-                    <p key={i} className="text-xs text-amber-800"><strong>{a.name}</strong> (age {a.age}) qualifies for the 20% Senior discount. Consider changing their type to <strong>Senior</strong> above.</p>
+              {/* Fare advisories — mismatched age vs fare type */}
+              {fareAdvisories.length > 0 && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-1">
+                  <p className="text-xs font-bold text-amber-900">💡 Discount available for some passengers</p>
+                  {fareAdvisories.map((a, i) => (
+                    <p key={i} className="text-xs text-amber-800">
+                      <strong>{a.name}</strong> qualifies as <strong>{a.suggestion.label}</strong> ({a.suggestion.discountLabel}).
+                      Consider changing their passenger type above.
+                    </p>
                   ))}
                 </div>
               )}
