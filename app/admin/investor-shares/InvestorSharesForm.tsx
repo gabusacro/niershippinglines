@@ -65,7 +65,7 @@ export function InvestorSharesForm({
         body: JSON.stringify({
           investor_id: addForm.investor_id,
           share_percent: parseFloat(addForm.share_percent) || 0,
-          notes: addForm.notes.trim() || null,
+          notes: addForm.notes.trim() || "Silent Investor",
         }),
       });
       const json = await res.json();
