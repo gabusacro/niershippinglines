@@ -260,6 +260,8 @@ export async function POST(request: NextRequest) {
     booking_source: "online",
     payment_method: "gcash",
     created_by: createdBy,
+    terms_accepted_at: typeof b.terms_accepted_at === "string" ? b.terms_accepted_at : null,
+    terms_version: typeof b.terms_version === "string" ? b.terms_version : null,
   };
   if (notifyAlsoEmail) insertPayload.notify_also_email = notifyAlsoEmail;
   if (passengerDetails && passengerDetails.length > 0) {
