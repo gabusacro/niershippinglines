@@ -376,14 +376,8 @@ export default async function InvestorDashboard({
 
       {/* Nav links */}
       <div className="flex gap-3 flex-wrap">
-        <Link href={ROUTES.dashboard} className="rounded-xl border-2 border-teal-200 bg-white px-4 py-2 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-          🏠 Main Dashboard
-        </Link>
-        <Link href={ROUTES.myBookings} className="rounded-xl border-2 border-teal-200 bg-white px-4 py-2 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-          🎫 My Bookings
-        </Link>
         <Link href={ROUTES.account} className="rounded-xl border-2 border-teal-200 bg-white px-4 py-2 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-          👤 Account
+          👤 Account Settings
         </Link>
       </div>
     </div>

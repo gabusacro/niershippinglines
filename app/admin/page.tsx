@@ -124,6 +124,7 @@ export default async function AdminDashboardPage() {
           { href: ROUTES.adminFees, label: "Fees & charges" },
           { href: "/admin/expenses", label: "Expenses" },
           { href: "/admin/investor-shares", label: "Investor Shares" },
+          { href: "/admin/investor-payouts", label: "💼 Investor Payouts" },
           { href: "/admin/vessel-owners", label: "Vessel Owners" },
           { href: ROUTES.adminFlagged, label: "Flagged accounts" },
           { href: ROUTES.account, label: "My Profile" },
