@@ -7,6 +7,8 @@ import { passengerTypeLabel } from "@/lib/dashboard/format";
 import { GCASH_NUMBER, GCASH_ACCOUNT_NAME, ROUTES } from "@/lib/constants";
 import { TranslatableNotices } from "@/components/booking/TranslatableNotices";
 
+const TERMS_VERSION = "1.0";
+
 type RouteRow = { id: string; origin: string; destination: string; display_name: string };
 type TripRow = {
   id: string;
@@ -95,7 +97,6 @@ function calcAge(birthdate: string): number | null {
   return age >= 0 ? age : null;
 }
 
-// Reusable passenger extra fields (gender, birthdate, nationality)
 function PassengerExtraFields({
   extra,
   onChange,
@@ -215,7 +216,6 @@ export default function BookingForm({
   const [childAddresses, setChildAddresses] = useState<string[]>([]);
   const [infantAddresses, setInfantAddresses] = useState<string[]>([]);
 
-  // Extra fields: gender, birthdate, nationality per passenger
   const firstAdultExtra: PassengerExtra = {
     gender: loggedInGender,
     birthdate: loggedInBirthdate,
@@ -227,7 +227,6 @@ export default function BookingForm({
   const [childExtras, setChildExtras] = useState<PassengerExtra[]>([]);
   const [infantExtras, setInfantExtras] = useState<PassengerExtra[]>([]);
 
-  // Saved travelers
   const [savedTravelers, setSavedTravelers] = useState<SavedTraveler[]>([]);
   const isLoggedIn = !!loggedInEmail?.trim();
 
@@ -259,7 +258,11 @@ export default function BookingForm({
   const router = useRouter();
   const canUpload = !!loggedInEmail?.trim() && (customerEmail.trim().toLowerCase() === loggedInEmail.trim().toLowerCase());
 
-  // Load saved travelers if logged in
+  // ── NEW STATE ──────────────────────────────────────────────────────────
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [idWaivers, setIdWaivers] = useState<Record<string, boolean>>({});
+  // ──────────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!isLoggedIn) return;
     fetch("/api/saved-travelers")
@@ -290,12 +293,16 @@ export default function BookingForm({
     setCustomerMobile("");
     setProofUploaded(false);
     setProofError("");
+    setTermsAccepted(false);
+    setIdWaivers({});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedInName, loggedInEmail]);
 
   const handleConfirmBooking = async () => {
+    // ── FIX 1: Proof REQUIRED ─────────────────────────────────────────
     const file = paymentProofInputRef.current?.files?.[0];
-    if (!file) { setProofError("Please upload your GCash payment screenshot first."); return; }
+    if (!file) { setProofError("Payment proof is required. Please upload your GCash screenshot before confirming."); return; }
+    // ──────────────────────────────────────────────────────────────────
     if (!result?.reference) return;
     setProofError("");
     setUploadingProof(true);
@@ -372,25 +379,11 @@ export default function BookingForm({
   const passengerDetails = useMemo(() => {
     const list: { fare_type: string; full_name: string; address: string; gender?: string; age?: number; nationality?: string; birthdate?: string }[] = [];
     const mainAddr = customerAddress.trim();
-    const addPassengers = (
-      count: number,
-      fareType: string,
-      names: string[],
-      addresses: string[],
-      extras: PassengerExtra[]
-    ) => {
+    const addPassengers = (count: number, fareType: string, names: string[], addresses: string[], extras: PassengerExtra[]) => {
       for (let i = 0; i < count; i++) {
         const extra = extras[i] ?? { gender: "", birthdate: "", nationality: "" };
         const age = extra.birthdate ? calcAge(extra.birthdate) : undefined;
-        list.push({
-          fare_type: fareType,
-          full_name: names[i]?.trim() ?? "",
-          address: addresses[i]?.trim() || mainAddr,
-          gender: extra.gender || undefined,
-          birthdate: extra.birthdate || undefined,
-          age: age ?? undefined,
-          nationality: extra.nationality || undefined,
-        });
+        list.push({ fare_type: fareType, full_name: names[i]?.trim() ?? "", address: addresses[i]?.trim() || mainAddr, gender: extra.gender || undefined, birthdate: extra.birthdate || undefined, age: age ?? undefined, nationality: extra.nationality || undefined });
       }
     };
     addPassengers(countAdult, "adult", adultNames, adultAddresses, adultExtras);
@@ -411,6 +404,19 @@ export default function BookingForm({
   const adminFeeCents = totalPassengers * adminFeePerPax;
   const totalCents = fareSubtotalCents + gcashFee + adminFeeCents;
 
+  // ── Detect senior/PWD passengers needing ID notice ────────────────────
+  const seniorOrPwdPassengers = useMemo(() => {
+    const result: { key: string; fareType: string; name: string }[] = [];
+    seniorNames.forEach((name, i) => result.push({ key: `senior-${i}`, fareType: "senior", name: name || `Senior ${i + 1}` }));
+    adultNames.forEach((name, i) => {
+      const age = adultExtras[i]?.birthdate ? calcAge(adultExtras[i].birthdate) : null;
+      if (age !== null && age >= 60) result.push({ key: `adult-senior-${i}`, fareType: "adult-senior", name: name || `Adult ${i + 1}` });
+    });
+    pwdNames.forEach((name, i) => result.push({ key: `pwd-${i}`, fareType: "pwd", name: name || `PWD ${i + 1}` }));
+    return result;
+  }, [seniorNames, pwdNames, adultNames, adultExtras]);
+  // ──────────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -421,6 +427,11 @@ export default function BookingForm({
     if (hasEmptyName) { setError("Please enter the name for every passenger."); return; }
     if (!customerEmail.trim() || !customerMobile.trim()) { setError("Please enter contact email and mobile number."); return; }
     if (!customerAddress.trim()) { setError("Please enter address (required for tickets and Coast Guard manifest)."); return; }
+
+    // ── FIX 2: Terms required ─────────────────────────────────────────
+    if (!termsAccepted) { setError("Please read and accept the Terms and Privacy Policy to continue."); return; }
+    // ──────────────────────────────────────────────────────────────────
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/booking", {
@@ -432,6 +443,12 @@ export default function BookingForm({
           customer_mobile: customerMobile.trim(),
           customer_address: customerAddress.trim(),
           ...(notifyAlsoEmail.trim() && { notify_also_email: notifyAlsoEmail.trim() }),
+          // ── FIX 2: Record terms acceptance ──────────────────────────
+          terms_accepted_at: new Date().toISOString(),
+          terms_version: TERMS_VERSION,
+          // ── FIX 3: Record ID waivers ─────────────────────────────────
+          id_waivers: idWaivers,
+          // ────────────────────────────────────────────────────────────
           passenger_details: passengerDetails.map((p) => ({
             fare_type: p.fare_type,
             full_name: p.full_name,
@@ -454,7 +471,6 @@ export default function BookingForm({
     finally { setSubmitting(false); }
   };
 
-  // Helper: render passenger name + extra fields block
   const renderPassengerBlock = (
     label: string,
     count: number,
@@ -560,28 +576,46 @@ export default function BookingForm({
                 </div>
               )}
               <TranslatableNotices listClassName="text-sm text-amber-900 space-y-1 list-disc list-outside pl-5 ml-1" />
+
+              {/* ── FIX 1: Payment proof REQUIRED ──────────────────────── */}
               {canUpload ? (
                 <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium text-[#134e4a] mb-2">Submit payment proof</p>
-                    <p className="text-xs text-[#0f766e] mb-2">Upload a screenshot of your GCash payment showing the reference number so we can confirm your booking faster.</p>
+                  <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3">
+                    <p className="text-sm font-semibold text-amber-900 mb-1">📎 Upload Payment Proof <span className="text-red-600">*</span></p>
+                    <p className="text-xs text-amber-700 mb-3">
+                      Upload a screenshot of your GCash payment showing the reference number.
+                      <strong className="block mt-1">Booking will not be confirmed without proof.</strong>
+                    </p>
                     <label className="inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-xl border-2 border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50">
                       <input ref={paymentProofInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="sr-only" onChange={() => setProofError("")} disabled={uploadingProof || proofUploaded} />
-                      {uploadingProof ? "Uploading…" : proofUploaded ? "Proof submitted" : "Choose screenshot or PDF"}
+                      {uploadingProof ? "Uploading…" : proofUploaded ? "✓ Proof submitted" : "Choose screenshot or PDF"}
                     </label>
+                    {paymentProofInputRef.current?.files?.[0] && !proofUploaded && (
+                      <p className="mt-1 text-xs text-green-700">✓ {paymentProofInputRef.current.files[0].name} selected</p>
+                    )}
                   </div>
-                  {proofError && <p className="text-sm text-red-600">{proofError}</p>}
+                  {proofError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                      <p className="text-sm font-semibold text-red-700">⚠ {proofError}</p>
+                    </div>
+                  )}
                   <button type="button" onClick={handleConfirmBooking} disabled={uploadingProof || proofUploaded} className="w-full min-h-[44px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50">
-                    {uploadingProof ? "Uploading…" : proofUploaded ? "Done" : "Confirm Booking"}
+                    {uploadingProof ? "Uploading…" : proofUploaded ? "✓ Done" : "Confirm Booking"}
+                  </button>
+                  <button type="button" onClick={resetBooking} className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50">
+                    I&apos;ll upload later (booking stays pending)
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <p className="text-sm text-[#0f766e]">Sign in with <strong>{customerEmail || "your email"}</strong> to upload payment proof, or pay at the ticket booth and present this reference.</p>
                   <Link href={ROUTES.login} className="block w-full min-h-[44px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] text-center">Sign in to upload proof</Link>
+                  <button type="button" onClick={resetBooking} className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50">
+                    Create another booking
+                  </button>
                 </div>
               )}
-              <button type="button" onClick={resetBooking} className="w-full rounded-xl border border-[#0c7b93] px-4 py-2 text-sm font-medium text-[#0c7b93] hover:bg-[#0c7b93]/10">Create another booking</button>
+              {/* ─────────────────────────────────────────────────────── */}
             </div>
           </div>
         </div>
@@ -670,6 +704,49 @@ export default function BookingForm({
       {renderPassengerBlock("Child", countChild, childNames, setChildNames, childAddresses, setChildAddresses, childExtras, setChildExtras)}
       {renderPassengerBlock("Infant (<7)", countInfant, infantNames, setInfantNames, infantAddresses, setInfantAddresses, infantExtras, setInfantExtras)}
 
+      {/* ── FIX 3: Senior / PWD ID notice ──────────────────────────── */}
+      {seniorOrPwdPassengers.length > 0 && (
+        <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 space-y-3">
+          <p className="text-sm font-bold text-blue-900">🪪 Senior Citizen / PWD ID Required</p>
+          <p className="text-xs text-blue-800">
+            Philippine law grants Senior Citizens and PWDs a 20% discount. A valid ID showing
+            your date of birth (Senior Citizen ID, OSCA ID, PWD ID, or any government-issued ID)
+            must be presented upon boarding.
+          </p>
+          <div className="space-y-2">
+            {seniorOrPwdPassengers.map((pax) => (
+              <div key={pax.key} className="rounded-lg border border-blue-200 bg-white p-3">
+                <p className="text-xs font-semibold text-blue-900 mb-1">
+                  {pax.fareType === "pwd" ? "PWD" : "Senior"}: {pax.name}
+                </p>
+                {pax.fareType === "adult-senior" && (
+                  <p className="text-xs text-blue-700 mb-2">
+                    ⚠️ This passenger appears to be 60 or older. Consider selecting &quot;Senior&quot; fare type to avail the 20% discount.
+                  </p>
+                )}
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!idWaivers[pax.key]}
+                    onChange={(e) => setIdWaivers((prev) => ({ ...prev, [pax.key]: e.target.checked }))}
+                    className="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-600"
+                  />
+                  <span className="text-xs text-blue-800">
+                    I acknowledge the ID requirement. I choose to <strong>waive the Senior/PWD discount</strong> and will not present an ID upon boarding.
+                  </span>
+                </label>
+                {idWaivers[pax.key] && (
+                  <p className="mt-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                    ⚠️ Waiver recorded. No ID required. Regular fare applies. This is final.
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* ─────────────────────────────────────────────────────────────── */}
+
       <div className="border-t border-teal-200 pt-4">
         <p className="text-sm font-medium text-[#134e4a] mb-2">Address (for tickets and Coast Guard manifest)</p>
         <div className="mb-4">
@@ -696,14 +773,43 @@ export default function BookingForm({
           <div>
             <label className="block text-xs text-[#0f766e] mb-1">Also notify (optional)</label>
             <input type="email" value={notifyAlsoEmail} onChange={(e) => setNotifyAlsoEmail(e.target.value)} placeholder="Another email to receive the same notification" className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]" aria-label="Optional second email for notifications" />
-            <p className="mt-0.5 text-xs text-[#0f766e]/80">e.g. travel partner or family — they'll get the payment required email too.</p>
+            <p className="mt-0.5 text-xs text-[#0f766e]/80">e.g. travel partner or family — they&apos;ll get the payment required email too.</p>
           </div>
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {/* ── FIX 2: Terms & Privacy checkbox ────────────────────────── */}
+      <div className={`rounded-xl border-2 p-4 ${termsAccepted ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"}`}>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
+            className="mt-0.5 h-5 w-5 rounded border-amber-400 text-[#0c7b93] focus:ring-[#0c7b93]"
+          />
+          <span className="text-sm text-[#134e4a]">
+            I have read and agree to the{" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Terms of Service</a>
+            {" "}and{" "}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#0c7b93] underline hover:text-[#0f766e]">Privacy Policy</a>
+            . I understand the refund and cancellation policy, including that once the vessel has departed, rebooking is not available.
+            <span className="block mt-1 text-xs text-[#0f766e]">This acceptance is recorded with your booking (v{TERMS_VERSION}).</span>
+          </span>
+        </label>
+      </div>
+      {/* ─────────────────────────────────────────────────────────────── */}
 
-      <button type="submit" disabled={submitting || !tripId || totalPassengers < 1} className="w-full min-h-[44px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 touch-manipulation">
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+          <p className="text-sm font-semibold text-red-700">⚠ {error}</p>
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={submitting || !tripId || totalPassengers < 1 || !termsAccepted}
+        className="w-full min-h-[44px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 touch-manipulation"
+      >
         {submitting ? "Creating…" : "Create Booking"}
       </button>
     </form>
