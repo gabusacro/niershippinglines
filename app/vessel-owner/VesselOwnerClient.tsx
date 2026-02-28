@@ -22,8 +22,11 @@ function formatDate(d: string, short = false) {
   } catch { return d; }
 }
 function formatDateTime(iso: string) {
-  try { return new Date(iso).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }); }
-  catch { return iso; }
+  try {
+    return new Date(iso).toLocaleString("en-PH", {
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true,
+    });
+  } catch { return iso; }
 }
 
 type BookingLine = {
@@ -34,6 +37,7 @@ type BookingLine = {
   paymentMethod: string | null;
   passengerCount: number;
   totalAmountCents: number;
+  netFareCents: number;
   platformFeeCents: number;
   processingFeeCents: number;
   customerName: string;
@@ -53,9 +57,9 @@ type TripRow = {
   isToday: boolean;
   onlinePax: number;
   walkInPax: number;
-  grossFareCents: number;
-  platformFeeCents: number;
-  processingFeeCents: number;
+  onlineNetFareCents: number;
+  walkInFareCents: number;
+  totalGrossCents: number;
   paymentStatus: "pending" | "paid" | "failed";
   paymentMethod: string | null;
   paymentReference: string | null;
@@ -64,7 +68,12 @@ type TripRow = {
 };
 
 type Vessel = { boatId: string; boatName: string; patronagePct: number; bonusCents: number };
-type MonthTotals = { onlinePax: number; walkInPax: number; grossFareCents: number };
+type MonthTotals = {
+  onlinePax: number;
+  walkInPax: number;
+  onlineNetFareCents: number;
+  walkInFareCents: number;
+};
 
 interface Props {
   ownerName: string;
@@ -81,11 +90,11 @@ interface Props {
 
 function RoleBadge({ role }: { role: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    passenger:    { label: "Passenger", cls: "bg-blue-100 text-blue-800" },
-    admin:        { label: "Admin",     cls: "bg-purple-100 text-purple-800" },
-    vessel_owner: { label: "Owner",     cls: "bg-teal-100 text-teal-800" },
-    crew:         { label: "Crew",      cls: "bg-orange-100 text-orange-800" },
-    ticket_booth: { label: "Booth",     cls: "bg-pink-100 text-pink-800" },
+    passenger:    { label: "Passenger",  cls: "bg-blue-100 text-blue-800" },
+    admin:        { label: "Admin",      cls: "bg-purple-100 text-purple-800" },
+    vessel_owner: { label: "Owner",      cls: "bg-teal-100 text-teal-800" },
+    crew:         { label: "Crew",       cls: "bg-orange-100 text-orange-800" },
+    ticket_booth: { label: "Booth",      cls: "bg-pink-100 text-pink-800" },
   };
   const { label, cls } = map[role] ?? { label: role, cls: "bg-gray-100 text-gray-700" };
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
@@ -111,7 +120,6 @@ export function VesselOwnerClient({
   const router = useRouter();
   const [activeVessel, setActiveVessel] = useState<string | null>(vessels[0]?.boatId ?? null);
   const [page, setPage] = useState(1);
-  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
   const [auditTripId, setAuditTripId] = useState<string | null>(null);
 
   const filteredTrips = useMemo(() =>
@@ -124,13 +132,21 @@ export function VesselOwnerClient({
   const totalPages = Math.ceil(allTrips.length / PAGE_SIZE);
   const pagedTrips = allTrips.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const goToMonth = (year: number, month: number) => { setPage(1); router.push(`/vessel-owner?year=${year}&month=${month}`); };
-  const prevMonth = () => selectedMonth === 1 ? goToMonth(selectedYear - 1, 12) : goToMonth(selectedYear, selectedMonth - 1);
+  const goToMonth = (year: number, month: number) => {
+    setPage(1);
+    router.push(`/vessel-owner?year=${year}&month=${month}`);
+  };
+  const prevMonth = () =>
+    selectedMonth === 1 ? goToMonth(selectedYear - 1, 12) : goToMonth(selectedYear, selectedMonth - 1);
   const nextMonth = () => {
     if (selectedYear > currentYear || (selectedYear === currentYear && selectedMonth >= currentMonth)) return;
     selectedMonth === 12 ? goToMonth(selectedYear + 1, 1) : goToMonth(selectedYear, selectedMonth + 1);
   };
   const isCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
+
+  const totalRemittable = monthTotals.onlineNetFareCents;
+  const totalWalkIn     = monthTotals.walkInFareCents;
+  const totalCombined   = totalRemittable + totalWalkIn;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
@@ -145,7 +161,9 @@ export function VesselOwnerClient({
           <span className="text-base font-bold">{MONTH_NAMES[selectedMonth - 1]} {selectedYear}</span>
           <button onClick={nextMonth} disabled={isCurrentMonth} className="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-semibold hover:bg-white/25 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">Next →</button>
           {!isCurrentMonth && (
-            <button onClick={() => goToMonth(currentYear, currentMonth)} className="ml-auto rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/30 transition-colors">This month</button>
+            <button onClick={() => goToMonth(currentYear, currentMonth)} className="ml-auto rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold hover:bg-white/30 transition-colors">
+              This month
+            </button>
           )}
         </div>
       </div>
@@ -172,21 +190,37 @@ export function VesselOwnerClient({
           <p className="text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Trips This Month</p>
           <p className="mt-1.5 text-2xl font-bold text-[#134e4a]">{allTrips.length}</p>
         </div>
+
+        {/* Online — shows NET fare (what platform remits) */}
         <div className="rounded-xl border border-[#0c7b93]/20 bg-[#0c7b93]/5 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">🌐 Online Bookings</p>
-          <p className="mt-1.5 text-2xl font-bold text-[#0c7b93]">{monthTotals.onlinePax}</p>
-          <p className="mt-0.5 text-xs text-[#0c7b93]/60">pax via GCash / website</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">🌐 Online Fare (Remitted)</p>
+          <p className="mt-1.5 text-2xl font-bold text-[#0c7b93]">{peso(totalRemittable)}</p>
+          <p className="mt-0.5 text-xs text-[#0c7b93]/60">{monthTotals.onlinePax} pax · fare after fees deducted</p>
         </div>
+
+        {/* Walk-in — their direct cash */}
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">🚶 Walk-in / Cash</p>
-          <p className="mt-1.5 text-2xl font-bold text-amber-800">{monthTotals.walkInPax}</p>
-          <p className="mt-0.5 text-xs text-amber-600/70">pax via booth / manual</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">🚶 Walk-in Cash</p>
+          <p className="mt-1.5 text-2xl font-bold text-amber-800">{peso(totalWalkIn)}</p>
+          <p className="mt-0.5 text-xs text-amber-600/70">{monthTotals.walkInPax} pax · collected directly by vessel</p>
         </div>
-        <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Gross Fare</p>
-          <p className="mt-1.5 text-2xl font-bold text-[#134e4a]">{peso(monthTotals.grossFareCents)}</p>
+
+        {/* Combined total */}
+        <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Total Revenue</p>
+          <p className="mt-1.5 text-2xl font-bold text-[#134e4a]">{peso(totalCombined)}</p>
           <p className="mt-0.5 text-xs text-[#0f766e]/60">{monthTotals.onlinePax + monthTotals.walkInPax} total pax</p>
         </div>
+      </div>
+
+      {/* Revenue note */}
+      <div className="rounded-xl border border-teal-100 bg-white p-4 text-xs text-[#0f766e] space-y-1">
+        <p>
+          <span className="font-semibold text-[#0c7b93]">🌐 Online Fare (Remitted)</span> — Passenger paid via GCash through the platform. Platform service fee and payment processing fee are deducted. The remaining fare is remitted to you by Travela Siargao.
+        </p>
+        <p>
+          <span className="font-semibold text-amber-700">🚶 Walk-in Cash</span> — Ticket sold at counter or manually by booth/crew/owner. Full cash amount goes directly to the vessel. Travela Siargao does not handle this money.
+        </p>
       </div>
 
       {/* Operator Loyalty Bonus */}
@@ -214,8 +248,12 @@ export function VesselOwnerClient({
         <div>
           <h2 className="text-sm font-bold uppercase tracking-wide text-[#0f766e]">Today&apos;s Trips</h2>
           <div className="mt-2 rounded-xl border border-teal-200 bg-white overflow-x-auto shadow-sm">
-            <TripTable trips={todayTrips} expandedTripId={expandedTripId} setExpandedTripId={setExpandedTripId}
-              auditTripId={auditTripId} setAuditTripId={setAuditTripId} highlight />
+            <TripTable
+              trips={todayTrips}
+              auditTripId={auditTripId}
+              setAuditTripId={setAuditTripId}
+              highlight
+            />
           </div>
         </div>
       )}
@@ -239,16 +277,23 @@ export function VesselOwnerClient({
         </div>
 
         {allTrips.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-teal-100 bg-white p-8 text-center text-sm text-[#0f766e]/60">No trips this month yet.</div>
+          <div className="mt-4 rounded-xl border border-teal-100 bg-white p-8 text-center text-sm text-[#0f766e]/60">
+            No trips this month yet.
+          </div>
         ) : (
           <div className="mt-2 rounded-xl border border-teal-200 bg-white overflow-x-auto shadow-sm">
-            <TripTable trips={pagedTrips} expandedTripId={expandedTripId} setExpandedTripId={setExpandedTripId}
-              auditTripId={auditTripId} setAuditTripId={setAuditTripId} />
-            <div className="border-t-2 border-teal-200 bg-teal-50/60 px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <TripTable
+              trips={pagedTrips}
+              auditTripId={auditTripId}
+              setAuditTripId={setAuditTripId}
+            />
+            {/* Footer totals */}
+            <div className="border-t-2 border-teal-200 bg-teal-50/60 px-4 py-3 grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
               <div><p className="text-xs text-[#0f766e]">Total Trips</p><p className="font-bold text-[#134e4a]">{allTrips.length}</p></div>
-              <div><p className="text-xs text-[#0f766e]">Online Pax</p><p className="font-bold text-[#0c7b93]">{monthTotals.onlinePax}</p></div>
-              <div><p className="text-xs text-[#0f766e]">Walk-in Pax</p><p className="font-bold text-amber-700">{monthTotals.walkInPax}</p></div>
-              <div><p className="text-xs text-[#0f766e]">Gross Fare</p><p className="font-bold text-[#134e4a]">{peso(monthTotals.grossFareCents)}</p></div>
+              <div><p className="text-xs text-[#0c7b93]">Online Pax</p><p className="font-bold text-[#0c7b93]">{monthTotals.onlinePax}</p></div>
+              <div><p className="text-xs text-amber-700">Walk-in Pax</p><p className="font-bold text-amber-700">{monthTotals.walkInPax}</p></div>
+              <div><p className="text-xs text-[#0c7b93]">Online Fare</p><p className="font-bold text-[#0c7b93]">{peso(totalRemittable)}</p></div>
+              <div><p className="text-xs text-amber-700">Walk-in Cash</p><p className="font-bold text-amber-700">{peso(totalWalkIn)}</p></div>
             </div>
           </div>
         )}
@@ -257,10 +302,14 @@ export function VesselOwnerClient({
   );
 }
 
-function TripTable({ trips, expandedTripId, setExpandedTripId, auditTripId, setAuditTripId, highlight = false }: {
+// ── Trip Table ────────────────────────────────────────────────────────────────
+function TripTable({
+  trips,
+  auditTripId,
+  setAuditTripId,
+  highlight = false,
+}: {
   trips: TripRow[];
-  expandedTripId: string | null;
-  setExpandedTripId: (id: string | null) => void;
   auditTripId: string | null;
   setAuditTripId: (id: string | null) => void;
   highlight?: boolean;
@@ -272,10 +321,11 @@ function TripTable({ trips, expandedTripId, setExpandedTripId, auditTripId, setA
           <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Date</th>
           <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Time</th>
           <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Route</th>
-          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">🌐 Online</th>
-          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">🚶 Walk-in</th>
-          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Gross Fare</th>
-          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Paid Out</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">🌐 Online Pax</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">Online Fare</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">🚶 Walk-in Pax</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">Walk-in Cash</th>
+          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Remit Status</th>
           <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Audit</th>
         </tr>
       </thead>
@@ -290,24 +340,44 @@ function TripTable({ trips, expandedTripId, setExpandedTripId, auditTripId, setA
                   {t.isToday && <span className="ml-1 rounded-full bg-[#0c7b93]/10 px-1.5 py-0.5 text-xs text-[#0c7b93]">today</span>}
                 </td>
                 <td className="px-3 py-2.5 text-[#134e4a]">{formatTime(t.departureTime)}</td>
-                <td className="px-3 py-2.5 text-[#134e4a] max-w-[150px] truncate">{t.routeName}</td>
+                <td className="px-3 py-2.5 text-[#134e4a] max-w-[140px] truncate">{t.routeName}</td>
+
+                {/* Online pax + net fare */}
                 <td className="px-3 py-2.5 text-right">
-                  {t.onlinePax > 0 ? <span className="font-semibold text-[#0c7b93]">{t.onlinePax}</span> : <span className="text-gray-300">—</span>}
+                  {t.onlinePax > 0
+                    ? <span className="font-semibold text-[#0c7b93]">{t.onlinePax}</span>
+                    : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="px-3 py-2.5 text-right">
-                  {t.walkInPax > 0 ? <span className="text-amber-700">{t.walkInPax}</span> : <span className="text-gray-300">—</span>}
+                  {t.onlineNetFareCents > 0
+                    ? <span className="font-medium text-[#0c7b93]">{peso(t.onlineNetFareCents)}</span>
+                    : <span className="text-gray-300">—</span>}
                 </td>
-                <td className="px-3 py-2.5 text-right font-medium text-[#134e4a]">
-                  {t.grossFareCents > 0 ? peso(t.grossFareCents) : <span className="text-gray-300">—</span>}
+
+                {/* Walk-in pax + cash */}
+                <td className="px-3 py-2.5 text-right">
+                  {t.walkInPax > 0
+                    ? <span className="text-amber-700">{t.walkInPax}</span>
+                    : <span className="text-gray-300">—</span>}
                 </td>
+                <td className="px-3 py-2.5 text-right">
+                  {t.walkInFareCents > 0
+                    ? <span className="text-amber-700">{peso(t.walkInFareCents)}</span>
+                    : <span className="text-gray-300">—</span>}
+                </td>
+
                 <td className="px-3 py-2.5 text-center">
                   <PaymentBadge status={t.paymentStatus} />
                 </td>
                 <td className="px-3 py-2.5 text-center">
                   {t.bookings.length > 0 && (
                     <button
-                      onClick={() => { setAuditTripId(isAudit ? null : t.id); setExpandedTripId(null); }}
-                      className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${isAudit ? "bg-[#0c7b93] text-white" : "bg-teal-50 text-[#0c7b93] border border-teal-200 hover:bg-teal-100"}`}>
+                      onClick={() => setAuditTripId(isAudit ? null : t.id)}
+                      className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${
+                        isAudit
+                          ? "bg-[#0c7b93] text-white"
+                          : "bg-teal-50 text-[#0c7b93] border border-teal-200 hover:bg-teal-100"
+                      }`}>
                       {isAudit ? "Hide" : `Log (${t.bookings.length})`}
                     </button>
                   )}
@@ -317,7 +387,7 @@ function TripTable({ trips, expandedTripId, setExpandedTripId, auditTripId, setA
               {/* Audit log */}
               {isAudit && t.bookings.length > 0 && (
                 <tr className="bg-slate-50">
-                  <td colSpan={8} className="px-4 py-4">
+                  <td colSpan={9} className="px-4 py-4">
                     <p className="mb-3 text-xs font-bold uppercase tracking-wide text-[#0f766e]">
                       📋 Booking Audit Log — {t.bookings.length} transaction{t.bookings.length !== 1 ? "s" : ""}
                     </p>
@@ -330,8 +400,8 @@ function TripTable({ trips, expandedTripId, setExpandedTripId, auditTripId, setA
                             <th className="px-3 py-2 text-center font-semibold text-slate-600">Source</th>
                             <th className="px-3 py-2 text-left font-semibold text-slate-600">Created By</th>
                             <th className="px-3 py-2 text-right font-semibold text-slate-600">Pax</th>
-                            <th className="px-3 py-2 text-right font-semibold text-slate-600">Fare</th>
-                            <th className="px-3 py-2 text-right font-semibold text-slate-600">Platform Fee</th>
+                            <th className="px-3 py-2 text-right font-semibold text-[#0c7b93]">Online Fare</th>
+                            <th className="px-3 py-2 text-right font-semibold text-amber-700">Walk-in Cash</th>
                             <th className="px-3 py-2 text-left font-semibold text-slate-600">Booked At</th>
                           </tr>
                         </thead>
@@ -348,10 +418,16 @@ function TripTable({ trips, expandedTripId, setExpandedTripId, auditTripId, setA
                                 </div>
                               </td>
                               <td className="px-3 py-2 text-right font-semibold text-slate-700">{bl.passengerCount}</td>
-                              <td className="px-3 py-2 text-right font-semibold text-slate-700">{peso(bl.totalAmountCents)}</td>
+                              {/* Online: show net fare (after fees) */}
                               <td className="px-3 py-2 text-right">
-                                {bl.isOnline && (bl.platformFeeCents + bl.processingFeeCents) > 0
-                                  ? <span className="text-[#0f766e] font-semibold">{peso(bl.platformFeeCents + bl.processingFeeCents)}</span>
+                                {bl.isOnline
+                                  ? <span className="font-semibold text-[#0c7b93]">{peso(bl.netFareCents)}</span>
+                                  : <span className="text-gray-300">—</span>}
+                              </td>
+                              {/* Walk-in: show cash amount */}
+                              <td className="px-3 py-2 text-right">
+                                {!bl.isOnline
+                                  ? <span className="font-semibold text-amber-700">{peso(bl.netFareCents)}</span>
                                   : <span className="text-gray-300">—</span>}
                               </td>
                               <td className="px-3 py-2 text-slate-500">{formatDateTime(bl.createdAt)}</td>
@@ -361,16 +437,23 @@ function TripTable({ trips, expandedTripId, setExpandedTripId, auditTripId, setA
                         <tfoot>
                           <tr className="bg-slate-100 font-semibold">
                             <td colSpan={4} className="px-3 py-2 text-slate-600">Trip Total</td>
-                            <td className="px-3 py-2 text-right text-slate-700">{t.bookings.reduce((s, b) => s + b.passengerCount, 0)}</td>
-                            <td className="px-3 py-2 text-right text-slate-700">{peso(t.grossFareCents)}</td>
-                            <td className="px-3 py-2 text-right text-[#0f766e]">{peso(t.platformFeeCents + t.processingFeeCents)}</td>
+                            <td className="px-3 py-2 text-right text-slate-700">
+                              {t.bookings.reduce((s, b) => s + b.passengerCount, 0)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-[#0c7b93]">
+                              {t.onlineNetFareCents > 0 ? peso(t.onlineNetFareCents) : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-right text-amber-700">
+                              {t.walkInFareCents > 0 ? peso(t.walkInFareCents) : "—"}
+                            </td>
                             <td className="px-3 py-2"></td>
                           </tr>
                         </tfoot>
                       </table>
                     </div>
                     <p className="mt-2 text-xs text-slate-400">
-                      🌐 Online = booked via website, platform fee applies · 🚶 Walk-in = cash at counter, no platform fee
+                      🌐 Online fare = total passenger paid minus platform service fee and payment processing fee (remitted by Travela Siargao) ·
+                      🚶 Walk-in cash = collected directly by vessel, not handled by platform
                     </p>
                   </td>
                 </tr>

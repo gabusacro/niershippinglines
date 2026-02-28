@@ -67,7 +67,7 @@ export default async function VesselOwnerDashboard({
 
   const tripIds = (trips ?? []).map((t) => t.id);
 
-  // Bookings with creator profile info
+  // Bookings with creator profile
   const { data: bookings } = tripIds.length > 0
     ? await supabase
         .from("bookings")
@@ -93,7 +93,7 @@ export default async function VesselOwnerDashboard({
         .order("created_at", { ascending: false })
     : { data: [] };
 
-  // Aggregate per trip
+  // Build booking lines
   type BookingLine = {
     id: string;
     tripId: string;
@@ -101,9 +101,12 @@ export default async function VesselOwnerDashboard({
     isOnline: boolean;
     paymentMethod: string | null;
     passengerCount: number;
+    // For online: total_amount - fees = net fare we remit
+    // For walk-in: total_amount = cash they collected directly
     totalAmountCents: number;
-    platformFeeCents: number;
-    processingFeeCents: number;
+    netFareCents: number;       // total - platform fee - processing fee (online only, else = total)
+    platformFeeCents: number;   // hidden from owner, just for internal calc
+    processingFeeCents: number; // hidden from owner
     customerName: string;
     createdByName: string;
     createdByRole: string;
@@ -115,9 +118,15 @@ export default async function VesselOwnerDashboard({
     const creator = (b as { creator?: { full_name?: string; role?: string } | null }).creator;
     const isOnline = b.booking_source === "online" && !b.is_walk_in;
     const createdByRole = creator?.role ?? "passenger";
-    let createdByName = creator?.full_name ?? "Passenger";
-    // Normalize display name for created_by
-    if (!creator) createdByName = "Passenger (online)";
+    const createdByName = creator?.full_name ?? "Passenger (online)";
+
+    const adminFee = b.admin_fee_cents ?? 0;
+    const gcashFee = b.gcash_fee_cents ?? 0;
+    const total = b.total_amount_cents ?? 0;
+
+    // Net fare = what we actually remit to vessel owner for online bookings
+    // Walk-in = full cash amount (owner collects directly, we show for reference)
+    const netFare = isOnline ? total - adminFee - gcashFee : total;
 
     return {
       id: b.id,
@@ -126,9 +135,10 @@ export default async function VesselOwnerDashboard({
       isOnline,
       paymentMethod: b.payment_method ?? null,
       passengerCount: b.passenger_count ?? 0,
-      totalAmountCents: b.total_amount_cents ?? 0,
-      platformFeeCents: b.admin_fee_cents ?? 0,
-      processingFeeCents: b.gcash_fee_cents ?? 0,
+      totalAmountCents: total,
+      netFareCents: netFare,
+      platformFeeCents: adminFee,
+      processingFeeCents: gcashFee,
       customerName: b.customer_full_name ?? "—",
       createdByName,
       createdByRole,
@@ -137,7 +147,7 @@ export default async function VesselOwnerDashboard({
     };
   });
 
-  // Group bookings by trip
+  // Group by trip
   const bookingsByTrip = new Map<string, BookingLine[]>();
   for (const bl of bookingLines) {
     const arr = bookingsByTrip.get(bl.tripId) ?? [];
@@ -149,20 +159,35 @@ export default async function VesselOwnerDashboard({
   type TripAgg = {
     onlinePax: number;
     walkInPax: number;
-    grossFareCents: number;
-    platformFeeCents: number;
-    processingFeeCents: number;
+    onlineNetFareCents: number;   // sum of (fare - fees) for online — what we remit
+    walkInFareCents: number;      // sum of cash fares for walk-in — owner's direct cash
+    totalGrossCents: number;      // online net + walkin (combined for display)
+    platformFeeCents: number;     // internal only
+    processingFeeCents: number;   // internal only
   };
 
   const byTrip = new Map<string, TripAgg>();
   for (const [tripId, lines] of bookingsByTrip) {
-    const agg: TripAgg = { onlinePax: 0, walkInPax: 0, grossFareCents: 0, platformFeeCents: 0, processingFeeCents: 0 };
+    const agg: TripAgg = {
+      onlinePax: 0,
+      walkInPax: 0,
+      onlineNetFareCents: 0,
+      walkInFareCents: 0,
+      totalGrossCents: 0,
+      platformFeeCents: 0,
+      processingFeeCents: 0,
+    };
     for (const bl of lines) {
-      if (bl.isOnline) agg.onlinePax += bl.passengerCount;
-      else agg.walkInPax += bl.passengerCount;
-      agg.grossFareCents += bl.totalAmountCents;
-      agg.platformFeeCents += bl.platformFeeCents;
-      agg.processingFeeCents += bl.processingFeeCents;
+      if (bl.isOnline) {
+        agg.onlinePax += bl.passengerCount;
+        agg.onlineNetFareCents += bl.netFareCents;
+        agg.platformFeeCents += bl.platformFeeCents;
+        agg.processingFeeCents += bl.processingFeeCents;
+      } else {
+        agg.walkInPax += bl.passengerCount;
+        agg.walkInFareCents += bl.netFareCents;
+      }
+      agg.totalGrossCents += bl.netFareCents;
     }
     byTrip.set(tripId, agg);
   }
@@ -175,12 +200,22 @@ export default async function VesselOwnerDashboard({
         .in("trip_id", tripIds)
     : { data: [] };
 
-  const paymentByTrip = new Map<string, { status: string; method: string | null; reference: string | null; paidAt: string | null }>();
+  const paymentByTrip = new Map<string, {
+    status: string;
+    method: string | null;
+    reference: string | null;
+    paidAt: string | null;
+  }>();
   for (const p of farePayments ?? []) {
-    if (p) paymentByTrip.set(p.trip_id, { status: p.status, method: p.payment_method, reference: p.payment_reference, paidAt: p.paid_at });
+    if (p) paymentByTrip.set(p.trip_id, {
+      status: p.status,
+      method: p.payment_method,
+      reference: p.payment_reference,
+      paidAt: p.paid_at,
+    });
   }
 
-  // Patronage bonus = % of this vessel's own platform fees
+  // Patronage bonus = % of vessel's own platform fees (admin internal, shown as loyalty bonus)
   const bonusByBoat = new Map<string, number>();
   for (const a of assignments ?? []) {
     let vesselFees = 0;
@@ -194,12 +229,15 @@ export default async function VesselOwnerDashboard({
   const totalPatronageBonus = Math.max(0, [...bonusByBoat.values()].reduce((s, v) => s + v, 0));
 
   // Month totals
-  let monthOnlinePax = 0, monthWalkInPax = 0, monthGrossFare = 0;
+  let monthOnlinePax = 0, monthWalkInPax = 0;
+  let monthOnlineNetFare = 0, monthWalkInFare = 0;
   for (const t of trips ?? []) {
-    const agg = byTrip.get(t.id) ?? { onlinePax: 0, walkInPax: 0, grossFareCents: 0, platformFeeCents: 0, processingFeeCents: 0 };
-    monthOnlinePax += agg.onlinePax;
-    monthWalkInPax += agg.walkInPax;
-    monthGrossFare += agg.grossFareCents;
+    const agg = byTrip.get(t.id);
+    if (!agg) continue;
+    monthOnlinePax  += agg.onlinePax;
+    monthWalkInPax  += agg.walkInPax;
+    monthOnlineNetFare += agg.onlineNetFareCents;
+    monthWalkInFare    += agg.walkInFareCents;
   }
 
   const todayTripIds = (trips ?? []).filter((t) => t.departure_date === todayManila).map((t) => t.id);
@@ -208,9 +246,14 @@ export default async function VesselOwnerDashboard({
   const tripRows = (trips ?? []).map((t) => {
     const boat  = (t as { boat?: { name?: string } | null }).boat;
     const route = (t as { route?: { display_name?: string; origin?: string; destination?: string } | null }).route;
-    const agg   = byTrip.get(t.id) ?? { onlinePax: 0, walkInPax: 0, grossFareCents: 0, platformFeeCents: 0, processingFeeCents: 0 };
+    const agg   = byTrip.get(t.id) ?? {
+      onlinePax: 0, walkInPax: 0,
+      onlineNetFareCents: 0, walkInFareCents: 0, totalGrossCents: 0,
+      platformFeeCents: 0, processingFeeCents: 0,
+    };
     const pay   = paymentByTrip.get(t.id) ?? { status: "pending", method: null, reference: null, paidAt: null };
     const lines = bookingsByTrip.get(t.id) ?? [];
+
     return {
       id:            t.id,
       boat_id:       t.boat_id,
@@ -221,9 +264,9 @@ export default async function VesselOwnerDashboard({
       isToday:       t.departure_date === todayManila,
       onlinePax:     agg.onlinePax,
       walkInPax:     agg.walkInPax,
-      grossFareCents: agg.grossFareCents,
-      platformFeeCents:    agg.platformFeeCents,
-      processingFeeCents:  agg.processingFeeCents,
+      onlineNetFareCents: agg.onlineNetFareCents,
+      walkInFareCents:    agg.walkInFareCents,
+      totalGrossCents:    agg.totalGrossCents,
       paymentStatus:    pay.status as "pending" | "paid" | "failed",
       paymentMethod:    pay.method,
       paymentReference: pay.reference,
@@ -252,7 +295,12 @@ export default async function VesselOwnerDashboard({
       selectedMonth={selectedMonth}
       currentYear={currentYear}
       currentMonth={currentMonth}
-      monthTotals={{ onlinePax: monthOnlinePax, walkInPax: monthWalkInPax, grossFareCents: monthGrossFare }}
+      monthTotals={{
+        onlinePax: monthOnlinePax,
+        walkInPax: monthWalkInPax,
+        onlineNetFareCents: monthOnlineNetFare,
+        walkInFareCents: monthWalkInFare,
+      }}
       totalPatronageBonusCents={totalPatronageBonus}
     />
   );
