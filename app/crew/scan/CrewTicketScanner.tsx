@@ -333,7 +333,6 @@ export function CrewTicketScanner() {
 
   const startScan = useCallback(() => {
     setResult(null);
-    if (!hasGetUserMedia()) { fileInputRef.current?.click(); return; }
     setStarting(true);
   }, []);
 
@@ -351,15 +350,6 @@ export function CrewTicketScanner() {
 
   return (
     <div className="space-y-4">
-      {/* Hidden file input for photo scan fallback */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleFileChange}
-      />
 
       {/* Scan button */}
       {!scanning && !starting && (
@@ -382,19 +372,17 @@ export function CrewTicketScanner() {
         </div>
       )}
 
-      {/* Camera view */}
-      {scanning && (
-        <div className="space-y-3">
-          <div id="qr-reader" className="w-full overflow-hidden rounded-xl border-2 border-teal-300" />
-          <button
-            type="button"
-            onClick={stopScan}
-            className="w-full rounded-xl border-2 border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            Stop scanning
-          </button>
-        </div>
-      )}
+      {/* Camera view — always in DOM so Html5Qrcode can find it, hidden when not scanning */}
+      <div className={scanning ? "space-y-3" : "hidden"}>
+        <div id="qr-reader" className="w-full overflow-hidden rounded-xl border-2 border-teal-300" />
+        <button
+          type="button"
+          onClick={stopScan}
+          className="w-full rounded-xl border-2 border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          Stop scanning
+        </button>
+      </div>
 
       {/* Loading */}
       {loading && !scanning && (
