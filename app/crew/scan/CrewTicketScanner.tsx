@@ -283,7 +283,7 @@ export function CrewTicketScanner() {
   }, [validateTicket, toast]);
 
   const initScanner = useCallback(() => {
-    // First explicitly request camera permission before initialising Html5Qrcode
+    // Explicitly request camera permission before initialising Html5Qrcode
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => {
         // Stop the test stream immediately — we just needed permission
@@ -325,10 +325,18 @@ export function CrewTicketScanner() {
       });
   }, [validateTicket, toast]);
 
+  // ── FIX: Use two animation frames so #qr-reader is fully painted before
+  //         Html5Qrcode measures its dimensions. Previously the div was always
+  //         in the DOM but hidden (height: 0), causing a collapsed video feed.
   useEffect(() => {
     if (!starting) return;
-    const raf = requestAnimationFrame(() => { initScanner(); });
-    return () => cancelAnimationFrame(raf);
+    const r1 = requestAnimationFrame(() => {
+      const r2 = requestAnimationFrame(() => {
+        initScanner();
+      });
+      return () => cancelAnimationFrame(r2);
+    });
+    return () => cancelAnimationFrame(r1);
   }, [starting, initScanner]);
 
   const startScan = useCallback(() => {
@@ -372,17 +380,26 @@ export function CrewTicketScanner() {
         </div>
       )}
 
-      {/* Camera view — always in DOM so Html5Qrcode can find it, hidden when not scanning */}
-      <div className={scanning ? "space-y-3" : "hidden"}>
-        <div id="qr-reader" className="w-full overflow-hidden rounded-xl border-2 border-teal-300" />
-        <button
-          type="button"
-          onClick={stopScan}
-          className="w-full rounded-xl border-2 border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-        >
-          Stop scanning
-        </button>
-      </div>
+      {/* ── FIX: Only mount #qr-reader when scanning/starting so Html5Qrcode
+               gets real dimensions instead of zero height from a hidden div. ── */}
+      {(scanning || starting) && (
+        <div className="space-y-3">
+          <div
+            id="qr-reader"
+            className="w-full overflow-hidden rounded-xl border-2 border-teal-300"
+            style={{ minHeight: 300 }}
+          />
+          {scanning && (
+            <button
+              type="button"
+              onClick={stopScan}
+              className="w-full rounded-xl border-2 border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              Stop scanning
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Loading */}
       {loading && !scanning && (
