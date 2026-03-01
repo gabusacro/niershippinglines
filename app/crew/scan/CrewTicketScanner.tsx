@@ -1,144 +1,82 @@
+"use client";
+
+import { useState, useRef } from "react";
+import { Html5QrcodeScanner } from "html5-qrcode";
+
+type ScanResult = {
+  booking_id: string;
+  passenger_name: string;
+};
+
 export function CrewTicketScanner() {
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const toast = useToast();
+  const startScanner = () => {
+    if (scannerRef.current) return;
 
-  /* ---------------- VALIDATE ---------------- */
+    const scanner = new Html5QrcodeScanner(
+      "reader",
+      {
+        fps: 5,
+        qrbox: 250,
+      },
+      false
+    );
 
-  const validateTicket = async (payload: string) => {
-    setLoading(true);
+    scanner.render(
+      (decodedText) => {
+        setResult({
+          booking_id: decodedText,
+          passenger_name: "Passenger",
+        });
 
-    try {
-      const res = await fetch(
-        `/api/crew/validate-ticket?payload=${encodeURIComponent(payload)}`
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.showError(data.error ?? "Invalid ticket");
-        return;
-      }
-
-      setResult(data);
-    } catch {
-      toast.showError("Validation failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* ---------------- START CAMERA ---------------- */
-
-  const startScan = async () => {
-    try {
-      setResult(null);
-
-      /** ✅ IMPORTANT — SHOW CONTAINER FIRST */
-      setScanning(true);
-
-      await new Promise((r) => setTimeout(r, 200));
-
-      const html5QrCode = new Html5Qrcode("qr-reader");
-      scannerRef.current = html5QrCode;
-
-      await html5QrCode.start(
-        { facingMode: "environment" },
-        {
-          fps: 5,
-          qrbox: { width: 260, height: 260 },
-        },
-        (decodedText) => {
-          stopScan();
-          validateTicket(decodedText);
-        }
-      );
-    } catch (err: any) {
-      setScanning(false);
-      toast.showError(
-        "Camera failed. Allow camera permission in browser."
-      );
-    }
-  };
-
-  /* ---------------- STOP CAMERA ---------------- */
-
-  const stopScan = async () => {
-    try {
-      if (scannerRef.current) {
-        await scannerRef.current.stop();
-        await scannerRef.current.clear();
+        scanner.clear();
         scannerRef.current = null;
-      }
-    } catch {}
+        setScanning(false);
+      },
+      () => {}
+    );
 
+    scannerRef.current = scanner;
+    setScanning(true);
+  };
+
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      await scannerRef.current.clear();
+      scannerRef.current = null;
+    }
     setScanning(false);
   };
 
-  useEffect(() => {
-    return () => {
-      stopScan();
-    };
-  }, []);
-
-  /* ---------------- UI ---------------- */
-
   return (
-    <div className="space-y-4">
+    <div className="p-4">
+      <h2 className="text-xl font-bold mb-4">Crew Ticket Scanner</h2>
 
-      {/* START BUTTON */}
-      {!scanning && (
+      {!scanning ? (
         <button
-          onClick={startScan}
-          className="w-full rounded-xl bg-[#0c7b93] px-4 py-3 text-white font-bold"
+          onClick={startScanner}
+          className="bg-blue-600 text-white px-4 py-2 rounded"
         >
-          📷 Scan QR Code
+          Start Scan
+        </button>
+      ) : (
+        <button
+          onClick={stopScanner}
+          className="bg-red-600 text-white px-4 py-2 rounded"
+        >
+          Stop Scan
         </button>
       )}
 
-      {/* ✅ CAMERA ALWAYS EXISTS WHEN SCANNING */}
-      {scanning && (
-        <div className="space-y-3">
-
-          {/* VERY IMPORTANT HEIGHT */}
-          <div
-            id="qr-reader"
-            className="w-full min-h-[320px] rounded-xl border-2 border-teal-400 overflow-hidden"
-          />
-
-          <button
-            onClick={stopScan}
-            className="w-full rounded-xl border px-4 py-2"
-          >
-            Stop scanning
-          </button>
-        </div>
-      )}
-
-      {/* RESULT */}
-      {loading && (
-        <p className="text-center animate-pulse">
-          Validating ticket...
-        </p>
-      )}
+      <div id="reader" className="mt-4" />
 
       {result && (
-        <div className="rounded-xl border p-4">
-          <p className="font-bold text-lg">
-            {result.passenger_name}
-          </p>
-
-          <p>Status: {result.status}</p>
-
-          <button
-            onClick={() => setResult(null)}
-            className="mt-3 border px-3 py-1 rounded"
-          >
-            Scan another
-          </button>
+        <div className="mt-4 p-3 border rounded">
+          <p><strong>Booking ID:</strong> {result.booking_id}</p>
+          <p><strong>Name:</strong> {result.passenger_name}</p>
         </div>
       )}
     </div>
