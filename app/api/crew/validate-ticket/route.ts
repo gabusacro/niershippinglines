@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     customer_full_name: string | null;
     passenger_details: unknown;
     trip: unknown;
-    user_id: string | null;
+    created_by: string | null;
   } | null = null;
   let passengerIndex: number = 0;
   let ticketStatus: string | null = null;
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     const { data: b, error } = await supabase
       .from("bookings")
-      .select("id, reference, status, refund_status, customer_full_name, passenger_details, user_id, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
+      .select("id, reference, status, refund_status, customer_full_name, passenger_details, created_by, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
       .eq("reference", ref!.toUpperCase())
       .maybeSingle();
 
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     const { data: b, error: bookError } = await supabase
       .from("bookings")
-      .select("id, reference, status, refund_status, customer_full_name, passenger_details, user_id, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
+      .select("id, reference, status, refund_status, customer_full_name, passenger_details, created_by, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
       .eq("id", ticket.booking_id).single();
 
     if (bookError || !b) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
@@ -136,12 +136,12 @@ export async function GET(request: NextRequest) {
       idVerification = verified ?? pending ?? idRows[0] ?? null;
     }
 
-    // Step 2: Reusable ID — look up by the booking owner's profile_id
-    if (!idVerification && booking.user_id) {
+    // Step 2: Reusable ID — look up by created_by (the profile who made the booking)
+    if (!idVerification && booking.created_by) {
       const { data: profileIds } = await supabase
         .from("passenger_id_verifications")
         .select("id, discount_type, verification_status, id_image_url, expires_at, uploaded_at, admin_note, passenger_name")
-        .eq("profile_id", booking.user_id)
+        .eq("profile_id", booking.created_by)
         .eq("discount_type", fareType)
         .order("uploaded_at", { ascending: false });
 
