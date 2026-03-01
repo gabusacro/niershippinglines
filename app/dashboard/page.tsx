@@ -30,26 +30,17 @@ import { getDiscoverItems } from "@/lib/dashboard/get-discover-items";
 
 export async function generateMetadata() {
   const branding = await getSiteBranding();
-  return { title: "Dashboard", description: `Dashboard — ${branding.site_name}` };
+  return { title: "Dashboard", description: `Dashboard – ${branding.site_name}` };
 }
 
-/** Always fetch fresh user so "Set your name" disappears after save. */
 export const dynamic = "force-dynamic";
 
 async function TripCalendarWrapper({
-  loggedInEmail,
-  passengerName,
-  loggedInAddress,
-  loggedInGender,
-  loggedInBirthdate,
-  loggedInNationality,
+  loggedInEmail, passengerName, loggedInAddress,
+  loggedInGender, loggedInBirthdate, loggedInNationality,
 }: {
-  loggedInEmail: string;
-  passengerName?: string;
-  loggedInAddress?: string;
-  loggedInGender?: string;
-  loggedInBirthdate?: string;
-  loggedInNationality?: string;
+  loggedInEmail: string; passengerName?: string; loggedInAddress?: string;
+  loggedInGender?: string; loggedInBirthdate?: string; loggedInNationality?: string;
 }) {
   const trips = await getUpcomingTrips();
   return (
@@ -73,47 +64,37 @@ export default async function DashboardPage({
   searchParams: DashboardSearchParams;
 }) {
   const user = await getAuthUser();
-  if (!user) {
-    redirect(ROUTES.login);
-  }
+  if (!user) redirect(ROUTES.login);
 
   const role = user.role as string;
-  if (role === "admin") {
-    redirect(ROUTES.admin);
-  }
-  if (role === "investor") {
-    redirect("/investor");
-  }
-
-  if (role === "vessel_owner") {
-    redirect("/vessel-owner");
-  }
+  if (role === "admin")        redirect(ROUTES.admin);
+  if (role === "investor")     redirect("/investor");
+  if (role === "vessel_owner") redirect("/vessel-owner");
 
   const params = await searchParams;
   const roleLabel: Record<string, string> = {
-    admin: "Admin",
-    captain: "Captain",
-    ticket_booth: "Ticket booth",
-    crew: "Deck crew",
-    passenger: "Passenger",
-    vessel_owner: "Vessel Owner",
-    investor: "Investor",
+    admin: "Admin", captain: "Captain", ticket_booth: "Ticket booth",
+    crew: "Deck crew", passenger: "Passenger",
+    vessel_owner: "Vessel Owner", investor: "Investor",
   };
   const yourRoleLabel = roleLabel[user.role] ?? user.role;
-  const isPassenger = user.role === "passenger";
-  const loggedInEmail = user.email ?? "";
-  const passengerName = user.fullName ?? "";
-  const loggedInAddress = user.address ?? "";
+  const isPassenger  = user.role === "passenger";
+  const loggedInEmail    = user.email ?? "";
+  const passengerName    = user.fullName ?? "";
+  const loggedInAddress  = user.address ?? "";
   const isAdmin = false;
 
-  const displayName = user.fullName?.trim() || null;
-  const salutation = user.salutation?.trim() || null;
-  const welcomeName = displayName
+  const displayName  = user.fullName?.trim() || null;
+  const salutation   = user.salutation?.trim() || null;
+  const welcomeName  = displayName
     ? (salutation ? `${salutation}. ${displayName}` : displayName)
     : null;
   const showWelcomeName = welcomeName ?? (user.email ? null : "User");
 
-  const [branding, passengerRestriction, allPending, recentlyConfirmed, refundedBookings, pendingPreviewBooth, discoverItems] = await Promise.all([
+  const [
+    branding, passengerRestriction, allPending,
+    recentlyConfirmed, refundedBookings, pendingPreviewBooth, discoverItems,
+  ] = await Promise.all([
     getSiteBranding(),
     isPassenger ? getPassengerRestrictions(user.id) : Promise.resolve(null),
     isPassenger ? getPendingPaymentBookings(user.id) : Promise.resolve([]),
@@ -123,10 +104,9 @@ export default async function DashboardPage({
     isPassenger ? getDiscoverItems() : Promise.resolve([]),
   ]);
 
-  const awaitingPayment = allPending.filter((b) => !b.payment_proof_path);
-  const awaitingConfirmation = allPending.filter((b) => !!b.payment_proof_path);
+  const awaitingPayment       = allPending.filter(b => !b.payment_proof_path);
+  const awaitingConfirmation  = allPending.filter(b => !!b.payment_proof_path);
 
-  // Fetch manifest data for crew, captain, AND ticket_booth
   let crewCaptainData: {
     boatIds: string[];
     todayTrips: Awaited<ReturnType<typeof getTodaysTripsForBoats>>;
@@ -136,11 +116,11 @@ export default async function DashboardPage({
   } | null = null;
 
   if (user.role === "crew" || user.role === "captain") {
-    const boatIds = await getCrewCaptainAssignedBoatIds(user.id);
-    const todayTrips = await getTodaysTripsForBoats(boatIds);
-    const currentTrip = getCurrentTripFromTodays(todayTrips);
+    const boatIds      = await getCrewCaptainAssignedBoatIds(user.id);
+    const todayTrips   = await getTodaysTripsForBoats(boatIds);
+    const currentTrip  = getCurrentTripFromTodays(todayTrips);
     const selectedTripId =
-      params.tripId && todayTrips.some((t) => t.id === params.tripId)
+      params.tripId && todayTrips.some(t => t.id === params.tripId)
         ? params.tripId
         : currentTrip?.id ?? null;
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
@@ -157,35 +137,31 @@ export default async function DashboardPage({
 
   if (user.role === "ticket_booth") {
     const { data: allBoats } = await (await import("@/lib/supabase/server")).createClient()
-      .then((sb) => sb.from("boats").select("id"));
-    const boatIds = (allBoats ?? []).map((b: { id: string }) => b.id);
-    const todayTrips = await getTodaysTripsForBoats(boatIds);
-    const currentTrip = getCurrentTripFromTodays(todayTrips);
+      .then(sb => sb.from("boats").select("id"));
+    const boatIds      = (allBoats ?? []).map((b: { id: string }) => b.id);
+    const todayTrips   = await getTodaysTripsForBoats(boatIds);
+    const currentTrip  = getCurrentTripFromTodays(todayTrips);
     const selectedTripId =
-      params.tripId && todayTrips.some((t) => t.id === params.tripId)
+      params.tripId && todayTrips.some(t => t.id === params.tripId)
         ? params.tripId
         : currentTrip?.id ?? null;
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
     ticketBoothManifestData = { boatIds, todayTrips, currentTrip, selectedTripId, manifest };
   }
 
-  // ─── Total confirmed trips count for hero stat ────────────────────────────
-  // recentlyConfirmed is available; for total we use allPending length + confirmed
-  // We'll pass the count of recentlyConfirmed as a proxy — you can wire a real total later
   const totalTrips = recentlyConfirmed.length + awaitingConfirmation.length + awaitingPayment.length;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      {/* ══════════════════════════════════════════════════════════
           PASSENGER DASHBOARD
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      ══════════════════════════════════════════════════════════ */}
       {isPassenger ? (
         <div className="space-y-6">
 
           {/* ① HERO WELCOME BANNER */}
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-8 text-white shadow-lg">
-            {/* Wave pattern overlay */}
             <div
               className="pointer-events-none absolute inset-0 opacity-10"
               style={{
@@ -194,7 +170,6 @@ export default async function DashboardPage({
                 backgroundRepeat: "repeat",
               }}
             />
-            {/* Palm decoration */}
             <span className="pointer-events-none absolute -right-4 top-0 select-none text-[8rem] leading-none opacity-[0.07]">🌴</span>
 
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -203,11 +178,7 @@ export default async function DashboardPage({
                   Passenger Dashboard
                 </p>
                 <h1 className="mt-1 font-bold text-3xl leading-tight">
-                  {showWelcomeName ? (
-                    <>Welcome back, {showWelcomeName}! 👋</>
-                  ) : (
-                    <>Welcome aboard! 👋</>
-                  )}
+                  {showWelcomeName ? <>Welcome back, {showWelcomeName}! 👋</> : <>Welcome aboard! 👋</>}
                 </h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white/75">
                   {loggedInAddress && (
@@ -220,7 +191,6 @@ export default async function DashboardPage({
                   )}
                 </div>
               </div>
-              {/* Trip stat card */}
               {totalTrips > 0 && (
                 <div className="shrink-0 rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-center backdrop-blur-sm">
                   <div className="text-3xl font-bold leading-none">{totalTrips}</div>
@@ -229,7 +199,6 @@ export default async function DashboardPage({
               )}
             </div>
 
-            {/* Address editor — shown inline in hero */}
             {displayName && (
               <div className="relative mt-4 border-t border-white/15 pt-4">
                 <p className="text-xs font-semibold text-white/70 mb-1">
@@ -254,7 +223,9 @@ export default async function DashboardPage({
             <div className="rounded-2xl border-2 border-amber-500 bg-amber-50 p-6 shadow-sm">
               <h2 className="text-lg font-bold text-amber-900">⚠️ Notice about your account</h2>
               <p className="mt-2 text-sm text-amber-800">
-                We&apos;ve noticed some issues with your recent booking activity. Please ensure you only book when you intend to complete payment. Repeated abuse may result in temporary or permanent restrictions on your account.
+                We&apos;ve noticed some issues with your recent booking activity. Please ensure you only
+                book when you intend to complete payment. Repeated abuse may result in temporary or
+                permanent restrictions on your account.
               </p>
             </div>
           )}
@@ -262,19 +233,22 @@ export default async function DashboardPage({
             <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-6 shadow-sm">
               <h2 className="text-lg font-bold text-red-900">🚫 Account temporarily restricted</h2>
               <p className="mt-2 text-sm text-red-800">
-                We noticed unusual activity and have temporarily restricted your account from making new bookings. If you believe this is an error, please contact us at{" "}
-                <a href="mailto:gabu.sacro@gmail.com" className="font-semibold underline">gabu.sacro@gmail.com</a>.
+                We noticed unusual activity and have temporarily restricted your account from making new
+                bookings. If you believe this is an error, please contact us at{" "}
+                <a href="mailto:gabu.sacro@gmail.com" className="font-semibold underline">
+                  gabu.sacro@gmail.com
+                </a>.
               </p>
             </div>
           )}
 
-          {/* ③ BOOKING STATUS — side by side cards */}
+          {/* ③ BOOKING STATUS CARDS */}
           {(awaitingPayment.length > 0 || awaitingConfirmation.length > 0 || recentlyConfirmed.length > 0 || refundedBookings.length > 0) && (
             <div>
               <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">My Active Bookings</p>
               <div className="grid gap-4 sm:grid-cols-2">
 
-                {/* Awaiting payment */}
+                {/* ── Awaiting payment ── */}
                 {awaitingPayment.length > 0 && (
                   <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
@@ -284,8 +258,10 @@ export default async function DashboardPage({
                       </span>
                     </div>
                     <ul className="space-y-2">
-                      {awaitingPayment.map((b) => {
-                        const routeName = b.trip?.route?.display_name ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
+                      {awaitingPayment.map(b => {
+                        const routeName = b.trip?.route?.display_name
+                          ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ")
+                          ?? "—";
                         return (
                           <li key={b.id}>
                             <Link
@@ -316,7 +292,7 @@ export default async function DashboardPage({
                   </div>
                 )}
 
-                {/* Awaiting confirmation */}
+                {/* ── Awaiting confirmation (proof uploaded) ── */}
                 {awaitingConfirmation.length > 0 && (
                   <div className="rounded-2xl border-2 border-teal-200 bg-teal-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
@@ -325,9 +301,12 @@ export default async function DashboardPage({
                         🕐 Awaiting Confirmation
                       </span>
                     </div>
+                    <p className="mb-2 text-xs text-teal-700">Payment proof submitted — waiting for admin to confirm.</p>
                     <ul className="space-y-2">
-                      {awaitingConfirmation.map((b) => {
-                        const routeName = b.trip?.route?.display_name ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
+                      {awaitingConfirmation.map(b => {
+                        const routeName = b.trip?.route?.display_name
+                          ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ")
+                          ?? "—";
                         return (
                           <li key={b.id}>
                             <Link
@@ -353,8 +332,8 @@ export default async function DashboardPage({
                   </div>
                 )}
 
-                                {/* Confirmed / tickets ready */}
-                                {recentlyConfirmed.length > 0 && (
+                {/* ── Confirmed — tickets ready ── */}
+                {recentlyConfirmed.length > 0 && (
                   <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
                       <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(5,150,105,0.2)]" />
@@ -362,92 +341,100 @@ export default async function DashboardPage({
                         ✅ Confirmed — Tickets Ready
                       </span>
                     </div>
+                    <p className="mb-2 text-xs text-emerald-700">
+                      Your tickets are confirmed. Show QR code when boarding. Disappears 6 hours after departure.
+                    </p>
                     <ul className="space-y-2">
-                      {recentlyConfirmed.map((b) => {
-                        // Determine refund badge
+                      {recentlyConfirmed.map(b => {
                         const refundBadge =
-                          b.refund_status === "pending" ? { emoji: "⏳", label: "Refund pending", color: "bg-amber-100 text-amber-800" } :
-                          b.refund_status === "under_review" ? { emoji: "🔍", label: "Refund under review", color: "bg-blue-100 text-blue-800" } :
-                          b.refund_status === "approved" ? { emoji: "✅", label: "Refund approved", color: "bg-emerald-100 text-emerald-800" } :
-                          b.refund_status === "processed" ? { emoji: "💸", label: "Refunded", color: "bg-teal-100 text-teal-800" } :
-                          b.refund_status === "rejected" ? { emoji: "❌", label: "Refund rejected", color: "bg-red-100 text-red-800" } :
+                          b.refund_status === "pending"      ? { emoji: "⏳", label: "Refund pending",      color: "bg-amber-100 text-amber-800"   } :
+                          b.refund_status === "under_review" ? { emoji: "🔍", label: "Refund under review", color: "bg-blue-100 text-blue-800"     } :
+                          b.refund_status === "approved"     ? { emoji: "✅", label: "Refund approved",     color: "bg-emerald-100 text-emerald-800"} :
+                          b.refund_status === "processed"    ? { emoji: "💸", label: "Refunded",            color: "bg-teal-100 text-teal-800"      } :
+                          b.refund_status === "rejected"     ? { emoji: "❌", label: "Refund rejected",     color: "bg-red-100 text-red-800"        } :
                           null;
-                        const hasReschedule = !!b.reschedule_requested_at;
+                        const isRescheduleRequested = !!b.reschedule_requested_at;
                         return (
-                          <li key={b.id} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-sm">
+                          <li key={b.id} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-sm space-y-2">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</span>
+                              <div>
+                                <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
+                                {b.trip_snapshot_departure_date && (
+                                  <div className="text-xs text-[#6B8886] mt-0.5">
+                                    {b.trip_snapshot_departure_date}
+                                    {b.trip_snapshot_departure_time ? ` · ${b.trip_snapshot_departure_time}` : ""}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 {refundBadge && (
                                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${refundBadge.color}`}>
                                     {refundBadge.emoji} {refundBadge.label}
                                   </span>
                                 )}
-                                {hasReschedule && !refundBadge && (
+                                {isRescheduleRequested && (
                                   <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800">
                                     🔄 Reschedule requested
                                   </span>
                                 )}
                               </div>
-                              {!refundBadge && (
-                                <PrintTicketsTrigger reference={b.reference} siteName={branding.site_name} />
-                              )}
-                              {refundBadge && (
-                                <Link href={`/dashboard/bookings/${b.reference}`}
-                                  className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-[#0c7b93] hover:bg-emerald-50">
-                                  View →
-                                </Link>
-                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link
+                                href={`/dashboard/bookings/${b.reference}`}
+                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                              >
+                                View &amp; Print Ticket
+                              </Link>
+                              <PrintTicketsTrigger reference={b.reference} />
                             </div>
                           </li>
                         );
                       })}
                     </ul>
+                    <Link
+                      href={ROUTES.myBookings}
+                      className="mt-3 inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-700"
+                    >
+                      View all bookings →
+                    </Link>
                   </div>
                 )}
 
-
-                {/* Refunded */}
+                {/* ── Refunded bookings ── */}
                 {refundedBookings.length > 0 && (
-                  <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-5 shadow-sm">
+                  <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-amber-800">
-                        💸 Refund Notice ({refundedBookings.length})
+                      <span className="text-xs font-bold uppercase tracking-widest text-slate-600">
+                        💸 Recent Refunds
                       </span>
                     </div>
-                    <p className="mb-2 text-xs text-amber-800">
-                      {branding.site_name} has refunded your ticket(s). The amount has been processed.
-                    </p>
                     <ul className="space-y-2">
-                      {refundedBookings.map((b) => {
-                        const routeName = b.trip_snapshot_route_name ?? b.trip?.route?.display_name ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
-                        const passengerNames = Array.isArray(b.passenger_names) && b.passenger_names.length > 0
-                          ? b.passenger_names.join(", ")
-                          : b.customer_full_name ?? `${b.passenger_count} passenger${b.passenger_count !== 1 ? "s" : ""}`;
-                        return (
-                          <li key={b.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-3">
-                            <span className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</span>
-                            <span className="text-xs text-amber-800">₱{(b.total_amount_cents / 100).toLocaleString()} · {routeName}</span>
-                            <Link
-                              href={`/dashboard/bookings/${b.reference}`}
-                              className="ml-auto rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
-                            >
-                              View details
-                            </Link>
-                          </li>
-                        );
-                      })}
+                      {refundedBookings.map(b => (
+                        <li key={b.id}>
+                          <Link
+                            href={`/dashboard/bookings/${b.reference}`}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all hover:border-slate-400 hover:shadow-md"
+                          >
+                            <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
+                            <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800">Refunded</span>
+                          </Link>
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 )}
-              </div>
+
+              </div>{/* end grid */}
             </div>
           )}
 
           {/* Confirmation toast */}
           {recentlyConfirmed.length > 0 && (
-            <ConfirmationToast items={recentlyConfirmed.map((b) => ({ reference: b.reference }))} siteName={branding.site_name} />
+            <ConfirmationToast
+              items={recentlyConfirmed.map(b => ({ reference: b.reference }))}
+              siteName={branding.site_name}
+            />
           )}
 
           {/* ④ QUICK ACTION GRID */}
@@ -502,10 +489,10 @@ export default async function DashboardPage({
             />
           </div>
 
-          {/* ⑥ DISCOVER SIARGAO — hidden automatically when no items */}
+          {/* ⑥ DISCOVER SIARGAO */}
           <DiscoverSiargao items={discoverItems} />
 
-          {/* ⑦ FIND BOOKING BY REFERENCE — utility, moved to bottom */}
+          {/* ⑦ FIND BOOKING BY REFERENCE */}
           <div className="rounded-2xl border-2 border-teal-100 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center gap-4">
               <span className="text-2xl">🔍</span>
@@ -522,13 +509,10 @@ export default async function DashboardPage({
         </div>
 
       ) : isAdmin ? (
-        /* ── ADMIN (redirected above, kept for safety) ─── */
+        /* ── ADMIN (redirected above, kept for safety) ── */
         <>
           <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
           <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email || "User"}. Your role: <strong>{yourRoleLabel}</strong>.</p>
-          <p className="mt-1 text-sm text-[#0f766e]/80">
-            Manage reports, vessels, and assign crew. No first-admin link — admin is already set up.
-          </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Link href={ROUTES.admin} className="rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93]/5 p-5 text-left transition-colors hover:bg-[#0c7b93]/10">
               <h2 className="font-semibold text-[#134e4a]">Dashboard</h2>
@@ -546,7 +530,7 @@ export default async function DashboardPage({
         </>
 
       ) : user.role === "ticket_booth" ? (
-        /* ── TICKET BOOTH ──────────────────────────────── */
+        /* ── TICKET BOOTH ── */
         <div className="mt-6 space-y-4">
           <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
           <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email || "User"}. Your role: <strong>{yourRoleLabel}</strong>.</p>
@@ -566,7 +550,7 @@ export default async function DashboardPage({
                 </Link>
               </div>
               <ul className="mt-4 space-y-2">
-                {pendingPreviewBooth.items.map((b) => (
+                {pendingPreviewBooth.items.map(b => (
                   <li key={b.reference} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 px-3 py-2">
                     <Link href={ROUTES.adminPendingPayments} className="font-mono font-semibold text-[#0c7b93] hover:underline">{b.reference}</Link>
                     <span className="text-sm text-[#134e4a]">{b.customer_full_name} · ₱{(b.total_amount_cents / 100).toLocaleString()}</span>
@@ -597,7 +581,7 @@ export default async function DashboardPage({
               <p className="mt-1 text-sm text-[#0f766e]">Your profile and password.</p>
             </Link>
             <Link href={ROUTES.adminReports} className="rounded-xl border-2 border-teal-200 px-5 py-4 text-left transition-colors hover:bg-teal-50">
-              <h2 className="font-semibold text-[#134e4a]">Reports & manifests</h2>
+              <h2 className="font-semibold text-[#134e4a]">Reports &amp; manifests</h2>
               <p className="mt-1 text-sm text-[#0f766e]">Daily/weekly/monthly/yearly reports; trip manifests.</p>
             </Link>
           </div>
@@ -617,7 +601,7 @@ export default async function DashboardPage({
         </div>
 
       ) : (user.role === "crew" || user.role === "captain") && crewCaptainData ? (
-        /* ── CREW / CAPTAIN ────────────────────────────── */
+        /* ── CREW / CAPTAIN ── */
         <>
           <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
           <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email || "User"}. Your role: <strong>{yourRoleLabel}</strong>.</p>
@@ -649,13 +633,10 @@ export default async function DashboardPage({
         </>
 
       ) : user.role === "vessel_owner" ? (
-        /* ── VESSEL OWNER ──────────────────────────────── */
+        /* ── VESSEL OWNER ── */
         <>
           <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
           <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email || "User"}. Your role: <strong>{yourRoleLabel}</strong>.</p>
-          <p className="mt-1 text-sm text-[#0f766e]/80">
-            View your vessel&apos;s earnings, passengers, fuel costs, and your patronage bonus from the platform revenue pool.
-          </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Link href="/vessel-owner" className="rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93]/5 p-5 text-left transition-colors hover:bg-[#0c7b93]/10">
               <h2 className="font-semibold text-[#134e4a]">🚢 Vessel Dashboard</h2>
@@ -669,16 +650,13 @@ export default async function DashboardPage({
         </>
 
       ) : (
-        /* ── FALLBACK ──────────────────────────────────── */
+        /* ── FALLBACK ── */
         <>
           <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
           <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email || "User"}. Your role: <strong>{yourRoleLabel}</strong>.</p>
-          <p className="mt-1 text-sm text-[#0f766e]/80">
-            Crew and captain access are assigned per vessel by admin. You only see the areas you have access to.
-          </p>
           <div className="mt-6">
             <Link href={ROUTES.account} className="inline-flex rounded-xl border-2 border-teal-200 bg-white px-5 py-4 text-left transition-colors hover:border-[#0c7b93] hover:bg-[#0c7b93]/5">
-              <h2 className="font-semibold text-[#134e4a]">Account</h2>
+              <p className="font-semibold text-[#134e4a]">Account</p>
               <p className="mt-1 text-sm text-[#0f766e]">Your profile and password.</p>
             </Link>
           </div>

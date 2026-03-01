@@ -12,6 +12,17 @@ function hasGetUserMedia() {
   );
 }
 
+type IdVerification = {
+  id: string;
+  discount_type: string;
+  status: "pending" | "verified" | "rejected" | string;
+  image_url: string | null;
+  expires_at: string | null;
+  uploaded_at: string | null;
+  admin_note: string | null;
+  is_expired: boolean;
+};
+
 type ScanResult = {
   valid: boolean;
   refunded?: boolean;
@@ -20,11 +31,17 @@ type ScanResult = {
   ticket_number?: string;
   passenger_index?: number;
   passenger_name: string;
+  fare_type?: string;
   status: string;
   refund_status?: string;
   refund_note?: string | null;
   refund_gcash_reference?: string | null;
+  passenger_gender?: string | null;
+  passenger_birthdate?: string | null;
+  passenger_nationality?: string | null;
   trip: { date?: string; time?: string; vessel?: string; route?: string } | null;
+  id_required?: boolean;
+  id_verification?: IdVerification | null;
 };
 
 const REFUND_STATUS_LABELS: Record<string, string> = {
@@ -35,12 +52,161 @@ const REFUND_STATUS_LABELS: Record<string, string> = {
   rejected: "Rejected",
 };
 
+const FARE_TYPE_LABELS: Record<string, string> = {
+  adult: "Adult",
+  senior: "Senior Citizen",
+  pwd: "PWD",
+  student: "Student",
+  child: "Child",
+  infant: "Infant",
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; className: string }> = {
+    confirmed:       { label: "✓ Confirmed",    className: "bg-green-100 text-green-800 border-green-300" },
+    checked_in:      { label: "✓ Checked in",   className: "bg-teal-100 text-teal-800 border-teal-300" },
+    boarded:         { label: "✓ Boarded",       className: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+    pending_payment: { label: "⏳ Pending payment", className: "bg-amber-100 text-amber-800 border-amber-300" },
+    refunded:        { label: "↩ Refunded",      className: "bg-red-100 text-red-800 border-red-300" },
+    cancelled:       { label: "✕ Cancelled",     className: "bg-slate-100 text-slate-700 border-slate-300" },
+  };
+  const s = map[status] ?? { label: status, className: "bg-slate-100 text-slate-700 border-slate-300" };
+  return (
+    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold ${s.className}`}>
+      {s.label}
+    </span>
+  );
+}
+
+function IdVerificationPanel({ idVerification, fareType }: {
+  idVerification: IdVerification | null | undefined;
+  fareType?: string;
+}) {
+  const [imgExpanded, setImgExpanded] = useState(false);
+
+  if (!fareType || !["senior","pwd","student","child"].includes(fareType)) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="text-sm text-slate-500">Regular passenger — no discount ID required.</p>
+      </div>
+    );
+  }
+
+  if (!idVerification) {
+    return (
+      <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3">
+        <p className="text-sm font-bold text-red-800">⚠ No ID on file</p>
+        <p className="text-xs text-red-700 mt-1">
+          This passenger has not uploaded a {FARE_TYPE_LABELS[fareType] ?? fareType} ID.
+          Please verify their physical ID before allowing the discount fare.
+        </p>
+      </div>
+    );
+  }
+
+  const statusConfig = {
+    verified: { label: "✓ Verified",      bg: "bg-green-50",  border: "border-green-300",  text: "text-green-800"  },
+    pending:  { label: "⏳ Pending review", bg: "bg-amber-50",  border: "border-amber-300",  text: "text-amber-800"  },
+    rejected: { label: "✕ Rejected",       bg: "bg-red-50",    border: "border-red-300",    text: "text-red-800"    },
+  }[idVerification.status] ?? { label: idVerification.status, bg: "bg-slate-50", border: "border-slate-300", text: "text-slate-700" };
+
+  const uploadedDate = idVerification.uploaded_at
+    ? new Date(idVerification.uploaded_at).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })
+    : null;
+  const expiresDate = idVerification.expires_at
+    ? new Date(idVerification.expires_at).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })
+    : null;
+
+  return (
+    <div className={`rounded-xl border-2 ${statusConfig.border} ${statusConfig.bg} p-3 space-y-2`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-bold text-[#134e4a]">
+          🪪 {FARE_TYPE_LABELS[fareType] ?? fareType} ID
+        </p>
+        <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${statusConfig.border} ${statusConfig.text} bg-white`}>
+          {statusConfig.label}
+        </span>
+      </div>
+
+      {/* ID Image */}
+      {idVerification.image_url && (
+        <div>
+          {idVerification.is_expired && (
+            <p className="text-xs font-bold text-red-700 mb-1">⚠ This ID has expired — verify current physical ID</p>
+          )}
+          {imgExpanded ? (
+            <div className="space-y-2">
+              <img
+                src={idVerification.image_url}
+                alt="Passenger ID"
+                className="w-full rounded-lg border border-slate-200 object-contain max-h-64"
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+              <button
+                type="button"
+                onClick={() => setImgExpanded(false)}
+                className="text-xs text-blue-600 underline"
+              >
+                Hide ID image
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setImgExpanded(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-50"
+            >
+              👁 View uploaded ID photo
+            </button>
+          )}
+        </div>
+      )}
+
+      {!idVerification.image_url && (
+        <p className="text-xs text-slate-500 italic">No image available — verify physical ID.</p>
+      )}
+
+      {/* Dates */}
+      <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+        {uploadedDate && <p>Uploaded: <strong>{uploadedDate}</strong></p>}
+        {expiresDate && (
+          <p className={idVerification.is_expired ? "text-red-700 font-semibold" : ""}>
+            Expires: <strong>{expiresDate}</strong>
+            {idVerification.is_expired && " ⚠"}
+          </p>
+        )}
+      </div>
+
+      {/* Admin note */}
+      {idVerification.admin_note && (
+        <p className="text-xs text-slate-600 italic border-t border-slate-200 pt-2">
+          Note: {idVerification.admin_note}
+        </p>
+      )}
+
+      {/* Status guidance for crew */}
+      {idVerification.status === "pending" && (
+        <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+          <p className="text-xs text-amber-800 font-semibold">ID pending admin verification.</p>
+          <p className="text-xs text-amber-700 mt-0.5">Ask passenger to show their physical ID to confirm discount eligibility.</p>
+        </div>
+      )}
+      {idVerification.status === "rejected" && (
+        <div className="rounded-lg border border-red-200 bg-white px-3 py-2">
+          <p className="text-xs text-red-800 font-semibold">ID was rejected by admin.</p>
+          <p className="text-xs text-red-700 mt-0.5">Verify their physical ID carefully before allowing discount fare.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CrewTicketScanner() {
-  const [scanning, setScanning] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [result, setResult] = useState<ScanResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [scanning,  setScanning]  = useState(false);
+  const [starting,  setStarting]  = useState(false);
+  const [result,    setResult]    = useState<ScanResult | null>(null);
+  const [loading,   setLoading]   = useState(false);
+  const scannerRef  = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toast = useToast();
 
@@ -50,13 +216,6 @@ export function CrewTicketScanner() {
     try {
       const res = await fetch(`/api/crew/validate-ticket?payload=${encodeURIComponent(payload)}`);
       const data = await res.json();
-
-      // ⭐ Refunded or refund-blocked — show the void card instead of a toast
-      if (!res.ok && (data.refunded || data.refund_blocked)) {
-        setResult(data as ScanResult);
-        return;
-      }
-
       if (!res.ok) {
         toast.showError(data.error ?? "Invalid ticket");
         return;
@@ -83,12 +242,9 @@ export function CrewTicketScanner() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) {
-        toast.showError(data.error ?? "Check-in failed");
-        return;
-      }
+      if (!res.ok) { toast.showError(data.error ?? "Check-in failed"); return; }
       toast.showSuccess(`Passenger ${action === "checked_in" ? "checked in" : "boarded"} successfully`);
-      setResult((prev) => prev ? { ...prev, status: data.status } : null);
+      setResult(prev => prev ? { ...prev, status: data.status } : null);
     } catch {
       toast.showError("Check-in failed");
     } finally {
@@ -128,12 +284,8 @@ export function CrewTicketScanner() {
 
   const initScanner = useCallback(() => {
     Html5Qrcode.getCameras()
-      .then((cameras) => {
-        if (cameras.length === 0) {
-          toast.showError("No camera found.");
-          setStarting(false);
-          return;
-        }
+      .then(cameras => {
+        if (cameras.length === 0) { toast.showError("No camera found."); setStarting(false); return; }
         const qrboxSize = Math.min(280, typeof window !== "undefined" ? window.innerWidth - 48 : 250);
         const html5QrCode = new Html5Qrcode("qr-reader");
         scannerRef.current = html5QrCode;
@@ -175,26 +327,25 @@ export function CrewTicketScanner() {
 
   const startScan = useCallback(() => {
     setResult(null);
-    if (!hasGetUserMedia()) {
-      fileInputRef.current?.click();
-      return;
-    }
+    if (!hasGetUserMedia()) { fileInputRef.current?.click(); return; }
     setStarting(true);
   }, []);
 
   const stopScan = useCallback(() => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().catch(() => {});
-      scannerRef.current = null;
-    }
+    if (scannerRef.current) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; }
     setScanning(false);
     setStarting(false);
   }, []);
 
   useEffect(() => () => stopScan(), [stopScan]);
 
+  const canCheckIn = result?.valid && !["checked_in","boarded"].includes(result.status);
+  const canBoard   = result?.valid && result.status === "checked_in";
+  const isBoarded  = result?.status === "boarded";
+
   return (
     <div className="space-y-4">
+      {/* Hidden file input for photo scan fallback */}
       <input
         ref={fileInputRef}
         type="file"
@@ -204,165 +355,167 @@ export function CrewTicketScanner() {
         onChange={handleFileChange}
       />
 
+      {/* Scan button */}
       {!scanning && !starting && (
-        <button
-          type="button"
-          onClick={startScan}
-          disabled={loading}
-          className="w-full rounded-xl bg-[#0c7b93] px-6 py-4 text-lg font-semibold text-white hover:bg-[#0a6b7d] disabled:opacity-50 touch-manipulation"
-          style={{ minHeight: 52 }}
-        >
-          {loading ? "Validating…" : "Scan ticket QR code"}
-        </button>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={startScan}
+            disabled={loading}
+            className="w-full min-h-[52px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50"
+          >
+            {loading ? "Validating…" : "📷 Scan QR Code"}
+          </button>
+          <label
+            htmlFor="qr-file-upload"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-teal-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50"
+          >
+            🖼 Upload QR photo instead
+          </label>
+          <input
+            id="qr-file-upload"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </div>
       )}
 
-      {(starting || scanning) && (
-        <div className="space-y-2">
-          <div
-            id="qr-reader"
-            className="overflow-hidden rounded-xl border-2 border-teal-300 w-full bg-black"
-            style={{ minHeight: 280, width: "100%" }}
-          />
-          {starting && (
-            <p className="text-center text-sm text-[#0f766e] font-medium py-1">
-              Starting camera… allow access if prompted.
-            </p>
-          )}
+      {/* Starting state */}
+      {starting && (
+        <div className="flex items-center justify-center rounded-xl border-2 border-teal-200 bg-teal-50 py-8">
+          <p className="text-sm text-[#0f766e] animate-pulse">Starting camera…</p>
+        </div>
+      )}
+
+      {/* Camera view */}
+      {scanning && (
+        <div className="space-y-3">
+          <div id="qr-reader" className="w-full overflow-hidden rounded-xl border-2 border-teal-300" />
           <button
             type="button"
             onClick={stopScan}
-            className="w-full rounded-xl border-2 border-red-200 px-4 py-2 font-semibold text-red-600 hover:bg-red-50 touch-manipulation"
+            className="w-full rounded-xl border-2 border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           >
-            Cancel scan
+            Stop scanning
           </button>
         </div>
       )}
 
-      {/* ⭐ REFUNDED — Void card */}
-      {result && result.refunded && (
-        <div className="rounded-xl border-2 border-red-400 bg-red-50 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-2xl">🚫</span>
-            <div>
-              <h3 className="text-lg font-bold text-red-900">TICKET VOID — REFUNDED</h3>
-              <p className="text-xs font-medium text-red-700">Do not allow boarding</p>
-            </div>
-          </div>
-          <div className="space-y-1 text-sm">
-            <p className="font-mono font-bold text-red-800">{result.reference}</p>
-            {result.ticket_number && (
-              <p className="text-xs font-mono text-red-700">Ticket #: {result.ticket_number}</p>
-            )}
-            <p className="text-red-900"><span className="font-semibold">Passenger:</span> {result.passenger_name}</p>
-            {result.refund_status && (
-              <p className="text-red-800"><span className="font-semibold">Refund status:</span> {REFUND_STATUS_LABELS[result.refund_status] ?? result.refund_status}</p>
-            )}
-            {result.refund_gcash_reference && (
-              <p className="text-red-800"><span className="font-semibold">GCash ref:</span> <span className="font-mono">{result.refund_gcash_reference}</span></p>
-            )}
-            {result.refund_note && (
-              <div className="mt-2 rounded-lg border border-red-300 bg-red-100 px-3 py-2">
-                <p className="text-xs font-semibold text-red-800 uppercase tracking-wide">Admin note</p>
-                <p className="mt-0.5 text-sm text-red-900">{result.refund_note}</p>
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setResult(null)}
-            className="mt-4 w-full rounded-xl border-2 border-red-300 px-4 py-2 font-semibold text-red-700 hover:bg-red-100 touch-manipulation"
-          >
-            Scan another
-          </button>
+      {/* Loading */}
+      {loading && !scanning && (
+        <div className="flex items-center justify-center rounded-xl border-2 border-teal-100 bg-teal-50 py-6">
+          <p className="text-sm text-[#0f766e] animate-pulse">Validating ticket…</p>
         </div>
       )}
 
-      {/* ⭐ REFUND IN PROGRESS — Cannot board yet */}
-      {result && result.refund_blocked && (
-        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-2xl">⛔</span>
-            <div>
-              <h3 className="text-lg font-bold text-amber-900">BOARDING BLOCKED</h3>
-              <p className="text-xs font-medium text-amber-700">Active refund request on this booking</p>
+      {/* ── SCAN RESULT ─────────────────────────────────────────────────────── */}
+      {result && !loading && (
+        <div className="space-y-3">
+
+          {/* Header — valid or blocked */}
+          {result.refunded ? (
+            <div className="rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3">
+              <p className="font-bold text-red-800 text-lg">↩ REFUNDED TICKET</p>
+              <p className="text-sm text-red-700 mt-1">This ticket has been refunded. Do not allow boarding.</p>
             </div>
-          </div>
-          <div className="space-y-1 text-sm">
-            <p className="font-mono font-bold text-amber-800">{result.reference}</p>
-            {result.ticket_number && (
-              <p className="text-xs font-mono text-amber-700">Ticket #: {result.ticket_number}</p>
-            )}
-            <p className="text-amber-900"><span className="font-semibold">Passenger:</span> {result.passenger_name}</p>
-            {result.refund_status && (
-              <p className="text-amber-800">
-                <span className="font-semibold">Refund status:</span> {REFUND_STATUS_LABELS[result.refund_status] ?? result.refund_status}
+          ) : result.refund_blocked ? (
+            <div className="rounded-xl border-2 border-orange-400 bg-orange-50 px-4 py-3">
+              <p className="font-bold text-orange-800 text-lg">⚠ REFUND IN PROGRESS</p>
+              <p className="text-sm text-orange-700 mt-1">
+                Refund status: <strong>{REFUND_STATUS_LABELS[result.refund_status ?? ""] ?? result.refund_status}</strong>.
+                Contact admin before allowing boarding.
               </p>
-            )}
-            {result.refund_note && (
-              <div className="mt-2 rounded-lg border border-amber-300 bg-amber-100 px-3 py-2">
-                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Admin note</p>
-                <p className="mt-0.5 text-sm text-amber-900">{result.refund_note}</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border-2 border-green-300 bg-green-50 px-4 py-3">
+              <p className="font-bold text-green-800 text-lg">✓ VALID TICKET</p>
+            </div>
+          )}
+
+          {/* Passenger info */}
+          <div className="rounded-xl border border-teal-200 bg-white p-4 space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase text-[#0f766e] tracking-wide mb-1">Passenger</p>
+              <p className="text-xl font-bold text-[#134e4a]">{result.passenger_name}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-teal-800">
+                  {FARE_TYPE_LABELS[result.fare_type ?? "adult"] ?? result.fare_type ?? "Adult"}
+                </span>
+                <StatusBadge status={result.status} />
+              </div>
+            </div>
+
+            {/* Passenger details */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 border-t border-teal-100 pt-2">
+              {result.passenger_gender && <p>Gender: <strong>{result.passenger_gender}</strong></p>}
+              {result.passenger_birthdate && <p>Birthdate: <strong>{result.passenger_birthdate}</strong></p>}
+              {result.passenger_nationality && <p>Nationality: <strong>{result.passenger_nationality}</strong></p>}
+              {result.reference && <p>Ref: <strong className="font-mono">{result.reference}</strong></p>}
+              {result.ticket_number && <p>Ticket: <strong className="font-mono text-xs">{result.ticket_number}</strong></p>}
+            </div>
+
+            {/* Trip info */}
+            {result.trip && (
+              <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[#134e4a]">
+                {result.trip.route  && <p>Route: <strong>{result.trip.route}</strong></p>}
+                {result.trip.vessel && <p>Vessel: <strong>{result.trip.vessel}</strong></p>}
+                {result.trip.date   && <p>Date: <strong>{result.trip.date}</strong></p>}
+                {result.trip.time   && <p>Time: <strong>{result.trip.time}</strong></p>}
               </div>
             )}
           </div>
-          <p className="mt-3 text-xs text-amber-700">
-            Contact admin to resolve the refund before this passenger can board.
-          </p>
-          <button
-            type="button"
-            onClick={() => setResult(null)}
-            className="mt-3 w-full rounded-xl border-2 border-amber-300 px-4 py-2 font-semibold text-amber-800 hover:bg-amber-100 touch-manipulation"
-          >
-            Scan another
-          </button>
-        </div>
-      )}
 
-      {/* ✅ Valid ticket */}
-      {result && result.valid && (
-        <div className="rounded-xl border-2 border-teal-200 bg-teal-50/50 p-4">
-          <h3 className="text-lg font-semibold text-[#134e4a]">Ticket validated</h3>
-          <p className="mt-1 font-mono font-bold text-[#0c7b93]">{result.reference}</p>
-          {result.ticket_number && (
-            <p className="text-xs font-mono text-[#0f766e]">Ticket #: {result.ticket_number}</p>
-          )}
-          <p className="mt-1 text-[#134e4a]">{result.passenger_name}</p>
-          {result.trip && (
-            <p className="mt-1 text-sm text-[#0f766e]">
-              {result.trip.route} · {result.trip.vessel} · {result.trip.date} {result.trip.time}
-            </p>
-          )}
-          <p className="mt-2 text-sm">
-            <span className="font-semibold text-amber-800">Status:</span> {result.status}
-          </p>
-          {(result.status === "confirmed" || result.status === "checked_in") && (
-            <div className="mt-4 flex gap-2">
-              {result.status === "confirmed" && (
-                <button
-                  type="button"
-                  onClick={() => handleCheckIn("checked_in")}
-                  disabled={loading}
-                  className="rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-700 disabled:opacity-50 touch-manipulation"
-                >
-                  Check in
-                </button>
+          {/* ── ID Verification Panel ─────────────────────────────────────────── */}
+          <div>
+            <p className="text-xs font-bold uppercase text-[#0f766e] tracking-wide mb-1">Discount ID</p>
+            <IdVerificationPanel
+              idVerification={result.id_verification}
+              fareType={result.fare_type}
+            />
+          </div>
+
+          {/* ── Check-in / Board actions ──────────────────────────────────────── */}
+          {result.valid && (
+            <div className="space-y-2">
+              {isBoarded ? (
+                <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 text-center">
+                  <p className="font-bold text-emerald-800">✓ Already boarded</p>
+                </div>
+              ) : (
+                <>
+                  {canCheckIn && (
+                    <button
+                      type="button"
+                      onClick={() => handleCheckIn("checked_in")}
+                      disabled={loading}
+                      className="w-full min-h-[48px] rounded-xl bg-teal-600 px-4 py-3 text-sm font-bold text-white hover:bg-teal-700 disabled:opacity-50"
+                    >
+                      {loading ? "Processing…" : "✓ Check In Passenger"}
+                    </button>
+                  )}
+                  {canBoard && (
+                    <button
+                      type="button"
+                      onClick={() => handleCheckIn("boarded")}
+                      disabled={loading}
+                      className="w-full min-h-[48px] rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {loading ? "Processing…" : "🚢 Mark as Boarded"}
+                    </button>
+                  )}
+                </>
               )}
-              <button
-                type="button"
-                onClick={() => handleCheckIn("boarded")}
-                disabled={loading}
-                className="rounded-lg bg-[#0c7b93] px-4 py-2 font-semibold text-white hover:bg-[#0a6b7d] disabled:opacity-50 touch-manipulation"
-              >
-                Mark boarded
-              </button>
             </div>
           )}
+
           <button
             type="button"
             onClick={() => setResult(null)}
-            className="mt-3 text-sm font-semibold text-[#0c7b93] hover:underline"
+            className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50"
           >
-            Scan another
+            Scan another ticket
           </button>
         </div>
       )}

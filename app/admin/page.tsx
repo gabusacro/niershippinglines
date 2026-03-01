@@ -11,7 +11,7 @@ import { ROUTES } from "@/lib/constants";
 
 export const metadata = {
   title: "Admin dashboard",
-  description: "Manage Travela Siargao — reports, vessels, manual booking",
+  description: "Manage Travela Siargao – reports, vessels, manual booking",
 };
 
 function fmtPeso(cents: number) {
@@ -27,22 +27,16 @@ export default async function AdminDashboardPage() {
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  // Fetch unpaid past trips that have confirmed bookings
   async function getUnpaidVesselTrips() {
     try {
-      // Get all paid trip IDs
       const { data: paidTrips } = await supabase
-        .from("trip_fare_payments")
-        .select("trip_id")
-        .eq("status", "paid");
-      const paidTripIds = (paidTrips ?? []).map((p) => p.trip_id);
+        .from("trip_fare_payments").select("trip_id").eq("status", "paid");
+      const paidTripIds = (paidTrips ?? []).map(p => p.trip_id);
 
-      // Get past trips for vessels that have an owner assigned
       const { data: vesselAssignments } = await supabase
         .from("vessel_assignments")
         .select("boat_id, patronage_bonus_percent, profiles!vessel_owner_id(full_name), boat:boats(name)");
-
-      const assignedBoatIds = (vesselAssignments ?? []).map((a) => a.boat_id);
+      const assignedBoatIds = (vesselAssignments ?? []).map(a => a.boat_id);
       if (assignedBoatIds.length === 0) return { count: 0, items: [] };
 
       let tripsQuery = supabase
@@ -54,30 +48,26 @@ export default async function AdminDashboardPage() {
         .limit(200);
 
       if (paidTripIds.length > 0) {
-        tripsQuery = tripsQuery.not("id", "in", `(${paidTripIds.map((id) => `'${id}'`).join(",")})`);
+        tripsQuery = tripsQuery.not("id", "in", `(${paidTripIds.map(id => `'${id}'`).join(",")})`);
       }
 
       const { data: pastTrips } = await tripsQuery;
       if (!pastTrips?.length) return { count: 0, items: [] };
 
-      // Filter only trips that have at least one confirmed booking
-      const pastTripIds = pastTrips.map((t) => t.id);
+      const pastTripIds = pastTrips.map(t => t.id);
       const { data: bookings } = await supabase
-        .from("bookings")
-        .select("trip_id, passenger_count")
-        .in("trip_id", pastTripIds)
-        .in("status", PAID_STATUSES);
+        .from("bookings").select("trip_id, passenger_count")
+        .in("trip_id", pastTripIds).in("status", PAID_STATUSES);
 
       const passengersByTrip = new Map<string, number>();
       for (const b of bookings ?? []) {
         passengersByTrip.set(b.trip_id, (passengersByTrip.get(b.trip_id) ?? 0) + (b.passenger_count ?? 0));
       }
 
-      const tripsWithPassengers = pastTrips.filter((t) => (passengersByTrip.get(t.id) ?? 0) > 0);
-
+      const tripsWithPassengers = pastTrips.filter(t => (passengersByTrip.get(t.id) ?? 0) > 0);
       return {
         count: tripsWithPassengers.length,
-        items: tripsWithPassengers.slice(0, 6).map((t) => ({
+        items: tripsWithPassengers.slice(0, 6).map(t => ({
           id: t.id,
           boatId: t.boat_id,
           boatName: (t as { boat?: { name?: string } | null }).boat?.name ?? "—",
@@ -90,11 +80,25 @@ export default async function AdminDashboardPage() {
     }
   }
 
-  const [stats, pendingPreview, liveOps, unpaidTrips] = await Promise.all([
+  // Count pending ID verifications for badge
+  async function getPendingIdCount() {
+    try {
+      const { count } = await supabase
+        .from("passenger_id_verifications")
+        .select("id", { count: "exact", head: true })
+        .eq("verification_status", "pending");
+      return count ?? 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  const [stats, pendingPreview, liveOps, unpaidTrips, pendingIdCount] = await Promise.all([
     getTodayDashboardStats(),
     getPendingPaymentsPreview(),
     getTodayLiveOperations(),
     getUnpaidVesselTrips(),
+    getPendingIdCount(),
   ]);
 
   return (
@@ -115,25 +119,37 @@ export default async function AdminDashboardPage() {
       {/* Admin nav */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {[
-          { href: ROUTES.adminReports, label: "Reports (per vessel)" },
-          { href: ROUTES.adminVessels, label: "Vessels & Fleet" },
-          { href: ROUTES.adminSchedule, label: "Schedule (routes & times)" },
-          { href: ROUTES.adminPendingPayments, label: "Pending payments" },
-          { href: ROUTES.adminBookings, label: "Booking history" },
-          { href: ROUTES.adminBranding, label: "Site branding" },
-          { href: ROUTES.adminFees, label: "Fees & charges" },
-          { href: "/admin/expenses", label: "Expenses" },
-          { href: "/admin/investor-shares", label: "Investor Shares" },
-          { href: "/admin/investor-payouts", label: "💼 Investor Payouts" },
-          { href: "/admin/vessel-owners", label: "Vessel Owners" },
-          { href: ROUTES.adminFlagged, label: "Flagged accounts" },
-          { href: ROUTES.account, label: "My Profile" },
+          { href: ROUTES.adminReports,         label: "Reports (per vessel)"      },
+          { href: ROUTES.adminVessels,          label: "Vessels & Fleet"           },
+          { href: ROUTES.adminSchedule,         label: "Schedule (routes & times)" },
+          { href: ROUTES.adminPendingPayments,  label: "Pending payments"          },
+          { href: ROUTES.adminBookings,         label: "Booking history"           },
+          { href: ROUTES.adminBranding,         label: "Site branding"             },
+          { href: ROUTES.adminFees,             label: "Fees & charges"            },
+          { href: "/admin/expenses",            label: "Expenses"                  },
+          { href: "/admin/investor-shares",     label: "Investor Shares"           },
+          { href: "/admin/investor-payouts",    label: "💼 Investor Payouts"       },
+          { href: "/admin/vessel-owners",       label: "Vessel Owners"             },
+          { href: ROUTES.adminFlagged,          label: "Flagged accounts"          },
+          { href: ROUTES.account,               label: "My Profile"                },
         ].map(({ href, label }) => (
           <Link key={href} href={href}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] transition-colors hover:border-[#0c7b93] hover:bg-teal-50 text-center">
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] text-center transition-colors hover:border-[#0c7b93] hover:bg-teal-50">
             {label}
           </Link>
         ))}
+
+        {/* ID Verifications — with pending badge */}
+        <Link href="/admin/id-verifications"
+          className="relative flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-100">
+          🪪 ID Verifications
+          {pendingIdCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+              {pendingIdCount > 9 ? "9+" : pendingIdCount}
+            </span>
+          )}
+        </Link>
+
         <Link href={ROUTES.adminManualBooking}
           className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f766e]">
           Manual Booking
@@ -162,9 +178,27 @@ export default async function AdminDashboardPage() {
 
       {/* ── ALERT CARDS ── */}
 
+      {/* Pending ID verifications alert */}
+      {pendingIdCount > 0 && (
+        <div className="mt-6 rounded-2xl border-2 border-blue-300 bg-blue-50 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-blue-900">🪪 Pending ID Verifications ({pendingIdCount})</h2>
+              <p className="mt-0.5 text-sm text-blue-800">
+                Discount IDs uploaded by passengers waiting for your review.
+              </p>
+            </div>
+            <Link href="/admin/id-verifications"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+              Review IDs →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Pending passenger payments */}
       {pendingPreview.count > 0 && (
-        <div className="mt-8 rounded-2xl border-2 border-amber-400 bg-amber-50 p-6">
+        <div className="mt-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-amber-900">⏳ Pending Passenger Payments ({pendingPreview.count})</h2>
@@ -176,7 +210,7 @@ export default async function AdminDashboardPage() {
             </Link>
           </div>
           <ul className="mt-4 space-y-2">
-            {pendingPreview.items.map((b) => (
+            {pendingPreview.items.map(b => (
               <li key={b.reference} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 px-3 py-2">
                 <span className="font-mono font-semibold text-[#0c7b93]">{b.reference}</span>
                 <span className="text-sm text-[#134e4a]">{b.customer_full_name} · ₱{(b.total_amount_cents / 100).toLocaleString()}</span>
@@ -202,7 +236,7 @@ export default async function AdminDashboardPage() {
             </Link>
           </div>
           <ul className="mt-4 space-y-2">
-            {unpaidTrips.items.map((t) => (
+            {unpaidTrips.items.map(t => (
               <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 px-3 py-2 text-sm">
                 <span className="font-semibold text-orange-900">🚢 {t.boatName}</span>
                 <span className="text-orange-700">{t.departureDate}</span>
@@ -212,7 +246,7 @@ export default async function AdminDashboardPage() {
             ))}
             {unpaidTrips.count > 6 && (
               <li className="pt-1 text-center text-xs text-orange-600">
-                +{unpaidTrips.count - 6} more unpaid trips — open each vessel to mark as paid.
+                +{unpaidTrips.count - 6} more unpaid trips – open each vessel to mark as paid.
               </li>
             )}
           </ul>
