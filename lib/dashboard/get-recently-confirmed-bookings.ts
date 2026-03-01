@@ -12,9 +12,9 @@ export type RecentlyConfirmedRow = {
   reschedule_requested_at?: string | null;
 };
 
-/** Bookings owned by this profile (created_by) with status confirmed, shown in "Payment confirmed — tickets ready" until
- *  6 hours after the scheduled departure has passed. After that they disappear from the banner
- *  (ticket assumed consumed) and stay in My Bookings / ticket history. */
+/** Bookings owned by this profile with status confirmed.
+ *  Matches by created_by (logged-in bookings) OR customer_email (guest bookings claimed later).
+ *  Shown until 6 hours after departure, then disappears (ticket assumed consumed). */
 const HOURS_AFTER_DEPARTURE = 6;
 
 export async function getRecentlyConfirmedBookings(
@@ -23,17 +23,55 @@ export async function getRecentlyConfirmedBookings(
   if (!profileId?.trim()) return [];
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  // Get the user's email so we can also match guest bookings by email
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", profileId)
+    .maybeSingle();
+
+  const email = profile?.email ?? null;
+
+  // Query 1: matched by created_by (bookings made while logged in)
+  const { data: byOwner } = await supabase
     .from("bookings")
     .select("id, reference, updated_at, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_status, refund_requested_at, reschedule_requested_at")
     .eq("created_by", profileId)
     .eq("status", "confirmed")
     .order("updated_at", { ascending: false })
     .limit(20);
-  if (error) return [];
 
-  const rows = (data ?? []) as RecentlyConfirmedRow[];
-  return rows.filter((b) => {
+  // Query 2: matched by customer_email (guest bookings or claimed bookings)
+  let byEmail: typeof byOwner = [];
+  if (email) {
+    const { data } = await supabase
+      .from("bookings")
+      .select("id, reference, updated_at, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_status, refund_requested_at, reschedule_requested_at")
+      .eq("customer_email", email)
+      .eq("status", "confirmed")
+      .order("updated_at", { ascending: false })
+      .limit(20);
+    byEmail = data ?? [];
+  }
+
+  // Merge and deduplicate by id
+  const seen = new Set<string>();
+  const merged: RecentlyConfirmedRow[] = [];
+  for (const row of [...(byOwner ?? []), ...(byEmail ?? [])]) {
+    const r = row as RecentlyConfirmedRow;
+    if (!seen.has(r.id)) {
+      seen.add(r.id);
+      merged.push(r);
+    }
+  }
+
+  // Sort by updated_at descending
+  merged.sort((a, b) =>
+    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  );
+
+  // Filter out tickets that are 6+ hours past departure
+  return merged.filter(b => {
     const depDate = b.trip_snapshot_departure_date ?? "";
     const depTime = b.trip_snapshot_departure_time ?? "";
     if (!depDate || !depTime) return true;

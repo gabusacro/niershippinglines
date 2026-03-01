@@ -283,9 +283,12 @@ export function CrewTicketScanner() {
   }, [validateTicket, toast]);
 
   const initScanner = useCallback(() => {
-    Html5Qrcode.getCameras()
-      .then(cameras => {
-        if (cameras.length === 0) { toast.showError("No camera found."); setStarting(false); return; }
+    // First explicitly request camera permission before initialising Html5Qrcode
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => {
+        // Stop the test stream immediately — we just needed permission
+        stream.getTracks().forEach(t => t.stop());
+
         const qrboxSize = Math.min(280, typeof window !== "undefined" ? window.innerWidth - 48 : 250);
         const html5QrCode = new Html5Qrcode("qr-reader");
         scannerRef.current = html5QrCode;
@@ -306,16 +309,19 @@ export function CrewTicketScanner() {
             setStarting(false);
             setScanning(false);
             scannerRef.current = null;
-            const msg = err instanceof Error ? err.message : "Could not start camera";
-            const hint = /secure|https|permission|denied|not allowed/i.test(msg)
-              ? " Make sure you're on HTTPS and have allowed camera access."
-              : " Allow camera permission and try again.";
-            toast.showError(msg + hint);
+            const msg = err instanceof Error ? err.message : String(err);
+            toast.showError("Camera error: " + msg + " — Try allowing camera in browser settings.");
           });
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         setStarting(false);
-        toast.showError("Could not access camera. Use HTTPS and allow camera permission.");
+        setScanning(false);
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/denied|not allowed|permission/i.test(msg)) {
+          toast.showError("Camera permission denied. Tap the camera icon in your browser address bar and allow access, then try again.");
+        } else {
+          toast.showError("Could not access camera: " + msg);
+        }
       });
   }, [validateTicket, toast]);
 
@@ -366,19 +372,6 @@ export function CrewTicketScanner() {
           >
             {loading ? "Validating…" : "📷 Scan QR Code"}
           </button>
-          <label
-            htmlFor="qr-file-upload"
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-teal-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-teal-50"
-          >
-            🖼 Upload QR photo instead
-          </label>
-          <input
-            id="qr-file-upload"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileChange}
-          />
         </div>
       )}
 
