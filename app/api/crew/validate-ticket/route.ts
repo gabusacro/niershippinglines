@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     customer_full_name: string | null;
     passenger_details: unknown;
     trip: unknown;
+    user_id: string | null;
   } | null = null;
   let passengerIndex: number = 0;
   let ticketStatus: string | null = null;
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     const { data: b, error } = await supabase
       .from("bookings")
-      .select("id, reference, status, refund_status, customer_full_name, passenger_details, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
+      .select("id, reference, status, refund_status, customer_full_name, passenger_details, user_id, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
       .eq("reference", ref!.toUpperCase())
       .maybeSingle();
 
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     const { data: b, error: bookError } = await supabase
       .from("bookings")
-      .select("id, reference, status, refund_status, customer_full_name, passenger_details, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
+      .select("id, reference, status, refund_status, customer_full_name, passenger_details, user_id, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
       .eq("id", ticket.booking_id).single();
 
     if (bookError || !b) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
@@ -106,6 +107,7 @@ export async function GET(request: NextRequest) {
   // ── Fetch discount ID verification for this passenger ──────────────────────
   const fareType = (passenger as { fare_type?: string }).fare_type ?? "adult";
   const needsId = ["senior","pwd","student","child"].includes(fareType);
+  const passengerName = (passenger.full_name ?? "").toLowerCase().trim();
 
   let idVerification: {
     id: string;
@@ -119,7 +121,8 @@ export async function GET(request: NextRequest) {
   } | null = null;
 
   if (needsId) {
-    // Look up by booking_id + passenger_index, get most recent verified first, else latest pending
+
+    // Step 1: Look up by booking_id + passenger_index (most precise)
     const { data: idRows } = await supabase
       .from("passenger_id_verifications")
       .select("id, discount_type, verification_status, id_image_url, expires_at, uploaded_at, admin_note, passenger_name")
@@ -128,34 +131,61 @@ export async function GET(request: NextRequest) {
       .order("uploaded_at", { ascending: false });
 
     if (idRows && idRows.length > 0) {
-      // Prefer verified > pending > rejected
-      const verified  = idRows.find(r => r.verification_status === "verified");
-      const pending   = idRows.find(r => r.verification_status === "pending");
-      idVerification  = verified ?? pending ?? idRows[0] ?? null;
+      const verified = idRows.find(r => r.verification_status === "verified");
+      const pending  = idRows.find(r => r.verification_status === "pending");
+      idVerification = verified ?? pending ?? idRows[0] ?? null;
     }
 
-    // Also try by profile_id if not found by booking (reused ID from another booking)
-    if (!idVerification) {
-      // Find profile linked to this booking via uploaded_by
-      const { data: anyId } = await supabase
+    // Step 2: Reusable ID — look up by the booking owner's profile_id
+    if (!idVerification && booking.user_id) {
+      const { data: profileIds } = await supabase
+        .from("passenger_id_verifications")
+        .select("id, discount_type, verification_status, id_image_url, expires_at, uploaded_at, admin_note, passenger_name")
+        .eq("profile_id", booking.user_id)
+        .eq("discount_type", fareType)
+        .order("uploaded_at", { ascending: false });
+
+      if (profileIds && profileIds.length > 0) {
+        const verifiedMatch = profileIds.find(r =>
+          r.verification_status === "verified" &&
+          r.passenger_name?.toLowerCase().trim() === passengerName
+        );
+        const verifiedAny  = profileIds.find(r => r.verification_status === "verified");
+        const pendingMatch = profileIds.find(r =>
+          r.verification_status === "pending" &&
+          r.passenger_name?.toLowerCase().trim() === passengerName
+        );
+        idVerification = verifiedMatch ?? verifiedAny ?? pendingMatch ?? null;
+      }
+    }
+
+    // Step 3: Last resort — search verified IDs by passenger name only
+    if (!idVerification && passengerName) {
+      const { data: nameIds } = await supabase
         .from("passenger_id_verifications")
         .select("id, discount_type, verification_status, id_image_url, expires_at, uploaded_at, admin_note, passenger_name")
         .eq("discount_type", fareType)
         .eq("verification_status", "verified")
-        .not("profile_id", "is", null)
+        .ilike("passenger_name", passengerName)
         .order("uploaded_at", { ascending: false })
         .limit(1);
 
-      // Only use if name matches
-      const match = anyId?.find(r =>
-        r.passenger_name?.toLowerCase().trim() === (passenger.full_name ?? "").toLowerCase().trim()
-      );
-      if (match) idVerification = match;
+      idVerification = nameIds?.[0] ?? null;
     }
   }
 
-  // Refresh signed URL if needed (URLs expire)
-  // We return the stored URL — admin should regenerate via storage if expired
+  // Compute age from birthdate
+  const birthdate = (passenger as { birthdate?: string }).birthdate ?? null;
+  let age: number | null = null;
+  if (birthdate) {
+    const today = new Date();
+    const dob   = new Date(birthdate);
+    age = today.getFullYear() - dob.getFullYear();
+    const hasBirthdayPassed =
+      today.getMonth() > dob.getMonth() ||
+      (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+    if (!hasBirthdayPassed) age -= 1;
+  }
 
   return NextResponse.json({
     valid: !refunded && !refundBlocked,
@@ -168,17 +198,16 @@ export async function GET(request: NextRequest) {
     fare_type: fareType,
     status: ticketStatus ?? booking.status,
     refund_status: booking.refund_status,
-    // Passenger detail fields
     passenger_gender: (passenger as { gender?: string }).gender ?? null,
-    passenger_birthdate: (passenger as { birthdate?: string }).birthdate ?? null,
+    passenger_birthdate: birthdate,
     passenger_nationality: (passenger as { nationality?: string }).nationality ?? null,
+    passenger_age: age,
     trip: trip ? {
       date: trip.departure_date,
       time: trip.departure_time,
       vessel: trip.boat?.name ?? "—",
       route: trip.route?.display_name ?? "—",
     } : null,
-    // ID verification info
     id_required: needsId,
     id_verification: idVerification ? {
       id: idVerification.id,
@@ -188,7 +217,9 @@ export async function GET(request: NextRequest) {
       expires_at: idVerification.expires_at,
       uploaded_at: idVerification.uploaded_at,
       admin_note: idVerification.admin_note,
-      is_expired: idVerification.expires_at ? new Date(idVerification.expires_at) < new Date() : false,
+      is_expired: idVerification.expires_at
+        ? new Date(idVerification.expires_at) < new Date()
+        : false,
     } : null,
   });
 }
