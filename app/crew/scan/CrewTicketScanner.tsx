@@ -39,6 +39,7 @@ type ScanResult = {
   passenger_gender?: string | null;
   passenger_birthdate?: string | null;
   passenger_nationality?: string | null;
+  passenger_age?: number | null;
   trip: { date?: string; time?: string; vessel?: string; route?: string } | null;
   id_required?: boolean;
   id_verification?: IdVerification | null;
@@ -63,12 +64,12 @@ const FARE_TYPE_LABELS: Record<string, string> = {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
-    confirmed:       { label: "✓ Confirmed",    className: "bg-green-100 text-green-800 border-green-300" },
-    checked_in:      { label: "✓ Checked in",   className: "bg-teal-100 text-teal-800 border-teal-300" },
-    boarded:         { label: "✓ Boarded",       className: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+    confirmed:       { label: "✓ Confirmed",       className: "bg-green-100 text-green-800 border-green-300" },
+    checked_in:      { label: "✓ Checked in",      className: "bg-teal-100 text-teal-800 border-teal-300" },
+    boarded:         { label: "✓ Boarded",          className: "bg-emerald-100 text-emerald-800 border-emerald-300" },
     pending_payment: { label: "⏳ Pending payment", className: "bg-amber-100 text-amber-800 border-amber-300" },
-    refunded:        { label: "↩ Refunded",      className: "bg-red-100 text-red-800 border-red-300" },
-    cancelled:       { label: "✕ Cancelled",     className: "bg-slate-100 text-slate-700 border-slate-300" },
+    refunded:        { label: "↩ Refunded",         className: "bg-red-100 text-red-800 border-red-300" },
+    cancelled:       { label: "✕ Cancelled",        className: "bg-slate-100 text-slate-700 border-slate-300" },
   };
   const s = map[status] ?? { label: status, className: "bg-slate-100 text-slate-700 border-slate-300" };
   return (
@@ -78,9 +79,10 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function IdVerificationPanel({ idVerification, fareType }: {
+function IdVerificationPanel({ idVerification, fareType, passengerAge }: {
   idVerification: IdVerification | null | undefined;
   fareType?: string;
+  passengerAge?: number | null;
 }) {
   const [imgExpanded, setImgExpanded] = useState(false);
 
@@ -92,22 +94,41 @@ function IdVerificationPanel({ idVerification, fareType }: {
     );
   }
 
+  const seniorAgeWarning = fareType === "senior" && passengerAge !== null && passengerAge !== undefined && passengerAge < 60;
+  const seniorAgeOk      = fareType === "senior" && passengerAge !== null && passengerAge !== undefined && passengerAge >= 60;
+
   if (!idVerification) {
     return (
-      <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3">
-        <p className="text-sm font-bold text-red-800">⚠ No ID on file</p>
-        <p className="text-xs text-red-700 mt-1">
-          This passenger has not uploaded a {FARE_TYPE_LABELS[fareType] ?? fareType} ID.
-          Please verify their physical ID before allowing the discount fare.
-        </p>
+      <div className="space-y-2">
+        <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm font-bold text-red-800">⚠ No ID on file</p>
+          <p className="text-xs text-red-700 mt-1">
+            This passenger has not uploaded a {FARE_TYPE_LABELS[fareType] ?? fareType} ID.
+            Please verify their physical ID before allowing the discount fare.
+          </p>
+        </div>
+        {seniorAgeWarning && (
+          <div className="rounded-xl border-2 border-red-400 bg-red-100 px-4 py-3">
+            <p className="text-xs font-bold text-red-900">
+              ⚠ Age on record: {passengerAge} yrs — does not meet the 60+ Senior Citizen requirement.
+            </p>
+          </div>
+        )}
+        {seniorAgeOk && (
+          <div className="rounded-xl border border-green-300 bg-green-50 px-4 py-3">
+            <p className="text-xs text-green-800">
+              ✓ Age on record: <strong>{passengerAge} yrs</strong> — meets Senior Citizen requirement. Still verify physical ID.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
 
   const statusConfig = {
-    verified: { label: "✓ Verified",      bg: "bg-green-50",  border: "border-green-300",  text: "text-green-800"  },
+    verified: { label: "✓ Verified",       bg: "bg-green-50",  border: "border-green-300",  text: "text-green-800"  },
     pending:  { label: "⏳ Pending review", bg: "bg-amber-50",  border: "border-amber-300",  text: "text-amber-800"  },
-    rejected: { label: "✕ Rejected",       bg: "bg-red-50",    border: "border-red-300",    text: "text-red-800"    },
+    rejected: { label: "✕ Rejected",        bg: "bg-red-50",    border: "border-red-300",    text: "text-red-800"    },
   }[idVerification.status] ?? { label: idVerification.status, bg: "bg-slate-50", border: "border-slate-300", text: "text-slate-700" };
 
   const uploadedDate = idVerification.uploaded_at
@@ -118,83 +139,101 @@ function IdVerificationPanel({ idVerification, fareType }: {
     : null;
 
   return (
-    <div className={`rounded-xl border-2 ${statusConfig.border} ${statusConfig.bg} p-3 space-y-2`}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-bold text-[#134e4a]">
-          🪪 {FARE_TYPE_LABELS[fareType] ?? fareType} ID
-        </p>
-        <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${statusConfig.border} ${statusConfig.text} bg-white`}>
-          {statusConfig.label}
-        </span>
-      </div>
+    <div className="space-y-2">
+      <div className={`rounded-xl border-2 ${statusConfig.border} ${statusConfig.bg} p-3 space-y-2`}>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-bold text-[#134e4a]">
+            🪪 {FARE_TYPE_LABELS[fareType] ?? fareType} ID
+          </p>
+          <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${statusConfig.border} ${statusConfig.text} bg-white`}>
+            {statusConfig.label}
+          </span>
+        </div>
 
-      {/* ID Image */}
-      {idVerification.image_url && (
-        <div>
-          {idVerification.is_expired && (
-            <p className="text-xs font-bold text-red-700 mb-1">⚠ This ID has expired — verify current physical ID</p>
-          )}
-          {imgExpanded ? (
-            <div className="space-y-2">
-              <img
-                src={idVerification.image_url}
-                alt="Passenger ID"
-                className="w-full rounded-lg border border-slate-200 object-contain max-h-64"
-                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
+        {/* ID Image */}
+        {idVerification.image_url && (
+          <div>
+            {idVerification.is_expired && (
+              <p className="text-xs font-bold text-red-700 mb-1">⚠ This ID has expired — verify current physical ID</p>
+            )}
+            {imgExpanded ? (
+              <div className="space-y-2">
+                <img
+                  src={idVerification.image_url}
+                  alt="Passenger ID"
+                  className="w-full rounded-lg border border-slate-200 object-contain max-h-64"
+                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setImgExpanded(false)}
+                  className="text-xs text-blue-600 underline"
+                >
+                  Hide ID image
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={() => setImgExpanded(false)}
-                className="text-xs text-blue-600 underline"
+                onClick={() => setImgExpanded(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-50"
               >
-                Hide ID image
+                👁 View uploaded ID photo
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setImgExpanded(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-50"
-            >
-              👁 View uploaded ID photo
-            </button>
+            )}
+          </div>
+        )}
+
+        {!idVerification.image_url && (
+          <p className="text-xs text-slate-500 italic">No image available — verify physical ID.</p>
+        )}
+
+        {/* Dates */}
+        <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+          {uploadedDate && <p>Uploaded: <strong>{uploadedDate}</strong></p>}
+          {expiresDate && (
+            <p className={idVerification.is_expired ? "text-red-700 font-semibold" : ""}>
+              Expires: <strong>{expiresDate}</strong>
+              {idVerification.is_expired && " ⚠"}
+            </p>
           )}
         </div>
-      )}
 
-      {!idVerification.image_url && (
-        <p className="text-xs text-slate-500 italic">No image available — verify physical ID.</p>
-      )}
-
-      {/* Dates */}
-      <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
-        {uploadedDate && <p>Uploaded: <strong>{uploadedDate}</strong></p>}
-        {expiresDate && (
-          <p className={idVerification.is_expired ? "text-red-700 font-semibold" : ""}>
-            Expires: <strong>{expiresDate}</strong>
-            {idVerification.is_expired && " ⚠"}
+        {/* Admin note */}
+        {idVerification.admin_note && (
+          <p className="text-xs text-slate-600 italic border-t border-slate-200 pt-2">
+            Note: {idVerification.admin_note}
           </p>
+        )}
+
+        {/* Status guidance for crew */}
+        {idVerification.status === "pending" && (
+          <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+            <p className="text-xs text-amber-800 font-semibold">ID pending admin verification.</p>
+            <p className="text-xs text-amber-700 mt-0.5">Ask passenger to show their physical ID to confirm discount eligibility.</p>
+          </div>
+        )}
+        {idVerification.status === "rejected" && (
+          <div className="rounded-lg border border-red-200 bg-white px-3 py-2">
+            <p className="text-xs text-red-800 font-semibold">ID was rejected by admin.</p>
+            <p className="text-xs text-red-700 mt-0.5">Verify their physical ID carefully before allowing discount fare.</p>
+          </div>
         )}
       </div>
 
-      {/* Admin note */}
-      {idVerification.admin_note && (
-        <p className="text-xs text-slate-600 italic border-t border-slate-200 pt-2">
-          Note: {idVerification.admin_note}
-        </p>
-      )}
-
-      {/* Status guidance for crew */}
-      {idVerification.status === "pending" && (
-        <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-          <p className="text-xs text-amber-800 font-semibold">ID pending admin verification.</p>
-          <p className="text-xs text-amber-700 mt-0.5">Ask passenger to show their physical ID to confirm discount eligibility.</p>
+      {/* Age cross-check for senior */}
+      {seniorAgeWarning && (
+        <div className="rounded-xl border-2 border-red-400 bg-red-100 px-4 py-3">
+          <p className="text-xs font-bold text-red-900">
+            ⚠ Age on record: {passengerAge} yrs — does not meet the 60+ Senior Citizen requirement. Verify carefully.
+          </p>
         </div>
       )}
-      {idVerification.status === "rejected" && (
-        <div className="rounded-lg border border-red-200 bg-white px-3 py-2">
-          <p className="text-xs text-red-800 font-semibold">ID was rejected by admin.</p>
-          <p className="text-xs text-red-700 mt-0.5">Verify their physical ID carefully before allowing discount fare.</p>
+      {seniorAgeOk && (
+        <div className="rounded-xl border border-green-300 bg-green-50 px-4 py-3">
+          <p className="text-xs text-green-800">
+            ✓ Age on record: <strong>{passengerAge} yrs</strong> — meets Senior Citizen requirement.
+          </p>
         </div>
       )}
     </div>
@@ -206,7 +245,7 @@ export function CrewTicketScanner() {
   const [starting,  setStarting]  = useState(false);
   const [result,    setResult]    = useState<ScanResult | null>(null);
   const [loading,   setLoading]   = useState(false);
-  const scannerRef  = useRef<Html5Qrcode | null>(null);
+  const scannerRef   = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toast = useToast();
 
@@ -283,12 +322,9 @@ export function CrewTicketScanner() {
   }, [validateTicket, toast]);
 
   const initScanner = useCallback(() => {
-    // Explicitly request camera permission before initialising Html5Qrcode
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => {
-        // Stop the test stream immediately — we just needed permission
         stream.getTracks().forEach(t => t.stop());
-
         const qrboxSize = Math.min(280, typeof window !== "undefined" ? window.innerWidth - 48 : 250);
         const html5QrCode = new Html5Qrcode("qr-reader");
         scannerRef.current = html5QrCode;
@@ -325,9 +361,6 @@ export function CrewTicketScanner() {
       });
   }, [validateTicket, toast]);
 
-  // ── FIX: Use two animation frames so #qr-reader is fully painted before
-  //         Html5Qrcode measures its dimensions. Previously the div was always
-  //         in the DOM but hidden (height: 0), causing a collapsed video feed.
   useEffect(() => {
     if (!starting) return;
     const r1 = requestAnimationFrame(() => {
@@ -380,8 +413,7 @@ export function CrewTicketScanner() {
         </div>
       )}
 
-      {/* ── FIX: Only mount #qr-reader when scanning/starting so Html5Qrcode
-               gets real dimensions instead of zero height from a hidden div. ── */}
+      {/* Camera view — only mount when scanning/starting so Html5Qrcode gets real dimensions */}
       {(scanning || starting) && (
         <div className="space-y-3">
           <div
@@ -412,7 +444,7 @@ export function CrewTicketScanner() {
       {result && !loading && (
         <div className="space-y-3">
 
-          {/* Header — valid or blocked */}
+          {/* Header */}
           {result.refunded ? (
             <div className="rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3">
               <p className="font-bold text-red-800 text-lg">↩ REFUNDED TICKET</p>
@@ -441,17 +473,22 @@ export function CrewTicketScanner() {
                 <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-teal-800">
                   {FARE_TYPE_LABELS[result.fare_type ?? "adult"] ?? result.fare_type ?? "Adult"}
                 </span>
+                {result.passenger_age !== null && result.passenger_age !== undefined && (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                    {result.passenger_age} yrs old
+                  </span>
+                )}
                 <StatusBadge status={result.status} />
               </div>
             </div>
 
             {/* Passenger details */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 border-t border-teal-100 pt-2">
-              {result.passenger_gender && <p>Gender: <strong>{result.passenger_gender}</strong></p>}
-              {result.passenger_birthdate && <p>Birthdate: <strong>{result.passenger_birthdate}</strong></p>}
+              {result.passenger_gender      && <p>Gender: <strong>{result.passenger_gender}</strong></p>}
+              {result.passenger_birthdate   && <p>Birthdate: <strong>{result.passenger_birthdate}</strong></p>}
               {result.passenger_nationality && <p>Nationality: <strong>{result.passenger_nationality}</strong></p>}
-              {result.reference && <p>Ref: <strong className="font-mono">{result.reference}</strong></p>}
-              {result.ticket_number && <p>Ticket: <strong className="font-mono text-xs">{result.ticket_number}</strong></p>}
+              {result.reference             && <p>Ref: <strong className="font-mono">{result.reference}</strong></p>}
+              {result.ticket_number         && <p>Ticket: <strong className="font-mono text-xs">{result.ticket_number}</strong></p>}
             </div>
 
             {/* Trip info */}
@@ -471,6 +508,7 @@ export function CrewTicketScanner() {
             <IdVerificationPanel
               idVerification={result.id_verification}
               fareType={result.fare_type}
+              passengerAge={result.passenger_age}
             />
           </div>
 
