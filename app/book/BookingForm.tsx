@@ -44,6 +44,14 @@ type PassengerExtra = {
   nationality: string;
 };
 
+// Passengers that need a discount ID uploaded
+type DiscountPassenger = {
+  key: string;
+  fareType: "senior" | "pwd" | "child";
+  name: string;
+  passengerIndex: number; // index in the final passengerDetails array
+};
+
 const FARE_TYPE_OPTIONS = [
   { value: "adult", label: "Adult" },
   { value: "senior", label: "Senior" },
@@ -258,10 +266,15 @@ export default function BookingForm({
   const router = useRouter();
   const canUpload = !!loggedInEmail?.trim() && (customerEmail.trim().toLowerCase() === loggedInEmail.trim().toLowerCase());
 
-  // ── NEW STATE ──────────────────────────────────────────────────────────
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [idWaivers, setIdWaivers] = useState<Record<string, boolean>>({});
-  // ──────────────────────────────────────────────────────────────────────
+
+  // ── ID upload state ────────────────────────────────────────────────────────
+  // Track which discount passengers have uploaded their ID
+  const [idUploads, setIdUploads] = useState<Record<string, "idle" | "uploading" | "done" | "error">>({});
+  const [idUploadErrors, setIdUploadErrors] = useState<Record<string, string>>({});
+  const idFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  // ──────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -295,14 +308,14 @@ export default function BookingForm({
     setProofError("");
     setTermsAccepted(false);
     setIdWaivers({});
+    setIdUploads({});
+    setIdUploadErrors({});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedInName, loggedInEmail]);
 
   const handleConfirmBooking = async () => {
-    // ── FIX 1: Proof REQUIRED ─────────────────────────────────────────
     const file = paymentProofInputRef.current?.files?.[0];
     if (!file) { setProofError("Payment proof is required. Please upload your GCash screenshot before confirming."); return; }
-    // ──────────────────────────────────────────────────────────────────
     if (!result?.reference) return;
     setProofError("");
     setUploadingProof(true);
@@ -322,6 +335,38 @@ export default function BookingForm({
       if (paymentProofInputRef.current) paymentProofInputRef.current.value = "";
     }
   };
+
+  // ── Upload a discount ID for one passenger ─────────────────────────────────
+  const handleIdUpload = async (pax: DiscountPassenger) => {
+    const file = idFileInputRefs.current[pax.key]?.files?.[0];
+    if (!file || !result?.reference) return;
+
+    setIdUploads((prev) => ({ ...prev, [pax.key]: "uploading" }));
+    setIdUploadErrors((prev) => ({ ...prev, [pax.key]: "" }));
+
+    try {
+      const formData = new FormData();
+      formData.set("booking_reference", result.reference);
+      formData.set("passenger_index", String(pax.passengerIndex));
+      formData.set("passenger_name", pax.name);
+      formData.set("discount_type", pax.fareType);
+      formData.set("file", file);
+
+      const res = await fetch("/api/passenger-id", { method: "POST", body: formData });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setIdUploads((prev) => ({ ...prev, [pax.key]: "error" }));
+        setIdUploadErrors((prev) => ({ ...prev, [pax.key]: data.error ?? "Upload failed" }));
+      } else {
+        setIdUploads((prev) => ({ ...prev, [pax.key]: "done" }));
+      }
+    } catch {
+      setIdUploads((prev) => ({ ...prev, [pax.key]: "error" }));
+      setIdUploadErrors((prev) => ({ ...prev, [pax.key]: "Network error. Please try again." }));
+    }
+  };
+  // ──────────────────────────────────────────────────────────────────────────
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -394,6 +439,19 @@ export default function BookingForm({
     return list;
   }, [countAdult, countSenior, countPwd, countChild, countInfant, adultNames, seniorNames, pwdNames, childNames, infantNames, adultAddresses, seniorAddresses, pwdAddresses, childAddresses, infantAddresses, customerAddress, adultExtras, seniorExtras, pwdExtras, childExtras, infantExtras]);
 
+  // Build list of discount passengers that need IDs uploaded (computed from passengerDetails)
+  const discountPassengers = useMemo((): DiscountPassenger[] => {
+    return passengerDetails
+      .map((p, idx) => ({ p, idx }))
+      .filter(({ p }) => ["senior", "pwd", "child"].includes(p.fare_type))
+      .map(({ p, idx }) => ({
+        key: `${p.fare_type}-${idx}`,
+        fareType: p.fare_type as "senior" | "pwd" | "child",
+        name: p.full_name || `${p.fare_type} passenger`,
+        passengerIndex: idx,
+      }));
+  }, [passengerDetails]);
+
   const fareSubtotalCents = useMemo(
     () => passengerDetails.reduce((sum, p) => sum + fareCents(baseFare, discount, p.fare_type), 0),
     [passengerDetails, baseFare, discount]
@@ -404,7 +462,6 @@ export default function BookingForm({
   const adminFeeCents = totalPassengers * adminFeePerPax;
   const totalCents = fareSubtotalCents + gcashFee + adminFeeCents;
 
-  // ── Detect senior/PWD passengers needing ID notice ────────────────────
   const seniorOrPwdPassengers = useMemo(() => {
     const result: { key: string; fareType: string; name: string }[] = [];
     seniorNames.forEach((name, i) => result.push({ key: `senior-${i}`, fareType: "senior", name: name || `Senior ${i + 1}` }));
@@ -415,7 +472,6 @@ export default function BookingForm({
     pwdNames.forEach((name, i) => result.push({ key: `pwd-${i}`, fareType: "pwd", name: name || `PWD ${i + 1}` }));
     return result;
   }, [seniorNames, pwdNames, adultNames, adultExtras]);
-  // ──────────────────────────────────────────────────────────────────────
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -427,10 +483,7 @@ export default function BookingForm({
     if (hasEmptyName) { setError("Please enter the name for every passenger."); return; }
     if (!customerEmail.trim() || !customerMobile.trim()) { setError("Please enter contact email and mobile number."); return; }
     if (!customerAddress.trim()) { setError("Please enter address (required for tickets and Coast Guard manifest)."); return; }
-
-    // ── FIX 2: Terms required ─────────────────────────────────────────
     if (!termsAccepted) { setError("Please read and accept the Terms and Privacy Policy to continue."); return; }
-    // ──────────────────────────────────────────────────────────────────
 
     setSubmitting(true);
     try {
@@ -443,12 +496,9 @@ export default function BookingForm({
           customer_mobile: customerMobile.trim(),
           customer_address: customerAddress.trim(),
           ...(notifyAlsoEmail.trim() && { notify_also_email: notifyAlsoEmail.trim() }),
-          // ── FIX 2: Record terms acceptance ──────────────────────────
           terms_accepted_at: new Date().toISOString(),
           terms_version: TERMS_VERSION,
-          // ── FIX 3: Record ID waivers ─────────────────────────────────
           id_waivers: idWaivers,
-          // ────────────────────────────────────────────────────────────
           passenger_details: passengerDetails.map((p) => ({
             fare_type: p.fare_type,
             full_name: p.full_name,
@@ -541,6 +591,8 @@ export default function BookingForm({
             </div>
             <div className="p-4 space-y-4">
               <p className="font-mono text-xl font-bold text-[#0c7b93]">Reference: {result.reference}</p>
+
+              {/* Fare breakdown */}
               {result.fare_breakdown?.passenger_details?.length ? (
                 <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-3">
                   <p className="text-xs font-semibold uppercase text-[#0f766e] mb-2">Amount breakdown</p>
@@ -568,6 +620,8 @@ export default function BookingForm({
               ) : (
                 <p className="text-sm font-semibold text-[#134e4a]">Total to pay: ₱{(result.total_amount_cents / 100).toLocaleString()}</p>
               )}
+
+              {/* GCash instructions */}
               {GCASH_NUMBER && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
                   <p className="text-xs font-semibold uppercase text-amber-800 mb-1">Pay via GCash</p>
@@ -575,9 +629,66 @@ export default function BookingForm({
                   <p className="text-sm text-amber-800 mt-1">Put your reference <strong>{result.reference}</strong> in the message.</p>
                 </div>
               )}
+
               <TranslatableNotices listClassName="text-sm text-amber-900 space-y-1 list-disc list-outside pl-5 ml-1" />
 
-              {/* ── FIX 1: Payment proof REQUIRED ──────────────────────── */}
+              {/* ── ID Upload Section — shown only when booking has discount passengers ── */}
+              {canUpload && discountPassengers.length > 0 && (
+                <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 space-y-3">
+                  <p className="text-sm font-bold text-blue-900">🪪 Upload Discount ID (Optional but recommended)</p>
+                  <p className="text-xs text-blue-800">
+                    Upload a photo of each passenger&apos;s Senior Citizen / PWD / Student ID now so our admin can verify it
+                    before your trip. The crew will check this on boarding. You can also upload later from My Bookings.
+                  </p>
+                  <div className="space-y-3">
+                    {discountPassengers.map((pax) => {
+                      const status = idUploads[pax.key] ?? "idle";
+                      const errMsg = idUploadErrors[pax.key] ?? "";
+                      const isDone = status === "done";
+                      const isUploading = status === "uploading";
+                      return (
+                        <div key={pax.key} className="rounded-lg border border-blue-200 bg-white p-3 space-y-2">
+                          <p className="text-xs font-semibold text-blue-900">
+                            {pax.fareType === "senior" ? "Senior Citizen" : pax.fareType === "pwd" ? "PWD" : "Child"}: {pax.name}
+                          </p>
+                          {isDone ? (
+                            <p className="text-xs font-semibold text-green-700">✓ ID uploaded — pending admin verification</p>
+                          ) : (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-50">
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                                  className="sr-only"
+                                  disabled={isUploading}
+                                  ref={(el) => { idFileInputRefs.current[pax.key] = el; }}
+                                  onChange={() => setIdUploadErrors((prev) => ({ ...prev, [pax.key]: "" }))}
+                                />
+                                {isUploading ? "Uploading…" : "📎 Choose ID photo"}
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => handleIdUpload(pax)}
+                                disabled={isUploading}
+                                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                              >
+                                {isUploading ? "Uploading…" : "Upload"}
+                              </button>
+                            </div>
+                          )}
+                          {errMsg && <p className="text-xs text-red-700">⚠ {errMsg}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-blue-700 italic">
+                    Skipping ID upload? Crew will ask for the physical ID upon boarding to verify the discount fare.
+                  </p>
+                </div>
+              )}
+              {/* ───────────────────────────────────────────────────────────────────── */}
+
+              {/* Payment proof upload */}
               {canUpload ? (
                 <div className="space-y-3">
                   <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3">
@@ -615,7 +726,6 @@ export default function BookingForm({
                   </button>
                 </div>
               )}
-              {/* ─────────────────────────────────────────────────────── */}
             </div>
           </div>
         </div>
@@ -704,7 +814,6 @@ export default function BookingForm({
       {renderPassengerBlock("Child", countChild, childNames, setChildNames, childAddresses, setChildAddresses, childExtras, setChildExtras)}
       {renderPassengerBlock("Infant (<7)", countInfant, infantNames, setInfantNames, infantAddresses, setInfantAddresses, infantExtras, setInfantExtras)}
 
-      {/* ── FIX 3: Senior / PWD ID notice ──────────────────────────── */}
       {seniorOrPwdPassengers.length > 0 && (
         <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 space-y-3">
           <p className="text-sm font-bold text-blue-900">🪪 Senior Citizen / PWD ID Required</p>
@@ -745,7 +854,6 @@ export default function BookingForm({
           </div>
         </div>
       )}
-      {/* ─────────────────────────────────────────────────────────────── */}
 
       <div className="border-t border-teal-200 pt-4">
         <p className="text-sm font-medium text-[#134e4a] mb-2">Address (for tickets and Coast Guard manifest)</p>
@@ -778,7 +886,6 @@ export default function BookingForm({
         </div>
       </div>
 
-      {/* ── FIX 2: Terms & Privacy checkbox ────────────────────────── */}
       <div className={`rounded-xl border-2 p-4 ${termsAccepted ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"}`}>
         <label className="flex items-start gap-3 cursor-pointer">
           <input
@@ -797,7 +904,6 @@ export default function BookingForm({
           </span>
         </label>
       </div>
-      {/* ─────────────────────────────────────────────────────────────── */}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
