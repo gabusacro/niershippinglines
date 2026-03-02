@@ -1,93 +1,178 @@
-import Link from "next/link";
+// app/attractions/page.tsx
 import { APP_NAME, ROUTES } from "@/lib/constants";
-import { PalmTree, Wave, Sun, Surfboard } from "@/components/icons";
 import { getAttractionsFromSupabase } from "@/lib/attractions/get-attractions";
-import { AttractionThumbnail } from "./AttractionThumbnail";
+import Image from "next/image";
+import { AttractionsMosaicClient } from "./AttractionsMosaicClient";
 
 export const metadata = {
   title: "Attractions",
   description: `Tourist attractions in Siargao — ${APP_NAME}`,
 };
 
-const iconMap = {
-  surf: Surfboard,
-  wave: Wave,
-  palm: PalmTree,
-  sun: Sun,
-};
-
 const FALLBACK_ATTRACTIONS = [
-  { slug: "cloud-9", title: "Cloud 9", short: "World-famous surf break and viewing deck.", description: "Cloud 9 is Siargao's most famous surf break and a must-see even if you don't surf. The wooden viewing deck overlooks the waves and the horizon—perfect for photos and sunset. The break itself hosts international competitions.", icon: "surf" },
-  { slug: "magpupungko", title: "Magpupungko Rock Pools", short: "Tidal pools and natural rock formations.", description: "Magpupungko's tidal pools appear at low tide between dramatic rock formations. Swim in crystal-clear pools, jump from rocks, and take in the coastal scenery. Best visited at low tide—check tide times before you go.", icon: "wave" },
-  { slug: "sugba-lagoon", title: "Sugba Lagoon", short: "Turquoise lagoon and paddle boards.", description: "A peaceful turquoise lagoon surrounded by mangroves. Rent a kayak or paddleboard, swim, or relax on the floating deck. Often combined with island-hopping tours. A refreshing escape from the open sea.", icon: "palm" },
-  { slug: "naked-island", title: "Naked Island", short: "Tiny sandbar island for swimming and sun.", description: "A small strip of white sand with no structures—just sea and sky. Ideal for swimming, snorkeling, and photos. Usually visited as part of a three-island (Naked, Daku, Guyam) tour.", icon: "sun" },
-  { slug: "taktak-falls", title: "Taktak Falls", short: "Waterfall and natural pool in the interior.", description: "A short ride from the coast, Taktak Falls offers a freshwater pool and a scenic cascade. Good for a half-day trip when you want a break from the beach. The area is green and quiet.", icon: "palm" },
-  { slug: "general-luna", title: "General Luna & Beach Road", short: "Surf town with cafes, shops, and beach vibes.", description: "General Luna is the main tourist hub: surf schools, cafes, restaurants, and beachfront bars. The beach road runs along the coast—rent a motorbike or walk to feel the island pace. Nightlife and day trips start here.", icon: "surf" },
+  {
+    id: "cloud-9",
+    title: "Cloud 9",
+    short: "World-famous surf break and viewing deck.",
+    description: "Cloud 9 is Siargao's most famous surf break and a must-see even if you don't surf. The wooden viewing deck overlooks the waves and the horizon—perfect for photos and sunset. The break itself hosts international competitions.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/494421846_1238903398244282_5907375550827324770_n.jpg",
+    image_urls: [] as string[],
+    category: "Surfing",
+  },
+  {
+    id: "magpupungko",
+    title: "Magpupungko Rock Pools",
+    short: "Tidal pools and natural rock formations.",
+    description: "Magpupungko's tidal pools appear at low tide between dramatic rock formations. Swim in crystal-clear pools, jump from rocks, and take in the coastal scenery. Best visited at low tide—check tide times before you go.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/magpupungko-rock-pools-siargao-0036.webp",
+    image_urls: [] as string[],
+    category: "Adventure",
+  },
+  {
+    id: "sugba-lagoon",
+    title: "Sugba Lagoon",
+    short: "Turquoise lagoon and paddle boards.",
+    description: "A peaceful turquoise lagoon surrounded by mangroves. Rent a kayak or paddleboard, swim, or relax on the floating deck. Often combined with island-hopping tours.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/637396695_1499167005551252_6719252401910291062_n.jpg",
+    image_urls: [] as string[],
+    category: "Adventure",
+  },
+  {
+    id: "naked-island",
+    title: "Naked Island",
+    short: "Tiny sandbar island for swimming and sun.",
+    description: "A small strip of white sand with no structures—just sea and sky. Ideal for swimming, snorkeling, and photos. Usually visited as part of a three-island (Naked, Daku, Guyam) tour.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/Naked-Island-Drone-Photo-Siargao-Philippines-728x410.jpg",
+    image_urls: [] as string[],
+    category: "Islands",
+  },
+  {
+    id: "daku-island",
+    title: "Daku Island",
+    short: "Largest island-hop stop — white sand and local food.",
+    description: "Wide stretches of white sand, calm swimming areas, and traditional meals served by island residents. Beachfront cottages and a relaxed atmosphere give a deeper glimpse into authentic island life.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/daku-island-siargao-boats-island-hopping.jpg",
+    image_urls: [] as string[],
+    category: "Islands",
+  },
+  {
+    id: "guyam-island",
+    title: "Guyam Island",
+    short: "Postcard-perfect tiny island.",
+    description: "Powdery white sand, clear shallow waters, and a ring of swaying coconut trees. A raw and unspoiled half-day tropical escape just a short boat ride from General Luna.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/siargao-tri-island-hopping-daku-guyam-and-naked-island-t847678-8.jpg",
+    image_urls: [] as string[],
+    category: "Islands",
+  },
+  {
+    id: "sohoton-cove",
+    title: "Sohoton Cove",
+    short: "Limestone cliffs, emerald lagoons and cave systems.",
+    description: "A protected natural area in the Bucas Grande Islands. Explore hidden coves, paddle through crystal-clear waters, and enter caves with stalactites and rock pools.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/494153329_1238903248244297_3893621105851367722_n.jpg",
+    image_urls: [] as string[],
+    category: "Adventure",
+  },
+  {
+    id: "alegria-beach",
+    title: "Alegria Beach",
+    short: "Wide pristine stretch on the northern tip.",
+    description: "Shallow calm waters ideal for families. Uninterrupted ocean views with coconut trees lining the shore. Often combined with land tours exploring northern Siargao.",
+    image_url: "https://thefroggyadventures.com/wp-content/uploads/2024/10/alegria-beach-siargao-768x960.jpg",
+    image_urls: [] as string[],
+    category: "Beaches",
+  },
+  {
+    id: "pacifico-beach",
+    title: "Pacifico Beach",
+    short: "Consistent surf and wide, uncrowded shores.",
+    description: "One hour north of General Luna. Consistent surf suitable for beginners and intermediates. Wide panoramic views backed by coconut-lined hills.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/pacifico-beach-siargao.webp",
+    image_urls: [] as string[],
+    category: "Surfing",
+  },
+  {
+    id: "maasin-river",
+    title: "Maasin River",
+    short: "Bamboo rafts and cool freshwater jungle river.",
+    description: "Cool, clear freshwater flowing beneath a natural canopy of tall trees. Paddle bamboo rafts, swim in calm pools, or simply relax in the jungle shade.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/maasin-river-jumping-platform-768x576.jpg",
+    image_urls: [] as string[],
+    category: "Rivers & Caves",
+  },
+  {
+    id: "tayangban-cave",
+    title: "Tayangban Cave Pool",
+    short: "Limestone corridors and a naturally lit cave pool.",
+    description: "River passages and limestone corridors open into a naturally lit cave pool perfect for swimming. Often paired with Magpupungko.",
+    image_url: "https://thefroggyadventures.com/wp-content/uploads/2025/01/tayangban-cave-pool-siargao-exit-natural-pool-768x576.jpg",
+    image_urls: [] as string[],
+    category: "Rivers & Caves",
+  },
+  {
+    id: "corregidor-island",
+    title: "Corregidor Island",
+    short: "Rolling hills, rocky cliffs and Pacific panoramas.",
+    description: "Also known as Casolian Island. Hike to elevated viewpoints, explore quiet shorelines, or enjoy untouched landscapes shaped by wind and waves.",
+    image_url: "https://thefroggyadventures.com/wp-content/uploads/2025/01/corregidor-island-siargao-aerial-768x576.jpg",
+    image_urls: [] as string[],
+    category: "Adventure",
+  },
+  {
+    id: "secret-beach",
+    title: "Secret Beach (Malinao)",
+    short: "Tucked-away coastal gem near General Luna.",
+    description: "Accessible by motorbike then a short path. Soft sand, clear water, minimal crowds. A peaceful alternative for travelers seeking solitude.",
+    image_url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Attractions/636331291_1499190298882256_3094040769713568987_n.jpg",
+    image_urls: [] as string[],
+    category: "Beaches",
+  },
 ];
 
 export default async function AttractionsPage() {
   const fromDb = await getAttractionsFromSupabase();
-  const useDb = fromDb.length > 0;
+  const attractions = fromDb.length > 0 ? fromDb : FALLBACK_ATTRACTIONS;
+  const usingDb = fromDb.length > 0;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 mb-8 sm:mb-10">
-        <div className="rounded-full bg-[#0c7b93]/10 p-3 w-fit">
-          <PalmTree size={28} className="text-[#0d9488]" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold text-[#134e4a] sm:text-2xl">Explore Siargao</h1>
-          <p className="text-sm text-[#0f766e] sm:text-base">
-            {useDb ? "What to see and do on the island. Add or edit attractions in Supabase." : "What to see and do on the island. Add attractions in Supabase to show photos and descriptions here."}
+    <div className="min-h-screen bg-[#f7f3eb]">
+      {/* Header */}
+      <div className="bg-[#134e4a] px-4 py-10 sm:py-14 text-center relative overflow-hidden">
+        {/* Wave bottom edge */}
+        <svg
+          className="absolute bottom-0 left-0 w-full"
+          viewBox="0 0 1440 32"
+          fill="none"
+          preserveAspectRatio="none"
+        >
+          <path
+            d="M0 16 C240 32 480 0 720 16 C960 32 1200 0 1440 16 L1440 32 L0 32 Z"
+            fill="#f7f3eb"
+          />
+        </svg>
+
+
+        <div className="flex flex-col items-center gap-3 mb-2 relative z-10">
+          <Image
+            src="/favicon.png"
+            alt="Travela Siargao"
+            width={230}
+            height={230}
+            className="rounded-full border-2 border-white/30"
+          />
+          <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+            
+          </h1>
+          <p className="text-teal-200 text-sm sm:text-base max-w-md">
+            {usingDb
+              ? "Explore the must-visit spots of Siargao all in one place. The Attraction page highlights top destinations, island experiences, and travel essentials."
+              : "What to see and do on the island. Add attractions in Supabase to show photos here."}
           </p>
         </div>
       </div>
 
-      <div className="grid gap-6 sm:gap-8">
-        {useDb
-          ? fromDb.map((a) => (
-              <article key={a.id} className="rounded-2xl border border-teal-200 bg-white/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                <div className="flex flex-col gap-4 sm:flex-row sm:gap-4 p-4 sm:p-6 md:p-8">
-                  <AttractionThumbnail title={a.title} imageUrl={a.image_url} imageUrls={a.image_urls} />
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-bold text-[#134e4a] sm:text-xl">{a.title}</h2>
-                    <p className="mt-3 text-[#0f766e] text-xs sm:text-sm leading-relaxed">{a.description ?? ""}</p>
-                    <Link href={ROUTES.book} className="mt-4 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-[#0c7b93] hover:underline touch-target py-2">
-                      Book your trip to Siargao →
-                    </Link>
-                  </div>
-                </div>
-              </article>
-            ))
-          : FALLBACK_ATTRACTIONS.map((a) => {
-              const Icon = iconMap[a.icon as keyof typeof iconMap] ?? PalmTree;
-              return (
-                <article key={a.slug} className="rounded-2xl border border-teal-200 bg-white/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:gap-4 p-4 sm:p-6 md:p-8">
-                    <div className="shrink-0 rounded-xl bg-[#fef9e7] border border-teal-100 p-3 w-fit sm:p-4">
-                      <Icon size={28} className="text-[#0c7b93] sm:w-8 sm:h-8" />
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="text-lg font-bold text-[#134e4a] sm:text-xl">{a.title}</h2>
-                      <p className="mt-1 font-medium text-[#0f766e] text-sm">{a.short}</p>
-                      <p className="mt-3 text-[#0f766e] text-xs sm:text-sm leading-relaxed">{a.description}</p>
-                      <Link href={ROUTES.book} className="mt-4 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-[#0c7b93] hover:underline touch-target py-2">
-                        Book your trip to Siargao →
-                      </Link>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-      </div>
-
-      <div className="mt-10 sm:mt-12 rounded-xl bg-[#fef3c7]/50 border border-teal-100 p-4 sm:p-6 text-center">
-        <p className="text-[#134e4a] font-medium text-sm sm:text-base">Ready to go?</p>
-        <p className="mt-1 text-xs sm:text-sm text-[#0f766e]">Book your ferry from Surigao to Siargao and start your island adventure.</p>
-        <Link href={ROUTES.book} className="mt-4 inline-flex min-h-[48px] items-center justify-center rounded-xl bg-[#0c7b93] px-6 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors touch-target w-full sm:w-auto">
-          Book a trip
-        </Link>
-      </div>
+      {/* Mosaic grid */}
+      <AttractionsMosaicClient attractions={attractions} />
     </div>
   );
 }
