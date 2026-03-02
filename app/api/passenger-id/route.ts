@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         .insert({
           booking_id: booking.id,
           profile_id: user.id,
-          ticket_number: typeof ticketNumber === "string" ? ticketNumber.trim() || null : null,
+          ticket_number: typeof ticketNumber === "string" ? ticketNumber.trim() || "" : "",
           passenger_index: idx,
           passenger_name: paxName,
           discount_type: discountType,
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     .insert({
       booking_id: booking.id,
       profile_id: user.id,
-      ticket_number: typeof ticketNumber === "string" ? ticketNumber.trim() || null : null,
+      ticket_number: typeof ticketNumber === "string" ? ticketNumber.trim() || "" : "",
       passenger_index: idx,
       passenger_name: paxName,
       discount_type: discountType,
