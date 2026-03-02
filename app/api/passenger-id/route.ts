@@ -33,18 +33,61 @@ export async function POST(request: NextRequest) {
 
   const ref = bookingReference.trim().toUpperCase();
   const idx = parseInt(String(passengerIndexRaw), 10);
+  const adminClient = createAdminClient() ?? supabase;
 
-  const { data: booking, error: fetchErr } = await supabase
-    .from("bookings").select("id, customer_email, status").eq("reference", ref).maybeSingle();
+  // Look up booking — removed email ownership check.
+  // Passengers often book for family members using a different email,
+  // so restricting by email blocks legitimate uploads.
+  const { data: booking, error: fetchErr } = await adminClient
+    .from("bookings")
+    .select("id, customer_email, status")
+    .eq("reference", ref)
+    .maybeSingle();
   if (fetchErr || !booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
-  if ((booking.customer_email ?? "").toLowerCase().trim() !== user.email.toLowerCase())
-    return NextResponse.json({ error: "You can only upload IDs for your own booking" }, { status: 403 });
 
+  // ── Check if this profile already has a valid verified ID for this discount type ──
+  // If yes, reuse it — no need to upload again
+  const { data: existingVerified } = await adminClient
+    .from("passenger_id_verifications")
+    .select("id, id_image_url, expires_at")
+    .eq("profile_id", user.id)
+    .eq("discount_type", discountType)
+    .eq("verification_status", "verified")
+    .order("expires_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const isStillValid = existingVerified?.expires_at
+    ? new Date(existingVerified.expires_at) > new Date()
+    : false;
+
+  if (existingVerified && isStillValid) {
+    // Link existing verified ID to this booking
+    const { data: linked, error: linkErr } = await adminClient
+      .from("passenger_id_verifications")
+      .insert({
+        booking_id: booking.id,
+        profile_id: user.id,
+        ticket_number: typeof ticketNumber === "string" ? ticketNumber.trim() || null : null,
+        passenger_index: idx,
+        passenger_name: typeof passengerName === "string" ? passengerName.trim() : "",
+        discount_type: discountType,
+        id_image_path: null,
+        id_image_url: existingVerified.id_image_url,
+        uploaded_by: user.id,
+        verification_status: "verified",
+        expires_at: existingVerified.expires_at,
+      })
+      .select("id")
+      .single();
+    if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true, id: linked?.id, reused: true, message: "Your previously verified ID has been linked to this booking." });
+  }
+
+  // ── No existing verified ID — upload new file ──
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const safeExt = ["jpg","jpeg","png","webp","gif","pdf"].includes(ext) ? ext : "jpg";
   const path = `${ref}/pax-${idx}-${discountType}-${Date.now()}.${safeExt}`;
-
-  const adminClient = createAdminClient() ?? supabase;
 
   const { error: uploadErr } = await adminClient.storage
     .from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
@@ -62,7 +105,7 @@ export async function POST(request: NextRequest) {
     .insert({
       booking_id: booking.id,
       profile_id: user.id,
-      ticket_number: typeof ticketNumber === "string" ? ticketNumber.trim() || "" : "",
+      ticket_number: typeof ticketNumber === "string" ? ticketNumber.trim() || null : null,
       passenger_index: idx,
       passenger_name: typeof passengerName === "string" ? passengerName.trim() : "",
       discount_type: discountType,
