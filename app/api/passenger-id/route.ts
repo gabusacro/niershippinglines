@@ -8,7 +8,6 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "ap
 const DISCOUNT_TYPES = ["senior", "pwd", "student", "child"] as const;
 type DiscountType = typeof DISCOUNT_TYPES[number];
 
-/** Fuzzy name match — true if names are the same person. */
 function isSamePerson(a: string, b: string): boolean {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
   const na = norm(a);
@@ -41,28 +40,20 @@ export async function POST(request: NextRequest) {
   const file = formData.get("file");
 
   if (!bookingReference || typeof bookingReference !== "string" || passengerIndexRaw === null ||
-    !file || !(file instanceof File) || !discountType || !DISCOUNT_TYPES.includes(discountType)) {
-    return NextResponse.json({ error: "Missing fields: booking_reference, passenger_index, discount_type, file" }, { status: 400 });
+    !discountType || !DISCOUNT_TYPES.includes(discountType)) {
+    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
-  if (file.size > MAX_SIZE) return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 400 });
-  if (!ALLOWED_TYPES.includes(file.type)) return NextResponse.json({ error: "Allowed types: JPEG, PNG, WebP, GIF, or PDF" }, { status: 400 });
 
   const ref = bookingReference.trim().toUpperCase();
   const idx = parseInt(String(passengerIndexRaw), 10);
   const paxName = typeof passengerName === "string" ? passengerName.trim() : "";
   const adminClient = createAdminClient() ?? supabase;
 
-  // Look up booking
   const { data: booking, error: fetchErr } = await adminClient
-    .from("bookings")
-    .select("id, customer_email, status")
-    .eq("reference", ref)
-    .maybeSingle();
+    .from("bookings").select("id, customer_email, status").eq("reference", ref).maybeSingle();
   if (fetchErr || !booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
 
-  // ── Check if THIS EXACT PASSENGER NAME already has a verified non-expired ID ──
-  // Fetch all verified IDs on this profile for this discount type, then name-match in JS
-  // This way Marwin Corr's ID is only reused for Marwin Corr, not for Midnight Crawler
+  // ── Check if this exact passenger name already has a verified non-expired ID ──
   if (paxName) {
     const { data: allVerified } = await adminClient
       .from("passenger_id_verifications")
@@ -72,14 +63,18 @@ export async function POST(request: NextRequest) {
       .eq("verification_status", "verified")
       .order("expires_at", { ascending: false });
 
-    // Find one where the stored passenger_name matches the current passenger name
     const matchingRecord = (allVerified ?? []).find(r => {
       const isValid = r.expires_at ? new Date(r.expires_at) > new Date() : false;
       return isValid && isSamePerson(r.passenger_name ?? "", paxName);
     });
 
     if (matchingRecord) {
-      // Reuse this person's verified ID — link to new booking
+      // If check_only=true, just return the status without inserting
+      const checkOnly = formData.get("check_only") === "true";
+      if (checkOnly) {
+        return NextResponse.json({ ok: true, already_verified: true, reused: true });
+      }
+      // Otherwise link the verified ID to this booking
       const { data: linked, error: linkErr } = await adminClient
         .from("passenger_id_verifications")
         .insert({
@@ -95,14 +90,25 @@ export async function POST(request: NextRequest) {
           verification_status: "verified",
           expires_at: matchingRecord.expires_at,
         })
-        .select("id")
-        .single();
+        .select("id").single();
       if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
-      return NextResponse.json({ ok: true, id: linked?.id, reused: true, message: "Previously verified ID linked to this booking." });
+      return NextResponse.json({ ok: true, id: linked?.id, reused: true, already_verified: true });
     }
   }
 
-  // ── No matching verified ID for this person — upload new file ──
+  // ── No verified ID found — if check_only, return not verified ──
+  const checkOnly = formData.get("check_only") === "true";
+  if (checkOnly) {
+    return NextResponse.json({ ok: true, already_verified: false });
+  }
+
+  // ── Must have a file to upload ──
+  if (!file || !(file instanceof File)) {
+    return NextResponse.json({ error: "Missing fields: file required" }, { status: 400 });
+  }
+  if (file.size > MAX_SIZE) return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 400 });
+  if (!ALLOWED_TYPES.includes(file.type)) return NextResponse.json({ error: "Allowed types: JPEG, PNG, WebP, GIF, or PDF" }, { status: 400 });
+
   const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const safeExt = ["jpg","jpeg","png","webp","gif","pdf"].includes(ext) ? ext : "jpg";
   const path = `${ref}/pax-${idx}-${discountType}-${Date.now()}.${safeExt}`;
