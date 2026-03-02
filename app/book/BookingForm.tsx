@@ -443,7 +443,7 @@ export default function BookingForm({
   const discountPassengers = useMemo((): DiscountPassenger[] => {
     return passengerDetails
       .map((p, idx) => ({ p, idx }))
-      .filter(({ p }) => ["senior", "pwd", "child"].includes(p.fare_type))
+      .filter(({ p }) => ["senior", "pwd", "child", "student"].includes(p.fare_type))
       .map(({ p, idx }) => ({
         key: `${p.fare_type}-${idx}`,
         fareType: p.fare_type as "senior" | "pwd" | "child",
