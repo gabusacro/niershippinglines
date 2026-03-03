@@ -34,8 +34,8 @@ const CATEGORY_EMOJI: Record<string, string> = {
 
 const CATEGORIES = ["All", "Beaches", "Islands", "Surfing", "Rivers & Caves", "Adventure"];
 
-// Heights per card slot — varied to create the bento feel
-const HEIGHT_POOL = [220, 340, 260, 380, 220, 300, 240, 360, 260, 220, 220, 340, 220];
+// Varied heights — small / medium / large feel
+const HEIGHT_POOL = [200, 320, 240, 360, 200, 280, 200, 340, 260, 200, 200, 320, 200];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function seededShuffle<T>(arr: T[], seed: number): T[] {
@@ -71,56 +71,57 @@ function MosaicCard({
   isExpanded,
   isAnyExpanded,
   onToggle,
-  onImageClick,
+  onViewPhotos,
 }: {
   attraction: AttractionItem;
   baseHeight: number;
   isExpanded: boolean;
   isAnyExpanded: boolean;
   onToggle: () => void;
-  onImageClick: () => void;
+  onViewPhotos: () => void;
 }) {
   const imageUrls = resolveImageUrls(attraction);
   const hasImages = imageUrls.length > 0;
   const emoji     = getEmoji(attraction.category);
-  const expandedH = Math.min(baseHeight + 300, 620);
-  const finalH    = isExpanded ? expandedH : baseHeight;
   const isTall    = baseHeight >= 300;
+
+  // When expanded, card grows very tall to almost cover the viewport
+  const expandedH = Math.min(window.innerHeight * 0.82, 720);
+  const finalH    = isExpanded ? expandedH : baseHeight;
 
   return (
     <div
+      onClick={onToggle}
       style={{
         height:       finalH,
-        borderRadius: 14,
+        borderRadius: isExpanded ? 18 : 13,
         overflow:     "hidden",
         position:     "relative",
         cursor:       "pointer",
         marginBottom: 12,
         flexShrink:   0,
-        border:       isExpanded ? "2px solid #0c7b93" : "1.5px solid #d1fae5",
-        background:   "#c8e6e4",
+        border:       isExpanded ? "2.5px solid #0c7b93" : "1.5px solid #d1fae5",
+        background:   "#b2d8d8",
         transition: [
-          "height 0.52s cubic-bezier(0.34,1.1,0.64,1)",
+          "height 0.6s cubic-bezier(0.34,1.05,0.64,1)",
           "opacity 0.35s ease",
           "transform 0.35s ease",
-          "box-shadow 0.28s ease",
-          "border-color 0.25s ease",
+          "box-shadow 0.3s ease",
+          "border-radius 0.4s ease",
         ].join(", "),
-        opacity:    isAnyExpanded && !isExpanded ? 0.44 : 1,
-        transform:  isExpanded ? "scale(1.012)" : isAnyExpanded ? "scale(0.968)" : "scale(1)",
-        filter:     isAnyExpanded && !isExpanded ? "brightness(0.7) saturate(0.7)" : "none",
+        opacity:    isAnyExpanded && !isExpanded ? 0.35 : 1,
+        transform:  isExpanded ? "scale(1.015)" : isAnyExpanded ? "scale(0.96)" : "scale(1)",
+        filter:     isAnyExpanded && !isExpanded ? "brightness(0.6) saturate(0.5)" : "none",
         boxShadow:  isExpanded
-          ? "0 10px 40px rgba(12,123,147,0.22), 0 0 0 3px rgba(12,123,147,0.09)"
-          : isAnyExpanded ? "0 2px 6px rgba(0,0,0,0.07)"
+          ? "0 20px 60px rgba(12,123,147,0.3), 0 0 0 4px rgba(12,123,147,0.1)"
+          : isAnyExpanded ? "0 2px 6px rgba(0,0,0,0.06)"
           : "0 3px 12px rgba(0,0,0,0.09)",
         willChange: "height, transform, opacity",
+        zIndex:     isExpanded ? 10 : 1,
       }}
-      onClick={onToggle}
     >
-      {/* ── Photo (click = open modal) ── */}
+      {/* ── Full-card photo background ── */}
       <div
-        onClick={(e) => { e.stopPropagation(); if (hasImages) onImageClick(); }}
-        className="photo-tap"
         style={{
           position:           "absolute",
           inset:              0,
@@ -128,9 +129,8 @@ function MosaicCard({
           backgroundSize:     "cover",
           backgroundPosition: "center",
           backgroundColor:    "#a8d5d1",
-          transition:         "transform 0.6s ease",
-          transform:          isExpanded ? "scale(1.06)" : "scale(1)",
-          cursor:             hasImages ? "zoom-in" : "default",
+          transition:         "transform 0.65s ease",
+          transform:          isExpanded ? "scale(1.04)" : "scale(1)",
           zIndex:             0,
         }}
       >
@@ -138,80 +138,59 @@ function MosaicCard({
           <div style={{
             position: "absolute", inset: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 44, background: "linear-gradient(135deg,#ccede9,#a7f3d0)",
+            fontSize: 52, background: "linear-gradient(135deg,#ccede9,#a7f3d0)",
           }}>
             {emoji}
           </div>
         )}
-        {hasImages && (
-          <div className="photo-hint" style={{
-            position: "absolute", inset: 0,
-            background: "rgba(12,123,147,0.3)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            opacity: 0, transition: "opacity 0.2s", pointerEvents: "none",
-          }}>
-            <span style={{
-              display: "flex", alignItems: "center", gap: 5,
-              padding: "5px 12px", borderRadius: 999,
-              background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
-              color: "white", fontSize: 11, fontWeight: 700,
-              border: "1px solid rgba(255,255,255,0.2)",
-            }}>
-              🖼 {imageUrls.length > 1 ? `${imageUrls.length} photos` : "View photo"}
-            </span>
-          </div>
-        )}
       </div>
 
-      {/* ── Gradient ── */}
+      {/* ── Gradient overlay — deeper when expanded ── */}
       <div style={{
-        position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none",
+        position:   "absolute", inset: 0, zIndex: 1, pointerEvents: "none",
         background: isExpanded
-          ? "linear-gradient(to top, rgba(13,78,74,0.97) 0%, rgba(13,78,74,0.82) 30%, rgba(13,78,74,0.18) 62%, transparent 100%)"
-          : "linear-gradient(to top, rgba(10,60,58,0.9) 0%, rgba(10,60,58,0.35) 46%, transparent 100%)",
-        transition: "background 0.45s ease",
+          ? "linear-gradient(to top, rgba(10,55,52,0.98) 0%, rgba(10,55,52,0.88) 35%, rgba(10,55,52,0.3) 65%, transparent 100%)"
+          : "linear-gradient(to top, rgba(10,60,58,0.92) 0%, rgba(10,60,58,0.3) 50%, transparent 100%)",
+        transition: "background 0.5s ease",
       }} />
 
-      {/* ── Top accent ── */}
+      {/* ── Top accent bar ── */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, height: 3, zIndex: 2,
         background: "linear-gradient(90deg,#0c7b93,#0d9488,transparent)",
         opacity: isExpanded ? 1 : 0.4, transition: "opacity 0.3s", pointerEvents: "none",
       }} />
 
-      {/* ── Category badge (top-left) ── */}
-      <div
-        onClick={onToggle}
-        style={{
-          position: "absolute", top: 10, left: 10, zIndex: 3,
-          padding: "3px 10px", borderRadius: 999,
-          fontSize: 11, fontWeight: 700, color: "#fff",
-          background: "rgba(13,78,74,0.82)", backdropFilter: "blur(8px)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          letterSpacing: "0.04em", cursor: "pointer",
-          opacity: isExpanded ? 0 : 1, transition: "opacity 0.2s",
-          userSelect: "none",
-        }}
-      >
+      {/* ── Category badge (fades out when expanded) ── */}
+      <div style={{
+        position: "absolute", top: 11, left: 11, zIndex: 3,
+        padding: "3px 10px", borderRadius: 999,
+        fontSize: 11, fontWeight: 700, color: "#fff",
+        background: "rgba(13,78,74,0.82)", backdropFilter: "blur(8px)",
+        border: "1px solid rgba(255,255,255,0.2)",
+        letterSpacing: "0.04em",
+        opacity: isExpanded ? 0 : 1, transition: "opacity 0.25s",
+        userSelect: "none", pointerEvents: "none",
+      }}>
         {emoji} {attraction.category ?? "Attraction"}
       </div>
 
-      {/* ── +/× button (top-right) ── */}
+      {/* ── ×/+ button (top-right) ── */}
       <div
         onClick={(e) => { e.stopPropagation(); onToggle(); }}
         style={{
-          position: "absolute", top: 10, right: 10, zIndex: 3,
-          width: 28, height: 28, borderRadius: "50%",
-          background: isExpanded ? "#0c7b93" : "rgba(13,78,74,0.72)",
+          position: "absolute", top: 11, right: 11, zIndex: 4,
+          width: 30, height: 30, borderRadius: "50%",
+          background: isExpanded ? "#0c7b93" : "rgba(13,78,74,0.75)",
           backdropFilter: "blur(8px)",
-          border: `1px solid ${isExpanded ? "#0c7b93" : "rgba(255,255,255,0.22)"}`,
+          border: `1.5px solid ${isExpanded ? "#0c7b93" : "rgba(255,255,255,0.25)"}`,
           display: "flex", alignItems: "center", justifyContent: "center",
           cursor: "pointer", transition: "all 0.3s",
-          boxShadow: isExpanded ? "0 0 14px rgba(12,123,147,0.55)" : "none",
+          boxShadow: isExpanded ? "0 0 16px rgba(12,123,147,0.6)" : "none",
           userSelect: "none",
         }}
       >
-        <svg width="11" height="11" fill="none" stroke="white" strokeWidth="2.5" viewBox="0 0 24 24"
+        <svg width="12" height="12" fill="none" stroke="white" strokeWidth="2.5" viewBox="0 0 24 24"
           style={{ transform: isExpanded ? "rotate(45deg)" : "none", transition: "transform 0.3s" }}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
@@ -219,80 +198,91 @@ function MosaicCard({
 
       {/* ── Bottom content ── */}
       <div
-        onClick={onToggle}
         style={{
-          position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 2,
-          padding: isExpanded ? "18px 16px 16px" : "11px 13px 10px",
-          transition: "padding 0.4s", cursor: "pointer",
+          position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3,
+          padding: isExpanded ? "24px 20px 22px" : "12px 13px 11px",
+          transition: "padding 0.45s",
         }}
       >
+        {/* Title — bigger when expanded */}
         <h2 style={{
-          fontSize:      isExpanded ? 22 : (isTall ? 17 : 15),
-          fontWeight:    700, color: "#fff", lineHeight: 1.2,
-          marginTop:     0, marginBottom: isExpanded ? 6 : 0,
-          marginLeft:    0, marginRight: 0,
-          transition:    "font-size 0.3s",
-          textShadow:    "0 2px 10px rgba(0,0,0,0.45)",
-          letterSpacing: "-0.01em",
+          fontSize:      isExpanded ? 26 : (isTall ? 17 : 15),
+          fontWeight:    800,
+          color:         "#fff",
+          lineHeight:    1.15,
+          marginTop:     0, marginBottom: isExpanded ? 10 : 0,
+          marginLeft:    0, marginRight:  0,
+          transition:    "font-size 0.4s",
+          textShadow:    "0 2px 12px rgba(0,0,0,0.5)",
+          letterSpacing: "-0.02em",
         }}>
           {attraction.title}
         </h2>
 
+        {/* Short tagline on tall non-expanded cards */}
         {!isExpanded && isTall && attraction.short && (
           <p style={{
-            fontSize: 12, color: "rgba(255,255,255,0.72)",
+            fontSize: 12, color: "rgba(255,255,255,0.7)",
             lineHeight: 1.5, marginTop: 4, marginBottom: 0,
           }}>
             {attraction.short}
           </p>
         )}
 
-        {/* Expanded detail — slides open */}
+        {/* Expanded detail panel */}
         <div style={{
-          maxHeight:  isExpanded ? 500 : 0,
+          maxHeight:  isExpanded ? 600 : 0,
           overflow:   "hidden",
           opacity:    isExpanded ? 1 : 0,
-          transition: "max-height 0.52s ease, opacity 0.38s ease",
+          transition: "max-height 0.55s ease, opacity 0.4s ease 0.1s",
         }}>
-          <div style={{ height: 8 }} />
+          {/* Divider */}
+          <div style={{
+            height: 1, background: "rgba(255,255,255,0.15)",
+            marginBottom: 12,
+          }} />
+
           {attraction.short && (
             <p style={{
-              fontSize: 13, color: "rgba(255,255,255,0.72)",
-              lineHeight: 1.5, marginBottom: 7, fontStyle: "italic",
+              fontSize: 14, color: "rgba(255,255,255,0.75)",
+              lineHeight: 1.5, marginBottom: 8, fontStyle: "italic",
             }}>
               {attraction.short}
             </p>
           )}
+
           <p style={{
-            fontSize: 13, color: "rgba(255,255,255,0.87)",
-            lineHeight: 1.65, marginBottom: 13,
+            fontSize: 14, color: "rgba(255,255,255,0.9)",
+            lineHeight: 1.7, marginBottom: 16,
           }}>
             {attraction.description ?? ""}
           </p>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+          {/* Badges row */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 18 }}>
             {attraction.category && (
               <span style={{
-                padding: "3px 10px", borderRadius: 999,
-                fontSize: 11, fontWeight: 700, color: "#fff",
-                background: "rgba(12,123,147,0.5)",
-                border: "1px solid rgba(12,123,147,0.7)",
+                padding: "4px 12px", borderRadius: 999,
+                fontSize: 12, fontWeight: 700, color: "#fff",
+                background: "rgba(12,123,147,0.55)",
+                border: "1px solid rgba(12,123,147,0.8)",
               }}>
                 {emoji} {attraction.category}
               </span>
             )}
             {hasImages && (
-              <button type="button"
-                onClick={(e) => { e.stopPropagation(); onImageClick(); }}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onViewPhotos(); }}
                 style={{
-                  padding: "3px 10px", borderRadius: 999,
-                  fontSize: 11, fontWeight: 700, color: "#fff",
-                  background: "rgba(255,255,255,0.15)",
-                  border: "1px solid rgba(255,255,255,0.25)",
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                  padding: "4px 12px", borderRadius: 999,
+                  fontSize: 12, fontWeight: 700, color: "#fff",
+                  background: "rgba(255,255,255,0.18)",
+                  border: "1px solid rgba(255,255,255,0.3)",
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
                 }}
               >
-                🖼 {imageUrls.length > 1 ? `${imageUrls.length} photos` : "View photo"}
+                🖼 {imageUrls.length > 1 ? `View ${imageUrls.length} photos` : "View photo"}
               </button>
             )}
           </div>
@@ -300,8 +290,8 @@ function MosaicCard({
           <Link
             href={ROUTES.book}
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 min-h-[40px] px-4 py-2 rounded-xl bg-[#0c7b93] hover:bg-[#0f766e] text-white text-sm font-semibold transition-colors"
-            style={{ textDecoration: "none" }}
+            className="inline-flex items-center gap-1.5 min-h-[44px] px-5 py-2.5 rounded-xl bg-[#0c7b93] hover:bg-[#0f766e] text-white text-sm font-bold transition-colors"
+            style={{ textDecoration: "none", letterSpacing: "0.01em" }}
           >
             Book your trip to Siargao →
           </Link>
@@ -365,7 +355,7 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
     }, 8000);
   }, [scheduleNext]);
 
-  const handleImageClick = useCallback((attraction: AttractionItem) => {
+  const handleViewPhotos = useCallback((attraction: AttractionItem) => {
     const urls = resolveImageUrls(attraction);
     if (!urls.length) return;
     setModal({ title: attraction.title, imageUrls: urls, initialIndex: 0 });
@@ -393,10 +383,10 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
     return mc && ms;
   });
 
-  // Distribute into columns shortest-first (true masonry)
-  const cols: AttractionItem[][] = Array.from({ length: numCols }, () => []);
-  const colHeights               = new Array<number>(numCols).fill(0);
-  const colCardHeights: number[][] = Array.from({ length: numCols }, () => []);
+  // Shortest-column-first masonry distribution
+  const cols: AttractionItem[][]   = Array.from({ length: numCols }, () => []);
+  const colHeights                  = new Array<number>(numCols).fill(0);
+  const colCardHeights: number[][]  = Array.from({ length: numCols }, () => []);
 
   visible.forEach((a, i) => {
     const h = shuffledHeights[i % HEIGHT_POOL.length] ?? 220;
@@ -457,7 +447,7 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
           </span>
         </div>
 
-        {/* Masonry grid — flex columns, no CSS grid, no gaps */}
+        {/* Masonry grid */}
         {visible.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-5xl mb-3">🔍</div>
@@ -486,7 +476,7 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
                     isExpanded={expanded === attraction.id}
                     isAnyExpanded={expanded !== null}
                     onToggle={() => handleToggle(attraction.id)}
-                    onImageClick={() => handleImageClick(attraction)}
+                    onViewPhotos={() => handleViewPhotos(attraction)}
                   />
                 ))}
               </div>
@@ -506,10 +496,6 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
           </Link>
         </div>
       </div>
-
-      <style>{`
-        .photo-tap:hover .photo-hint { opacity: 1 !important; }
-      `}</style>
     </>
   );
 }
