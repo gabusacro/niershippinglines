@@ -1,7 +1,7 @@
 // app/attractions/page.tsx
 import { APP_NAME, ROUTES } from "@/lib/constants";
 import { getAttractionsFromSupabase } from "@/lib/attractions/get-attractions";
-import Image from "next/image";
+import { AttractionsHero } from "./AttractionsHero";
 import { AttractionsMosaicClient } from "./AttractionsMosaicClient";
 
 export const metadata = {
@@ -136,40 +136,14 @@ export default async function AttractionsPage() {
 
   return (
     <div className="min-h-screen bg-[#f7f3eb]">
-      {/* Header */}
-      <div className="bg-[#134e4a] px-4 py-10 sm:py-14 text-center relative overflow-hidden">
-        {/* Wave bottom edge */}
-        <svg
-          className="absolute bottom-0 left-0 w-full"
-          viewBox="0 0 1440 32"
-          fill="none"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M0 16 C240 32 480 0 720 16 C960 32 1200 0 1440 16 L1440 32 L0 32 Z"
-            fill="#f7f3eb"
-          />
-        </svg>
-
-
-        <div className="flex flex-col items-center gap-3 mb-2 relative z-10">
-          <Image
-            src="/favicon.png"
-            alt="Travela Siargao"
-            width={230}
-            height={230}
-            className="rounded-full border-2 border-white/30"
-          />
-          <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
-            
-          </h1>
-          <p className="text-teal-200 text-sm sm:text-base max-w-md">
-            {usingDb
-              ? "Explore the must-visit spots of Siargao all in one place. The Attraction page highlights top destinations, island experiences, and travel essentials."
-              : "What to see and do on the island. Add attractions in Supabase to show photos here."}
-          </p>
-        </div>
-      </div>
+      <AttractionsHero
+        imageUrls={attractions.flatMap(a =>
+          a.image_urls?.length ? a.image_urls : a.image_url ? [a.image_url] : []
+        ).slice(0, 10)}
+        subtitle={usingDb
+          ? "What to see and do on the island. Click any card to explore."
+          : "What to see and do on the island. Add attractions in Supabase to show photos here."}
+      />
 
       {/* Mosaic grid */}
       <AttractionsMosaicClient attractions={attractions} />

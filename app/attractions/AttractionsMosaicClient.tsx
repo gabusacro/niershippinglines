@@ -34,8 +34,8 @@ const CATEGORY_EMOJI: Record<string, string> = {
 
 const CATEGORIES = ["All", "Beaches", "Islands", "Surfing", "Rivers & Caves", "Adventure"];
 
-// Varied heights — small / medium / large feel
-const HEIGHT_POOL = [200, 320, 240, 360, 200, 280, 200, 340, 260, 200, 200, 320, 200];
+// Row heights — small / medium / large variety
+const HEIGHT_POOL = [200, 320, 240, 360, 200, 280, 200, 340, 260, 200, 220, 320, 200];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function seededShuffle<T>(arr: T[], seed: number): T[] {
@@ -85,55 +85,53 @@ function MosaicCard({
   const emoji     = getEmoji(attraction.category);
   const isTall    = baseHeight >= 300;
 
-  // When expanded, card grows very tall to almost cover the viewport
-  const expandedH = Math.min(window.innerHeight * 0.82, 720);
+  // When expanded: span 3 cols and grow very tall
+  const expandedH = 580;
   const finalH    = isExpanded ? expandedH : baseHeight;
 
   return (
     <div
       onClick={onToggle}
       style={{
+        // CSS Grid placement — expanded card spans 3 columns
+        gridColumn:   isExpanded ? "span 3" : "span 1",
+        gridRow:      "span 1",
         height:       finalH,
         borderRadius: isExpanded ? 18 : 13,
         overflow:     "hidden",
         position:     "relative",
         cursor:       "pointer",
-        marginBottom: 12,
-        flexShrink:   0,
         border:       isExpanded ? "2.5px solid #0c7b93" : "1.5px solid #d1fae5",
         background:   "#b2d8d8",
         transition: [
-          "height 0.6s cubic-bezier(0.34,1.05,0.64,1)",
-          "opacity 0.35s ease",
-          "transform 0.35s ease",
-          "box-shadow 0.3s ease",
-          "border-radius 0.4s ease",
+          "height 0.55s cubic-bezier(0.34,1.05,0.64,1)",
+          "opacity 0.32s ease",
+          "transform 0.32s ease",
+          "box-shadow 0.28s ease",
+          "border-radius 0.35s ease",
         ].join(", "),
-        opacity:    isAnyExpanded && !isExpanded ? 0.35 : 1,
-        transform:  isExpanded ? "scale(1.015)" : isAnyExpanded ? "scale(0.96)" : "scale(1)",
-        filter:     isAnyExpanded && !isExpanded ? "brightness(0.6) saturate(0.5)" : "none",
+        opacity:    isAnyExpanded && !isExpanded ? 0.38 : 1,
+        transform:  isExpanded ? "scale(1.01)" : isAnyExpanded ? "scale(0.97)" : "scale(1)",
+        filter:     isAnyExpanded && !isExpanded ? "brightness(0.58) saturate(0.5)" : "none",
         boxShadow:  isExpanded
-          ? "0 20px 60px rgba(12,123,147,0.3), 0 0 0 4px rgba(12,123,147,0.1)"
+          ? "0 16px 56px rgba(12,123,147,0.28), 0 0 0 4px rgba(12,123,147,0.1)"
           : isAnyExpanded ? "0 2px 6px rgba(0,0,0,0.06)"
           : "0 3px 12px rgba(0,0,0,0.09)",
         willChange: "height, transform, opacity",
         zIndex:     isExpanded ? 10 : 1,
       }}
     >
-      {/* ── Full-card photo background ── */}
-      <div
-        style={{
-          position:           "absolute",
-          inset:              0,
-          backgroundImage:    hasImages ? `url(${imageUrls[0]})` : "none",
-          backgroundSize:     "cover",
-          backgroundPosition: "center",
-          backgroundColor:    "#a8d5d1",
-          transition:         "transform 0.65s ease",
-          transform:          isExpanded ? "scale(1.04)" : "scale(1)",
-          zIndex:             0,
-        }}
-      >
+      {/* ── Photo background ── */}
+      <div style={{
+        position:           "absolute", inset: 0,
+        backgroundImage:    hasImages ? `url(${imageUrls[0]})` : "none",
+        backgroundSize:     "cover",
+        backgroundPosition: "center",
+        backgroundColor:    "#a8d5d1",
+        transition:         "transform 0.65s ease",
+        transform:          isExpanded ? "scale(1.04)" : "scale(1)",
+        zIndex:             0,
+      }}>
         {!hasImages && (
           <div style={{
             position: "absolute", inset: 0,
@@ -145,13 +143,13 @@ function MosaicCard({
         )}
       </div>
 
-      {/* ── Gradient overlay — deeper when expanded ── */}
+      {/* ── Gradient — deep dark at bottom when expanded so text pops ── */}
       <div style={{
-        position:   "absolute", inset: 0, zIndex: 1, pointerEvents: "none",
+        position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none",
         background: isExpanded
-          ? "linear-gradient(to top, rgba(10,55,52,0.98) 0%, rgba(10,55,52,0.88) 35%, rgba(10,55,52,0.3) 65%, transparent 100%)"
-          : "linear-gradient(to top, rgba(10,60,58,0.92) 0%, rgba(10,60,58,0.3) 50%, transparent 100%)",
-        transition: "background 0.5s ease",
+          ? "linear-gradient(to top, rgba(10,55,52,0.98) 0%, rgba(10,55,52,0.9) 38%, rgba(10,55,52,0.25) 65%, transparent 100%)"
+          : "linear-gradient(to top, rgba(10,60,58,0.92) 0%, rgba(10,60,58,0.28) 50%, transparent 100%)",
+        transition: "background 0.45s ease",
       }} />
 
       {/* ── Top accent bar ── */}
@@ -161,21 +159,20 @@ function MosaicCard({
         opacity: isExpanded ? 1 : 0.4, transition: "opacity 0.3s", pointerEvents: "none",
       }} />
 
-      {/* ── Category badge (fades out when expanded) ── */}
+      {/* ── Category badge ── */}
       <div style={{
         position: "absolute", top: 11, left: 11, zIndex: 3,
         padding: "3px 10px", borderRadius: 999,
         fontSize: 11, fontWeight: 700, color: "#fff",
         background: "rgba(13,78,74,0.82)", backdropFilter: "blur(8px)",
-        border: "1px solid rgba(255,255,255,0.2)",
-        letterSpacing: "0.04em",
-        opacity: isExpanded ? 0 : 1, transition: "opacity 0.25s",
+        border: "1px solid rgba(255,255,255,0.2)", letterSpacing: "0.04em",
+        opacity: isExpanded ? 0 : 1, transition: "opacity 0.22s",
         userSelect: "none", pointerEvents: "none",
       }}>
         {emoji} {attraction.category ?? "Attraction"}
       </div>
 
-      {/* ── ×/+ button (top-right) ── */}
+      {/* ── ×/+ button ── */}
       <div
         onClick={(e) => { e.stopPropagation(); onToggle(); }}
         style={{
@@ -183,7 +180,7 @@ function MosaicCard({
           width: 30, height: 30, borderRadius: "50%",
           background: isExpanded ? "#0c7b93" : "rgba(13,78,74,0.75)",
           backdropFilter: "blur(8px)",
-          border: `1.5px solid ${isExpanded ? "#0c7b93" : "rgba(255,255,255,0.25)"}`,
+          border: `1.5px solid ${isExpanded ? "#0c7b93" : "rgba(255,255,255,0.28)"}`,
           display: "flex", alignItems: "center", justifyContent: "center",
           cursor: "pointer", transition: "all 0.3s",
           boxShadow: isExpanded ? "0 0 16px rgba(12,123,147,0.6)" : "none",
@@ -197,29 +194,23 @@ function MosaicCard({
       </div>
 
       {/* ── Bottom content ── */}
-      <div
-        style={{
-          position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3,
-          padding: isExpanded ? "24px 20px 22px" : "12px 13px 11px",
-          transition: "padding 0.45s",
-        }}
-      >
-        {/* Title — bigger when expanded */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3,
+        padding: isExpanded ? "22px 20px 20px" : "11px 13px 10px",
+        transition: "padding 0.4s",
+      }}>
         <h2 style={{
-          fontSize:      isExpanded ? 26 : (isTall ? 17 : 15),
-          fontWeight:    800,
-          color:         "#fff",
-          lineHeight:    1.15,
-          marginTop:     0, marginBottom: isExpanded ? 10 : 0,
-          marginLeft:    0, marginRight:  0,
-          transition:    "font-size 0.4s",
+          fontSize:      isExpanded ? 28 : (isTall ? 17 : 15),
+          fontWeight:    800, color: "#fff", lineHeight: 1.15,
+          marginTop: 0, marginBottom: isExpanded ? 10 : 0,
+          marginLeft: 0, marginRight: 0,
+          transition:    "font-size 0.38s",
           textShadow:    "0 2px 12px rgba(0,0,0,0.5)",
           letterSpacing: "-0.02em",
         }}>
           {attraction.title}
         </h2>
 
-        {/* Short tagline on tall non-expanded cards */}
         {!isExpanded && isTall && attraction.short && (
           <p style={{
             fontSize: 12, color: "rgba(255,255,255,0.7)",
@@ -229,18 +220,14 @@ function MosaicCard({
           </p>
         )}
 
-        {/* Expanded detail panel */}
+        {/* Expanded detail */}
         <div style={{
           maxHeight:  isExpanded ? 600 : 0,
           overflow:   "hidden",
           opacity:    isExpanded ? 1 : 0,
-          transition: "max-height 0.55s ease, opacity 0.4s ease 0.1s",
+          transition: "max-height 0.55s ease, opacity 0.38s ease 0.1s",
         }}>
-          {/* Divider */}
-          <div style={{
-            height: 1, background: "rgba(255,255,255,0.15)",
-            marginBottom: 12,
-          }} />
+          <div style={{ height: 1, background: "rgba(255,255,255,0.15)", marginBottom: 12 }} />
 
           {attraction.short && (
             <p style={{
@@ -258,7 +245,6 @@ function MosaicCard({
             {attraction.description ?? ""}
           </p>
 
-          {/* Badges row */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 18 }}>
             {attraction.category && (
               <span style={{
@@ -271,8 +257,7 @@ function MosaicCard({
               </span>
             )}
             {hasImages && (
-              <button
-                type="button"
+              <button type="button"
                 onClick={(e) => { e.stopPropagation(); onViewPhotos(); }}
                 style={{
                   padding: "4px 12px", borderRadius: 999,
@@ -280,19 +265,15 @@ function MosaicCard({
                   background: "rgba(255,255,255,0.18)",
                   border: "1px solid rgba(255,255,255,0.3)",
                   cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-                }}
-              >
+                }}>
                 🖼 {imageUrls.length > 1 ? `View ${imageUrls.length} photos` : "View photo"}
               </button>
             )}
           </div>
 
-          <Link
-            href={ROUTES.book}
-            onClick={(e) => e.stopPropagation()}
+          <Link href={ROUTES.book} onClick={(e) => e.stopPropagation()}
             className="inline-flex items-center gap-1.5 min-h-[44px] px-5 py-2.5 rounded-xl bg-[#0c7b93] hover:bg-[#0f766e] text-white text-sm font-bold transition-colors"
-            style={{ textDecoration: "none", letterSpacing: "0.01em" }}
-          >
+            style={{ textDecoration: "none" }}>
             Book your trip to Siargao →
           </Link>
         </div>
@@ -309,23 +290,10 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
   const [modal, setModal]                   = useState<ModalState>(null);
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch]                 = useState("");
-  const [numCols, setNumCols]               = useState(4);
 
   const timerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pausedRef = useRef(false);
 
-  // Responsive columns
-  useEffect(() => {
-    function update() {
-      const w = window.innerWidth;
-      setNumCols(w < 640 ? 2 : w < 960 ? 3 : 4);
-    }
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  // Auto-shuffle
   const scheduleNext = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -371,7 +339,6 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
     }, 5000);
   }, [scheduleNext]);
 
-  // Shuffle & filter
   const shuffledAttractions = seededShuffle(attractions, seed);
   const shuffledHeights      = seededShuffle(HEIGHT_POOL, seed + 7);
 
@@ -381,19 +348,6 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
       || a.title.toLowerCase().includes(search.toLowerCase())
       || (a.description ?? "").toLowerCase().includes(search.toLowerCase());
     return mc && ms;
-  });
-
-  // Shortest-column-first masonry distribution
-  const cols: AttractionItem[][]   = Array.from({ length: numCols }, () => []);
-  const colHeights                  = new Array<number>(numCols).fill(0);
-  const colCardHeights: number[][]  = Array.from({ length: numCols }, () => []);
-
-  visible.forEach((a, i) => {
-    const h = shuffledHeights[i % HEIGHT_POOL.length] ?? 220;
-    const shortest = colHeights.indexOf(Math.min(...colHeights));
-    cols[shortest].push(a);
-    colHeights[shortest] += h + 12;
-    colCardHeights[shortest].push(h);
   });
 
   const hasCategories = attractions.some((a) => a.category);
@@ -423,7 +377,8 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
             />
             {search && (
               <button onClick={() => setSearch("")}
-                className="text-[#7a9088] hover:text-[#134e4a] transition-colors text-base leading-none">✕</button>
+                className="text-[#7a9088] hover:text-[#134e4a] transition-colors text-base leading-none">✕
+              </button>
             )}
           </div>
 
@@ -447,7 +402,7 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
           </span>
         </div>
 
-        {/* Masonry grid */}
+        {/* ── CSS Grid masonry — expanded card spans 3 cols, others reflow ── */}
         {visible.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-5xl mb-3">🔍</div>
@@ -458,29 +413,44 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
             </button>
           </div>
         ) : (
-          <div style={{
-            display:    "flex",
-            gap:        12,
-            alignItems: "flex-start",
-            opacity:    fading ? 0.12 : 1,
-            transform:  fading ? "scale(0.988)" : "scale(1)",
-            transition: "opacity 0.32s ease, transform 0.32s ease",
-          }}>
-            {cols.map((colItems, ci) => (
-              <div key={`col-${ci}-${seed}`} style={{ flex: 1, minWidth: 0 }}>
-                {colItems.map((attraction, ri) => (
+          <div
+            className="attractions-grid"
+            style={{
+              display:             "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gridAutoRows:        "1px",
+              gap:                 12,
+              opacity:             fading ? 0.12 : 1,
+              transform:           fading ? "scale(0.988)" : "scale(1)",
+              transition:          "opacity 0.32s ease, transform 0.32s ease",
+            }}
+          >
+            {visible.map((attraction, i) => {
+              const bh = shuffledHeights[i % HEIGHT_POOL.length] ?? 220;
+              const isExp = expanded === attraction.id;
+              const finalH = isExp ? 580 : bh;
+              // gridRowEnd = height + 12 gap (1px rows)
+              const rowSpan = finalH + 12;
+              return (
+                <div
+                  key={`${String(attraction.id)}-${seed}`}
+                  style={{
+                    gridColumn:    isExp ? "span 3" : "span 1",
+                    gridRowEnd:    `span ${rowSpan}`,
+                    transition:    "grid-column 0.55s ease",
+                  }}
+                >
                   <MosaicCard
-                    key={`${String(attraction.id)}-${seed}`}
                     attraction={attraction}
-                    baseHeight={colCardHeights[ci][ri] ?? 220}
-                    isExpanded={expanded === attraction.id}
+                    baseHeight={bh}
+                    isExpanded={isExp}
                     isAnyExpanded={expanded !== null}
                     onToggle={() => handleToggle(attraction.id)}
                     onViewPhotos={() => handleViewPhotos(attraction)}
                   />
-                ))}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -496,6 +466,16 @@ export function AttractionsMosaicClient({ attractions }: { attractions: Attracti
           </Link>
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 960px) {
+          .attractions-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+        @media (max-width: 640px) {
+          .attractions-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .attractions-grid [style*="span 3"] { grid-column: span 2 !important; }
+        }
+      `}</style>
     </>
   );
 }
