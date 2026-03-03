@@ -20,7 +20,7 @@ You do **not** need to change any code. Add these environment variables and use 
 
 1. Go to [Google Account → Security → 2-Step Verification](https://myaccount.google.com/signinoptions/two-step-verification).
 2. At the bottom, open **App passwords**.
-3. Select app: **Mail**, device: **Other** (e.g. “Nier Shipping Lines”).
+3. Select app: **Mail**, device: **Other** (e.g. “Travela Siargao”).
 4. Click **Generate**. Copy the **16-character password** (no spaces).
 
 ---
@@ -74,7 +74,7 @@ If you prefer not to use Gmail, you can use [Resend](https://resend.com) instead
 
 ```env
 RESEND_API_KEY=re_xxxxxxxxxxxx
-RESEND_FROM=Nier Shipping Lines <your-verified@domain.com>
+RESEND_FROM=Travela Siargao <your-verified@domain.com>
 ```
 
 The app uses Gmail first when `SMTP_*` is set; otherwise it uses Resend when `RESEND_API_KEY` is set.

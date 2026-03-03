@@ -7,7 +7,7 @@ import { FlaggedListActions } from "./FlaggedListActions";
 
 export const metadata = {
   title: "Flagged accounts",
-  description: "Passengers with warnings or booking restrictions — Nier Shipping Lines Admin",
+  description: "Passengers with warnings or booking restrictions — Travela Siargao Admin",
 };
 
 export const dynamic = "force-dynamic";

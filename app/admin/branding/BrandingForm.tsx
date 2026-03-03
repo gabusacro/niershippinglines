@@ -48,7 +48,7 @@ export function BrandingForm({ initial }: { initial: SiteBranding }) {
           type="text"
           value={siteName}
           onChange={(e) => setSiteName(e.target.value)}
-          placeholder="e.g. Nier Shipping Lines or Travel As Iargao"
+          placeholder="e.g. Travela Siargao or TravelaSiargao"
           className="mt-1 w-full rounded-lg border border-teal-200 px-4 py-2.5 text-[#134e4a] focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
         />
         <p className="mt-1 text-xs text-[#0f766e]">Shown in header, footer, tickets, manifest, and page titles.</p>

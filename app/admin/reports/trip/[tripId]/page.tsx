@@ -12,7 +12,7 @@ import { ReconcileWalkInButton } from "./ReconcileWalkInButton";
 
 export const metadata = {
   title: "Passenger manifest",
-  description: "Passenger manifest for Philippine Coast Guard — Nier Shipping Lines",
+  description: "Passenger manifest for Philippine Coast Guard — Travela Siargao",
 };
 
 export const dynamic = "force-dynamic";

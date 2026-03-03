@@ -7,7 +7,7 @@ import { ROUTES } from "@/lib/constants";
 
 export const metadata = {
   title: "Manual Booking",
-  description: "Add walk-in passenger to a trip — Nier Shipping Lines Admin",
+  description: "Add walk-in passenger to a trip — Travela Siargao Admin",
 };
 
 export default async function AdminManualBookingPage() {

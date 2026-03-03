@@ -40,7 +40,7 @@ export default async function HomePage() {
         </div>
         <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6">
           <span className="inline-block rounded-full border border-[#0c7b93]/20 bg-[#0c7b93]/10 px-4 py-1 text-xs font-extrabold uppercase tracking-widest text-[#0c7b93] mb-4">
-            🚢 Daily ferry · Siargao · Surigao · Dinagat
+            Daily ferry · Siargao · Surigao Del Norte · Province of Dinagat
           </span>
           <h1 className="text-3xl font-black text-[#134e4a] leading-tight tracking-tight sm:text-4xl md:text-5xl">
             {branding.site_name}

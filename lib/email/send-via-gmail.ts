@@ -31,7 +31,7 @@ export type SendMailParams = {
 export async function sendViaGmail(params: SendMailParams): Promise<boolean> {
   const transport = getTransport();
   if (!transport) return false;
-  const from = params.from ?? process.env.SMTP_USER ?? "Nier Shipping Lines";
+  const from = params.from ?? process.env.SMTP_USER ?? "Travela Siargao";
   try {
     await transport.sendMail({
       from: typeof from === "string" && from.includes("<") ? from : `${from} <${process.env.SMTP_USER}>`,

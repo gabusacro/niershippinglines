@@ -6,7 +6,7 @@ import { ROUTES } from "@/lib/constants";
 
 export const metadata = {
   title: "Booking history",
-  description: "All bookings — Nier Shipping Lines Admin",
+  description: "All bookings — Travela Siargao Admin",
 };
 
 const statusLabel: Record<string, string> = {

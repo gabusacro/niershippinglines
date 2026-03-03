@@ -1,4 +1,4 @@
-# Nier Shipping Lines — Policies, Disclaimers & User Information
+# Travela Siargao — Policies, Disclaimers & User Information
 
 This document captures policies, refund rules, schedule changes, and privacy considerations for inclusion in Terms of Service, Privacy Policy, and user-facing disclaimers.
 

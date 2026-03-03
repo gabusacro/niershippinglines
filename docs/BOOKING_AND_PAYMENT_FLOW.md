@@ -1,4 +1,4 @@
-# Booking and Payment Flow (Nier Shipping Lines)
+# Booking and Payment Flow (Travela Siargao)
 
 ## How booking and inventory work
 

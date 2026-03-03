@@ -2,7 +2,7 @@
 
 CREATE TABLE public.site_branding (
   id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  site_name TEXT NOT NULL DEFAULT 'Nier Shipping Lines',
+  site_name TEXT NOT NULL DEFAULT 'Travela Siargao',
   routes_text TEXT NOT NULL DEFAULT 'Siargao Island ↔ Surigao · Dinagat ↔ Surigao City',
   tagline TEXT NOT NULL DEFAULT 'Feel the island before you arrive. Sun, waves, and a smooth sail away.',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -10,7 +10,7 @@ CREATE TABLE public.site_branding (
 
 COMMENT ON TABLE public.site_branding IS 'Editable site name, routes line, and tagline. Admin only can update; all can read.';
 
-INSERT INTO public.site_branding (id, site_name, routes_text, tagline) VALUES (1, 'Nier Shipping Lines', 'Siargao Island ↔ Surigao · Dinagat ↔ Surigao City', 'Feel the island before you arrive. Sun, waves, and a smooth sail away.');
+INSERT INTO public.site_branding (id, site_name, routes_text, tagline) VALUES (1, 'Travela Siargao', 'Siargao Island ↔ Surigao · Dinagat ↔ Surigao City', 'Feel the island before you arrive. Sun, waves, and a smooth sail away.');
 
 ALTER TABLE public.site_branding ENABLE ROW LEVEL SECURITY;
 

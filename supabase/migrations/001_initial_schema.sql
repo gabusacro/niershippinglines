@@ -1,4 +1,4 @@
--- Nier Shipping Lines — Initial schema (inventory-first, secure)
+-- Travela Siargao — Initial schema (inventory-first, secure)
 -- Run this in Supabase SQL Editor (Dashboard) or via Supabase CLI.
 
 -- Enable UUID extension if not already

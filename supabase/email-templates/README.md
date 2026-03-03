@@ -1,6 +1,6 @@
-# Supabase Email Templates (Nier Shipping Lines)
+# Supabase Email Templates (Travela Siargao)
 
-Branded auth email templates for **Supabase Dashboard** (Authentication → Email Templates). Each template uses the same Nier Shipping Lines header, footer, and reference-number style.
+Branded auth email templates for **Supabase Dashboard** (Authentication → Email Templates). Each template uses the same Travela Siargao header, footer, and reference-number style.
 
 ---
 
@@ -19,12 +19,12 @@ Branded auth email templates for **Supabase Dashboard** (Authentication → Emai
 
 | Dashboard template   | HTML file               | Suggested subject |
 |----------------------|-------------------------|-------------------|
-| **Confirm signup**   | `confirm-signup.html`   | Confirm your account – Nier Shipping Lines |
-| **Invite user**      | `invite-user.html`      | You're invited – Nier Shipping Lines |
-| **Magic link**      | `magic-link.html`       | Sign in to Nier Shipping Lines |
-| **Change email address** | `change-email.html` | Verify your new email – Nier Shipping Lines |
-| **Reset password**   | `reset-password.html`   | Reset your password – Nier Shipping Lines |
-| **Reauthentication** | `reauthentication.html`| Confirm your identity – Nier Shipping Lines |
+| **Confirm signup**   | `confirm-signup.html`   | Confirm your account – Travela Siargao |
+| **Invite user**      | `invite-user.html`      | You're invited – Travela Siargao |
+| **Magic link**      | `magic-link.html`       | Sign in to Travela Siargao |
+| **Change email address** | `change-email.html` | Verify your new email – Travela Siargao |
+| **Reset password**   | `reset-password.html`   | Reset your password – Travela Siargao |
+| **Reauthentication** | `reauthentication.html`| Confirm your identity – Travela Siargao |
 
 ---
 
@@ -32,13 +32,13 @@ Branded auth email templates for **Supabase Dashboard** (Authentication → Emai
 
 ### Confirm signup
 - **Use:** New users who signed up with email/password.
-- **Copy:** “Confirm your account creation”, “You registered with Nier Shipping Lines using this email”.
+- **Copy:** “Confirm your account creation”, “You registered with Travela Siargao using this email”.
 - **Reference:** `NLR-{{ .Token }}` (registration reference).
 - **CTA:** “Confirm email address”.
 
 ### Invite user
 - **Use:** Inviting someone who doesn’t have an account yet.
-- **Copy:** “You’re invited to join Nier Shipping Lines”, “Accept the invitation and set up your account”.
+- **Copy:** “You’re invited to join Travela Siargao”, “Accept the invitation and set up your account”.
 - **Reference:** `NLR-INV-{{ .Token }}`.
 - **CTA:** “Accept invitation & create account”.
 
@@ -46,17 +46,17 @@ Branded auth email templates for **Supabase Dashboard** (Authentication → Emai
 - **Use:** One-time sign-in link (passwordless).
 - **Copy:** “You requested a one-time sign-in link”, “Click below to sign in”.
 - **Reference:** `NLR-{{ .Token }}`.
-- **CTA:** “Sign in to Nier Shipping Lines”.
+- **CTA:** “Sign in to Travela Siargao”.
 
 ### Change email address
 - **Use:** Verifying a new email after the user requested a change.
-- **Copy:** “You requested to change the email address for your Nier Shipping Lines account to **{{ .NewEmail }}**”.
+- **Copy:** “You requested to change the email address for your Travela Siargao account to **{{ .NewEmail }}**”.
 - **Reference:** `NLR-{{ .Token }}`.
 - **CTA:** “Verify new email address”.
 
 ### Reset password
 - **Use:** Forgot-password flow.
-- **Copy:** “We received a request to reset the password for your Nier Shipping Lines account”, “This link will expire in 1 hour”.
+- **Copy:** “We received a request to reset the password for your Travela Siargao account”, “This link will expire in 1 hour”.
 - **Reference:** `NLR-RESET-{{ .Token }}`.
 - **CTA:** “Reset password”.
 

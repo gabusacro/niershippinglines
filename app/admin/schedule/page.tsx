@@ -6,7 +6,7 @@ import { ScheduleManager } from "./ScheduleManager";
 
 export const metadata = {
   title: "Schedule — Routes & Times",
-  description: "Manage routes (origin, destination) and departure times — Nier Shipping Lines",
+  description: "Manage routes (origin, destination) and departure times — Travela Siargao",
 };
 
 export default async function AdminSchedulePage() {

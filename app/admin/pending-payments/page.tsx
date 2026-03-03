@@ -12,7 +12,7 @@ import { PaymentProofViewer } from "@/components/admin/PaymentProofViewer";
 
 export const metadata = {
   title: "Pending Payments",
-  description: "Bookings awaiting payment — Nier Shipping Lines Admin",
+  description: "Bookings awaiting payment — Travela Siargao Admin",
 };
 
 type Row = {

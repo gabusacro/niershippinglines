@@ -1,4 +1,4 @@
-# Nier Shipping Lines — Features & Readiness
+# Travela Siargao — Features & Readiness
 
 **Last updated:** Feb 2025  
 Use this to see what’s done, what’s missing, and what to do when you deploy.

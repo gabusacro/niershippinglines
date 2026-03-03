@@ -1,4 +1,4 @@
-# Nier Shipping Lines — Project Summary & Scope
+# Travela Siargao — Project Summary & Scope
 
 **Last updated:** Feb 10, 2025  
 **Status:** Awaiting your approval before coding.
@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-- **Product:** Booking, ticketing, and payment website for **Nier Shipping Lines**.
+- **Product:** Booking, ticketing, and payment website for **Travela Siargao**.
 - **Stack:** Next.js, Supabase (DB + Auth + Storage), Vercel, GitHub. All critical data in Supabase (no reliance on browser storage).
 - **Routes:** Siargao ↔ Surigao | Dinagat ↔ Surigao City (7 boats total).
 - **Compliance:** Philippine law–aware (PDPA-style consent, Senior/PWD discounts, provider-friendly Terms/Privacy, maritime disclaimers).
@@ -214,4 +214,4 @@ we will:
 
 ---
 
-*Summary prepared for Nier Shipping Lines. All decisions above are from your answers; any oversight is mine — tell me and we’ll update this doc.*
+*Summary prepared for Travela Siargao. All decisions above are from your answers; any oversight is mine — tell me and we’ll update this doc.*

@@ -12,7 +12,7 @@ import { RefundBookingButton } from "@/components/admin/RefundBookingButton";
 
 export const metadata = {
   title: "Booking details",
-  description: "View booking — Nier Shipping Lines Admin",
+  description: "View booking — Travela Siargao Admin",
 };
 
 const statusLabel: Record<string, string> = {

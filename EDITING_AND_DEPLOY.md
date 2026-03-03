@@ -15,7 +15,7 @@ Use this guide for minor content changes (titles, descriptions, text) and for pu
 | **Book page** — “How it works”, instructions, disclaimers | `app/book/page.tsx`, `app/book/BookingForm.tsx`, `app/book/HowItWorksSection.tsx` |
 | **Terms of Service** | `app/terms/page.tsx` |
 | **Privacy policy** | `app/privacy/page.tsx` |
-| **Site name, tagline, routes line** (e.g. “Nier Shipping Lines”, “Siargao ↔ Surigao”) | **Supabase** → Table `site_branding` (row `id = 1`). Or Admin → Branding in the app if you have that page. |
+| **Site name, tagline, routes line** (e.g. “Travela Siargao”, “Siargao ↔ Surigao”) | **Supabase** → Table `site_branding` (row `id = 1`). Or Admin → Branding in the app if you have that page. |
 | **Footer** links and text | `components/layout/Footer.tsx` |
 | **Header** (nav links, logo text) | `components/layout/Header.tsx` |
 | **Login / Sign up** — success messages, labels | `app/login/AuthForm.tsx` |
