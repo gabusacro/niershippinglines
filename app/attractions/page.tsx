@@ -1,5 +1,5 @@
 // app/attractions/page.tsx
-import { APP_NAME, ROUTES } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
 import { getAttractionsFromSupabase } from "@/lib/attractions/get-attractions";
 import { AttractionsHero } from "./AttractionsHero";
 import { AttractionsMosaicClient } from "./AttractionsMosaicClient";
@@ -137,9 +137,12 @@ export default async function AttractionsPage() {
   return (
     <div className="min-h-screen bg-[#f7f3eb]">
       <AttractionsHero
-        imageUrls={attractions.flatMap(a =>
-          a.image_urls?.length ? a.image_urls : a.image_url ? [a.image_url] : []
-        ).slice(0, 10)}
+        imageUrls={attractions.flatMap((a) => {
+          const urls: string[] = Array.isArray(a.image_urls) && a.image_urls.length > 0
+            ? a.image_urls
+            : a.image_url ? [a.image_url] : [];
+          return urls;
+        }).slice(0, 10)}
         subtitle={usingDb
           ? "What to see and do on the island. Click any card to explore."
           : "What to see and do on the island. Add attractions in Supabase to show photos here."}
