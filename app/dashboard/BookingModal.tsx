@@ -24,7 +24,7 @@ const NATIONALITIES = ["Filipino","American","Australian","British","Canadian","
   "French","German","Japanese","Korean","Singaporean","Other"];
 const GENDERS = ["Male","Female","Other"];
 
-// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Types
 type FareRow = {
   base_fare_cents: number;
   discount_percent: number;
@@ -54,7 +54,7 @@ type IdUpload = {
   error: string;
 };
 
-// â”€â”€ Pure helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Pure helpers
 function calcAge(birthdate: string): number | null {
   if (!birthdate) return null;
   const today = new Date();
@@ -98,16 +98,12 @@ function discountPct(fareType: string, f: FareRow): number {
   return 0;
 }
 
-/**
- * Effective fare for a passenger.
- * If they have waived their discount â†’ charge adult rate.
- */
 function effectiveFareCents(
   base: number, fareType: string, waived: boolean, f: FareRow
 ): number {
   if (fareType === "adult")  return base;
   if (fareType === "infant" && !waived) return 0;
-  if (waived)  return base;                              // full adult fare
+  if (waived)  return base;
   const pct = discountPct(fareType, f);
   return Math.round(base * (1 - pct / 100));
 }
@@ -122,7 +118,7 @@ function ensureExtraLength(arr: PassengerExtra[], len: number): PassengerExtra[]
   return [...arr, ...Array(len - arr.length).fill(null).map(() => ({...e}))];
 }
 
-// â”€â”€ PassengerExtraFields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PassengerExtraFields
 function PassengerExtraFields({
   extra, onChange, savedTravelers, onSelectTraveler,
   isLoggedIn, fareType, fare, onSuggestSwitch,
@@ -153,7 +149,7 @@ function PassengerExtraFields({
             }}
             className="w-full rounded-lg border border-teal-200 px-2 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
           >
-            <option value="">â€” Select saved traveler â€”</option>
+            <option value="">— Select saved traveler —</option>
             {savedTravelers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
           </select>
         </div>
@@ -164,7 +160,7 @@ function PassengerExtraFields({
           <label className="block text-xs text-[#0f766e] mb-1">Gender</label>
           <select value={extra.gender} onChange={e => onChange({...extra, gender: e.target.value})}
             className="w-full rounded-lg border border-teal-200 px-2 py-1.5 text-xs text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]">
-            <option value="">â€”</option>
+            <option value="">—</option>
             {GENDERS.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
         </div>
@@ -181,7 +177,7 @@ function PassengerExtraFields({
           <label className="block text-xs text-[#0f766e] mb-1">Nationality</label>
           <select value={extra.nationality} onChange={e => onChange({...extra, nationality: e.target.value})}
             className="w-full rounded-lg border border-teal-200 px-2 py-1.5 text-xs text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]">
-            <option value="">â€”</option>
+            <option value="">—</option>
             {NATIONALITIES.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
@@ -191,7 +187,7 @@ function PassengerExtraFields({
       {showTip && onSuggestSwitch && (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5">
           <p className="text-xs text-amber-800">
-            Age {age} â†’ qualifies as <strong className="capitalize">{suggested}</strong>
+            Age {age} → qualifies as <strong className="capitalize">{suggested}</strong>
             {suggested === "infant" ? " (FREE)" : ` (${discountPct(suggested!, fare!)}% off)`}
           </p>
           <button
@@ -207,7 +203,7 @@ function PassengerExtraFields({
   );
 }
 
-// â”€â”€ IdWaiverCard â€” shown BEFORE booking to decide discount vs waive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// IdWaiverCard — shown BEFORE booking to decide discount vs waive
 function IdWaiverCard({
   paxKey, fareType, name, waived, onWaiverChange,
 }: {
@@ -224,7 +220,7 @@ function IdWaiverCard({
       {waived ? (
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-semibold text-amber-700">
-            âš  Discount waived â€” full adult fare will be charged.
+            ⚠ Discount waived — full adult fare will be charged.
           </p>
           <button
             type="button"
@@ -244,7 +240,7 @@ function IdWaiverCard({
             className="mt-0.5 h-4 w-4 cursor-pointer rounded border-amber-400 text-amber-500"
           />
           <label htmlFor={`waive-${paxKey}`} className="text-xs text-amber-800 cursor-pointer">
-            <strong>Waive discount</strong> â€” I will not present an ID on boarding.
+            <strong>Waive discount</strong> — I will not present an ID on boarding.
             Regular adult fare applies instead.
           </label>
         </div>
@@ -253,7 +249,7 @@ function IdWaiverCard({
   );
 }
 
-// â”€â”€ IdUploadCard â€” shown AFTER booking to upload the ID â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// IdUploadCard — shown AFTER booking to upload the ID
 function IdUploadCard({
   paxKey, fareType, name, passengerIndex,
   upload, onFileChange, onUpload,
@@ -271,17 +267,18 @@ function IdUploadCard({
       </p>
       <p className="text-xs text-slate-500 italic">{idHint(fareType)}</p>
       {upload.uploaded ? (
-        <p className="text-xs font-semibold text-green-700">{upload.preVerified ? "✓ ID already on file — verified" : "✓ ID uploaded successfully"}</p>
-
+        <p className="text-xs font-semibold text-green-700">
+          {upload.preVerified ? "✓ ID already on file — verified" : "✓ ID uploaded successfully"}
+        </p>
       ) : (
         <div className="space-y-2">
-          {/* Proper label+input â€” works on iOS Safari, Android, desktop */}
+          {/* Proper label+input — works on iOS Safari, Android, desktop */}
           <div className="flex items-center gap-2 flex-wrap">
             <label
               htmlFor={inputId}
               className="inline-flex min-h-[36px] cursor-pointer items-center rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-50 active:bg-blue-100"
             >
-              ðŸ“Ž Choose ID photo or PDF
+              🔎 Choose ID photo or PDF
             </label>
             <input
               id={inputId}
@@ -297,23 +294,23 @@ function IdUploadCard({
               onClick={() => onUpload({ key: paxKey, fareType, name, passengerIndex })}
               className="inline-flex min-h-[36px] items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"
             >
-              {upload.uploading ? "Uploadingâ€¦" : "Upload ID"}
+              {upload.uploading ? "Uploading…" : "Upload ID"}
             </button>
           </div>
           {upload.fileName && (
-            <p className="text-xs text-green-700">âœ“ Selected: {upload.fileName}</p>
+            <p className="text-xs text-green-700">✓ Selected: {upload.fileName}</p>
           )}
           {upload.error && (
-            <p className="text-xs font-semibold text-red-600">âš  {upload.error}</p>
+            <p className="text-xs font-semibold text-red-600">⚠ {upload.error}</p>
           )}
-          <p className="text-xs text-slate-400">Optional â€” you may skip and present ID at the terminal instead.</p>
+          <p className="text-xs text-slate-400">Optional — you may skip and present ID at the terminal instead.</p>
         </div>
       )}
     </div>
   );
 }
 
-// â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Main Component
 export function BookingModal({
   trip, onClose,
   loggedInEmail = "", passengerName,
@@ -326,13 +323,13 @@ export function BookingModal({
   loggedInBirthdate?: string; loggedInNationality?: string;
 }) {
   const routeName  = trip.route?.display_name
-    ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" â†” ") ?? "â€”";
-  const vesselName = trip.boat?.name ?? "â€”";
+    ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" ↔ ") ?? "—";
+  const vesselName = trip.boat?.name ?? "—";
   const toast      = useToast();
   const router     = useRouter();
   const isLoggedIn = !!loggedInEmail?.trim();
 
-  // â”€â”€ Fare rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Fare rules
   const [fare, setFare] = useState<FareRow|null>(null);
   const [autoFareApplied, setAutoFareApplied] = useState(false);
   const loggedInAge  = loggedInBirthdate ? calcAge(loggedInBirthdate) : null;
@@ -340,7 +337,7 @@ export function BookingModal({
     gender: loggedInGender, birthdate: loggedInBirthdate, nationality: loggedInNationality,
   };
 
-  // â”€â”€ Passenger counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Passenger counts
   const [countAdult,   setCountAdult]   = useState(1);
   const [countSenior,  setCountSenior]  = useState(0);
   const [countPwd,     setCountPwd]     = useState(0);
@@ -348,7 +345,7 @@ export function BookingModal({
   const [countChild,   setCountChild]   = useState(0);
   const [countInfant,  setCountInfant]  = useState(0);
 
-  // â”€â”€ Names â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Names
   const [adultNames,   setAdultNames]   = useState<string[]>([passengerName ?? ""]);
   const [seniorNames,  setSeniorNames]  = useState<string[]>([]);
   const [pwdNames,     setPwdNames]     = useState<string[]>([]);
@@ -356,7 +353,7 @@ export function BookingModal({
   const [childNames,   setChildNames]   = useState<string[]>([]);
   const [infantNames,  setInfantNames]  = useState<string[]>([]);
 
-  // â”€â”€ Addresses â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Addresses
   const [adultAddresses,   setAdultAddresses]   = useState<string[]>([]);
   const [seniorAddresses,  setSeniorAddresses]  = useState<string[]>([]);
   const [pwdAddresses,     setPwdAddresses]     = useState<string[]>([]);
@@ -364,7 +361,7 @@ export function BookingModal({
   const [childAddresses,   setChildAddresses]   = useState<string[]>([]);
   const [infantAddresses,  setInfantAddresses]  = useState<string[]>([]);
 
-  // â”€â”€ Extras (gender/birthdate/nationality) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Extras (gender/birthdate/nationality)
   const [adultExtras,   setAdultExtras]   = useState<PassengerExtra[]>([firstExtra]);
   const [seniorExtras,  setSeniorExtras]  = useState<PassengerExtra[]>([]);
   const [pwdExtras,     setPwdExtras]     = useState<PassengerExtra[]>([]);
@@ -372,15 +369,14 @@ export function BookingModal({
   const [childExtras,   setChildExtras]   = useState<PassengerExtra[]>([]);
   const [infantExtras,  setInfantExtras]  = useState<PassengerExtra[]>([]);
 
-  // â”€â”€ Waivers â€” decided BEFORE booking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // key = "fareType-index", value = true if waived
+  // Waivers — decided BEFORE booking
   const [waivers, setWaivers] = useState<Record<string, boolean>>({});
 
-  // â”€â”€ ID uploads â€” happen AFTER booking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ID uploads — happen AFTER booking
   const [idUploads, setIdUploads] = useState<Record<string, IdUpload>>({});
   const idFiles = useRef<Record<string, File|null>>({});
 
-  // â”€â”€ Contact / booking state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Contact / booking state
   const [savedTravelers,  setSavedTravelers]  = useState<SavedTraveler[]>([]);
   const [customerEmail,   setCustomerEmail]   = useState(loggedInEmail);
   const [customerMobile,  setCustomerMobile]  = useState("");
@@ -390,7 +386,7 @@ export function BookingModal({
   const [submitting,      setSubmitting]      = useState(false);
   const [formError,       setFormError]       = useState("");
 
-  // â”€â”€ Payment proof â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Payment proof
   const [proofFile,       setProofFile]       = useState<File|null>(null);
   const [proofUploading,  setProofUploading]  = useState(false);
   const [proofUploaded,   setProofUploaded]   = useState(false);
@@ -407,7 +403,7 @@ export function BookingModal({
     };
   }|null>(null);
 
-  // â”€â”€ Load saved travelers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Load saved travelers
   useEffect(() => {
     if (!isLoggedIn) return;
     fetch("/api/saved-travelers")
@@ -416,7 +412,7 @@ export function BookingModal({
       .catch(() => {});
   }, [isLoggedIn]);
 
-  // â”€â”€ Load fare rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Load fare rules
   const routeId = trip.route?.id;
   useEffect(() => {
     if (!routeId) return;
@@ -425,24 +421,24 @@ export function BookingModal({
       .then(data => {
         if (data?.base_fare_cents == null) return;
         setFare({
-          base_fare_cents:              data.base_fare_cents,
-          discount_percent:             data.discount_percent             ?? 20,
-          admin_fee_cents_per_passenger:data.admin_fee_cents_per_passenger,
-          gcash_fee_cents:              data.gcash_fee_cents,
-          child_min_age:                data.child_min_age                ?? 3,
-          child_max_age:                data.child_max_age                ?? 10,
-          child_discount_percent:       data.child_discount_percent       ?? 50,
-          infant_max_age:               data.infant_max_age               ?? 2,
-          infant_is_free:               data.infant_is_free               ?? true,
-          senior_min_age:               data.senior_min_age               ?? 60,
-          senior_discount_percent:      data.senior_discount_percent      ?? 20,
-          pwd_discount_percent:         data.pwd_discount_percent         ?? 20,
+          base_fare_cents:               data.base_fare_cents,
+          discount_percent:              data.discount_percent             ?? 20,
+          admin_fee_cents_per_passenger: data.admin_fee_cents_per_passenger,
+          gcash_fee_cents:               data.gcash_fee_cents,
+          child_min_age:                 data.child_min_age                ?? 3,
+          child_max_age:                 data.child_max_age                ?? 10,
+          child_discount_percent:        data.child_discount_percent       ?? 50,
+          infant_max_age:                data.infant_max_age               ?? 2,
+          infant_is_free:                data.infant_is_free               ?? true,
+          senior_min_age:                data.senior_min_age               ?? 60,
+          senior_discount_percent:       data.senior_discount_percent      ?? 20,
+          pwd_discount_percent:          data.pwd_discount_percent         ?? 20,
         });
       })
       .catch(() => {});
   }, [routeId]);
 
-  // â”€â”€ Auto-set logged-in user fare type once fare loads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Auto-set logged-in user fare type once fare loads
   useEffect(() => {
     if (!fare || autoFareApplied) { if (fare) setAutoFareApplied(true); return; }
     if (!loggedInBirthdate) { setAutoFareApplied(true); return; }
@@ -462,7 +458,7 @@ export function BookingModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fare]);
 
-  // â”€â”€ Sync array lengths when counts change â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Sync array lengths when counts change
   useEffect(() => { setAdultNames(p=>ensureLength(p,countAdult));     setAdultAddresses(p=>ensureLength(p,countAdult));     setAdultExtras(p=>ensureExtraLength(p,countAdult));     }, [countAdult]);
   useEffect(() => { setSeniorNames(p=>ensureLength(p,countSenior));   setSeniorAddresses(p=>ensureLength(p,countSenior));   setSeniorExtras(p=>ensureExtraLength(p,countSenior));   }, [countSenior]);
   useEffect(() => { setPwdNames(p=>ensureLength(p,countPwd));         setPwdAddresses(p=>ensureLength(p,countPwd));         setPwdExtras(p=>ensureExtraLength(p,countPwd));         }, [countPwd]);
@@ -470,7 +466,7 @@ export function BookingModal({
   useEffect(() => { setChildNames(p=>ensureLength(p,countChild));     setChildAddresses(p=>ensureLength(p,countChild));     setChildExtras(p=>ensureExtraLength(p,countChild));     }, [countChild]);
   useEffect(() => { setInfantNames(p=>ensureLength(p,countInfant));   setInfantAddresses(p=>ensureLength(p,countInfant));   setInfantExtras(p=>ensureExtraLength(p,countInfant));   }, [countInfant]);
 
-  // â”€â”€ Fares â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Fares
   const base           = fare?.base_fare_cents          ?? 55000;
   const adminFeePerPax = fare?.admin_fee_cents_per_passenger ?? 2000;
   const gcashFee       = fare?.gcash_fee_cents           ?? 1500;
@@ -517,7 +513,7 @@ export function BookingModal({
     waivers,
   ]);
 
-  // Fare subtotal â€” respects waivers (waived = adult rate)
+  // Fare subtotal — respects waivers (waived = adult rate)
   const fareSubtotalCents = useMemo(() => {
     if (!fare) return 0;
     return passengerDetails.reduce((sum, p) =>
@@ -528,7 +524,7 @@ export function BookingModal({
   const adminFeeCents = totalPassengers * adminFeePerPax;
   const totalCents    = fareSubtotalCents + gcashFee + adminFeeCents;
 
-  // Passengers needing ID upload (after booking) â€” only those who did NOT waive
+  // Passengers needing ID upload (after booking) — only those who did NOT waive
   const idUploadRequired = useMemo(() => {
     let offset = countAdult;
     const list: { key: string; fareType: string; name: string; passengerIndex: number }[] = [];
@@ -548,12 +544,12 @@ export function BookingModal({
     return list;
   }, [countAdult,countSenior,countPwd,countStudent,countChild,seniorNames,pwdNames,studentNames,childNames,waivers]);
 
-  // â”€â”€ Waiver helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Waiver helpers
   const setWaiver = useCallback((key: string, val: boolean) => {
     setWaivers(prev => ({ ...prev, [key]: val }));
   }, []);
 
-  // â”€â”€ ID upload helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ID upload helpers
   const getUpload = useCallback((key: string): IdUpload => {
     return idUploads[key] ?? { fileName:"", uploading:false, uploaded:false, preVerified:false, error:"" };
   }, [idUploads]);
@@ -577,7 +573,7 @@ export function BookingModal({
       fd.set("booking_reference", result.reference);
       fd.set("passenger_index",   String(pax.passengerIndex));
       fd.set("passenger_name",    pax.name);
-      fd.set("discount_type",     pax.fareType === "student" ? "pwd" : pax.fareType);
+      fd.set("discount_type",     pax.fareType === "student" ? "student" : pax.fareType);
       fd.set("file", file);
       const res  = await fetch("/api/passenger-id", { method:"POST", body: fd });
       const data = await res.json().catch(() => ({}));
@@ -589,37 +585,35 @@ export function BookingModal({
     }
   }, [result, patchUpload, toast]);
 
-// â”€â”€ Auto-check verified IDs when booking is created â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-useEffect(() => {
-  if (!result?.reference || idUploadRequired.length === 0) return;
-  idUploadRequired.forEach(async (pax) => {
-    // Skip if already marked
-    const current = idFiles.current[pax.key];
-    if (current) return; // user already selected a file, let them upload manually
-    try {
-      const fd = new FormData();
-      fd.set("booking_reference", result.reference);
-      fd.set("passenger_index",   String(pax.passengerIndex));
-      fd.set("passenger_name",    pax.name);
-      fd.set("discount_type",     pax.fareType === "student" ? "student" : pax.fareType);
-      fd.set("check_only",        "true");
-      const res  = await fetch("/api/passenger-id", { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.already_verified) {
-        // Mark as already uploaded so card shows green "âœ“ ID already on file"
-        patchUpload(pax.key, { uploaded: true, preVerified: true, fileName: "", error: "" });
-      }
-    } catch { /* silent â€” user can still upload manually */ }
-  });
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [result?.reference]);
+  // Auto-check verified IDs when booking is created
+  useEffect(() => {
+    if (!result?.reference || idUploadRequired.length === 0) return;
+    idUploadRequired.forEach(async (pax) => {
+      const current = idFiles.current[pax.key];
+      if (current) return;
+      try {
+        const fd = new FormData();
+        fd.set("booking_reference", result.reference);
+        fd.set("passenger_index",   String(pax.passengerIndex));
+        fd.set("passenger_name",    pax.name);
+        fd.set("discount_type",     pax.fareType === "student" ? "student" : pax.fareType);
+        fd.set("check_only",        "true");
+        const res  = await fetch("/api/passenger-id", { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.already_verified) {
+          patchUpload(pax.key, { uploaded: true, preVerified: true, fileName: "", error: "" });
+        }
+      } catch { /* silent — user can still upload manually */ }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result?.reference]);
 
-  // â”€â”€ Switch passenger fare type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Switch passenger fare type
   const switchFareType = useCallback((fromType: string, fromIndex: number, toType: FareTypeValue) => {
     const getName = (t: string, i: number) => {
       if (t==="adult")   return adultNames[i]   ?? "";
       if (t==="senior")  return seniorNames[i]  ?? "";
-      if (t==="pwd")     return pwdNames[i]      ?? "";
+      if (t==="pwd")     return pwdNames[i]     ?? "";
       if (t==="student") return studentNames[i] ?? "";
       if (t==="child")   return childNames[i]   ?? "";
       if (t==="infant")  return infantNames[i]  ?? "";
@@ -629,7 +623,7 @@ useEffect(() => {
       const e = { gender:"", birthdate:"", nationality:"" };
       if (t==="adult")   return adultExtras[i]   ?? e;
       if (t==="senior")  return seniorExtras[i]  ?? e;
-      if (t==="pwd")     return pwdExtras[i]      ?? e;
+      if (t==="pwd")     return pwdExtras[i]     ?? e;
       if (t==="student") return studentExtras[i] ?? e;
       if (t==="child")   return childExtras[i]   ?? e;
       if (t==="infant")  return infantExtras[i]  ?? e;
@@ -638,7 +632,6 @@ useEffect(() => {
     const name  = getName(fromType, fromIndex);
     const extra = getExtra(fromType, fromIndex);
 
-    // Remove from old slot
     const rm = (names: string[], setN: (v:string[])=>void, setC: (v:number)=>void, extras: PassengerExtra[], setE: (v:PassengerExtra[])=>void) => {
       const nn = names.filter((_,i)=>i!==fromIndex);
       const ne = extras.filter((_,i)=>i!==fromIndex);
@@ -651,7 +644,6 @@ useEffect(() => {
     if (fromType==="child")   rm(childNames,   setChildNames,   setCountChild,   childExtras,   setChildExtras);
     if (fromType==="infant")  rm(infantNames,  setInfantNames,  setCountInfant,  infantExtras,  setInfantExtras);
 
-    // Add to new slot
     const add = (names: string[], setN: (v:string[])=>void, setC: (v:number)=>void, extras: PassengerExtra[], setE: (v:PassengerExtra[])=>void) => {
       setN([...names, name]); setE([...extras, extra]); setC(names.length+1);
     };
@@ -663,7 +655,7 @@ useEffect(() => {
     if (toType==="infant")  add(infantNames,  setInfantNames,  setCountInfant,  infantExtras,  setInfantExtras);
   }, [adultNames,seniorNames,pwdNames,studentNames,childNames,infantNames,adultExtras,seniorExtras,pwdExtras,studentExtras,childExtras,infantExtras]);
 
-  // â”€â”€ Submit booking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Submit booking
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -685,7 +677,6 @@ useEffect(() => {
           notify_also_email: notifyAlsoEmail.trim() || undefined,
           terms_accepted_at: new Date().toISOString(),
           terms_version:    TERMS_VERSION,
-          // Send effective fare type: waived passengers sent as "adult" so API calculates full fare
           passenger_details: passengerDetails.map(p => ({
             fare_type:   p.waived ? "adult" : p.fare_type,
             full_name:   p.full_name,
@@ -711,7 +702,7 @@ useEffect(() => {
     }
   };
 
-  // â”€â”€ Confirm booking (upload proof) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Confirm booking (upload proof)
   const handleConfirmBooking = async () => {
     setProofError("");
     if (!proofFile) { setProofError("Please select your GCash screenshot first."); return; }
@@ -735,7 +726,7 @@ useEffect(() => {
     }
   };
 
-  // â”€â”€ Render passenger block â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Render passenger block
   const renderBlock = (
     label: string, fareType: string, count: number,
     names: string[], setNames: (v:string[])=>void,
@@ -754,7 +745,7 @@ useEffect(() => {
                 type="text" required
                 value={names[i] ?? ""}
                 onChange={e => { const n=[...names]; n[i]=e.target.value; setNames(n); }}
-                placeholder={`${label} ${i+1} â€” Full Name`}
+                placeholder={`${label} ${i+1} — Full Name`}
                 className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
               />
               <input
@@ -778,7 +769,7 @@ useEffect(() => {
                 onSuggestSwitch={to => switchFareType(fareType, i, to)}
               />
 
-              {/* Waiver decision â€” only for discount types, shown inline before booking */}
+              {/* Waiver decision — only for discount types, shown inline before booking */}
               {requiresId(fareType) && (
                 <IdWaiverCard
                   paxKey={key}
@@ -795,12 +786,12 @@ useEffect(() => {
     );
   };
 
-  // â”€â”€ Auto-fare banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Auto-fare banner
   const autoType = fare ? getAutoFareType(loggedInAge, fare) : "adult";
   const autoFareBanner = autoFareApplied && autoType !== "adult" && loggedInBirthdate ? (
     <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
       <p className="text-sm font-semibold text-blue-900">
-        {autoType === "infant" ? "ðŸ‘¶" : autoType === "child" ? "ðŸ§’" : "ðŸ‘´"}{" "}
+        {autoType === "infant" ? "👶" : autoType === "child" ? "🧒" : "👴"}{" "}
         {autoType.charAt(0).toUpperCase() + autoType.slice(1)} fare applied
       </p>
       <p className="text-xs text-blue-700 mt-1">
@@ -812,7 +803,6 @@ useEffect(() => {
     </div>
   ) : null;
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
@@ -837,7 +827,7 @@ useEffect(() => {
         <div className="p-4">
           {/* Trip summary */}
           <div className="rounded-xl border border-teal-200 bg-[#fef9e7]/50 px-4 py-3 mb-4">
-            <p className="font-semibold text-[#134e4a]">{formatTime(trip.departure_time)} Â· {vesselName}</p>
+            <p className="font-semibold text-[#134e4a]">{formatTime(trip.departure_time)} · {vesselName}</p>
             <p className="text-sm text-[#0f766e]">{routeName}</p>
             <p className="text-xs text-[#0f766e] mt-1">
               {new Date(trip.departure_date + "Z").toLocaleDateString("en-PH", { weekday:"long", month:"short", day:"numeric", year:"numeric" })}
@@ -846,14 +836,12 @@ useEffect(() => {
 
           {autoFareBanner}
 
-          {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-              PAYMENT STEP â€” after booking created
-          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          {/* PAYMENT STEP — after booking created */}
           {result ? (
             <div className="space-y-4">
               {/* Booking confirmed banner */}
               <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4">
-                <p className="font-semibold text-[#134e4a]">âœ“ Booking created</p>
+                <p className="font-semibold text-[#134e4a]">✓ Booking created</p>
                 <p className="mt-1 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
                   Pending payment
                 </p>
@@ -877,8 +865,8 @@ useEffect(() => {
                         {isFree
                           ? <strong>Free</strong>
                           : isDis
-                            ? <>â‚±{(b/100).toLocaleString()} âˆ’ {dp}% = <strong>â‚±{(p.per_person_cents/100).toLocaleString()}</strong></>
-                            : <strong>â‚±{(p.per_person_cents/100).toLocaleString()}</strong>
+                            ? <>₱{(b/100).toLocaleString()} − {dp}% = <strong>₱{(p.per_person_cents/100).toLocaleString()}</strong></>
+                            : <strong>₱{(p.per_person_cents/100).toLocaleString()}</strong>
                         }
                       </span>
                     </div>
@@ -886,13 +874,13 @@ useEffect(() => {
                 })}
                 {result.fare_breakdown?.fare_subtotal_cents != null && (
                   <div className="mt-2 pt-2 border-t border-teal-100 space-y-0.5">
-                    <p className="text-sm text-[#134e4a]">Fare subtotal: â‚±{(result.fare_breakdown.fare_subtotal_cents/100).toLocaleString()}</p>
-                    <p className="text-sm text-[#134e4a]">Platform fee: â‚±{((result.fare_breakdown.admin_fee_cents??0)/100).toLocaleString()}</p>
-                    <p className="text-sm text-[#134e4a]">Processing fee: â‚±{((result.fare_breakdown.gcash_fee_cents??0)/100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">Fare subtotal: ₱{(result.fare_breakdown.fare_subtotal_cents/100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">Platform fee: ₱{((result.fare_breakdown.admin_fee_cents??0)/100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">Processing fee: ₱{((result.fare_breakdown.gcash_fee_cents??0)/100).toLocaleString()}</p>
                   </div>
                 )}
                 <p className="mt-2 pt-2 border-t border-teal-200 text-sm font-bold text-[#134e4a]">
-                  Total: â‚±{(result.total_amount_cents/100).toLocaleString()}
+                  Total: ₱{(result.total_amount_cents/100).toLocaleString()}
                 </p>
               </div>
 
@@ -904,17 +892,17 @@ useEffect(() => {
                 <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
                   <p className="text-xs font-semibold uppercase text-amber-800 mb-1">Pay via GCash</p>
                   <p className="text-sm text-amber-900">
-                    Send <strong>â‚±{(result.total_amount_cents/100).toLocaleString()}</strong> to{" "}
+                    Send <strong>₱{(result.total_amount_cents/100).toLocaleString()}</strong> to{" "}
                     <strong>{GCASH_NUMBER}</strong> ({GCASH_ACCOUNT_NAME}).
                     Include reference <span className="font-mono font-semibold">{result.reference}</span> in the message.
                   </p>
                 </div>
               )}
 
-              {/* ID uploads â€” optional, only for non-waived discount passengers */}
+              {/* ID uploads — optional, only for non-waived discount passengers */}
               {idUploadRequired.length > 0 && (
                 <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 space-y-3">
-                  <p className="text-sm font-bold text-blue-900">ðŸªª Upload Discount IDs (Optional)</p>
+                  <p className="text-sm font-bold text-blue-900">🪪 Upload Discount IDs (Optional)</p>
                   <p className="text-xs text-blue-700">
                     You can upload IDs now or present them at the terminal upon boarding.
                     Discount has already been applied to your fare.
@@ -937,7 +925,7 @@ useEffect(() => {
               {/* Payment proof upload */}
               <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 space-y-2">
                 <p className="text-sm font-semibold text-amber-900">
-                  ðŸ“Ž Upload Payment Proof <span className="text-red-600">*</span>
+                  🔎 Upload Payment Proof <span className="text-red-600">*</span>
                 </p>
                 <p className="text-xs text-amber-700">
                   <strong>Required.</strong> Upload your GCash screenshot showing the reference number.
@@ -947,7 +935,7 @@ useEffect(() => {
                     htmlFor="proof-upload"
                     className="inline-flex min-h-[40px] cursor-pointer items-center rounded-xl border-2 border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 active:bg-amber-100"
                   >
-                    {proofUploaded ? "âœ“ Proof submitted" : "Choose screenshot or PDF"}
+                    {proofUploaded ? "✓ Proof submitted" : "Choose screenshot or PDF"}
                   </label>
                   <input
                     id="proof-upload"
@@ -960,13 +948,13 @@ useEffect(() => {
                   />
                 </div>
                 {proofFile && !proofUploaded && (
-                  <p className="text-xs text-green-700">âœ“ Selected: {proofFile.name}</p>
+                  <p className="text-xs text-green-700">✓ Selected: {proofFile.name}</p>
                 )}
               </div>
 
               {proofError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-                  <p className="text-sm font-semibold text-red-700">âš  {proofError}</p>
+                  <p className="text-sm font-semibold text-red-700">⚠ {proofError}</p>
                 </div>
               )}
 
@@ -976,7 +964,7 @@ useEffect(() => {
                 disabled={proofUploading || proofUploaded}
                 className="w-full min-h-[48px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50"
               >
-                {proofUploading ? "Uploadingâ€¦" : proofUploaded ? "âœ“ Done" : "Confirm Booking"}
+                {proofUploading ? "Uploading…" : proofUploaded ? "✓ Done" : "Confirm Booking"}
               </button>
               <button
                 type="button"
@@ -988,9 +976,7 @@ useEffect(() => {
             </div>
 
           ) : (
-          /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-              BOOKING FORM
-          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+            /* BOOKING FORM */
             <form onSubmit={handleSubmit} className="space-y-4">
 
               {/* Passenger counts */}
@@ -1026,13 +1012,13 @@ useEffect(() => {
               {/* Discount summary */}
               {fare && (
                 <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 space-y-0.5 text-xs text-[#0f766e]">
-                  <p className="font-semibold text-[#134e4a] mb-1">Discounted fares â€” ID required on boarding</p>
-                  <p>â€¢ Senior (60+ yrs): {fare.senior_discount_percent ?? 20}% off</p>
-                  <p>â€¢ PWD: {fare.pwd_discount_percent ?? 20}% off</p>
-                  <p>â€¢ Student: {fare.discount_percent ?? 20}% off â€” school ID required</p>
-                  <p>â€¢ Child ({fare.child_min_age ?? 3}â€“{fare.child_max_age ?? 10} yrs): {fare.child_discount_percent ?? 50}% off</p>
-                  <p>â€¢ Infant (under {fare.infant_max_age ?? 2} yrs): FREE â€” crew verifies on board</p>
-                  <p className="mt-1 text-amber-700 font-medium">If you waive the discount, regular adult fare applies â€” you will see the updated amount before confirming.</p>
+                  <p className="font-semibold text-[#134e4a] mb-1">Discounted fares — ID required on boarding</p>
+                  <p>• Senior (60+ yrs): {fare.senior_discount_percent ?? 20}% off</p>
+                  <p>• PWD: {fare.pwd_discount_percent ?? 20}% off</p>
+                  <p>• Student: {fare.discount_percent ?? 20}% off — school ID required</p>
+                  <p>• Child ({fare.child_min_age ?? 3}–{fare.child_max_age ?? 10} yrs): {fare.child_discount_percent ?? 50}% off</p>
+                  <p>• Infant (under {fare.infant_max_age ?? 2} yrs): FREE — crew verifies on board</p>
+                  <p className="mt-1 text-amber-700 font-medium">If you waive the discount, regular adult fare applies — you will see the updated amount before confirming.</p>
                 </div>
               )}
 
@@ -1042,19 +1028,19 @@ useEffect(() => {
                   <p className="text-xs font-semibold uppercase text-[#0f766e]">Amount breakdown</p>
                   {passengerDetails.map((p, i) => {
                     const cents = effectiveFareCents(base, p.fare_type, p.waived, fare);
-                    const label = p.waived ? `${p.fare_type} (waived â†’ adult)` : p.fare_type;
+                    const lbl = p.waived ? `${p.fare_type} (waived → adult)` : p.fare_type;
                     return (
                       <p key={i} className="text-sm text-[#134e4a]">
-                        {p.full_name || `Passenger ${i+1}`} ({label}): {cents === 0 ? "FREE" : `â‚±${(cents/100).toLocaleString()}`}
+                        {p.full_name || `Passenger ${i+1}`} ({lbl}): {cents === 0 ? "FREE" : `₱${(cents/100).toLocaleString()}`}
                       </p>
                     );
                   })}
                   <div className="pt-1 border-t border-teal-100 space-y-0.5">
-                    <p className="text-sm text-[#134e4a]">Fare subtotal: â‚±{(fareSubtotalCents/100).toLocaleString()}</p>
-                    <p className="text-sm text-[#134e4a]">Platform fee (â‚±{(adminFeePerPax/100).toLocaleString()}/pax): â‚±{(adminFeeCents/100).toLocaleString()}</p>
-                    <p className="text-sm text-[#134e4a]">Processing fee: â‚±{(gcashFee/100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">Fare subtotal: ₱{(fareSubtotalCents/100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">Platform fee (₱{(adminFeePerPax/100).toLocaleString()}/pax): ₱{(adminFeeCents/100).toLocaleString()}</p>
+                    <p className="text-sm text-[#134e4a]">Processing fee: ₱{(gcashFee/100).toLocaleString()}</p>
                     <p className="text-sm font-bold text-[#134e4a] pt-1 border-t border-teal-200">
-                      Total: â‚±{(totalCents/100).toLocaleString()} ({totalPassengers} passenger{totalPassengers!==1?"s":""})
+                      Total: ₱{(totalCents/100).toLocaleString()} ({totalPassengers} passenger{totalPassengers!==1?"s":""})
                     </p>
                   </div>
                 </div>
@@ -1067,7 +1053,7 @@ useEffect(() => {
               {isLoggedIn && savedTravelers.length > 0 && (
                 <div className="rounded-lg border border-teal-200 bg-teal-50/20 px-3 py-2">
                   <p className="text-xs text-[#0f766e]">
-                    ðŸ’¡ You have {savedTravelers.length} saved traveler{savedTravelers.length!==1?"s":""}. Use the dropdowns in each passenger slot to auto-fill.
+                    💡 You have {savedTravelers.length} saved traveler{savedTravelers.length!==1?"s":""}. Use the dropdowns in each passenger slot to auto-fill.
                   </p>
                 </div>
               )}
@@ -1107,7 +1093,7 @@ useEffect(() => {
                     placeholder="email@example.com"
                     className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
                   />
-                  {loggedInEmail && <p className="mt-0.5 text-xs text-[#0f766e]">Using your account email â€” booking appears in My Bookings.</p>}
+                  {loggedInEmail && <p className="mt-0.5 text-xs text-[#0f766e]">Using your account email — booking appears in My Bookings.</p>}
                 </div>
                 <div>
                   <label className="block text-xs text-[#0f766e] mb-1">Mobile Number</label>
@@ -1125,7 +1111,7 @@ useEffect(() => {
                     type="email"
                     value={notifyAlsoEmail}
                     onChange={e => setNotifyAlsoEmail(e.target.value)}
-                    placeholder="Another email â€” e.g. travel partner or family"
+                    placeholder="Another email — e.g. travel partner or family"
                     className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
                   />
                 </div>
@@ -1153,7 +1139,7 @@ useEffect(() => {
 
               {formError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-                  <p className="text-sm font-semibold text-red-700">âš  {formError}</p>
+                  <p className="text-sm font-semibold text-red-700">⚠ {formError}</p>
                 </div>
               )}
 
@@ -1169,7 +1155,7 @@ useEffect(() => {
                   disabled={submitting || totalPassengers < 1 || !termsAccepted}
                   className="flex-1 rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50"
                 >
-                  {submitting ? "Creatingâ€¦" : "Create Booking"}
+                  {submitting ? "Creating…" : "Create Booking"}
                 </button>
               </div>
             </form>
@@ -1179,8 +1165,3 @@ useEffect(() => {
     </div>
   );
 }
-
-
-
-
-
