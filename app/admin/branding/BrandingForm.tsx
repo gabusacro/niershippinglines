@@ -62,7 +62,7 @@ export function BrandingForm({ initial }: { initial: SiteBranding }) {
           type="text"
           value={routesText}
           onChange={(e) => setRoutesText(e.target.value)}
-          placeholder="e.g. Siargao Island ↔ Surigao · Dinagat ↔ Surigao City"
+          placeholder="e.g. Siargao Island ↔ Surigao City · Dinagat ↔ Surigao City"
           className="mt-1 w-full rounded-lg border border-teal-200 px-4 py-2.5 text-[#134e4a] focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30"
         />
         <p className="mt-1 text-xs text-[#0f766e]">Shown under the site name on home, tickets, and emails.</p>

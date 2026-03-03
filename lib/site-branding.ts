@@ -9,7 +9,7 @@ export interface SiteBranding {
 
 const DEFAULT_BRANDING: SiteBranding = {
   site_name: APP_NAME,
-  routes_text: "Siargao Island ↔ Surigao · Dinagat ↔ Surigao City",
+  routes_text: "Siargao Island ↔ Surigao City · Dinagat ↔ Surigao City",
   tagline: "Feel the island before you arrive. Sun, waves, and a smooth sail away.",
 };
 

@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest) {
 
   const updates: Record<string, string> = { updated_at: new Date().toISOString() };
   if (site_name !== undefined) updates.site_name = site_name || "Travela Siargao";
-  if (routes_text !== undefined) updates.routes_text = routes_text || "Siargao Island ↔ Surigao · Dinagat ↔ Surigao City";
+  if (routes_text !== undefined) updates.routes_text = routes_text || "Siargao Island ↔ Surigao City · Dinagat ↔ Surigao City";
   if (tagline !== undefined) updates.tagline = tagline || "Feel the island before you arrive. Sun, waves, and a smooth sail away.";
 
   const { error } = await supabase
