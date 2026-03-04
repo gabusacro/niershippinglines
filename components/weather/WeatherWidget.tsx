@@ -2,118 +2,90 @@
 
 import { useEffect, useState } from "react";
 import { Sun, Wave } from "@/components/icons";
-import { createClient } from "@/lib/supabase/client";
 
 const SIARGAO_LAT = 9.75;
 const SIARGAO_LON = 126.05;
 
-interface WeatherData {
+interface WeatherState {
   temp: number;
   feels_like: number;
   description: string;
-  icon: string;
   humidity: number;
-  wind_speed: number;
-  weather_id: number;
-  pop?: number;
+  wind_speed: number; // km/h
+  wind_dir: string;
+  precip: number; // mm
+  is_day: boolean;
+  weather_code: number;
 }
 
-interface TideData {
-  high_tide_time: string | null;
-  low_tide_time: string | null;
-  entry_date: string;
+function getWeatherDescription(code: number, isDay: boolean): { label: string; emoji: string } {
+  if (code === 0) return { label: isDay ? "Clear sky" : "Clear night", emoji: isDay ? "☀️" : "🌙" };
+  if (code <= 2) return { label: "Partly cloudy", emoji: "⛅" };
+  if (code === 3) return { label: "Overcast", emoji: "☁️" };
+  if (code <= 49) return { label: "Foggy", emoji: "🌫️" };
+  if (code <= 59) return { label: "Drizzle", emoji: "🌦️" };
+  if (code <= 69) return { label: "Rain", emoji: "🌧️" };
+  if (code <= 79) return { label: "Snow / sleet", emoji: "🌨️" };
+  if (code <= 82) return { label: "Rain showers", emoji: "🌦️" };
+  if (code <= 84) return { label: "Heavy showers", emoji: "⛈️" };
+  if (code <= 99) return { label: "Thunderstorm", emoji: "⛈️" };
+  return { label: "Unknown", emoji: "🌡️" };
 }
 
-/** Response from GET /api/tide when WorldTides API is configured */
-interface TideApiData {
-  source: "worldtides";
-  highTideTime: string | null;
-  lowTideTime: string | null;
-  nextLowTideTime: string | null;
-  tideNow: "high" | "low" | null;
-  extremesToday?: { type: "High" | "Low"; time: string }[];
+function getWindDir(deg: number): string {
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return dirs[Math.round(deg / 45) % 8] ?? "N";
 }
 
-function parseTimeToMinutes(t: string | null): number | null {
-  if (!t) return null;
-  const [h, m] = t.split(":").map(Number);
-  if (isNaN(h)) return null;
-  return (h % 24) * 60 + (isNaN(m) ? 0 : m);
-}
-
-function formatTime(t: string | null): string {
-  if (!t) return "—";
-  const [h, m] = t.split(":").map(Number);
-  if (isNaN(h)) return t;
-  const h12 = h % 12 || 12;
-  const ampm = h < 12 ? "AM" : "PM";
-  return `${h12}:${isNaN(m) ? "00" : String(m).padStart(2, "0")} ${ampm}`;
-}
-
-function getTideNow(lowMin: number | null, highMin: number | null, nowMin: number): "high" | "low" | null {
-  if (lowMin == null || highMin == null) return null;
-  const distToLow = Math.min(Math.abs(nowMin - lowMin), Math.abs(nowMin - lowMin + 24 * 60), Math.abs(nowMin - lowMin - 24 * 60));
-  const distToHigh = Math.min(Math.abs(nowMin - highMin), Math.abs(nowMin - highMin + 24 * 60), Math.abs(nowMin - highMin - 24 * 60));
-  return distToLow <= distToHigh ? "low" : "high";
-}
-
-function getWaveLabel(windMs: number): string {
-  if (windMs < 2) return "Calm / Small waves";
-  if (windMs < 5) return "Small–moderate waves";
-  if (windMs < 10) return "Moderate waves";
-  return "Big / choppy waves";
+function getSeaCondition(windKmh: number): { label: string; color: string; safe: boolean } {
+  if (windKmh < 15) return { label: "Calm — good sailing conditions", color: "text-emerald-700", safe: true };
+  if (windKmh < 25) return { label: "Light chop — generally safe", color: "text-emerald-700", safe: true };
+  if (windKmh < 40) return { label: "Moderate waves — exercise caution", color: "text-amber-700", safe: false };
+  if (windKmh < 55) return { label: "Rough seas — small vessels at risk", color: "text-red-700", safe: false };
+  return { label: "Very rough — sailing not advised", color: "text-red-700", safe: false };
 }
 
 export function WeatherWidget() {
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [tide, setTide] = useState<TideData | null>(null);
-  const [tideApi, setTideApi] = useState<TideApiData | null>(null);
+  const [weather, setWeather] = useState<WeatherState | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-
     const load = async () => {
-      if (!key) {
-        setLoading(false);
-        return;
-      }
       try {
-        const [weatherRes, tideRes, supabase] = await Promise.all([
-          fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${SIARGAO_LAT}&lon=${SIARGAO_LON}&appid=${key}&units=metric`),
-          fetch("/api/tide").then((r) => (r.ok ? r.json() : null)).catch(() => null),
-          (async () => {
-            try {
-              return createClient();
-            } catch {
-              return null;
-            }
-          })(),
-        ]);
+        // Open-Meteo: free, no API key, open source
+        const url = [
+          "https://api.open-meteo.com/v1/forecast",
+          `?latitude=${SIARGAO_LAT}&longitude=${SIARGAO_LON}`,
+          "&current=temperature_2m,relative_humidity_2m,apparent_temperature",
+          ",precipitation,weather_code,wind_speed_10m,wind_direction_10m,is_day",
+          "&wind_speed_unit=kmh&timezone=Asia%2FManila",
+        ].join("");
 
-        if (!weatherRes.ok) throw new Error("Weather unavailable");
-        const w = await weatherRes.json();
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("fetch failed");
+        const data = await res.json();
+        const c = data.current;
+
         setWeather({
-          temp: Math.round(w.main.temp),
-          feels_like: Math.round(w.main.feels_like),
-          description: w.weather[0]?.description ?? "",
-          icon: w.weather[0]?.icon ?? "",
-          humidity: w.main.humidity ?? 0,
-          wind_speed: w.wind?.speed ?? 0,
-          weather_id: w.weather[0]?.id ?? 0,
-          pop: w.pop,
+          temp: Math.round(c.temperature_2m),
+          feels_like: Math.round(c.apparent_temperature),
+          humidity: c.relative_humidity_2m,
+          wind_speed: Math.round(c.wind_speed_10m),
+          wind_dir: getWindDir(c.wind_direction_10m),
+          precip: c.precipitation ?? 0,
+          is_day: c.is_day === 1,
+          weather_code: c.weather_code,
+          description: getWeatherDescription(c.weather_code, c.is_day === 1).label,
         });
 
-        if (tideRes?.source === "worldtides") {
-          setTideApi(tideRes);
-        } else if (supabase) {
-          const { data } = await supabase.from("tide_entries").select("entry_date, high_tide_time, low_tide_time").eq("entry_date", today).maybeSingle();
-          if (data) setTide(data);
-        }
+        const now = new Date();
+        setLastUpdated(
+          now.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: true })
+        );
       } catch {
-        setError("Could not load weather");
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -121,126 +93,108 @@ export function WeatherWidget() {
     load();
   }, []);
 
-  if (loading && !weather) {
+  if (loading) {
     return (
-      <div className="rounded-2xl border border-teal-200 bg-white/80 p-4 sm:p-5 animate-pulse">
-        <div className="h-5 w-32 bg-teal-100 rounded mb-3" />
-        <div className="h-8 w-20 bg-teal-100 rounded" />
+      <div className="rounded-2xl border border-teal-200 bg-white/80 p-5 animate-pulse text-center">
+        <div className="h-5 w-40 bg-teal-100 rounded mx-auto mb-3" />
+        <div className="h-10 w-24 bg-teal-100 rounded mx-auto" />
       </div>
     );
   }
 
-  if (error || !weather) return null;
+  if (error || !weather) {
+    return (
+      <div className="rounded-2xl border border-teal-200 bg-white/80 p-5 text-center">
+        <p className="text-sm text-[#0f766e]">Weather data unavailable. Check{" "}
+          <a href="https://www.pagasa.dost.gov.ph" target="_blank" rel="noopener noreferrer"
+            className="font-bold text-[#0c7b93] underline">PAGASA</a> for official forecast.
+        </p>
+      </div>
+    );
+  }
 
-  const iconUrl = `https://openweathermap.org/img/wn/${weather.icon}@2x.png`;
-  const isRain = weather.weather_id >= 500 && weather.weather_id < 600 || weather.description.toLowerCase().includes("rain") || (weather.pop != null && weather.pop > 0.5);
-  const waveLabel = getWaveLabel(weather.wind_speed);
-  const goodSurf = !isRain && weather.wind_speed >= 2 && weather.wind_speed <= 12;
-
-  const now = new Date();
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const useApi = tideApi != null;
-  const highTime = useApi ? tideApi.highTideTime : formatTime(tide?.high_tide_time ?? null);
-  const lowTime = useApi ? tideApi.lowTideTime : formatTime(tide?.low_tide_time ?? null);
-  const tideNow = useApi ? tideApi.tideNow : getTideNow(parseTimeToMinutes(tide?.low_tide_time ?? null) ?? 0, parseTimeToMinutes(tide?.high_tide_time ?? null) ?? 0, nowMin);
-  const nextLowFormatted = useApi ? (tideApi.nextLowTideTime ?? lowTime) : formatTime(tide?.low_tide_time ?? null);
-  const lowMin = parseTimeToMinutes(tide?.low_tide_time ?? null);
-  const goodMagpupungko = (tideNow as string | null) === "low" || (!useApi && lowMin != null && Math.abs(nowMin - lowMin) <= 90);
-
-  const hasTide = useApi || tide != null;
+  const { label, emoji } = getWeatherDescription(weather.weather_code, weather.is_day);
+  const sea = getSeaCondition(weather.wind_speed);
+  const isRain = weather.precip > 0 || weather.weather_code >= 51;
 
   return (
-    <div className="rounded-2xl border border-teal-200 bg-white/80 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-center gap-2 bg-[#0c7b93]/10 px-4 py-2 border-b border-teal-100">
-        <Sun size={18} className="text-[#f59e0b] shrink-0" />
-        <span className="text-sm font-semibold text-[#134e4a]">Siargao Weather & Forecast</span>
+    <div className="rounded-2xl border border-teal-200 bg-white shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-center gap-2 bg-[#0c7b93]/10 px-4 py-2.5 border-b border-teal-100">
+        <Sun size={16} className="text-[#f59e0b] shrink-0" />
+        <span className="text-sm font-bold text-[#134e4a]">Siargao Live Weather</span>
+        {lastUpdated && (
+          <span className="text-xs text-[#0f766e]/60 ml-1">· updated {lastUpdated}</span>
+        )}
       </div>
 
-      <div className="p-4 sm:p-5">
-        {/* Landscape on md+: two columns. Mobile: single column. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          {/* Left: current weather, Rain, Waves */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <img src={iconUrl} alt="" className="w-12 h-12 sm:w-14 sm:h-14 animate-weather-icon" />
-                <div>
-                  <p className="text-2xl sm:text-3xl font-bold text-[#134e4a]">{weather.temp}°C</p>
-                  <p className="text-sm text-[#0f766e] capitalize">{weather.description}</p>
-                  <p className="text-xs text-[#0f766e]/80">Feels like {weather.feels_like}°C · Humidity {weather.humidity}%</p>
-                </div>
-              </div>
-              <div className="text-right text-xs text-[#0f766e]">
-                <p className="font-medium text-[#134e4a]">Wind {weather.wind_speed} m/s</p>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-[#fef9e7] border border-teal-100 p-3">
-              <p className="text-sm font-semibold text-[#134e4a]">Rain</p>
-              <p className="text-sm text-[#0f766e]">{isRain ? "Yes — expect rain." : "No rain expected."}</p>
-            </div>
-
-            <div className="rounded-xl bg-[#fef9e7] border border-teal-100 p-3 flex items-center gap-2">
-              <Wave size={20} className="text-[#0c7b93] shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-[#134e4a]">Waves</p>
-                <p className="text-sm text-[#0f766e]">{waveLabel}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Tide, Surf, Magpupungko */}
-          <div className="space-y-4">
-            <div className="rounded-xl bg-[#fef9e7] border border-teal-100 p-3">
-              <p className="text-sm font-semibold text-[#134e4a]">Tide today</p>
-              {hasTide ? (
-                <>
-                  {useApi && tideApi.extremesToday && tideApi.extremesToday.length > 0 ? (
-                    <div className="text-sm text-[#0f766e] space-y-1">
-                      {tideApi.extremesToday.map((ex, i) => (
-                        <p key={i}>
-                          {ex.type === "High" ? "High" : "Low"} tide — {ex.time}
-                        </p>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-[#0f766e]">
-                      High tide {highTime !== "—" ? highTime : "—"} · Low tide {lowTime !== "—" ? lowTime : "—"}
-                    </p>
-                  )}
-                  <p className="text-sm font-medium text-[#134e4a] mt-1">
-                    Now: {tideNow === "high" ? "High tide" : tideNow === "low" ? "Low tide" : "—"}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-[#0f766e]">Tide times not set for today. Add times in admin.</p>
-              )}
-            </div>
-
-            <div className="rounded-xl bg-[#0c7b93]/10 border border-teal-200 p-3">
-              <p className="text-sm font-semibold text-[#134e4a]">Good time to surf?</p>
-              <p className="text-sm text-[#0f766e]">
-                {goodSurf ? "Yes — conditions are reasonable for surfing." : isRain ? "Rain expected — less ideal." : weather.wind_speed < 2 ? "Very light wind — waves may be small." : "Strong wind — choppy. Check local break."}
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-[#0d9488]/10 border border-teal-200 p-3">
-              <p className="text-sm font-semibold text-[#134e4a]">Magpupungko rock pools</p>
-              <p className="text-sm text-[#0f766e]">
-                Best at low tide so you can see the pools and rocks. {hasTide ? (
-                  goodMagpupungko ? (
-                    <span className="font-medium text-[#0f766e]">Good time to visit today — around low tide.</span>
-                  ) : (
-                    <>Best time today: around {nextLowFormatted} (next low tide).</>
-                  )
-                ) : (
-                  "Add tide times (or WorldTides API key) to see the best time to visit today."
-                )}
-              </p>
-            </div>
+      <div className="p-4 sm:p-5 space-y-4">
+        {/* Main temp row */}
+        <div className="flex items-center justify-center gap-4">
+          <span className="text-5xl">{emoji}</span>
+          <div className="text-center">
+            <p className="text-4xl font-black text-[#134e4a]">{weather.temp}°C</p>
+            <p className="text-sm font-semibold text-[#0f766e] capitalize">{label}</p>
+            <p className="text-xs text-[#0f766e]/70">Feels like {weather.feels_like}°C</p>
           </div>
         </div>
 
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-xl bg-teal-50 border border-teal-100 px-3 py-2.5">
+            <p className="text-xs font-bold text-[#0f766e] uppercase tracking-wide">Humidity</p>
+            <p className="text-lg font-black text-[#134e4a]">{weather.humidity}%</p>
+          </div>
+          <div className="rounded-xl bg-teal-50 border border-teal-100 px-3 py-2.5">
+            <p className="text-xs font-bold text-[#0f766e] uppercase tracking-wide">Wind</p>
+            <p className="text-lg font-black text-[#134e4a]">{weather.wind_speed} <span className="text-sm font-semibold">km/h</span></p>
+            <p className="text-xs text-[#0f766e]">{weather.wind_dir}</p>
+          </div>
+          <div className="rounded-xl bg-teal-50 border border-teal-100 px-3 py-2.5">
+            <p className="text-xs font-bold text-[#0f766e] uppercase tracking-wide">Rain</p>
+            <p className="text-lg font-black text-[#134e4a]">{weather.precip} <span className="text-sm font-semibold">mm</span></p>
+          </div>
+        </div>
+
+        {/* Sea condition banner */}
+        <div className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${
+          sea.safe
+            ? "bg-emerald-50 border-emerald-200"
+            : weather.wind_speed >= 40
+            ? "bg-red-50 border-red-200"
+            : "bg-amber-50 border-amber-200"
+        }`}>
+          <Wave size={20} className={`shrink-0 ${sea.safe ? "text-emerald-600" : weather.wind_speed >= 40 ? "text-red-600" : "text-amber-600"}`} />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#134e4a]">Sea Conditions</p>
+            <p className={`text-sm font-semibold ${sea.color}`}>{sea.label}</p>
+          </div>
+        </div>
+
+        {/* Rain notice */}
+        {isRain && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-center gap-2">
+            <span className="text-lg">🌧️</span>
+            <p className="text-sm font-semibold text-blue-800">
+              Rain expected today — bring a rain jacket and waterproof your bags.
+            </p>
+          </div>
+        )}
+
+        {/* PAGASA official link */}
+        <div className="rounded-xl border border-teal-100 bg-teal-50/60 px-4 py-3 text-center">
+          <p className="text-xs text-[#0f766e] font-semibold">
+            Weather data via{" "}
+            <a href="https://open-meteo.com" target="_blank" rel="noopener noreferrer"
+              className="font-bold text-[#0c7b93] hover:underline">Open-Meteo</a>
+            {" "}· Official PH forecast:{" "}
+            <a href="https://www.pagasa.dost.gov.ph/marine/gale-warning" target="_blank" rel="noopener noreferrer"
+              className="font-bold text-[#0c7b93] hover:underline">PAGASA Gale Warning</a>
+            {" "}·{" "}
+            <a href="https://www.pagasa.dost.gov.ph/weather#daily-weather-forecast" target="_blank" rel="noopener noreferrer"
+              className="font-bold text-[#0c7b93] hover:underline">Daily Forecast</a>
+          </p>
+        </div>
       </div>
     </div>
   );

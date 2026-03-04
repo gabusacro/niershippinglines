@@ -133,16 +133,14 @@ export default async function HomePage() {
 
       {/* ④ WEATHER */}
       <section className="border-t border-teal-200/50 bg-white py-8 sm:py-10">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <p className="text-xs font-extrabold uppercase tracking-widest text-[#0c7b93] mb-1">Live conditions · Siargao</p>
-          <h2 className="text-xl font-black text-[#134e4a] mb-4">Today&apos;s weather</h2>
-          <div className="max-w-4xl">
-            <WeatherWidget />
-          </div>
-          <p className="mt-3 text-sm font-semibold text-[#0f766e]">
-            <Link href={ROUTES.weather} className="font-extrabold text-[#0c7b93] hover:underline">Full weather forecast →</Link>
-          </p>
-        </div>
+      <div className="mx-auto max-w-2xl px-4 sm:px-6 text-center">
+      <p className="text-xs font-extrabold uppercase tracking-widest text-[#0c7b93] mb-1">Live conditions · Siargao</p>
+      <h2 className="text-xl font-black text-[#134e4a] mb-4">Today&apos;s weather</h2>
+      <WeatherWidget />
+      <p className="mt-3 text-sm font-semibold text-[#0f766e]">
+      <Link href={ROUTES.weather} className="font-extrabold text-[#0c7b93] hover:underline">Full weather forecast →</Link>
+      </p>
+      </div>
       </section>
 
       {/* ⑤ DISCOVER SIARGAO */}
