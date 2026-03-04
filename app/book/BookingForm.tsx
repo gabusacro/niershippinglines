@@ -708,7 +708,7 @@ export default function BookingForm({
 
       {/* Trip — now uses actual route data, no more idx-based direction guessing */}
       <div>
-        <label className="block text-sm font-medium text-[#134e4a] mb-1">Trip (vessel, time, route)</label>
+        <label className="block text-sm font-medium text-[#134e4a] mb-1">Trip/s</label>
         <select value={tripId} onChange={e => setTripId(e.target.value)}
           className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
           disabled={loadingTrips || !routeId || !date} required>

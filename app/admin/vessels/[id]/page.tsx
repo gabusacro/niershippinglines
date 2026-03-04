@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { ROUTES } from "@/lib/constants";
 import VesselEditForm from "./VesselEditForm";
-import VesselAddTripsForm from "./VesselAddTripsForm";
 import { TripsTableWithBulkActions } from "./TripsTableWithBulkActions";
 import { PastTripsTable, type PastTrip } from "./PastTripsTable";
 import { DeleteVesselButton } from "../DeleteVesselButton";
@@ -12,8 +11,8 @@ import { CollapsibleSection } from "./CollapsibleSection";
 import { VesselAnnouncementsSection } from "./VesselAnnouncementsSection";
 
 export const metadata = {
-  title: "Edit vessel",
-  description: "Edit vessel — Travela Siargao",
+  title: "Manage vessel",
+  description: "Manage vessel — Travela Siargao",
 };
 
 export const dynamic = "force-dynamic";
@@ -48,7 +47,7 @@ export default async function AdminVesselEditPage({
       .eq("boat_id", id);
     assignments = res.data ?? [];
   } catch {
-    // Table may not exist until migration 007
+    // boat_assignments table may not exist yet
   }
 
   const isAdmin = user.role === "admin";
@@ -86,27 +85,11 @@ export default async function AdminVesselEditPage({
     .order("departure_time", { ascending: false })
     .limit(30);
 
-  const { data: routes } = await supabase
-    .from("routes")
-    .select("id, display_name, origin, destination")
-    .order("display_name");
-
-  let ports: { id: string; name: string }[] = [];
-  try {
-    const res = await supabase.from("ports").select("id, name").order("name");
-    ports = res.data ?? [];
-  } catch {
-    // ports table may not exist
-  }
-
-  // Get all trip IDs
   const pastTripIds = (pastTripsRaw ?? []).map((t) => t.id);
   const allTripIds = [...(upcomingTrips ?? []).map((t) => t.id), ...pastTripIds];
 
-  // Booking aggregates for ALL trips (confirmed passengers count)
   const confirmedByTrip = new Map<string, number>();
 
-  // Financial aggregates for PAST trips only
   type TripFinancials = {
     passengers: number;
     grossFareCents: number;
@@ -123,10 +106,7 @@ export default async function AdminVesselEditPage({
       .in("status", CONFIRMED_STATUSES);
 
     for (const b of confirmedBookings ?? []) {
-      // Confirmed count for all trips
       confirmedByTrip.set(b.trip_id, (confirmedByTrip.get(b.trip_id) ?? 0) + (b.passenger_count ?? 0));
-
-      // Financials for past trips
       if (pastTripIds.includes(b.trip_id)) {
         const cur = financialsByTrip.get(b.trip_id) ?? { passengers: 0, grossFareCents: 0, platformFeeCents: 0, paymentProcessingCents: 0 };
         cur.passengers += b.passenger_count ?? 0;
@@ -138,7 +118,6 @@ export default async function AdminVesselEditPage({
     }
   }
 
-  // Fetch payment status for past trips from trip_fare_payments
   const paymentStatusByTrip = new Map<string, { status: "pending" | "paid" | "failed"; reference: string | null }>();
   if (pastTripIds.length > 0) {
     try {
@@ -146,7 +125,6 @@ export default async function AdminVesselEditPage({
         .from("trip_fare_payments")
         .select("trip_id, status, payment_reference")
         .in("trip_id", pastTripIds);
-
       for (const p of farePayments ?? []) {
         paymentStatusByTrip.set(p.trip_id, {
           status: p.status as "pending" | "paid" | "failed",
@@ -154,7 +132,7 @@ export default async function AdminVesselEditPage({
         });
       }
     } catch {
-      // trip_fare_payments may not exist yet — run migration first
+      // trip_fare_payments may not exist yet
     }
   }
 
@@ -168,15 +146,12 @@ export default async function AdminVesselEditPage({
     return `${h12}:${m ?? "00"} ${am ? "AM" : "PM"}`;
   }
 
-  // Build past trips with financial data
   const pastTrips: PastTrip[] = (pastTripsRaw ?? []).map((t) => {
     const route = Array.isArray((t as { route?: unknown }).route)
       ? ((t as { route: unknown[] }).route[0] as { display_name?: string } | null)
       : ((t as { route?: { display_name?: string } | null }).route ?? null);
-
     const fin = financialsByTrip.get(t.id) ?? { passengers: 0, grossFareCents: 0, platformFeeCents: 0, paymentProcessingCents: 0 };
     const payment = paymentStatusByTrip.get(t.id) ?? { status: "pending" as const, reference: null };
-
     return {
       id: t.id,
       departure_date: t.departure_date,
@@ -202,7 +177,10 @@ export default async function AdminVesselEditPage({
         <div>
           <h1 className="text-2xl font-bold text-[#134e4a]">Manage vessel — {boat.name}</h1>
           <p className="mt-1 text-sm text-[#0f766e]">
-            Edit details, assign schedule, or manage trips. Only <strong>confirmed</strong> passengers block deletion.
+            Edit details, manage trips and announcements. Route schedules are managed in{" "}
+            <Link href={ROUTES.adminVessels} className="font-semibold text-[#0c7b93] hover:underline">
+              Fleet & Schedule
+            </Link>.
           </p>
         </div>
         {isAdmin && (
@@ -255,15 +233,20 @@ export default async function AdminVesselEditPage({
             totalConfirmed={totalConfirmed}
           />
         ) : (
-          <p className="mt-4 text-sm text-[#0f766e]">No upcoming trips. Use the form below to add trips.</p>
+          <p className="mt-4 text-sm text-[#0f766e]">
+            No upcoming trips. Go to{" "}
+            <Link href={ROUTES.adminVessels} className="font-semibold text-[#0c7b93] hover:underline">
+              Fleet & Schedule
+            </Link>{" "}
+            to assign a route and generate trips.
+          </p>
         )}
 
-        {/* Past trips with payment tracking */}
         {pastTrips.length > 0 && (
           <div className="mt-8">
             <h3 className="text-sm font-semibold text-[#134e4a]">Past trips & fare payments</h3>
             <p className="mt-0.5 text-xs text-[#0f766e]">
-              Mark each trip as paid after transferring the gross fare to the vessel owner. Platform fees are deducted from the payout shown.
+              Mark each trip as paid after transferring the gross fare to the vessel owner.
             </p>
             <PastTripsTable
               boatId={boat.id}
@@ -274,6 +257,7 @@ export default async function AdminVesselEditPage({
         )}
       </section>
 
+      {/* Announcements */}
       <CollapsibleSection
         title="Announcements & updates"
         description="Post schedule or trip updates for passengers."
@@ -286,39 +270,32 @@ export default async function AdminVesselEditPage({
         />
       </CollapsibleSection>
 
+      {/* Vessel details — admin only */}
       {isAdmin && (
-        <>
-          <CollapsibleSection
-            title="Vessel details & assign schedule"
-            description="Assign this vessel to one route for a date range."
-          >
-            <VesselEditForm
-              boatId={boat.id}
-              initialName={boat.name}
-              initialCapacity={boat.capacity}
-              initialOnlineQuota={boat.online_quota}
-              initialStatus={boat.status}
-              initialImageUrl={boat.image_url}
-              assignments={assignments}
-              routes={routes ?? []}
-              ports={ports}
-            />
-          </CollapsibleSection>
-
-          <CollapsibleSection
-            title="Add more trips"
-            description="Add another route and date range."
-          >
-            <VesselAddTripsForm boatId={boat.id} routes={routes ?? []} ports={ports} />
-          </CollapsibleSection>
-        </>
+        <CollapsibleSection
+          title="Vessel details"
+          description="Edit vessel name, capacity, image and status."
+        >
+          <VesselEditForm
+            boatId={boat.id}
+            initialName={boat.name}
+            initialCapacity={boat.capacity}
+            initialOnlineQuota={boat.online_quota}
+            initialStatus={boat.status}
+            initialImageUrl={boat.image_url}
+          />
+        </CollapsibleSection>
       )}
 
       <div className="mt-8">
-        <Link href={ROUTES.adminVessels} className="text-sm font-semibold text-[#0c7b93] hover:underline">
-          ← Back to vessels
+        <Link
+          href={ROUTES.adminVessels}
+          className="text-sm font-semibold text-[#0c7b93] hover:underline"
+        >
+          ← Back to Fleet & Schedule
         </Link>
       </div>
     </div>
   );
 }
+

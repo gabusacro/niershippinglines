@@ -28,7 +28,7 @@ export default async function AdminVesselsPage() {
   // Get all boats
   let boatsQuery = supabase
     .from("boats")
-    .select("id, name, capacity, online_quota, status, image_url, marina_number")
+    .select("id, name, capacity, online_quota, status, booking_suspended, image_url, marina_number")
     .order("name");
 
   // Captains only see their assigned boats
@@ -131,6 +131,7 @@ export default async function AdminVesselsPage() {
       capacity: boat.capacity,
       online_quota: boat.online_quota,
       status: boat.status,
+      booking_suspended: boat.booking_suspended ?? false,
       image_url: boat.image_url ?? null,
       marina_number: boat.marina_number ?? null,
       upcomingTripCount: tripCountByBoat.get(boat.id) ?? 0,
@@ -154,6 +155,7 @@ export default async function AdminVesselsPage() {
       crew: boatCrew,
     };
   });
+
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">

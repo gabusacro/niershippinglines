@@ -20,7 +20,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let body: { name?: string; capacity?: number; online_quota?: number; status?: string; image_url?: string | null };
+  let body: { name?: string; capacity?: number; online_quota?: number; status?: string; image_url?: string | null; booking_suspended?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -33,7 +33,7 @@ export async function PATCH(
   if (typeof body.online_quota === "number" && body.online_quota >= 0) updates.online_quota = body.online_quota;
   if (body.status === "running" || body.status === "maintenance") updates.status = body.status;
   if (body.image_url !== undefined) updates.image_url = typeof body.image_url === "string" ? body.image_url.trim() || null : null;
-
+  if (typeof body.booking_suspended === "boolean") updates.booking_suspended = body.booking_suspended;
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
