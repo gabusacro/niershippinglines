@@ -40,8 +40,10 @@ function BookingModal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-      onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      onClick={onClose}
+    >
       <div className="absolute inset-0 bg-[#085C52]/80 backdrop-blur-md" />
       <div
         className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
@@ -56,8 +58,11 @@ function BookingModal({
               {vesselName} · Departs {trip.departureTime}
             </p>
           </div>
-          <button type="button" onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-100 text-[#134e4a] transition-all hover:bg-teal-200 font-bold text-lg">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-100 text-[#134e4a] transition-all hover:bg-teal-200 font-bold text-lg"
+          >
             ×
           </button>
         </div>
@@ -68,7 +73,9 @@ function BookingModal({
             <span className="text-2xl">🚢</span>
             <div>
               <p className="font-black text-[#134e4a] text-sm">{trip.departureTime}</p>
-              <p className="text-xs font-semibold text-[#0f766e]">{trip.routeOrigin} → {trip.routeDestination}</p>
+              <p className="text-xs font-semibold text-[#0f766e]">
+                {trip.routeOrigin} → {trip.routeDestination}
+              </p>
             </div>
           </div>
 
@@ -91,7 +98,9 @@ function BookingModal({
           <div className="flex gap-3 rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3">
             <span className="text-lg shrink-0">🖨️</span>
             <p className="text-xs font-semibold text-amber-800 leading-relaxed">
-              Print or save your QR ticket on your phone. A separate <strong>gate pass fee</strong> is collected at the port — <strong>not included</strong> in your fare. Prepare cash.
+              Print or save your QR ticket on your phone. A separate{" "}
+              <strong>gate pass fee</strong> is collected at the port —{" "}
+              <strong>not included</strong> in your fare. Prepare cash.
             </p>
           </div>
 
@@ -132,7 +141,7 @@ export function ScheduleSectionClient({
       )}
 
       <section id="schedule" className="border-t border-teal-200/50 bg-white py-10 sm:py-14">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
 
           {/* Header */}
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -151,72 +160,80 @@ export function ScheduleSectionClient({
             </Link>
           </div>
 
-          {/* Vessel cards */}
+          {/* Vessel cards — 2 col on desktop, 1 col on mobile */}
           {schedule.length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-teal-200 bg-teal-50/50 py-12 text-center">
               <p className="text-sm font-semibold text-[#0f766e]">No schedule data yet. Check back soon!</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="grid gap-5 sm:grid-cols-2">
               {schedule.map((vessel) => (
                 <div
                   key={vessel.vesselId}
-                  className="overflow-hidden rounded-2xl border-2 border-teal-100 bg-white shadow-sm"
+                  className="overflow-hidden rounded-2xl border-2 border-teal-100 bg-white shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md flex flex-col"
                 >
-                  {/* Vessel header */}
-                  <div className="flex items-center gap-4 px-5 py-4 border-b border-teal-100 bg-[#f8fffe]">
-                    {vessel.vesselImageUrl ? (
+                  {/* Big landscape photo */}
+                  {vessel.vesselImageUrl ? (
+                    <div className="h-44 w-full overflow-hidden">
                       <img
                         src={vessel.vesselImageUrl}
                         alt={vessel.vesselName}
-                        className="h-14 w-20 rounded-xl object-cover border border-teal-100 shrink-0"
+                        className="h-full w-full object-cover"
                       />
-                    ) : (
-                      <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#085C52] to-[#0c7b93]">
-                        <span className="text-3xl">🚢</span>
-                      </div>
-                    )}
+                    </div>
+                  ) : (
+                    <div className="flex h-44 w-full items-center justify-center bg-gradient-to-br from-[#085C52] to-[#0c7b93]">
+                      <span className="text-6xl">🚢</span>
+                    </div>
+                  )}
+
+                  {/* Vessel name + Daily badge */}
+                  <div className="flex items-center justify-between px-5 pt-4 pb-2">
                     <div>
                       <p className="text-xs font-extrabold uppercase tracking-widest text-[#0c7b93]">Vessel</p>
                       <p className="font-black text-[#134e4a] text-lg leading-tight">{vessel.vesselName}</p>
-                      <span className="inline-block mt-0.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-emerald-700">
-                        Daily
-                      </span>
                     </div>
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-emerald-700">
+                      Daily
+                    </span>
                   </div>
 
-                  {/* Trip slots */}
-                  <div className="divide-y divide-teal-50">
+                  {/* Divider */}
+                  <div className="mx-5 border-t border-teal-100" />
+
+                  {/* Trip rows */}
+                  <div className="flex flex-col divide-y divide-teal-50 flex-1">
                     {vessel.trips.map((trip, i) => (
                       <div
                         key={`${trip.routeId}-${i}`}
-                        className="flex items-center gap-3 px-5 py-3.5 hover:bg-teal-50/40 transition-colors"
+                        className="flex items-center gap-3 px-5 py-3 hover:bg-teal-50/40 transition-colors"
                       >
                         {/* Time */}
-                        <div className="shrink-0 w-20">
-                          <p className="text-base font-black text-[#134e4a]">{trip.departureTime}</p>
-                        </div>
+                        <span className="shrink-0 w-[72px] text-base font-black text-[#134e4a]">
+                          {trip.departureTime}
+                        </span>
 
                         {/* Route */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-[#0f766e] leading-tight truncate">
-                            {trip.routeOrigin}
-                            <span className="mx-1.5 text-[#0c7b93]">→</span>
-                            {trip.routeDestination}
-                          </p>
-                        </div>
+                        <span className="flex-1 min-w-0 text-sm font-semibold text-[#0f766e] leading-tight">
+                          {trip.routeOrigin}
+                          <span className="mx-1 text-[#0c7b93] font-bold">→</span>
+                          {trip.routeDestination}
+                        </span>
 
                         {/* Book button */}
                         <button
                           type="button"
                           onClick={() => setModalData({ trip, vesselName: vessel.vesselName })}
-                          className="shrink-0 rounded-xl bg-[#0c7b93] px-4 py-2 text-xs font-extrabold text-white transition-all hover:bg-[#0f766e] hover:-translate-y-0.5 shadow-sm"
+                          className="shrink-0 rounded-xl bg-[#0c7b93] px-3.5 py-2 text-xs font-extrabold text-white transition-all hover:bg-[#0f766e] hover:-translate-y-0.5 shadow-sm"
                         >
                           🎫 Book
                         </button>
                       </div>
                     ))}
                   </div>
+
+                  {/* Bottom padding */}
+                  <div className="pb-2" />
                 </div>
               ))}
             </div>
@@ -251,10 +268,25 @@ export function ScheduleSectionClient({
           <div className="mt-6 rounded-2xl border-2 border-teal-100 bg-teal-50/60 p-5">
             <p className="mb-3 text-xs font-extrabold uppercase tracking-widest text-[#0c7b93]">📋 Good to know</p>
             <ul className="flex flex-col gap-2 text-sm font-semibold text-[#0f766e]">
-              <li className="flex items-start gap-2"><span className="text-[#0c7b93] mt-0.5 shrink-0">•</span>Arrive at the pier at least 30 minutes before departure.</li>
-              <li className="flex items-start gap-2"><span className="text-[#0c7b93] mt-0.5 shrink-0">•</span>Schedules can change due to weather or sea conditions.</li>
-              <li className="flex items-start gap-2"><span className="text-[#0c7b93] mt-0.5 shrink-0">•</span><span>A separate <strong className="text-[#134e4a]">gate pass fee</strong> is collected at the port — not included in your ferry fare. Prepare cash.</span></li>
-              <li className="flex items-start gap-2"><span className="text-[#0c7b93] mt-0.5 shrink-0">•</span>Print your e-ticket or save the QR code on your phone. It will be scanned at the pier.</li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#0c7b93] mt-0.5 shrink-0">•</span>
+                Arrive at the pier at least 30 minutes before departure.
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#0c7b93] mt-0.5 shrink-0">•</span>
+                Schedules can change due to weather or sea conditions.
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#0c7b93] mt-0.5 shrink-0">•</span>
+                <span>
+                  A separate <strong className="text-[#134e4a]">gate pass fee</strong> is
+                  collected at the port — not included in your ferry fare. Prepare cash.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#0c7b93] mt-0.5 shrink-0">•</span>
+                Print your e-ticket or save the QR code on your phone. It will be scanned at the pier.
+              </li>
             </ul>
           </div>
 
