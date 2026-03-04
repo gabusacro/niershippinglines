@@ -243,12 +243,12 @@ export function WeatherWidget() {
             <p className="text-xs font-bold uppercase tracking-wide text-[#134e4a]">Magpupungko Rock Pools</p>
           </div>
           <p className="text-sm font-semibold text-[#0f766e]">
-            Best visited at <strong className="text-[#134e4a]">low tide</strong> — natural rock pools are only visible and swimmable during low tide.
+            Best visited at <strong className="text-[#134e4a]">low tide</strong> — natural rock pools are only visible during low tide.
           </p>
           <p className="text-xs text-[#0f766e]/80 mt-1">
             Check tide times at{" "}
-            <a href="https://tides.net/asia/philippines/siargao" target="_blank" rel="noopener noreferrer"
-              className="font-bold text-[#0c7b93] hover:underline">tides.net</a>
+            <a href="https://www.tideschart.com/Philippines/Caraga/Province-of-Surigao-del-Norte/Port-Pilar-(Siargao-Island)/" target="_blank" rel="noopener noreferrer"
+              className="font-bold text-[#0c7b93] hover:underline">tideschart.com</a>
             {" "}or ask your hotel before heading out.
           </p>
         </div>
