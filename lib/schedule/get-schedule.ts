@@ -30,126 +30,128 @@ function formatTimeForDisplay(t: string): string {
   return `${h12}:${m} ${am ? "AM" : "PM"}`;
 }
 
-type VesselInfo = { boatId: string; name: string; image_url: string | null };
-
 /**
- * Returns route IDs that have at least one upcoming trip with a boat in "running" status,
- * and one representative vessel (id, name, image_url) per route for display.
- */
-async function getRouteIdsWithAvailableVessels(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<{ routeIds: Set<string>; vesselByRouteId: Map<string, VesselInfo> }> {
-  const today = new Date().toISOString().slice(0, 10);
-  const { data: trips } = await supabase
-    .from("trips")
-    .select("route_id, boat:boats(id, name, status, image_url)")
-    .gte("departure_date", today);
-
-  const routeIds = new Set<string>();
-  const vesselByRouteId = new Map<string, VesselInfo>();
-  if (!trips?.length) return { routeIds, vesselByRouteId };
-
-  for (const t of trips) {
-    const row = t as { route_id: string; boat?: { id?: string; name?: string; status?: string; image_url?: string | null } | null };
-    const boat = row.boat;
-    if (boat?.status === "running" && boat?.id) {
-      routeIds.add(row.route_id);
-      if (!vesselByRouteId.has(row.route_id) && boat.name) {
-        vesselByRouteId.set(row.route_id, {
-          boatId: boat.id,
-          name: boat.name,
-          image_url: boat.image_url ?? null,
-        });
-      }
-    }
-  }
-  return { routeIds, vesselByRouteId };
-}
-
-/**
- * Fetches schedule from Supabase: each route with its active departure times (from schedule_slots).
- * Only includes routes that have at least one upcoming trip with a vessel in "running" status.
+ * Fetches schedule: one card per vessel per route.
+ * Each vessel only shows its own departure times — no mixing across vessels.
  */
 export async function getScheduleFromSupabase(): Promise<ScheduleRow[]> {
   const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
 
-  const [{ routeIds: routeIdsWithVessels, vesselByRouteId }, slotsResult] = await Promise.all([
-    getRouteIdsWithAvailableVessels(supabase),
-    supabase
-      .from("schedule_slots")
-      .select("route_id, departure_time")
-      .eq("is_active", true)
-      .order("departure_time"),
-  ]);
+  // Step 1: Get active vessel-route assignments for today
+  const { data: assignments } = await supabase
+    .from("vessel_route_assignments")
+    .select("id, boat_id, route_id, available_from, available_until, is_active")
+    .eq("is_active", true)
+    .lte("available_from", today)
+    .gte("available_until", today);
 
-  const { data: slots, error: slotsError } = slotsResult;
-  if (slotsError || !slots?.length) {
-    return [];
-  }
+  if (!assignments?.length) return [];
 
-  const routeIds = [...new Set(slots.map((s) => s.route_id))].filter((id) => routeIdsWithVessels.has(id));
-  if (routeIds.length === 0) return [];
+  // Step 2: Get boats for those assignments — running only
+  const boatIds = [...new Set(assignments.map((a) => a.boat_id as string))];
+  const routeIds = [...new Set(assignments.map((a) => a.route_id as string))];
 
-  const boatIds = [...new Set([...vesselByRouteId.values()].map((v) => v.boatId))];
-  const { data: boatImagesRows } = boatIds.length > 0
-    ? await supabase
-        .from("boat_images")
-        .select("boat_id, image_url, sort_order")
-        .in("boat_id", boatIds)
-        .order("sort_order")
-    : { data: [] };
-  const imagesByBoatId = new Map<string, string[]>();
-  for (const row of boatImagesRows ?? []) {
-    const r = row as { boat_id: string; image_url: string; sort_order: number };
-    const arr = imagesByBoatId.get(r.boat_id) ?? [];
-    arr.push(r.image_url);
-    imagesByBoatId.set(r.boat_id, arr);
-  }
+  const { data: boats } = await supabase
+    .from("boats")
+    .select("id, name, status, image_url, booking_suspended")
+    .in("id", boatIds)
+    .eq("status", "running");
 
-  const { data: routes, error: routesError } = await supabase
+  if (!boats?.length) return [];
+
+  const runningBoatIds = new Set(boats.map((b) => b.id));
+  const boatById = new Map(boats.map((b) => [b.id, b]));
+
+  // Step 3: Get routes
+  const { data: routes } = await supabase
     .from("routes")
     .select("id, origin, destination, display_name")
-    .in("id", routeIds)
-    .order("display_name");
+    .in("id", routeIds);
 
-  if (routesError || !routes?.length) {
-    return [];
-  }
+  if (!routes?.length) return [];
+  const routeById = new Map(routes.map((r) => [r.id, r]));
 
-  const slotsByRouteId = new Map<string, { time: string; formatted: string }[]>();
-  for (const s of slots) {
-    if (!routeIdsWithVessels.has(s.route_id)) continue;
-    const timeStr = typeof s.departure_time === "string" ? s.departure_time : "";
-    const formatted = formatTimeForDisplay(timeStr);
+  // Step 4: Get active schedule slots for these boat+route combos
+  const { data: slots } = await supabase
+    .from("schedule_slots")
+    .select("boat_id, route_id, departure_time, is_active")
+    .in("boat_id", boatIds)
+    .in("route_id", routeIds)
+    .eq("is_active", true)
+    .order("departure_time");
+
+  if (!slots?.length) return [];
+
+  // Step 5: Group slots by vessel+route key
+  type SlotGroup = {
+    boatId: string;
+    routeId: string;
+    times: { raw: string; formatted: string }[];
+  };
+
+  const groups = new Map<string, SlotGroup>();
+
+  for (const slot of slots) {
+    const boatId = slot.boat_id as string;
+    const routeId = slot.route_id as string;
+
+    // Only include running boats that have an active assignment today
+    if (!runningBoatIds.has(boatId)) continue;
+    const hasAssignment = assignments.some(
+      (a) => a.boat_id === boatId && a.route_id === routeId
+    );
+    if (!hasAssignment) continue;
+
+    const formatted = formatTimeForDisplay(slot.departure_time as string);
     if (!formatted) continue;
-    const arr = slotsByRouteId.get(s.route_id) ?? [];
-    arr.push({ time: timeStr, formatted });
-    slotsByRouteId.set(s.route_id, arr);
+
+    const key = `${boatId}::${routeId}`;
+    if (!groups.has(key)) {
+      groups.set(key, { boatId, routeId, times: [] });
+    }
+    groups.get(key)!.times.push({ raw: slot.departure_time as string, formatted });
   }
 
-  return routes.map((r) => {
-    const vessel = vesselByRouteId.get(r.id);
-    const mainUrl = vessel?.image_url ?? null;
-    const extraUrls = vessel ? (imagesByBoatId.get(vessel.boatId) ?? []) : [];
-    const vesselImageUrls = mainUrl ? [mainUrl, ...extraUrls] : extraUrls;
-    const slotList = slotsByRouteId.get(r.id) ?? [];
-    const times = slotList.map((s) => s.formatted);
-    const origin = r.origin ?? "";
-    const destination = r.destination ?? "";
-    const timesWithDirection: TimeWithDirection[] = slotList.map((s, idx) => ({
-      time: s.formatted,
-      directionLabel: idx === 0 ? `${origin} → ${destination}` : `${destination} → ${origin}`,
+  if (groups.size === 0) return [];
+
+  // Step 6: Build ScheduleRow per group
+  const rows: ScheduleRow[] = [];
+
+  for (const group of groups.values()) {
+    if (group.times.length === 0) continue;
+
+    const boat = boatById.get(group.boatId);
+    const route = routeById.get(group.routeId);
+    if (!boat || !route) continue;
+
+    const origin = (route.origin as string) ?? "";
+    const destination = (route.destination as string) ?? "";
+    const times = group.times.map((t) => t.formatted);
+
+    const timesWithDirection: TimeWithDirection[] = group.times.map((t) => ({
+      time: t.formatted,
+      directionLabel: `${origin} → ${destination}`,
     }));
-    return {
-      routeId: r.id,
-      routeDisplayName: r.display_name,
+
+    rows.push({
+      routeId: group.routeId,
+      routeDisplayName: (route.display_name as string) ?? `${origin} → ${destination}`,
       routeOrigin: origin,
       routeDestination: destination,
       times,
       timesWithDirection,
-      vesselImageUrl: mainUrl,
-      vesselImageUrls: vesselImageUrls.length > 0 ? vesselImageUrls : undefined,
-      vesselName: vessel?.name,
-    };
-  }).filter((row) => row.times.length > 0);
+      vesselImageUrl: (boat.image_url as string | null) ?? null,
+      vesselName: boat.name as string,
+    });
+  }
+
+  // Sort by route display name then first departure time
+  rows.sort((a, b) => {
+    const rc = a.routeDisplayName.localeCompare(b.routeDisplayName);
+    if (rc !== 0) return rc;
+    return (a.times[0] ?? "").localeCompare(b.times[0] ?? "");
+  });
+
+  return rows;
 }
