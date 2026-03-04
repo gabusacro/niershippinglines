@@ -64,11 +64,7 @@ export default async function HomePage() {
 
           {/* Quick trip checker */}
           <TripCheckerForm
-            routes={schedule.map((r) => ({
-              routeId: r.routeId,
-              routeOrigin: r.routeOrigin,
-              routeDestination: r.routeDestination,
-            }))}
+            routes={schedule.flatMap((v) => v.trips.map((t) => ({ routeId: t.routeId, routeOrigin: t.routeOrigin, routeDestination: t.routeDestination }))).filter((r, i, arr) => arr.findIndex((x) => x.routeId === r.routeId) === i)}
             today={today}
           />
 

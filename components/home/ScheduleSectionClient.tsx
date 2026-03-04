@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { ScheduleRow } from "@/lib/schedule/get-schedule";
+import type { VesselScheduleRow, TripSlot } from "@/lib/schedule/get-schedule";
 import type { AnnouncementDisplay } from "@/lib/announcements/get-announcements";
 import { ROUTES } from "@/lib/constants";
 
@@ -15,13 +15,15 @@ function formatRelativeTime(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-// ─── Booking Modal ──────────────────────────────────────────────────────────
+// ─── Booking Modal ────────────────────────────────────────────────────────────
 function BookingModal({
-  route,
+  trip,
+  vesselName,
   today,
   onClose,
 }: {
-  route: ScheduleRow;
+  trip: TripSlot;
+  vesselName: string;
   today: string;
   onClose: () => void;
 }) {
@@ -31,11 +33,15 @@ function BookingModal({
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", handler);
     document.body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", handler); document.body.style.overflow = ""; };
-  }, []);
+    return () => {
+      document.removeEventListener("keydown", handler);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      onClick={onClose}>
       <div className="absolute inset-0 bg-[#085C52]/80 backdrop-blur-md" />
       <div
         className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
@@ -45,16 +51,27 @@ function BookingModal({
         <div className="flex items-center justify-between border-b border-teal-100 bg-[#f8fffe] px-5 py-4">
           <div>
             <p className="text-xs font-extrabold uppercase tracking-widest text-[#0c7b93]">Book a ferry</p>
-            <p className="mt-0.5 font-black text-[#134e4a] leading-tight">{route.routeDisplayName}</p>
-            {route.vesselName && <p className="text-xs font-semibold text-[#0f766e]">{route.vesselName}</p>}
+            <p className="mt-0.5 font-black text-[#134e4a] leading-tight">{trip.routeDisplayName}</p>
+            <p className="text-xs font-semibold text-[#0f766e]">
+              {vesselName} · Departs {trip.departureTime}
+            </p>
           </div>
           <button type="button" onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-100 text-[#134e4a] transition-all hover:bg-teal-200 font-bold">
-            ✕
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-100 text-[#134e4a] transition-all hover:bg-teal-200 font-bold text-lg">
+            ×
           </button>
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Trip summary */}
+          <div className="rounded-xl border border-teal-200 bg-teal-50/60 px-4 py-3 flex items-center gap-3">
+            <span className="text-2xl">🚢</span>
+            <div>
+              <p className="font-black text-[#134e4a] text-sm">{trip.departureTime}</p>
+              <p className="text-xs font-semibold text-[#0f766e]">{trip.routeOrigin} → {trip.routeDestination}</p>
+            </div>
+          </div>
+
           {/* Date picker */}
           <div>
             <label className="mb-2 block text-xs font-extrabold uppercase tracking-widest text-[#6B8886]">
@@ -70,33 +87,17 @@ function BookingModal({
             />
           </div>
 
-          {/* Departure times */}
-          <div>
-            <label className="mb-2 block text-xs font-extrabold uppercase tracking-widest text-[#6B8886]">
-              Departure times
-            </label>
-            <div className="flex flex-col gap-2">
-              {(route.timesWithDirection ?? route.times.map((t) => ({ time: t, directionLabel: t }))).map((tw, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-xl border border-teal-100 bg-[#f8fffe] px-3 py-2.5">
-                  <span className="min-w-[76px] text-base font-black text-[#134e4a]">{tw.time}</span>
-                  <span className="text-[#0c7b93] font-bold">→</span>
-                  <span className="text-sm font-semibold text-[#0f766e] leading-tight">{tw.directionLabel}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Gate pass notice */}
           <div className="flex gap-3 rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3">
             <span className="text-lg shrink-0">🖨️</span>
             <p className="text-xs font-semibold text-amber-800 leading-relaxed">
-              Print or save your QR ticket on your phone. A separate <strong>gate pass fee</strong> is collected at the port — this is <strong>not included</strong> in your fare. Please prepare cash.
+              Print or save your QR ticket on your phone. A separate <strong>gate pass fee</strong> is collected at the port — <strong>not included</strong> in your fare. Prepare cash.
             </p>
           </div>
 
           {/* CTA */}
           <Link
-            href={`${ROUTES.book}?route_id=${encodeURIComponent(route.routeId)}&date=${encodeURIComponent(selectedDate)}`}
+            href={`${ROUTES.book}?route_id=${encodeURIComponent(trip.routeId)}&date=${encodeURIComponent(selectedDate)}`}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0c7b93] py-3.5 text-base font-black text-white shadow-md transition-all hover:bg-[#0f766e] hover:-translate-y-0.5"
           >
             🎫 Continue to booking →
@@ -107,26 +108,31 @@ function BookingModal({
   );
 }
 
-// ─── Main ScheduleSection client component ──────────────────────────────────
+// ─── Main ScheduleSection client component ────────────────────────────────────
 export function ScheduleSectionClient({
   schedule,
   announcements,
   today,
 }: {
-  schedule: ScheduleRow[];
+  schedule: VesselScheduleRow[];
   announcements: AnnouncementDisplay[];
   today: string;
 }) {
-  const [modalRoute, setModalRoute] = useState<ScheduleRow | null>(null);
+  const [modalData, setModalData] = useState<{ trip: TripSlot; vesselName: string } | null>(null);
 
   return (
     <>
-      {modalRoute && (
-        <BookingModal route={modalRoute} today={today} onClose={() => setModalRoute(null)} />
+      {modalData && (
+        <BookingModal
+          trip={modalData.trip}
+          vesselName={modalData.vesselName}
+          today={today}
+          onClose={() => setModalData(null)}
+        />
       )}
 
       <section id="schedule" className="border-t border-teal-200/50 bg-white py-10 sm:py-14">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6">
 
           {/* Header */}
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -151,60 +157,65 @@ export function ScheduleSectionClient({
               <p className="text-sm font-semibold text-[#0f766e]">No schedule data yet. Check back soon!</p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {schedule.map((row) => (
+            <div className="flex flex-col gap-4">
+              {schedule.map((vessel) => (
                 <div
-                  key={row.routeId}
-                  className="overflow-hidden rounded-2xl border-2 border-teal-100 bg-white shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md"
+                  key={vessel.vesselId}
+                  className="overflow-hidden rounded-2xl border-2 border-teal-100 bg-white shadow-sm"
                 >
-                  {/* Vessel photo */}
-                  {row.vesselImageUrl ? (
-                    <div className="h-36 w-full overflow-hidden">
-                      <img src={row.vesselImageUrl} alt={row.vesselName ?? "Vessel"}
-                        className="h-full w-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="flex h-36 w-full items-center justify-center bg-gradient-to-br from-[#085C52] to-[#0c7b93]">
-                      <span className="text-5xl">🚢</span>
-                    </div>
-                  )}
-
-                  <div className="p-5">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="min-w-0">
-                        {row.vesselName && (
-                          <p className="text-xs font-extrabold uppercase tracking-widest text-[#0c7b93]">
-                            {row.vesselName}
-                          </p>
-                        )}
-                        <p className="mt-0.5 font-black text-[#134e4a] leading-tight">{row.routeDisplayName}</p>
+                  {/* Vessel header */}
+                  <div className="flex items-center gap-4 px-5 py-4 border-b border-teal-100 bg-[#f8fffe]">
+                    {vessel.vesselImageUrl ? (
+                      <img
+                        src={vessel.vesselImageUrl}
+                        alt={vessel.vesselName}
+                        className="h-14 w-20 rounded-xl object-cover border border-teal-100 shrink-0"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#085C52] to-[#0c7b93]">
+                        <span className="text-3xl">🚢</span>
                       </div>
-                      <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-emerald-700">
+                    )}
+                    <div>
+                      <p className="text-xs font-extrabold uppercase tracking-widest text-[#0c7b93]">Vessel</p>
+                      <p className="font-black text-[#134e4a] text-lg leading-tight">{vessel.vesselName}</p>
+                      <span className="inline-block mt-0.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-emerald-700">
                         Daily
                       </span>
                     </div>
+                  </div>
 
-                    {/* Times */}
-                    <div className="flex flex-col gap-2">
-                      {(row.timesWithDirection ?? row.times.map((t) => ({ time: t, directionLabel: t }))).map((tw, i) => (
-                        <div key={i} className="flex items-center gap-3 rounded-xl border border-teal-100 bg-[#f8fffe] px-3 py-2.5">
-                          <span className="min-w-[72px] text-base font-black text-[#134e4a]">{tw.time}</span>
-                          <span className="text-[#0c7b93] font-bold">→</span>
-                          <span className="text-sm font-semibold text-[#0f766e] leading-tight">{tw.directionLabel}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Book button — opens modal */}
-                    <div className="mt-4 pt-3 border-t border-teal-100">
-                      <button
-                        type="button"
-                        onClick={() => setModalRoute(row)}
-                        className="block w-full rounded-xl bg-[#0c7b93] py-2.5 text-center text-sm font-extrabold text-white transition-all hover:bg-[#0f766e] hover:-translate-y-0.5"
+                  {/* Trip slots */}
+                  <div className="divide-y divide-teal-50">
+                    {vessel.trips.map((trip, i) => (
+                      <div
+                        key={`${trip.routeId}-${i}`}
+                        className="flex items-center gap-3 px-5 py-3.5 hover:bg-teal-50/40 transition-colors"
                       >
-                        🎫 Book this vessel
-                      </button>
-                    </div>
+                        {/* Time */}
+                        <div className="shrink-0 w-20">
+                          <p className="text-base font-black text-[#134e4a]">{trip.departureTime}</p>
+                        </div>
+
+                        {/* Route */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[#0f766e] leading-tight truncate">
+                            {trip.routeOrigin}
+                            <span className="mx-1.5 text-[#0c7b93]">→</span>
+                            {trip.routeDestination}
+                          </p>
+                        </div>
+
+                        {/* Book button */}
+                        <button
+                          type="button"
+                          onClick={() => setModalData({ trip, vesselName: vessel.vesselName })}
+                          className="shrink-0 rounded-xl bg-[#0c7b93] px-4 py-2 text-xs font-extrabold text-white transition-all hover:bg-[#0f766e] hover:-translate-y-0.5 shadow-sm"
+                        >
+                          🎫 Book
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
