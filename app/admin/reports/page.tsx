@@ -207,7 +207,7 @@ export default async function AdminReportsPage({
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link href={ROUTES.adminSchedule} className="rounded-lg bg-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0f766e]">Schedule</Link>
+        <Link href={ROUTES.adminVessels} className="rounded-lg bg-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0f766e]">Vessels & Schedule</Link>
         <Link href={ROUTES.adminVessels} className="rounded-lg border-2 border-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/5">Vessels</Link>
         <Link href={`${ROUTES.adminReports}/trips?year=${currentYear}&month=${currentMonth}`} className="rounded-lg border-2 border-teal-200 px-3 py-1.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">Passengers per vessel &amp; manifests</Link>
       </div>
@@ -636,8 +636,7 @@ export default async function AdminReportsPage({
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href={ROUTES.admin} className="rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e]">← Admin dashboard</Link>
             <Link href={ROUTES.adminVessels} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">Vessels</Link>
-            <Link href={ROUTES.adminSchedule} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">Schedule</Link>
-          </div>
+         </div>
         </div>
       )}
     </div>
