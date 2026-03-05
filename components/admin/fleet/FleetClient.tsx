@@ -1042,7 +1042,7 @@ function SetFareModal({ assignment, vessel, onClose, onSuccess }: {
   const [existing, setExisting] = useState<{ valid_from: string; valid_until: string | null } | null>(null);
 
   useEffect(() => {
-    fetch(`/api/admin/fare-rules?route_id=${encodeURIComponent(assignment.route_id)}`)
+    fetch(`/api/admin/fare-rules?route_id=${encodeURIComponent(assignment.route_id)}&boat_id=${encodeURIComponent(assignment.boat_id)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data?.base_fare_cents != null) {
