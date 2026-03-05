@@ -187,7 +187,7 @@ export default async function AdminPendingPaymentsPage() {
         )}
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-4">
+<div className="mt-8 flex flex-wrap gap-4">
         <Link
           href={user.role === "ticket_booth" ? ROUTES.dashboard : ROUTES.admin}
           className="rounded-xl border-2 border-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-[#0c7b93]/10"
@@ -201,14 +201,9 @@ export default async function AdminPendingPaymentsPage() {
           Reports
         </Link>
         {user.role === "admin" && (
-          <>
-            <Link href={ROUTES.adminVessels} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-              Vessels
-            </Link>
-            <Link href={ROUTES.adminSchedule} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-              Schedule
-            </Link>
-          </>
+          <Link href={ROUTES.adminVessels} className="rounded-xl border-2 border-teal-200 px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
+            Vessels
+          </Link>
         )}
       </div>
     </div>
