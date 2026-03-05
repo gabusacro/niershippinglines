@@ -362,7 +362,7 @@ function VesselCard({
                 onDelete={() => handleDeleteAssignment(a.id)}
                 onToggle={() => handleToggleAssignment(a.id, a.is_active)}
                 onEditSlot={(slot) => onEditSlot(slot, a)}
-                onSetFare={() => onSetFare(a)}
+                onSetFare={() => onSetFare(a, () => setFareRefetch(n => n + 1))}
                 isDeleting={deletingAssignment === a.id}
                 isToggling={togglingAssignment === a.id}
               />
@@ -414,14 +414,15 @@ function RouteAssignmentCard({
 
   const [currentFare, setCurrentFare] = useState<number | null>(null);
   const [fareLoading, setFareLoading] = useState(true);
+  const [fareRefetch, setFareRefetch] = useState(0);
 
   useEffect(() => {
     fetch(`/api/admin/fare-rules?route_id=${encodeURIComponent(assignment.route_id)}&boat_id=${encodeURIComponent(assignment.boat_id)}`)
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : null)
       .then((data) => setCurrentFare(data?.base_fare_cents ?? null))
       .catch(() => setCurrentFare(null))
       .finally(() => setFareLoading(false));
-  }, [assignment.route_id]);
+  }, [assignment.route_id, assignment.boat_id]);
 
   return (
     <div className={`rounded-xl border p-4 transition-all ${isActive && isCurrent ? "border-teal-200 bg-white" : isActive ? "border-teal-100 bg-teal-50/30" : "border-gray-200 bg-gray-50/50 opacity-60"}`}>
@@ -446,7 +447,7 @@ function RouteAssignmentCard({
                 ⚠ No fare set — passengers cannot book this route
               </span>
             )}
-            <button type="button" onClick={onSetFare}
+            <button type="button" onClick={() => { onSetFare(); }}
               className="text-xs font-semibold text-[#0c7b93] border border-[#0c7b93]/30 rounded-lg px-2 py-0.5 hover:bg-[#0c7b93]/10 transition-colors">
               {currentFare !== null ? "Edit Fare" : "Set Fare"}
             </button>
