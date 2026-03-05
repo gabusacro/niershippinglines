@@ -121,7 +121,6 @@ export default async function AdminDashboardPage() {
         {[
           { href: ROUTES.adminReports,         label: "Reports (per vessel)"      },
           { href: ROUTES.adminVessels,          label: "Vessels & Fleet"           },
-          { href: ROUTES.adminSchedule,         label: "Schedule (routes & times)" },
           { href: ROUTES.adminPendingPayments,  label: "Pending payments"          },
           { href: ROUTES.adminBookings,         label: "Booking history"           },
           { href: ROUTES.adminBranding,         label: "Site branding"             },

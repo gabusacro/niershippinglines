@@ -17,7 +17,6 @@ export const ROUTES = {
   admin: "/admin",
   adminReports: "/admin/reports",
   adminVessels: "/admin/vessels",
-  adminSchedule: "/admin/schedule",
   adminPendingPayments: "/admin/pending-payments",
   adminBookings: "/admin/bookings",
   adminManualBooking: "/admin/manual-booking",
