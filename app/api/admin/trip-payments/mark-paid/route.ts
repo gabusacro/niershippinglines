@@ -30,14 +30,12 @@ export async function POST(request: NextRequest) {
 
   if (tripErr || !trip) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
 
-  // Get vessel assignment
+  // Get vessel assignment — optional, vessel owner may not be assigned yet
   const { data: assignment } = await db
     .from("vessel_assignments")
     .select("vessel_owner_id, patronage_bonus_percent")
     .eq("boat_id", trip.boat_id)
     .maybeSingle();
-
-  if (!assignment) return NextResponse.json({ error: "No vessel owner assigned to this boat" }, { status: 400 });
 
   // Get booking totals
   const { data: bookings } = await db
@@ -57,7 +55,8 @@ export async function POST(request: NextRequest) {
   const payload = {
     trip_id,
     boat_id: trip.boat_id,
-    vessel_owner_id: assignment.vessel_owner_id,
+    // null if no owner assigned — still allowed to mark paid
+    vessel_owner_id: assignment?.vessel_owner_id ?? null,
     gross_fare_cents: grossFareCents,
     platform_fee_cents: platformFeeCents,
     payment_processing_cents: paymentProcessingCents,
@@ -93,11 +92,15 @@ export async function POST(request: NextRequest) {
 
   if (saveError) return NextResponse.json({ error: saveError.message }, { status: 500 });
 
+  const ownerNote = assignment?.vessel_owner_id
+    ? ""
+    : " (No vessel owner assigned — payment recorded without owner link.)";
+
   return NextResponse.json({
     ok: true,
     gross_fare_cents: grossFareCents,
     net_payout_cents: netPayoutCents,
-    message: `Marked as paid. ₱${(grossFareCents / 100).toFixed(0)} gross fare recorded.`,
+    message: `Marked as paid. ₱${(grossFareCents / 100).toFixed(0)} gross fare recorded.${ownerNote}`,
   });
 }
 

@@ -177,14 +177,6 @@ export default async function AdminVesselsPage() {
           >
             ← Dashboard
           </Link>
-          {isAdmin && (
-            <Link
-              href={ROUTES.adminSchedule}
-              className="inline-flex min-h-[44px] items-center rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:border-[#0c7b93] hover:bg-teal-50"
-            >
-              Manage Routes
-            </Link>
-          )}
         </div>
       </div>
 
