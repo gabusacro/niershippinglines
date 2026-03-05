@@ -416,7 +416,7 @@ function RouteAssignmentCard({
   const [fareLoading, setFareLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/admin/fare-rules?route_id=${encodeURIComponent(assignment.route_id)}`)
+    fetch(`/api/admin/fare-rules?route_id=${encodeURIComponent(assignment.route_id)}&boat_id=${encodeURIComponent(assignment.boat_id)}`)
       .then((r) => r.json())
       .then((data) => setCurrentFare(data?.base_fare_cents ?? null))
       .catch(() => setCurrentFare(null))
@@ -1058,7 +1058,7 @@ function SetFareModal({ assignment, vessel, onClose, onSuccess }: {
       const res = await fetch("/api/admin/fare-rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ route_id: assignment.route_id, base_fare_cents: Math.round(parsed * 100) }),
+        body: JSON.stringify({ route_id: assignment.route_id, boat_id: assignment.boat_id, base_fare_cents: Math.round(parsed * 100) }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to save fare."); return; }
