@@ -96,6 +96,7 @@ export function FleetClient({ vessels, routes: initialRoutes }: FleetClientProps
   const [assignModalVessel, setAssignModalVessel] = useState<Vessel | null>(null);
   const [crewModalVessel, setCrewModalVessel] = useState<Vessel | null>(null);
   const [editSlot, setEditSlot] = useState<{ slot: ScheduleSlot; assignment: RouteAssignment; vessel: Vessel } | null>(null);
+  const [fareModal, setFareModal] = useState<{ assignment: RouteAssignment; vessel: Vessel } | null>(null);
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
   const [suspendLoading, setSuspendLoading] = useState<string | null>(null);
 
@@ -160,6 +161,7 @@ export function FleetClient({ vessels, routes: initialRoutes }: FleetClientProps
             onAssignRoute={() => setAssignModalVessel(vessel)}
             onManageCrew={() => setCrewModalVessel(vessel)}
             onEditSlot={(slot, assignment) => setEditSlot({ slot, assignment, vessel })}
+            onSetFare={(assignment) => setFareModal({ assignment, vessel })}
             onToggleStatus={() => handleToggleStatus(vessel)}
             onToggleSuspend={() => handleToggleSuspend(vessel)}
             statusLoading={statusLoading === vessel.id}
@@ -194,6 +196,15 @@ export function FleetClient({ vessels, routes: initialRoutes }: FleetClientProps
           onSuccess={() => { setEditSlot(null); router.refresh(); }}
         />
       )}
+
+      {fareModal && (
+    <SetFareModal
+    assignment={fareModal.assignment}
+    vessel={fareModal.vessel}
+    onClose={() => setFareModal(null)}
+    onSuccess={() => { setFareModal(null); router.refresh(); }}
+    />
+       )}
     </div>
   );
 }
@@ -201,13 +212,14 @@ export function FleetClient({ vessels, routes: initialRoutes }: FleetClientProps
 // ─── Vessel Card ──────────────────────────────────────────────────────────────
 
 function VesselCard({
-  vessel, onAssignRoute, onManageCrew, onEditSlot,
+  vessel, onAssignRoute, onManageCrew, onEditSlot, onSetFare,
   onToggleStatus, onToggleSuspend, statusLoading, suspendLoading, onRefresh,
 }: {
   vessel: Vessel;
   onAssignRoute: () => void;
   onManageCrew: () => void;
   onEditSlot: (slot: ScheduleSlot, assignment: RouteAssignment) => void;
+  onSetFare: (assignment: RouteAssignment) => void;
   onToggleStatus: () => void;
   onToggleSuspend: () => void;
   statusLoading: boolean;
@@ -350,6 +362,7 @@ function VesselCard({
                 onDelete={() => handleDeleteAssignment(a.id)}
                 onToggle={() => handleToggleAssignment(a.id, a.is_active)}
                 onEditSlot={(slot) => onEditSlot(slot, a)}
+                onSetFare={() => onSetFare(a)}
                 isDeleting={deletingAssignment === a.id}
                 isToggling={togglingAssignment === a.id}
               />
@@ -363,12 +376,13 @@ function VesselCard({
                 <div className="mt-2 space-y-2">
                   {inactiveAssignments.map((a) => (
                     <RouteAssignmentCard key={a.id} assignment={a} vesselId={vessel.id}
-                      onDelete={() => handleDeleteAssignment(a.id)}
-                      onToggle={() => handleToggleAssignment(a.id, a.is_active)}
-                      onEditSlot={(slot) => onEditSlot(slot, a)}
-                      isDeleting={deletingAssignment === a.id}
-                      isToggling={togglingAssignment === a.id}
-                    />
+                onDelete={() => handleDeleteAssignment(a.id)}
+                onToggle={() => handleToggleAssignment(a.id, a.is_active)}
+                onEditSlot={(slot) => onEditSlot(slot, a)}
+                onSetFare={() => onSetFare(a)}
+                isDeleting={deletingAssignment === a.id}
+                isToggling={togglingAssignment === a.id}
+              />
                   ))}
                 </div>
               </details>
@@ -383,19 +397,31 @@ function VesselCard({
 // ─── Route Assignment Card ────────────────────────────────────────────────────
 
 function RouteAssignmentCard({
-  assignment, onDelete, onToggle, onEditSlot, isDeleting, isToggling,
+  assignment, onDelete, onToggle, onEditSlot, onSetFare, isDeleting, isToggling,
 }: {
   assignment: RouteAssignment;
   vesselId: string;
-  onDelete: () => void;
+ onDelete: () => void;
   onToggle: () => void;
   onEditSlot: (slot: ScheduleSlot) => void;
+  onSetFare: () => void;
   isDeleting: boolean;
   isToggling: boolean;
 }) {
-  const isActive = assignment.is_active;
+  const isActive  = assignment.is_active;
   const isCurrent = isCurrentlyActive(assignment.available_from, assignment.available_until);
   const activeSlots = assignment.schedule_slots.filter((s) => s.is_active);
+
+  const [currentFare, setCurrentFare] = useState<number | null>(null);
+  const [fareLoading, setFareLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/admin/fare-rules?route_id=${encodeURIComponent(assignment.route_id)}`)
+      .then((r) => r.json())
+      .then((data) => setCurrentFare(data?.base_fare_cents ?? null))
+      .catch(() => setCurrentFare(null))
+      .finally(() => setFareLoading(false));
+  }, [assignment.route_id]);
 
   return (
     <div className={`rounded-xl border p-4 transition-all ${isActive && isCurrent ? "border-teal-200 bg-white" : isActive ? "border-teal-100 bg-teal-50/30" : "border-gray-200 bg-gray-50/50 opacity-60"}`}>
@@ -407,6 +433,24 @@ function RouteAssignmentCard({
             {!isActive && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Inactive</span>}
           </div>
           <p className="text-xs text-[#0f766e] mt-0.5">{formatDateRange(assignment.available_from, assignment.available_until)}</p>
+
+          <div className="mt-1.5 flex items-center gap-2">
+            {fareLoading ? (
+              <span className="text-xs text-[#0f766e]/50">Loading fare…</span>
+            ) : currentFare !== null ? (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#134e4a] bg-teal-50 border border-teal-200 rounded-lg px-2 py-0.5">
+                💰 Base fare: ₱{(currentFare / 100).toLocaleString()}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5">
+                ⚠ No fare set — passengers cannot book this route
+              </span>
+            )}
+            <button type="button" onClick={onSetFare}
+              className="text-xs font-semibold text-[#0c7b93] border border-[#0c7b93]/30 rounded-lg px-2 py-0.5 hover:bg-[#0c7b93]/10 transition-colors">
+              {currentFare !== null ? "Edit Fare" : "Set Fare"}
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button type="button" onClick={onToggle} disabled={isToggling}
@@ -973,6 +1017,132 @@ function ManageCrewModal({ vessel, onClose, onSuccess }: {
             </div>
           </form>
         </div>
+      </div>
+    </div>
+  );
+}
+// ─── Set Fare Modal ───────────────────────────────────────────────────────────
+
+function SetFareModal({ assignment, vessel, onClose, onSuccess }: {
+  assignment: RouteAssignment;
+  vessel: Vessel;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [baseFare, setBaseFare] = useState("");
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState("");
+  const [existing, setExisting] = useState<{ valid_from: string; valid_until: string | null } | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/admin/fare-rules?route_id=${encodeURIComponent(assignment.route_id)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.base_fare_cents != null) {
+          setBaseFare((data.base_fare_cents / 100).toString());
+          setExisting({ valid_from: data.valid_from, valid_until: data.valid_until });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [assignment.route_id]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const parsed = parseFloat(baseFare);
+    if (isNaN(parsed) || parsed <= 0) { setError("Enter a valid fare amount greater than ₱0."); return; }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/fare-rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ route_id: assignment.route_id, base_fare_cents: Math.round(parsed * 100) }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Failed to save fare."); return; }
+      onSuccess();
+    } catch { setError("Network error."); }
+    finally { setSaving(false); }
+  };
+
+  const parsedFare = parseFloat(baseFare);
+  const fareValid  = !isNaN(parsedFare) && parsedFare > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-teal-100">
+        <div className="border-b border-teal-100 px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-[#134e4a]">{existing ? "Edit Base Fare" : "Set Base Fare"}</h2>
+            <p className="text-xs text-[#0f766e] mt-0.5">
+              {assignment.routes.origin} → {assignment.routes.destination} · {vessel.name}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold p-1">×</button>
+        </div>
+
+        <form onSubmit={handleSave} className="p-6 space-y-4">
+          {loading ? (
+            <p className="text-sm text-[#0f766e] text-center py-4">Loading…</p>
+          ) : (
+            <>
+              {existing && (
+                <div className="rounded-xl bg-teal-50 border border-teal-200 px-4 py-3 text-xs text-[#0f766e]">
+                  <p className="font-semibold text-[#134e4a] mb-0.5">Current fare rule</p>
+                  <p>Active from: {new Date(existing.valid_from + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</p>
+                  {existing.valid_until
+                    ? <p>Expires: {new Date(existing.valid_until + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</p>
+                    : <p>No expiry — open-ended</p>}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-[#134e4a] mb-1.5">
+                  Base Fare (₱) <span className="text-xs font-normal text-[#0f766e]">— adult full price</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-[#134e4a]">₱</span>
+                  <input type="number" min="0" step="0.01" value={baseFare}
+                    onChange={(e) => setBaseFare(e.target.value)} placeholder="e.g. 550" autoFocus
+                    className="flex-1 rounded-xl border-2 border-teal-200 px-4 py-2.5 text-lg font-semibold text-[#134e4a] focus:outline-none focus:border-[#0c7b93] focus:ring-2 focus:ring-[#0c7b93]/20" />
+                </div>
+                <p className="mt-1 text-xs text-[#0f766e]">
+                  Discounts are applied on top of this. Configure them in{" "}
+                  <a href="/admin/fees" className="font-semibold text-[#0c7b93] hover:underline">Admin → Fees</a>.
+                </p>
+              </div>
+
+              {fareValid && (
+                <div className="rounded-xl bg-teal-50 border border-teal-200 p-4 space-y-1.5 text-sm">
+                  <p className="text-xs font-semibold uppercase text-[#0c7b93] mb-2">Fare preview</p>
+                  <div className="flex justify-between text-[#134e4a]"><span>Adult</span><span className="font-semibold">₱{parsedFare.toLocaleString()}</span></div>
+                  <div className="flex justify-between text-[#134e4a]"><span>Senior / PWD (20% off)</span><span className="font-semibold">₱{(parsedFare * 0.8).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between text-[#134e4a]"><span>Child (50% off)</span><span className="font-semibold">₱{(parsedFare * 0.5).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between text-[#134e4a]"><span>Infant</span><span className="font-semibold text-emerald-600">FREE</span></div>
+                  <p className="text-xs text-[#0f766e]/70 pt-1 border-t border-teal-200 mt-1">
+                    Actual % follows your <a href="/admin/fees" className="text-[#0c7b93] hover:underline font-medium">Fees settings</a>.
+                  </p>
+                </div>
+              )}
+
+              {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">⚠ {error}</div>}
+
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={saving || !fareValid}
+                  className="flex-1 min-h-[44px] rounded-xl bg-[#0c7b93] text-white font-semibold text-sm hover:bg-[#0f766e] disabled:opacity-50 transition-colors">
+                  {saving ? "Saving…" : existing ? "Update Fare" : "Save Fare"}
+                </button>
+                <button type="button" onClick={onClose}
+                  className="min-h-[44px] rounded-xl border-2 border-teal-200 px-4 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+        </form>
       </div>
     </div>
   );
