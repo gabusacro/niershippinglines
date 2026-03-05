@@ -202,7 +202,7 @@ export function FleetClient({ vessels, routes: initialRoutes }: FleetClientProps
     assignment={fareModal.assignment}
     vessel={fareModal.vessel}
     onClose={() => setFareModal(null)}
-    onSuccess={() => { setFareModal(null); router.refresh(); }}
+    onSuccess={() => { setFareModal(null); router.refresh(); window.location.reload(); }}
     />
        )}
     </div>
@@ -362,7 +362,7 @@ function VesselCard({
                 onDelete={() => handleDeleteAssignment(a.id)}
                 onToggle={() => handleToggleAssignment(a.id, a.is_active)}
                 onEditSlot={(slot) => onEditSlot(slot, a)}
-                onSetFare={() => onSetFare(a, () => setFareRefetch(n => n + 1))}
+                onSetFare={() => onSetFare(a)}
                 isDeleting={deletingAssignment === a.id}
                 isToggling={togglingAssignment === a.id}
               />
