@@ -417,6 +417,11 @@ function RouteAssignmentCard({
   const [fareRefetch, setFareRefetch] = useState(0);
 
   useEffect(() => {
+    if (!assignment.boat_id) {
+      setCurrentFare(null);
+      setFareLoading(false);
+      return;
+    }
     fetch(`/api/admin/fare-rules?route_id=${encodeURIComponent(assignment.route_id)}&boat_id=${encodeURIComponent(assignment.boat_id)}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => setCurrentFare(data?.base_fare_cents ?? null))
