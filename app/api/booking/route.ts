@@ -2,24 +2,43 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendBookingPaymentRequired } from "@/lib/email/send-booking-payment-required";
 import { GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
-import { getFeeSettings } from "@/lib/get-fee-settings";
+import { getFeeSettings, FeeSettings } from "@/lib/get-fee-settings";
 import { getTodayInManila, isTripDepartureAtLeast30MinFromNow } from "@/lib/admin/ph-time";
 import { NextRequest, NextResponse } from "next/server";
 
-const FARE_TYPES = ["adult", "senior", "pwd", "child", "infant"] as const;
+const FARE_TYPES = ["adult", "senior", "pwd", "student", "child", "infant"] as const;
 
-/** Infant (below 7) is free; adult = base; senior/pwd/child = discounted. Used for revenue. */
+/**
+ * Calculate per-person fare in cents using live fee settings from DB.
+ * - adult   → full base fare
+ * - infant  → free (if infant_is_free) or full fare
+ * - senior  → senior_discount_percent off
+ * - pwd     → pwd_discount_percent off
+ * - child   → child_discount_percent off
+ * - student → pwd_discount_percent off (same 20% default, no separate field in fee_settings)
+ */
 function fareCents(
   baseFareCents: number,
-  discountPercent: number,
-  fareType: string
+  fareType: string,
+  fees: FeeSettings
 ): number {
-  if (fareType === "adult") return baseFareCents;
-  if (fareType === "infant") return 0; // Infant free of charge
-  const discounted = Math.round(
-    baseFareCents * (1 - discountPercent / 100)
-  );
-  return discounted;
+  switch (fareType) {
+    case "adult":
+      return baseFareCents;
+    case "infant":
+      return fees.infant_is_free ? 0 : baseFareCents;
+    case "senior":
+      return Math.round(baseFareCents * (1 - fees.senior_discount_percent / 100));
+    case "pwd":
+      return Math.round(baseFareCents * (1 - fees.pwd_discount_percent / 100));
+    case "child":
+      return Math.round(baseFareCents * (1 - fees.child_discount_percent / 100));
+    case "student":
+      // Student uses pwd_discount_percent (both default 20%) — no separate field in fee_settings
+      return Math.round(baseFareCents * (1 - fees.pwd_discount_percent / 100));
+    default:
+      return baseFareCents;
+  }
 }
 
 /** GET: Look up a booking by reference (for payment / status check). */
@@ -32,7 +51,9 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data: booking, error } = await supabase
     .from("bookings")
-    .select("id, reference, trip_id, customer_full_name, customer_email, customer_mobile, passenger_count, fare_type, total_amount_cents, passenger_details, status, created_at, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))")
+    .select(
+      "id, reference, trip_id, customer_full_name, customer_email, customer_mobile, passenger_count, fare_type, total_amount_cents, passenger_details, status, created_at, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, route:routes(display_name, origin, destination))"
+    )
     .eq("reference", reference)
     .maybeSingle();
   if (error) {
@@ -61,7 +82,9 @@ function isValidPassengerDetail(x: unknown): x is PassengerDetail {
     "full_name" in x &&
     typeof (x as PassengerDetail).full_name === "string" &&
     (x as PassengerDetail).full_name.trim().length > 0 &&
-    FARE_TYPES.includes((x as PassengerDetail).fare_type as (typeof FARE_TYPES)[number])
+    FARE_TYPES.includes(
+      (x as PassengerDetail).fare_type as (typeof FARE_TYPES)[number]
+    )
   );
 }
 
@@ -79,14 +102,39 @@ export async function POST(request: NextRequest) {
   const customerAddressRaw = b.customer_address;
   const notifyAlsoEmailRaw = b.notify_also_email;
   const passengerDetailsRaw = b.passenger_details;
+
+  // ── Walk-in flag (set by ticket_booth / admin manual booking) ──────────────
+  // Online passenger bookings never set this; it defaults to false.
+  const isWalkIn = b.is_walk_in === true;
+
   if (!tripId || typeof customerEmail !== "string" || !customerEmail.trim()) {
-    return NextResponse.json({ error: "Missing or invalid: trip_id, customer_email" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing or invalid: trip_id, customer_email" },
+      { status: 400 }
+    );
   }
-  if (!customerMobile || typeof customerMobile !== "string" || !customerMobile.trim()) {
-    return NextResponse.json({ error: "Missing or invalid: customer_mobile" }, { status: 400 });
+  if (
+    !customerMobile ||
+    typeof customerMobile !== "string" ||
+    !customerMobile.trim()
+  ) {
+    return NextResponse.json(
+      { error: "Missing or invalid: customer_mobile" },
+      { status: 400 }
+    );
   }
-  if (!customerAddressRaw || typeof customerAddressRaw !== "string" || !customerAddressRaw.trim()) {
-    return NextResponse.json({ error: "Missing or invalid: customer_address (required for tickets and manifest)" }, { status: 400 });
+  if (
+    !customerAddressRaw ||
+    typeof customerAddressRaw !== "string" ||
+    !customerAddressRaw.trim()
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Missing or invalid: customer_address (required for tickets and manifest)",
+      },
+      { status: 400 }
+    );
   }
   const mobile = customerMobile.trim();
   const customerAddress = customerAddressRaw.trim();
@@ -100,7 +148,10 @@ export async function POST(request: NextRequest) {
   if (Array.isArray(passengerDetailsRaw) && passengerDetailsRaw.length > 0) {
     if (!passengerDetailsRaw.every(isValidPassengerDetail)) {
       return NextResponse.json(
-        { error: "passenger_details must be an array of { fare_type: adult|senior|pwd|child, full_name: string } with non-empty names" },
+        {
+          error:
+            "passenger_details must be an array of { fare_type: adult|senior|pwd|student|child|infant, full_name: string } with non-empty names",
+        },
         { status: 400 }
       );
     }
@@ -113,21 +164,31 @@ export async function POST(request: NextRequest) {
     const count = b.passenger_count;
     const ft = b.fare_type;
     if (!name || typeof name !== "string" || !name.trim()) {
-      return NextResponse.json({ error: "Missing or invalid: customer_full_name" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing or invalid: customer_full_name" },
+        { status: 400 }
+      );
     }
     if (typeof count !== "number" || count < 1) {
-      return NextResponse.json({ error: "Missing or invalid: passenger_count (min 1)" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing or invalid: passenger_count (min 1)" },
+        { status: 400 }
+      );
     }
     customerFullName = name.trim();
     passengerCount = count;
-    fareType = typeof ft === "string" && FARE_TYPES.includes(ft as (typeof FARE_TYPES)[number])
-      ? (ft as (typeof FARE_TYPES)[number])
-      : "adult";
+    fareType =
+      typeof ft === "string" &&
+      FARE_TYPES.includes(ft as (typeof FARE_TYPES)[number])
+        ? (ft as (typeof FARE_TYPES)[number])
+        : "adult";
   }
 
-  // Resolve authenticated user once (for block check and created_by).
+  // ── Auth / block check ─────────────────────────────────────────────────────
   const authClient = await createClient();
-  const { data: { user: authUser } } = await authClient.auth.getUser();
+  const {
+    data: { user: authUser },
+  } = await authClient.auth.getUser();
 
   if (authUser?.id) {
     const adminForCheck = createAdminClient();
@@ -140,13 +201,19 @@ export async function POST(request: NextRequest) {
       const now = new Date().toISOString();
       if (restriction?.booking_blocked_at) {
         return NextResponse.json(
-          { error: "Your account is blocked from making new bookings. If you believe this is an error, please contact us at gabu.sacro@gmail.com." },
+          {
+            error:
+              "Your account is blocked from making new bookings. If you believe this is an error, please contact us at gabu.sacro@gmail.com.",
+          },
           { status: 403 }
         );
       }
       if (restriction?.blocked_until && restriction.blocked_until > now) {
         return NextResponse.json(
-          { error: "We noticed unusual activity and have temporarily restricted your account. If you believe this is an error, please contact us at gabu.sacro@gmail.com." },
+          {
+            error:
+              "We noticed unusual activity and have temporarily restricted your account. If you believe this is an error, please contact us at gabu.sacro@gmail.com.",
+          },
           { status: 403 }
         );
       }
@@ -168,7 +235,9 @@ export async function POST(request: NextRequest) {
 
   const { data: trip, error: tripError } = await supabase
     .from("trips")
-    .select("id, route_id, departure_date, departure_time, online_quota, online_booked, status")
+    .select(
+      "id, route_id, departure_date, departure_time, online_quota, online_booked, status"
+    )
     .eq("id", tripId)
     .eq("status", "scheduled")
     .single();
@@ -178,15 +247,23 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
   const todayManila = getTodayInManila();
   const depDate = (trip as { departure_date?: string }).departure_date;
   const depTime = (trip as { departure_time?: string }).departure_time ?? "";
-  if (depDate === todayManila && !isTripDepartureAtLeast30MinFromNow(depDate, depTime)) {
+  if (
+    depDate === todayManila &&
+    !isTripDepartureAtLeast30MinFromNow(depDate, depTime)
+  ) {
     return NextResponse.json(
-      { error: "This trip departs too soon. Book a later trip (at least 30 minutes from now) so you have time to pay and board." },
+      {
+        error:
+          "This trip departs too soon. Book a later trip (at least 30 minutes from now) so you have time to pay and board.",
+      },
       { status: 400 }
     );
   }
+
   const available = (trip.online_quota ?? 0) - (trip.online_booked ?? 0);
   if (available < passengerCount) {
     return NextResponse.json(
@@ -195,6 +272,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // ── Fare rule (base fare for this route) ──────────────────────────────────
   const today = new Date().toISOString().slice(0, 10);
   const { data: fareRule, error: fareError } = await supabase
     .from("fare_rules")
@@ -209,26 +287,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: fareError.message }, { status: 500 });
   }
   const base = fareRule?.base_fare_cents ?? 55000;
-  const discount = fareRule?.discount_percent ?? 20;
 
+  // ── Fee settings from DB (set by admin in /admin/fees) ────────────────────
+  // This is the single source of truth for all discounts and fees.
+  const fees = await getFeeSettings();
+
+  // ── Calculate fare subtotal using per-type discounts from fee_settings ────
   if (passengerDetails && passengerDetails.length > 0) {
     totalCents = passengerDetails.reduce(
-      (sum, p) => sum + fareCents(base, discount, p.fare_type),
+      (sum, p) => sum + fareCents(base, p.fare_type, fees),
       0
     );
   } else {
-    const perPersonCents = fareCents(base, discount, fareType);
-    totalCents = passengerCount * perPersonCents;
+    totalCents = passengerCount * fareCents(base, fareType, fees);
   }
   const fareSubtotalCents = totalCents;
-  const feeSettings = await getFeeSettings();
-  const gcashFeeCents = feeSettings.gcash_fee_cents; // Online bookings pay via GCash
-  const adminFeeCents = passengerCount * feeSettings.admin_fee_cents_per_passenger;
-  totalCents = fareSubtotalCents + gcashFeeCents + adminFeeCents;
 
+  // ── Platform Service Fee ──────────────────────────────────────────────────
+  // For walk-ins: only charge if admin has enabled admin_fee_applies_walkin.
+  // For online bookings: always charge.
+  const chargeAdminFee = isWalkIn ? fees.admin_fee_applies_walkin : true;
+  const adminFeeCents = chargeAdminFee
+    ? passengerCount * fees.admin_fee_cents_per_passenger
+    : 0;
+
+  // ── Payment Processing Fee ────────────────────────────────────────────────
+  // Only applies to online (GCash) bookings — walk-ins pay cash, no processing fee.
+  const gcashFeeCents = isWalkIn ? 0 : fees.gcash_fee_cents;
+
+  totalCents = fareSubtotalCents + adminFeeCents + gcashFeeCents;
+
+  // ── created_by ────────────────────────────────────────────────────────────
   let createdBy: string | null = null;
   if (authUser?.id) {
-    // Only set created_by when a matching profile exists, to satisfy FK bookings_created_by_fkey.
     const { data: profile } = await supabase
       .from("profiles")
       .select("id")
@@ -240,9 +331,12 @@ export async function POST(request: NextRequest) {
   }
 
   const notifyAlsoEmail =
-    typeof notifyAlsoEmailRaw === "string" && notifyAlsoEmailRaw.trim().length > 0
+    typeof notifyAlsoEmailRaw === "string" &&
+    notifyAlsoEmailRaw.trim().length > 0
       ? notifyAlsoEmailRaw.trim()
       : null;
+
+  // ── Insert booking ────────────────────────────────────────────────────────
   const insertPayload: Record<string, unknown> = {
     trip_id: tripId,
     reference: ref,
@@ -256,18 +350,22 @@ export async function POST(request: NextRequest) {
     gcash_fee_cents: gcashFeeCents,
     admin_fee_cents: adminFeeCents,
     status: "pending_payment",
-    is_walk_in: false,
-    booking_source: "online",
-    payment_method: "gcash",
+    is_walk_in: isWalkIn,
+    booking_source: isWalkIn ? "walk_in" : "online",
+    payment_method: isWalkIn ? "cash" : "gcash",
     created_by: createdBy,
-    terms_accepted_at: typeof b.terms_accepted_at === "string" ? b.terms_accepted_at : null,
-    terms_version: typeof b.terms_version === "string" ? b.terms_version : null,
+    terms_accepted_at:
+      typeof b.terms_accepted_at === "string" ? b.terms_accepted_at : null,
+    terms_version:
+      typeof b.terms_version === "string" ? b.terms_version : null,
   };
   if (notifyAlsoEmail) insertPayload.notify_also_email = notifyAlsoEmail;
   if (passengerDetails && passengerDetails.length > 0) {
     insertPayload.passenger_details = passengerDetails.map((p) => {
-      const addr = typeof p.address === "string" && p.address.trim() ? p.address.trim() : customerAddress;
-      // ✅ Now includes gender, birthdate, nationality for Coast Guard manifest
+      const addr =
+        typeof p.address === "string" && p.address.trim()
+          ? p.address.trim()
+          : customerAddress;
       return {
         fare_type: p.fare_type,
         full_name: p.full_name.trim(),
@@ -289,51 +387,69 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // Email: payment required to main contact and optionally to second email.
-  const emailParams = {
-    reference: ref,
-    totalAmountCents: totalCents,
-    gcashNumber: GCASH_NUMBER || undefined,
-    gcashAccountName: GCASH_ACCOUNT_NAME || undefined,
-  };
-  sendBookingPaymentRequired({ to: customerEmail.trim(), ...emailParams }).catch((err) =>
-    console.error("[booking] payment-required email (main) failed:", err)
-  );
-  if (notifyAlsoEmail && notifyAlsoEmail !== customerEmail.trim()) {
-    sendBookingPaymentRequired({ to: notifyAlsoEmail, ...emailParams }).catch((err) =>
-      console.error("[booking] payment-required email (also notify) failed:", err)
+  // ── Send payment-required email ───────────────────────────────────────────
+  // Skip for walk-ins — they pay at the booth.
+  if (!isWalkIn) {
+    const emailParams = {
+      reference: ref,
+      totalAmountCents: totalCents,
+      gcashNumber: GCASH_NUMBER || undefined,
+      gcashAccountName: GCASH_ACCOUNT_NAME || undefined,
+    };
+    sendBookingPaymentRequired({
+      to: customerEmail.trim(),
+      ...emailParams,
+    }).catch((err) =>
+      console.error("[booking] payment-required email (main) failed:", err)
     );
+    if (notifyAlsoEmail && notifyAlsoEmail !== customerEmail.trim()) {
+      sendBookingPaymentRequired({
+        to: notifyAlsoEmail,
+        ...emailParams,
+      }).catch((err) =>
+        console.error(
+          "[booking] payment-required email (also notify) failed:",
+          err
+        )
+      );
+    }
   }
+
+  // ── Build fare_breakdown for frontend ─────────────────────────────────────
+  // Includes labels and toggles so the payment modal renders correctly.
+  const fareBreakdownBase = {
+    base_fare_cents: base,
+    fare_subtotal_cents: fareSubtotalCents,
+    admin_fee_cents: adminFeeCents,
+    gcash_fee_cents: gcashFeeCents,
+    total_cents: totalCents,
+    // Labels from fee_settings so custom names show in the payment modal
+    admin_fee_label: fees.admin_fee_label,
+    gcash_fee_label: fees.gcash_fee_label,
+    gcash_fee_show_breakdown: fees.gcash_fee_show_breakdown,
+  };
+
+  const fareBreakdown = passengerDetails
+    ? {
+        ...fareBreakdownBase,
+        passenger_details: passengerDetails.map((p) => ({
+          fare_type: p.fare_type,
+          full_name: p.full_name.trim(),
+          per_person_cents: fareCents(base, p.fare_type, fees),
+        })),
+      }
+    : {
+        ...fareBreakdownBase,
+        fare_type: fareType,
+        per_person_cents: fareCents(base, fareType, fees),
+        passenger_count: passengerCount,
+      };
 
   return NextResponse.json({
     booking_id: booking.id,
     reference: booking.reference,
     total_amount_cents: booking.total_amount_cents,
     status: booking.status,
-    fare_breakdown: passengerDetails
-      ? {
-          base_fare_cents: base,
-          discount_percent: discount,
-          passenger_details: passengerDetails.map((p) => ({
-            fare_type: p.fare_type,
-            full_name: p.full_name.trim(),
-            per_person_cents: fareCents(base, discount, p.fare_type),
-          })),
-          fare_subtotal_cents: fareSubtotalCents,
-          gcash_fee_cents: gcashFeeCents,
-          admin_fee_cents: adminFeeCents,
-          total_cents: totalCents,
-        }
-      : {
-          base_fare_cents: base,
-          discount_percent: discount,
-          fare_type: fareType,
-          per_person_cents: fareCents(base, discount, fareType),
-          passenger_count: passengerCount,
-          fare_subtotal_cents: fareSubtotalCents,
-          gcash_fee_cents: gcashFeeCents,
-          admin_fee_cents: adminFeeCents,
-          total_cents: totalCents,
-        },
+    fare_breakdown: fareBreakdown,
   });
 }
