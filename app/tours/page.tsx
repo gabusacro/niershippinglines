@@ -40,9 +40,9 @@ export default async function ToursPage() {
       {/* Hero */}
       <div className="bg-gradient-to-br from-[#0c7b93] to-[#0f766e] px-6 py-16 text-center text-white">
         <p className="text-sm font-medium uppercase tracking-widest text-white/70 mb-2">Travela Siargao</p>
-        <h1 className="text-3xl font-bold sm:text-4xl">🏝️ Tours & Experiences</h1>
+        <h1 className="text-3xl font-bold sm:text-4xl">🏝️ Travel & Tours</h1>
         <p className="mt-3 max-w-xl mx-auto text-white/80 text-sm">
-          Island hopping, lagoon adventures, transfers and more. All tours include a local guide and are run by Kuya Gab.
+          Island hopping, lagoon adventures, transfers and more. All tours include a local guide and are run by Local Tour Operator/s.
         </p>
       </div>
 
