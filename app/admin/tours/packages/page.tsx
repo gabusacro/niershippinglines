@@ -26,17 +26,23 @@ function formatPrice(pkg: Record<string, unknown>): string {
 
 function formatBookingType(pkg: Record<string, unknown>): string {
   const types: string[] = [];
-  if (pkg.accepts_joiners)  types.push("Joiners");
-  if (pkg.accepts_private)  types.push("Private");
+  if (pkg.accepts_joiners)   types.push("Joiners");
+  if (pkg.accepts_private)   types.push("Private");
   if (pkg.accepts_exclusive) types.push(`Exclusive (${pkg.exclusive_unit_label})`);
-  if (pkg.is_hourly)        types.push("Hourly");
-  if (pkg.is_per_person)    types.push("Per Person");
+  if (pkg.is_hourly)         types.push("Hourly");
+  if (pkg.is_per_person)     types.push("Per Person");
   return types.join(" · ") || "—";
 }
 
-export default async function AdminTourPackagesPage() {
+export default async function AdminTourPackagesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ updated?: string; error?: string }>;
+}) {
   const user = await getAuthUser();
   if (!user || user.role !== "admin") redirect("/dashboard");
+
+  const { updated, error: updateError } = await searchParams;
 
   const supabase = await createClient();
   const { data: packages, error } = await supabase
@@ -47,7 +53,21 @@ export default async function AdminTourPackagesPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
 
-      {/* Header */}
+      {/* ── SUCCESS TOAST ── */}
+      {updated && (
+        <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          ✅ &quot;{updated}&quot; updated successfully.
+        </div>
+      )}
+
+      {/* ── ERROR TOAST ── */}
+      {updateError && (
+        <div className="mb-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+          ❌ Error: {updateError}
+        </div>
+      )}
+
+      {/* ── HEADER ── */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2 text-sm text-emerald-700 mb-1">
@@ -68,14 +88,14 @@ export default async function AdminTourPackagesPage() {
         </Link>
       </div>
 
-      {/* Error state */}
+      {/* ── DB ERROR ── */}
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 mb-6">
           Failed to load packages: {error.message}
         </div>
       )}
 
-      {/* Package list */}
+      {/* ── PACKAGE LIST ── */}
       <div className="space-y-3">
         {(packages ?? []).map((pkg) => (
           <div key={pkg.id}
@@ -141,7 +161,7 @@ export default async function AdminTourPackagesPage() {
         ))}
       </div>
 
-      {/* Empty state */}
+      {/* ── EMPTY STATE ── */}
       {(packages ?? []).length === 0 && !error && (
         <div className="rounded-2xl border-2 border-dashed border-emerald-200 p-12 text-center">
           <div className="text-4xl mb-3">📦</div>
@@ -154,13 +174,14 @@ export default async function AdminTourPackagesPage() {
         </div>
       )}
 
-      {/* Back */}
+      {/* ── BACK ── */}
       <div className="mt-6">
         <Link href="/admin/tours"
           className="text-sm font-medium text-emerald-700 hover:underline">
           ← Back to Tours
         </Link>
       </div>
+
     </div>
   );
 }
