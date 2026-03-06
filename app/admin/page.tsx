@@ -173,6 +173,16 @@ export default async function AdminDashboardPage() {
           className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100">
           💸 Refunds
         </Link>
+
+        {/* ── NEW SERVICES ── */}
+        <Link href="/admin/tours"
+          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100">
+          🏝️ Tours
+        </Link>
+        <Link href="/admin/parking"
+          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 transition-colors hover:bg-blue-100">
+          🚗 Pay Parking
+        </Link>
       </div>
 
       {/* ── ALERT CARDS ── */}
