@@ -262,8 +262,7 @@ export default async function TourSchedulesPage({
                     <input type="hidden" name="schedule_id" value={s.id} />
                     <input type="hidden" name="tour_id" value={id} />
                     <button type="submit"
-                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
-                      onClick={(e) => { if (!confirm("Cancel this schedule?")) e.preventDefault(); }}>
+                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors">
                       Cancel
                     </button>
                   </form>
