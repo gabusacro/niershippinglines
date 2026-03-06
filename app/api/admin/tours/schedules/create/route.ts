@@ -50,10 +50,7 @@ export async function POST(request: NextRequest) {
 
     if (notes) insertData.notes = notes;
 
-    const userId = (user as unknown as Record<string, unknown>).id
-      ?? (user as unknown as Record<string, unknown>).userId
-      ?? null;
-    if (userId) insertData.created_by = userId;
+    insertData.created_by = user.id;
 
     const supabase = await createClient();
     const { error } = await supabase

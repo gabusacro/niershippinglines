@@ -16,13 +16,15 @@ export default async function TourSchedulesPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ added?: string; error?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await getAuthUser();
   if (!user || user.role !== "admin") redirect("/dashboard");
 
   const { id } = await params;
-  const { added, error: flashError } = await searchParams;
+  const sp = await searchParams;
+  const added = typeof sp.added === "string" ? sp.added : null;
+  const flashError = typeof sp.error === "string" ? sp.error : null;
   const supabase = await createClient();
 
   // Load the package
