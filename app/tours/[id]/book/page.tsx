@@ -198,7 +198,7 @@ export default async function BookTourPage({
             <h2 className="font-bold text-[#134e4a] mb-2">💚 GCash Payment</h2>
             <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 mb-4 text-sm text-emerald-800">
               <p className="font-semibold mb-1">Send payment to:</p>
-              <p className="text-lg font-bold text-emerald-700">09XX XXX XXXX</p>
+              <p className="text-lg font-bold text-emerald-700">0946 365 7331</p>
               <p className="text-xs text-emerald-600 mt-1">Account name: Gabriel Sacro · Ref: your name + tour date</p>
             </div>
             <div>
