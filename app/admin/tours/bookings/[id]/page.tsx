@@ -24,6 +24,20 @@ export default async function AdminTourBookingDetailPage({
 
   if (!booking) notFound();
 
+  // Generate signed URL for GCash screenshot
+  let gcashSignedUrl: string | null = null;
+  if (booking.gcash_screenshot_url) {
+    // Extract the path from the full URL
+    const urlParts = booking.gcash_screenshot_url.split("/payment-proofs/");
+    const filePath = urlParts[1];
+    if (filePath) {
+      const { data: signedData } = await supabase.storage
+        .from("payment-proofs")
+        .createSignedUrl(filePath, 3600); // 1 hour
+      gcashSignedUrl = signedData?.signedUrl ?? null;
+    }
+  }
+
   function formatDate(dateStr: string) {
     return new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", {
       weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -135,10 +149,10 @@ export default async function AdminTourBookingDetailPage({
       {/* GCash Screenshot */}
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 mb-4">
         <h2 className="font-bold text-[#134e4a] mb-4">💚 GCash Payment Proof</h2>
-        {booking.gcash_screenshot_url ? (
+        {gcashSignedUrl ? (
           <div>
             <img
-              src={booking.gcash_screenshot_url}
+              src={gcashSignedUrl}
               alt="GCash Screenshot"
               className="rounded-xl border border-gray-200 max-w-full max-h-96 object-contain mb-3"
             />
