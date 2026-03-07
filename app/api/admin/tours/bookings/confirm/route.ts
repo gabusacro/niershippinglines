@@ -13,14 +13,21 @@ export async function POST(request: NextRequest) {
   const booking_id = formData.get("booking_id") as string;
   const reference  = formData.get("reference") as string;
 
+  console.log("🔥 CONFIRM ROUTE HIT", { booking_id, reference });
+
   const supabase = await createClient();
 
-  // Fetch booking details for the email
-  const { data: booking } = await supabase
+  const { data: booking, error: fetchError } = await supabase
     .from("tour_bookings")
-    .select("*, tour:tour_packages(title), schedule:tour_schedules(available_date, departure_time)")
+    .select(`
+      *,
+      tour:tour_packages(title),
+      schedule:tour_schedules(available_date, departure_time)
+    `)
     .eq("id", booking_id)
     .single();
+
+  console.log("📦 BOOKING FETCHED", { found: !!booking, fetchError });
 
   const { error } = await supabase
     .from("tour_bookings")
@@ -34,11 +41,14 @@ export async function POST(request: NextRequest) {
     .eq("id", booking_id);
 
   if (error) {
+    console.log("❌ UPDATE ERROR", error);
     return NextResponse.redirect(
       new URL(`/admin/tours/bookings/${booking_id}?error=${encodeURIComponent(error.message)}`, request.url),
       { status: 303 }
     );
   }
+
+  console.log("📧 ABOUT TO SEND EMAIL", { email: booking?.customer_email });
 
   // Send confirmation email
   if (booking?.customer_email) {
@@ -55,7 +65,7 @@ export async function POST(request: NextRequest) {
       ? `₱${(booking.total_amount_cents / 100).toLocaleString()}`
       : "Negotiable";
 
-    await sendViaGmail({
+    const emailResult = await sendViaGmail({
       to: booking.customer_email,
       subject: `✅ Booking Confirmed — ${reference} | Travela Siargao`,
       html: `
@@ -63,7 +73,6 @@ export async function POST(request: NextRequest) {
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f5f5f0;font-family:Arial,sans-serif;">
-
   <div style="max-width:520px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
 
     <!-- Header -->
@@ -75,7 +84,6 @@ export async function POST(request: NextRequest) {
 
     <!-- Body -->
     <div style="padding:28px 24px;">
-
       <p style="margin:0 0 20px;color:#374151;font-size:15px;">
         Hi <strong>${booking.customer_name}</strong>, your payment has been verified and your tour booking is confirmed. 🎉
       </p>
@@ -138,7 +146,7 @@ export async function POST(request: NextRequest) {
     <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 24px;text-align:center;">
       <p style="margin:0;color:#9ca3af;font-size:12px;">
         Travela Siargao · Booking, ticketing &amp; ferry schedules<br>
-        <a href="${process.env.NEXT_PUBLIC_SITE_URL}" style="color:#0c7b93;text-decoration:none;">travelasiargao.gabrielsacro.com</a>
+        <a href="${process.env.NEXT_PUBLIC_SITE_URL}" style="color:#0c7b93;text-decoration:none;">travelasiargao.com</a>
       </p>
     </div>
 
@@ -147,6 +155,10 @@ export async function POST(request: NextRequest) {
 </html>
       `,
     });
+
+    console.log("📧 EMAIL RESULT", { emailResult });
+  } else {
+    console.log("⚠️ NO EMAIL — customer_email is missing from booking");
   }
 
   return NextResponse.redirect(
