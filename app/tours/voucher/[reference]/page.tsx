@@ -161,11 +161,10 @@ export default async function TourVoucherPage({
         </div>
 
         {/* Print button */}
-        <button
-          onClick={() => window.print()}
-          className="w-full rounded-xl border-2 border-emerald-200 bg-white py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors mb-3">
+        <a href={`/tours/voucher/${reference}/print`}
+          className="block w-full rounded-xl border-2 border-emerald-200 bg-white py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors mb-3 text-center">
           🖨️ Print / Save as PDF
-        </button>
+        </a>
 
         <div className="text-center">
           <Link href="/tours" className="text-sm text-emerald-600 hover:underline">
