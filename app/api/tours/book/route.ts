@@ -116,7 +116,8 @@ export async function POST(request: NextRequest) {
 
     // Redirect to confirmation page
     return NextResponse.redirect(
-      new URL(`/tours/confirmation?ref=${booking.reference}`, request.url)
+      new URL(`/tours/confirmation?ref=${booking.reference}`, request.url),
+      { status: 303 }
     );
 
   } catch (err) {
