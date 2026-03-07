@@ -24,6 +24,12 @@ export default async function AdminTourBookingDetailPage({
 
   if (!booking) notFound();
 
+  const { data: passengers } = await supabase
+  .from("tour_booking_passengers")
+  .select("*")
+  .eq("booking_id", id)
+  .order("passenger_number", { ascending: true });
+
   // Generate signed URL for GCash screenshot
   let gcashSignedUrl: string | null = null;
   if (booking.gcash_screenshot_url) {
@@ -218,6 +224,83 @@ export default async function AdminTourBookingDetailPage({
           </p>
         </section>
       )}
+
+{/* Tourist Manifest */}
+<section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 mb-4">
+  <div className="flex items-center justify-between mb-4">
+    <h2 className="font-bold text-[#134e4a]">🧑‍🤝‍🧑 Tourist Manifest</h2>
+    <span className="text-xs text-gray-400">{passengers?.length ?? 0} tourist/s</span>
+  </div>
+
+  {!passengers || passengers.length === 0 ? (
+    <p className="text-sm text-gray-400">No passenger details recorded.</p>
+  ) : (
+    <div className="space-y-4">
+      {passengers.map((p, i) => (
+        <div key={p.id} className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center">
+              {p.passenger_number}
+            </span>
+            <span className="font-bold text-[#134e4a] text-sm">{p.full_name}</span>
+            {p.passenger_number === 1 && (
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                Lead
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+            <div>
+              <span className="text-gray-400">Address</span>
+              <p className="font-medium text-gray-700">{p.address || "—"}</p>
+            </div>
+            <div>
+              <span className="text-gray-400">Birthdate</span>
+              <p className="font-medium text-gray-700">
+                {p.birthdate
+                  ? new Date(p.birthdate + "T00:00:00").toLocaleDateString("en-PH", {
+                      month: "long", day: "numeric", year: "numeric",
+                    })
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <span className="text-gray-400">Age</span>
+              <p className="font-bold text-emerald-700">{p.age} yrs old</p>
+            </div>
+            <div>
+              <span className="text-gray-400">Contact</span>
+              <p className="font-medium text-gray-700">{p.contact_number || "—"}</p>
+            </div>
+            <div>
+              <span className="text-gray-400">Emergency Contact</span>
+              <p className="font-medium text-gray-700">{p.emergency_contact_name || "—"}</p>
+            </div>
+            <div>
+              <span className="text-gray-400">Emergency Number</span>
+              <p className="font-medium text-gray-700">{p.emergency_contact_number || "—"}</p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {/* Print manifest button */}
+  {passengers && passengers.length > 0 && (
+    <div className="mt-4 pt-4 border-t border-emerald-100">
+      <a
+        href={`/admin/tours/bookings/${booking.id}/manifest`}
+        target="_blank"
+        className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
+      >
+        🖨️ Print / Export Manifest
+      </a>
+    </div>
+  )}
+</section>
+
+
 
       <div className="mt-4">
         <Link href="/admin/tours/bookings"
