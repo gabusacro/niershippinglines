@@ -202,6 +202,20 @@ export default async function AdminTourBookingDetailPage({
               ? ` on ${new Date(booking.payment_verified_at).toLocaleString("en-PH")}`
               : ""}
           </p>
+          <div className="mt-3 flex gap-3">
+            <Link href={`/tours/voucher/${booking.reference}`} target="_blank"
+              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+              🎫 View Voucher
+            </Link>
+            <Link href={`/tours/voucher/${booking.reference}`} target="_blank"
+              className="rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
+              📤 Send to Customer
+            </Link>
+          </div>
+          <p className="text-xs text-emerald-600 mt-2">
+            Share this link with customer:{" "}
+            <span className="font-mono">/tours/voucher/{booking.reference}</span>
+          </p>
         </section>
       )}
 
