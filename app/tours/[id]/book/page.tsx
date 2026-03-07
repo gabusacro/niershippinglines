@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
+import { BookingCalculator } from "@/components/tours/BookingCalculator";
 
 export const metadata = { title: "Book Tour — Travela Siargao" };
 
@@ -39,8 +40,8 @@ export default async function BookTourPage({
 
   if (!schedule) redirect(`/tours/${id}`);
 
-  const joinersLeft  = schedule.joiner_slots_total  - schedule.joiner_slots_booked;
-  const privateLeft  = schedule.private_slots_total - schedule.private_slots_booked;
+  const joinersLeft = schedule.joiner_slots_total - schedule.joiner_slots_booked;
+  const privateLeft = schedule.private_slots_total - schedule.private_slots_booked;
 
   function formatDate(dateStr: string) {
     return new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", {
@@ -48,10 +49,12 @@ export default async function BookTourPage({
     });
   }
 
+  const bookingType = pkg.accepts_joiners && pkg.accepts_private ? "both"
+    : pkg.accepts_private ? "private"
+    : "joiner";
+
   return (
     <div className="min-h-screen bg-[#fafaf7]">
-
-      {/* Header */}
       <div className="bg-gradient-to-br from-[#0c7b93] to-[#0f766e] px-6 py-10 text-white">
         <div className="mx-auto max-w-2xl">
           <Link href={`/tours/${id}`} className="text-sm text-white/70 hover:text-white mb-3 inline-block">
@@ -61,14 +64,11 @@ export default async function BookTourPage({
           <p className="text-white/80 text-sm mt-1">{pkg.title}</p>
           <div className="mt-3 flex flex-wrap gap-4 text-sm text-white/80">
             <span>📅 {formatDate(schedule.available_date)}</span>
-            <span>🕐 Departure: {schedule.departure_time?.slice(0,5)}</span>
+            <span>🕐 Departure: {schedule.departure_time?.slice(0, 5)}</span>
           </div>
         </div>
-      </div>
+      </div><div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
 
-      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-
-        {/* Login notice if not logged in */}
         {!user && (
           <div className="mb-6 rounded-2xl border-2 border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
             💡 <strong>Have an account?</strong>{" "}
@@ -80,60 +80,20 @@ export default async function BookTourPage({
         )}
 
         <form action="/api/tours/book" method="POST" encType="multipart/form-data">
-          <input type="hidden" name="tour_id"    value={id} />
+          <input type="hidden" name="tour_id" value={id} />
           <input type="hidden" name="schedule_id" value={scheduleId} />
 
-          {/* Booking type selection */}
-          {pkg.accepts_joiners && pkg.accepts_private && (
-            <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 mb-4">
-              <h2 className="font-bold text-[#134e4a] mb-4">Booking Type</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {joinersLeft > 0 && (
-                  <label className="cursor-pointer rounded-xl border-2 border-emerald-200 p-4 hover:border-emerald-400 transition-colors has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
-                    <input type="radio" name="booking_type" value="joiner" defaultChecked className="sr-only" />
-                    <div className="font-bold text-emerald-800 mb-1">👥 Joiner</div>
-                    <div className="text-xs text-gray-500 mb-2">Join a shared group trip</div>
-                    <div className="text-lg font-bold text-emerald-700">
-                      ₱{(pkg.joiner_price_cents / 100).toLocaleString()}/pax
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">{joinersLeft} slots left</div>
-                  </label>
-                )}
-                {privateLeft > 0 && (
-                  <label className="cursor-pointer rounded-xl border-2 border-teal-200 p-4 hover:border-teal-400 transition-colors has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50">
-                    <input type="radio" name="booking_type" value="private" className="sr-only" />
-                    <div className="font-bold text-teal-800 mb-1">🔒 Private</div>
-                    <div className="text-xs text-gray-500 mb-2">Exclusive trip for your group</div>
-                    <div className="text-lg font-bold text-teal-700">
-                      {pkg.private_is_negotiable ? "Negotiable" : pkg.private_price_cents ? `₱${(pkg.private_price_cents / 100).toLocaleString()}` : "Contact us"}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">{privateLeft} slot{privateLeft > 1 ? "s" : ""} left</div>
-                  </label>
-                )}
-              </div>
-            </section>
-          )}
-
-          {/* Only joiners */}
-          {pkg.accepts_joiners && !pkg.accepts_private && (
-            <input type="hidden" name="booking_type" value="joiner" />
-          )}
-          {/* Only private */}
-          {!pkg.accepts_joiners && pkg.accepts_private && (
-            <input type="hidden" name="booking_type" value="private" />
-          )}
-
-          {/* Passenger count */}
-          <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 mb-4">
-            <h2 className="font-bold text-[#134e4a] mb-4">Number of Guests</h2>
-            <div className="flex items-center gap-4">
-              <input type="number" name="total_pax" min="1" max={Math.min(joinersLeft, 20)} defaultValue="1" required
-                className="w-24 rounded-xl border-2 border-emerald-200 px-3 py-2 text-center text-lg font-bold focus:border-emerald-400 focus:outline-none" />
-              <div className="text-sm text-gray-500">
-                {pkg.accepts_joiners && <span>Max {Math.min(joinersLeft, 20)} for joiners</span>}
-              </div>
-            </div>
-          </section>
+          {/* Calculator — booking type + pax counter + price summary */}
+          <div className="mb-4">
+            <BookingCalculator
+              bookingType={bookingType}
+              joinerPriceCents={pkg.joiner_price_cents}
+              privatePriceCents={pkg.private_price_cents}
+              privateIsNegotiable={pkg.private_is_negotiable ?? false}
+              joinersLeft={joinersLeft}
+              privateLeft={privateLeft}
+            />
+          </div>
 
           {/* Contact details */}
           <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 mb-4">
@@ -211,7 +171,6 @@ export default async function BookTourPage({
             </div>
           </section>
 
-          {/* Submit */}
           <button type="submit"
             className="w-full rounded-xl bg-emerald-600 py-4 text-base font-bold text-white hover:bg-emerald-700 transition-colors">
             Submit Booking →
