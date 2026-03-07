@@ -156,7 +156,7 @@ export default async function AdminTourBookingDetailPage({
               alt="GCash Screenshot"
               className="rounded-xl border border-gray-200 max-w-full max-h-96 object-contain mb-3"
             />
-            <a href={booking.gcash_screenshot_url} target="_blank" rel="noopener noreferrer"
+            <a href={gcashSignedUrl} target="_blank" rel="noopener noreferrer"
               className="text-sm text-emerald-600 hover:underline">
               Open full image →
             </a>
