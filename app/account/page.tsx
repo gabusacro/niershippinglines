@@ -19,7 +19,6 @@ export default async function AccountPage({ searchParams }: Props) {
 
   const { reset } = await searchParams;
 
-  // Clean focused UI for password reset flow
   if (reset === "1") {
     return (
       <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
@@ -39,7 +38,6 @@ export default async function AccountPage({ searchParams }: Props) {
     );
   }
 
-  // Normal account settings
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-[#134e4a]">Account settings</h1>
@@ -57,6 +55,8 @@ export default async function AccountPage({ searchParams }: Props) {
             nationality: user.nationality,
             recovery_email: user.recoveryEmail,
             mobile: user.mobile,
+            emergency_contact_name: user.emergencyContactName,
+            emergency_contact_number: user.emergencyContactNumber,
           }}
           authEmail={user.email ?? ""}
         />

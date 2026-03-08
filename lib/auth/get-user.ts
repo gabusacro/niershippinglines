@@ -15,6 +15,8 @@ export interface AuthUser {
   nationality: string | null;
   recoveryEmail: string | null;
   mobile: string | null;
+  emergencyContactName: string | null;
+  emergencyContactNumber: string | null;
 }
 
 export async function getAuthUser(): Promise<AuthUser | null> {
@@ -25,7 +27,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role, full_name, salutation, address, approved_at, gender, birthdate, nationality, recovery_email, mobile")
+    .select("role, full_name, salutation, address, approved_at, gender, birthdate, nationality, recovery_email, mobile, emergency_contact_name, emergency_contact_number")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -50,6 +52,8 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     nationality: profile?.nationality ?? null,
     recoveryEmail: profile?.recovery_email ?? null,
     mobile: profile?.mobile ?? null,
+    emergencyContactName: profile?.emergency_contact_name ?? null,
+    emergencyContactNumber: profile?.emergency_contact_number ?? null,
   };
 }
 

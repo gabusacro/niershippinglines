@@ -48,6 +48,8 @@ type Props = {
     nationality: string | null;
     recovery_email: string | null;
     mobile: string | null;
+    emergency_contact_name: string | null;
+    emergency_contact_number: string | null;
   };
   authEmail: string;
 };
@@ -63,6 +65,8 @@ export function ProfileForm({ initialData, authEmail }: Props) {
   const [nationality, setNationality] = useState(initialData.nationality ?? "Filipino");
   const [address, setAddress] = useState(initialData.address ?? "");
   const [mobile, setMobile] = useState(initialData.mobile ?? "");
+  const [emergencyContactName, setEmergencyContactName] = useState(initialData.emergency_contact_name ?? "");
+  const [emergencyContactNumber, setEmergencyContactNumber] = useState(initialData.emergency_contact_number ?? "");
   const [recoveryEmail, setRecoveryEmail] = useState(initialData.recovery_email ?? "");
   const [newEmail, setNewEmail] = useState("");
   const [saving, setSaving] = useState(false);
@@ -93,6 +97,8 @@ export function ProfileForm({ initialData, authEmail }: Props) {
         nationality: nationality || "Filipino",
         recovery_email: recoveryEmail.trim() || null,
         mobile: mobile.trim() || null,
+        emergency_contact_name: emergencyContactName.trim() || null,
+        emergency_contact_number: emergencyContactNumber.trim() || null,
       };
       if (newEmail.trim()) body.email = newEmail.trim();
 
@@ -121,7 +127,7 @@ export function ProfileForm({ initialData, authEmail }: Props) {
   return (
     <form onSubmit={handleSave} className="space-y-5">
 
-      {/* Personal Info Section */}
+      {/* Personal Info */}
       <div className="rounded-xl border-2 border-teal-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[#134e4a]">Personal information</h2>
         <p className="mt-1 text-sm text-[#0f766e]">Used on tickets and Coast Guard manifest.</p>
@@ -155,12 +161,8 @@ export function ProfileForm({ initialData, authEmail }: Props) {
 
           <div>
             <label className={labelClass}>Date of birth</label>
-            <input
-              type="date" value={birthdate}
-              onChange={(e) => setBirthdate(e.target.value)}
-              max={new Date().toISOString().split("T")[0]}
-              className={inputClass}
-            />
+            <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)}
+              max={new Date().toISOString().split("T")[0]} className={inputClass} />
             {age !== null && (
               <p className="mt-1 text-xs text-[#0f766e]">Age: {age} years old</p>
             )}
@@ -177,25 +179,42 @@ export function ProfileForm({ initialData, authEmail }: Props) {
 
           <div>
             <label className={labelClass}>Address</label>
-            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} placeholder="For tickets and manifest" />
+            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)}
+              className={inputClass} placeholder="For tickets and manifest" />
           </div>
 
           <div>
             <label className={labelClass}>Mobile number</label>
-            <input
-              type="tel"
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
-              className={inputClass}
-              placeholder="09XX XXX XXXX"
-            />
+            <input type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)}
+              className={inputClass} placeholder="09XX XXX XXXX" />
             <p className="mt-1 text-xs text-[#0f766e]/80">Used to pre-fill tour booking forms.</p>
           </div>
-
         </div>
       </div>
 
-      {/* Email Section */}
+      {/* Emergency Contact */}
+      <div className="rounded-xl border-2 border-teal-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-[#134e4a]">Emergency contact</h2>
+        <p className="mt-1 text-sm text-[#0f766e]">Pre-filled in tour booking forms for your safety.</p>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>Emergency contact name</label>
+            <input type="text" value={emergencyContactName}
+              onChange={(e) => setEmergencyContactName(e.target.value)}
+              className={inputClass} placeholder="Juan Dela Cruz" />
+          </div>
+
+          <div>
+            <label className={labelClass}>Emergency contact number</label>
+            <input type="tel" value={emergencyContactNumber}
+              onChange={(e) => setEmergencyContactNumber(e.target.value)}
+              className={inputClass} placeholder="09XX XXX XXXX" />
+          </div>
+        </div>
+      </div>
+
+      {/* Email Settings */}
       <div className="rounded-xl border-2 border-teal-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[#134e4a]">Email settings</h2>
         <p className="mt-1 text-sm text-[#0f766e]">Your current email: <span className="font-semibold">{authEmail}</span></p>
@@ -205,33 +224,23 @@ export function ProfileForm({ initialData, authEmail }: Props) {
             <label className={labelClass}>
               Change email <span className="text-xs text-[#0f766e] font-normal">(optional)</span>
             </label>
-            <input
-              type="email" value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              className={inputClass}
-              placeholder="Enter new email address"
-            />
-            <p className="mt-1 text-xs text-[#0f766e]/80">You will receive a confirmation link at the new email. Your old email will no longer work after confirmation.</p>
+            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+              className={inputClass} placeholder="Enter new email address" />
+            <p className="mt-1 text-xs text-[#0f766e]/80">You will receive a confirmation link at the new email.</p>
           </div>
 
           <div>
             <label className={labelClass}>
               Recovery email <span className="text-xs text-[#0f766e] font-normal">(optional)</span>
             </label>
-            <input
-              type="email" value={recoveryEmail}
-              onChange={(e) => setRecoveryEmail(e.target.value)}
-              className={inputClass}
-              placeholder="Backup email if you lose access"
-            />
+            <input type="email" value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)}
+              className={inputClass} placeholder="Backup email if you lose access" />
           </div>
         </div>
       </div>
 
-      <button
-        type="submit" disabled={saving}
-        className="w-full rounded-xl bg-[#0c7b93] px-5 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors"
-      >
+      <button type="submit" disabled={saving}
+        className="w-full rounded-xl bg-[#0c7b93] px-5 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors">
         {saving ? "Saving..." : "Save profile"}
       </button>
     </form>

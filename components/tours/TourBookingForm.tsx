@@ -25,32 +25,25 @@ interface Props {
   profileMobile: string;
   profileAddress: string;
   profileBirthdate: string;
+  profileEmergencyName: string;
+  profileEmergencyNumber: string;
   userEmail: string;
   userId: string;
 }
 
 export default function TourBookingForm({
-  tour,
-  schedule,
-  bookingType,
-  profileName,
-  profileMobile,
-  profileAddress,
-  profileBirthdate,
-  userEmail,
-  userId,
+  tour, schedule, bookingType,
+  profileName, profileMobile, profileAddress, profileBirthdate,
+  profileEmergencyName, profileEmergencyNumber,
+  userEmail, userId,
 }: Props) {
   const [actualPax, setActualPax] = useState(1);
   const [selectedType, setSelectedType] = useState<"joiner" | "private">(
     bookingType === "private" ? "private" : "joiner"
   );
 
-  const joinersLeft = schedule
-    ? schedule.joiner_slots_total - schedule.joiner_slots_booked
-    : 20;
-  const privateLeft = schedule
-    ? schedule.private_slots_total - schedule.private_slots_booked
-    : 1;
+  const joinersLeft = schedule ? schedule.joiner_slots_total - schedule.joiner_slots_booked : 20;
+  const privateLeft = schedule ? schedule.private_slots_total - schedule.private_slots_booked : 1;
 
   return (
     <form action="/api/tours/book" method="POST" encType="multipart/form-data" className="space-y-6">
@@ -72,26 +65,18 @@ export default function TourBookingForm({
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 space-y-4">
         <h2 className="font-bold text-[#134e4a]">📋 Contact Information</h2>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">
-            Full Name <span className="text-red-400">*</span>
-          </label>
-          <input type="text" name="customer_name" defaultValue={profileName} required
-            placeholder="Juan Dela Cruz"
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name <span className="text-red-400">*</span></label>
+          <input type="text" name="customer_name" defaultValue={profileName} required placeholder="Juan Dela Cruz"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">
-            Email Address <span className="text-red-400">*</span>
-          </label>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Email Address <span className="text-red-400">*</span></label>
           <input type="email" name="customer_email" defaultValue={userEmail} required
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">
-            Phone Number <span className="text-red-400">*</span>
-          </label>
-          <input type="tel" name="customer_phone" defaultValue={profileMobile} required
-            placeholder="09XX XXX XXXX"
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Phone Number <span className="text-red-400">*</span></label>
+          <input type="tel" name="customer_phone" defaultValue={profileMobile} required placeholder="09XX XXX XXXX"
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
         </div>
       </section>
@@ -111,6 +96,8 @@ export default function TourBookingForm({
           profileMobile={profileMobile}
           profileAddress={profileAddress}
           profileBirthdate={profileBirthdate}
+          profileEmergencyName={profileEmergencyName}
+          profileEmergencyNumber={profileEmergencyNumber}
         />
       </section>
 
@@ -122,9 +109,7 @@ export default function TourBookingForm({
           <p className="text-xs text-emerald-600 mt-1">Gabriel Sacro · Travela Siargao</p>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">
-            Upload GCash Screenshot <span className="text-red-400">*</span>
-          </label>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Upload GCash Screenshot <span className="text-red-400">*</span></label>
           <input type="file" name="gcash_screenshot" accept="image/*" required
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-1 file:text-emerald-700 file:font-semibold hover:file:bg-emerald-100" />
         </div>

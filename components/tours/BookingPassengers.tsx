@@ -18,6 +18,8 @@ interface Props {
   profileMobile?: string;
   profileAddress?: string;
   profileBirthdate?: string;
+  profileEmergencyName?: string;
+  profileEmergencyNumber?: string;
 }
 
 function calculateAge(birthdate: string): number {
@@ -31,21 +33,14 @@ function calculateAge(birthdate: string): number {
 }
 
 const emptyPassenger = (): PassengerData => ({
-  full_name: "",
-  address: "",
-  birthdate: "",
-  age: "",
-  contact_number: "",
-  emergency_contact_name: "",
-  emergency_contact_number: "",
+  full_name: "", address: "", birthdate: "", age: "",
+  contact_number: "", emergency_contact_name: "", emergency_contact_number: "",
 });
 
 export default function BookingPassengers({
   totalPax,
-  profileName = "",
-  profileMobile = "",
-  profileAddress = "",
-  profileBirthdate = "",
+  profileName = "", profileMobile = "", profileAddress = "",
+  profileBirthdate = "", profileEmergencyName = "", profileEmergencyNumber = "",
 }: Props) {
   const [passengers, setPassengers] = useState<PassengerData[]>(() => {
     const list: PassengerData[] = [];
@@ -67,10 +62,12 @@ export default function BookingPassengers({
         address: profileAddress || updated[0].address,
         birthdate: profileBirthdate || updated[0].birthdate,
         age: profileBirthdate ? String(calculateAge(profileBirthdate)) : updated[0].age,
+        emergency_contact_name: profileEmergencyName || updated[0].emergency_contact_name,
+        emergency_contact_number: profileEmergencyNumber || updated[0].emergency_contact_number,
       };
       return updated;
     });
-  }, [profileName, profileMobile, profileAddress, profileBirthdate]);
+  }, [profileName, profileMobile, profileAddress, profileBirthdate, profileEmergencyName, profileEmergencyNumber]);
 
   // Sync list size when totalPax changes
   useEffect(() => {
@@ -92,17 +89,13 @@ export default function BookingPassengers({
     setPassengers(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
-      if (field === "birthdate") {
-        updated[index].age = String(calculateAge(value));
-      }
+      if (field === "birthdate") updated[index].age = String(calculateAge(value));
       return updated;
     });
   }
 
   function toggle(index: number) {
-    setExpanded(prev =>
-      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
-    );
+    setExpanded(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]);
   }
 
   function isComplete(p: PassengerData) {
@@ -119,23 +112,14 @@ export default function BookingPassengers({
 
       {passengers.map((p, i) => (
         <div key={i} className="rounded-xl border-2 border-emerald-100 bg-white overflow-hidden">
-          <button
-            type="button"
-            onClick={() => toggle(i)}
-            className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-emerald-50 transition-colors"
-          >
+          <button type="button" onClick={() => toggle(i)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-emerald-50 transition-colors">
             <div className="flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm flex items-center justify-center">
-                {i + 1}
-              </span>
+              <span className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm flex items-center justify-center">{i + 1}</span>
               <span className="font-semibold text-[#134e4a] text-sm">
                 {p.full_name || (i === 0 ? "Lead Tourist (You)" : `Tourist ${i + 1}`)}
               </span>
-              {i === 0 && (
-                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-                  Lead
-                </span>
-              )}
+              {i === 0 && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Lead</span>}
             </div>
             <div className="flex items-center gap-2">
               {isComplete(p) && <span className="text-emerald-500 text-sm">✅</span>}
@@ -147,71 +131,50 @@ export default function BookingPassengers({
             <div className="px-4 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-emerald-50">
 
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-gray-500 mb-1">
-                  Full Name <span className="text-red-400">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name <span className="text-red-400">*</span></label>
                 <input type="text" name={`passengers[${i}][full_name]`} value={p.full_name}
-                  onChange={e => update(i, "full_name", e.target.value)}
-                  placeholder="Juan Dela Cruz" required
+                  onChange={e => update(i, "full_name", e.target.value)} placeholder="Juan Dela Cruz" required
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-gray-500 mb-1">
-                  Address <span className="text-red-400">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Address <span className="text-red-400">*</span></label>
                 <input type="text" name={`passengers[${i}][address]`} value={p.address}
-                  onChange={e => update(i, "address", e.target.value)}
-                  placeholder="Barangay, City, Province" required
+                  onChange={e => update(i, "address", e.target.value)} placeholder="Barangay, City, Province" required
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">
-                  Birthdate <span className="text-red-400">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Birthdate <span className="text-red-400">*</span></label>
                 <input type="date" name={`passengers[${i}][birthdate]`} value={p.birthdate}
-                  onChange={e => update(i, "birthdate", e.target.value)}
-                  required max={new Date().toISOString().split("T")[0]}
+                  onChange={e => update(i, "birthdate", e.target.value)} required max={new Date().toISOString().split("T")[0]}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">
-                  Age <span className="text-xs text-emerald-600 font-normal">(auto-calculated)</span>
-                </label>
-                <input type="number" name={`passengers[${i}][age]`} value={p.age}
-                  readOnly placeholder="—"
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Age <span className="text-xs text-emerald-600 font-normal">(auto-calculated)</span></label>
+                <input type="number" name={`passengers[${i}][age]`} value={p.age} readOnly placeholder="—"
                   className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-emerald-700 font-bold cursor-not-allowed" />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-gray-500 mb-1">
-                  Contact Number <span className="text-red-400">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Contact Number <span className="text-red-400">*</span></label>
                 <input type="tel" name={`passengers[${i}][contact_number]`} value={p.contact_number}
-                  onChange={e => update(i, "contact_number", e.target.value)}
-                  placeholder="09XX XXX XXXX" required
+                  onChange={e => update(i, "contact_number", e.target.value)} placeholder="09XX XXX XXXX" required
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">
-                  Emergency Contact Name <span className="text-red-400">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Emergency Contact Name <span className="text-red-400">*</span></label>
                 <input type="text" name={`passengers[${i}][emergency_contact_name]`} value={p.emergency_contact_name}
-                  onChange={e => update(i, "emergency_contact_name", e.target.value)}
-                  placeholder="Maria Dela Cruz" required
+                  onChange={e => update(i, "emergency_contact_name", e.target.value)} placeholder="Maria Dela Cruz" required
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">
-                  Emergency Contact Number <span className="text-red-400">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Emergency Contact Number <span className="text-red-400">*</span></label>
                 <input type="tel" name={`passengers[${i}][emergency_contact_number]`} value={p.emergency_contact_number}
-                  onChange={e => update(i, "emergency_contact_number", e.target.value)}
-                  placeholder="09XX XXX XXXX" required
+                  onChange={e => update(i, "emergency_contact_number", e.target.value)} placeholder="09XX XXX XXXX" required
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 

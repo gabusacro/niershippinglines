@@ -36,17 +36,12 @@ export default async function TourBookPage({
   if (!tour) notFound();
 
   const { data: schedule } = scheduleId
-    ? await supabase
-        .from("tour_schedules")
-        .select("*")
-        .eq("id", scheduleId)
-        .eq("tour_id", id)
-        .single()
+    ? await supabase.from("tour_schedules").select("*").eq("id", scheduleId).eq("tour_id", id).single()
     : { data: null };
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, mobile, address, birthdate")
+    .select("full_name, mobile, address, birthdate, emergency_contact_name, emergency_contact_number")
     .eq("id", user.id)
     .single();
 
@@ -75,6 +70,8 @@ export default async function TourBookPage({
         profileMobile={profile?.mobile ?? ""}
         profileAddress={profile?.address ?? ""}
         profileBirthdate={profile?.birthdate ?? ""}
+        profileEmergencyName={profile?.emergency_contact_name ?? ""}
+        profileEmergencyNumber={profile?.emergency_contact_number ?? ""}
         userEmail={user.email ?? ""}
         userId={user.id}
       />
