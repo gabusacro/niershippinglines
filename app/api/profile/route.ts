@@ -15,6 +15,7 @@ export async function PATCH(request: NextRequest) {
     birthdate?: string;
     nationality?: string;
     recovery_email?: string;
+    mobile?: string;
     email?: string;
   };
   try {
@@ -47,7 +48,8 @@ export async function PATCH(request: NextRequest) {
   if (gender !== undefined) profileUpdates.gender = gender;
   if (birthdate !== undefined) profileUpdates.birthdate = birthdate;
   if (nationality !== undefined) profileUpdates.nationality = nationality;
-  if (recoveryEmail !== undefined) profileUpdates.recovery_email = recoveryEmail;
+  const mobile = typeof body.mobile === "string" ? body.mobile.trim() || null : undefined;
+  if (mobile !== undefined) profileUpdates.mobile = mobile;
 
   const { error } = await supabase
     .from("profiles")
