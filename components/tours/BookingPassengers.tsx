@@ -43,18 +43,26 @@ export default function BookingPassengers({
   profileBirthdate = "", profileEmergencyName = "", profileEmergencyNumber = "",
 }: Props) {
   const [passengers, setPassengers] = useState<PassengerData[]>(() => {
-    const list: PassengerData[] = [];
-    for (let i = 0; i < totalPax; i++) list.push(emptyPassenger());
+    const p0: PassengerData = {
+      full_name: profileName,
+      address: profileAddress,
+      birthdate: profileBirthdate,
+      age: profileBirthdate ? String(calculateAge(profileBirthdate)) : "",
+      contact_number: profileMobile,
+      emergency_contact_name: profileEmergencyName,
+      emergency_contact_number: profileEmergencyNumber,
+    };
+    const list = [p0];
+    for (let i = 1; i < totalPax; i++) list.push(emptyPassenger());
     return list;
   });
 
   const [expanded, setExpanded] = useState<number[]>([0]);
 
-  // Auto-fill passenger 1 from profile
+  // Sync profile prefill into passenger 0
   useEffect(() => {
     setPassengers(prev => {
       const updated = [...prev];
-      if (!updated[0]) updated[0] = emptyPassenger();
       updated[0] = {
         ...updated[0],
         full_name: profileName || updated[0].full_name,
@@ -76,20 +84,13 @@ export default function BookingPassengers({
       while (updated.length < totalPax) updated.push(emptyPassenger());
       return updated.slice(0, totalPax);
     });
-    setExpanded(prev => {
-      const next = [...prev];
-      for (let i = 0; i < totalPax; i++) {
-        if (!next.includes(i)) next.push(i);
-      }
-      return next.filter(i => i < totalPax);
-    });
   }, [totalPax]);
 
   function update(index: number, field: keyof PassengerData, value: string) {
     setPassengers(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
-      if (field === "birthdate") updated[index].age = String(calculateAge(value));
+      if (field === "birthdate") updated[index].age = value ? String(calculateAge(value)) : "";
       return updated;
     });
   }
@@ -105,6 +106,9 @@ export default function BookingPassengers({
 
   return (
     <div className="space-y-3">
+      {/* Single hidden input with all passenger data as JSON */}
+      <input type="hidden" name="passengers_json" value={JSON.stringify(passengers)} />
+
       <div className="flex items-center justify-between mb-1">
         <h3 className="font-bold text-[#134e4a] text-base">🧑‍🤝‍🧑 Tourist Details</h3>
         <span className="text-xs text-gray-400">Required for tourism office manifest</span>
@@ -132,49 +136,55 @@ export default function BookingPassengers({
 
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name <span className="text-red-400">*</span></label>
-                <input type="text" name={`passengers[${i}][full_name]`} value={p.full_name}
-                  onChange={e => update(i, "full_name", e.target.value)} placeholder="Juan Dela Cruz" required
+                <input type="text" value={p.full_name}
+                  onChange={e => update(i, "full_name", e.target.value)}
+                  placeholder="Juan Dela Cruz"
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Address <span className="text-red-400">*</span></label>
-                <input type="text" name={`passengers[${i}][address]`} value={p.address}
-                  onChange={e => update(i, "address", e.target.value)} placeholder="Barangay, City, Province" required
+                <input type="text" value={p.address}
+                  onChange={e => update(i, "address", e.target.value)}
+                  placeholder="Barangay, City, Province"
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Birthdate <span className="text-red-400">*</span></label>
-                <input type="date" name={`passengers[${i}][birthdate]`} value={p.birthdate}
-                  onChange={e => update(i, "birthdate", e.target.value)} required max={new Date().toISOString().split("T")[0]}
+                <input type="date" value={p.birthdate}
+                  onChange={e => update(i, "birthdate", e.target.value)}
+                  max={new Date().toISOString().split("T")[0]}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Age <span className="text-xs text-emerald-600 font-normal">(auto-calculated)</span></label>
-                <input type="number" name={`passengers[${i}][age]`} value={p.age} readOnly placeholder="—"
+                <input type="text" value={p.age} readOnly placeholder="—"
                   className="w-full rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-emerald-700 font-bold cursor-not-allowed" />
               </div>
 
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Contact Number <span className="text-red-400">*</span></label>
-                <input type="tel" name={`passengers[${i}][contact_number]`} value={p.contact_number}
-                  onChange={e => update(i, "contact_number", e.target.value)} placeholder="09XX XXX XXXX" required
+                <input type="tel" value={p.contact_number}
+                  onChange={e => update(i, "contact_number", e.target.value)}
+                  placeholder="09XX XXX XXXX"
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Emergency Contact Name <span className="text-red-400">*</span></label>
-                <input type="text" name={`passengers[${i}][emergency_contact_name]`} value={p.emergency_contact_name}
-                  onChange={e => update(i, "emergency_contact_name", e.target.value)} placeholder="Maria Dela Cruz" required
+                <input type="text" value={p.emergency_contact_name}
+                  onChange={e => update(i, "emergency_contact_name", e.target.value)}
+                  placeholder="Maria Dela Cruz"
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Emergency Contact Number <span className="text-red-400">*</span></label>
-                <input type="tel" name={`passengers[${i}][emergency_contact_number]`} value={p.emergency_contact_number}
-                  onChange={e => update(i, "emergency_contact_number", e.target.value)} placeholder="09XX XXX XXXX" required
+                <input type="tel" value={p.emergency_contact_number}
+                  onChange={e => update(i, "emergency_contact_number", e.target.value)}
+                  placeholder="09XX XXX XXXX"
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
               </div>
 

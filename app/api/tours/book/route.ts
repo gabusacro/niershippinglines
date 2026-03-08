@@ -28,13 +28,6 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const formData = await request.formData();
 
-  // DEBUG: log all form keys and values
-  const allKeys: string[] = [];
-  formData.forEach((value, key) => {
-    if (key !== "gcash_screenshot") allKeys.push(`${key}=${value}`);
-  });
-  console.log("📋 FORM DATA KEYS:", allKeys.join(" | "));
-
   // ── Core booking fields ──────────────────────────────────
   const tour_id      = formData.get("tour_id") as string;
   const schedule_id  = formData.get("schedule_id") as string;
@@ -45,8 +38,10 @@ export async function POST(request: NextRequest) {
   const customer_email = formData.get("customer_email") as string;
   const customer_phone = formData.get("customer_phone") as string;
   const health_declaration_accepted = formData.get("health_declaration_accepted") === "true";
+  const passengers_json = formData.get("passengers_json") as string;
 
-  console.log(`📊 total_pax=${total_pax} booking_type=${booking_type} total_amount_cents=${total_amount_cents}`);
+  console.log("📊 total_pax=", total_pax, "booking_type=", booking_type);
+  console.log("📋 passengers_json=", passengers_json);
 
   // ── Upload GCash screenshot ──────────────────────────────
   const gcashFile = formData.get("gcash_screenshot") as File | null;
@@ -116,58 +111,48 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Save passenger manifest ───────────────────────────────
-  const passengerFields = [
-    "full_name", "address", "birthdate", "age",
-    "contact_number", "emergency_contact_name", "emergency_contact_number"
-  ];
+  // ── Save passenger manifest from JSON ────────────────────
+  try {
+    const passengersRaw = JSON.parse(passengers_json || "[]") as Array<{
+      full_name: string;
+      address: string;
+      birthdate: string;
+      age: string;
+      contact_number: string;
+      emergency_contact_name: string;
+      emergency_contact_number: string;
+    }>;
 
-  const passengersToInsert = [];
-
-  for (let i = 0; i < total_pax; i++) {
-    const passenger: Record<string, string | number | null> = {};
-    let hasData = false;
-
-    for (const field of passengerFields) {
-      const value = formData.get(`passengers[${i}][${field}]`) as string;
-      passenger[field] = value || "";
-      if (value) hasData = true;
-    }
-
-    console.log(`👤 Passenger ${i}: hasData=${hasData} name=${passenger.full_name}`);
-
-    if (hasData) {
-      const age = passenger.birthdate
-        ? calculateAge(passenger.birthdate as string)
-        : 0;
-
-      passengersToInsert.push({
+    const passengersToInsert = passengersRaw
+      .filter(p => p.full_name?.trim())
+      .map((p, i) => ({
         booking_id: booking.id,
         passenger_number: i + 1,
-        full_name: passenger.full_name as string,
-        address: passenger.address as string,
-        birthdate: passenger.birthdate as string || null,
-        age,
-        contact_number: passenger.contact_number as string,
-        emergency_contact_name: passenger.emergency_contact_name as string,
-        emergency_contact_number: passenger.emergency_contact_number as string,
+        full_name: p.full_name.trim(),
+        address: p.address?.trim() || "",
+        birthdate: p.birthdate || null,
+        age: p.birthdate ? calculateAge(p.birthdate) : (parseInt(p.age) || 0),
+        contact_number: p.contact_number?.trim() || "",
+        emergency_contact_name: p.emergency_contact_name?.trim() || "",
+        emergency_contact_number: p.emergency_contact_number?.trim() || "",
         linked_profile_id: i === 0 ? user.id : null,
-      });
+      }));
+
+    console.log("🧑 PASSENGERS TO INSERT:", passengersToInsert.length);
+
+    if (passengersToInsert.length > 0) {
+      const { error: passengersError } = await supabase
+        .from("tour_booking_passengers")
+        .insert(passengersToInsert);
+
+      if (passengersError) {
+        console.error("Tour passengers insert error:", JSON.stringify(passengersError));
+      } else {
+        console.log("✅ PASSENGERS SAVED:", passengersToInsert.length);
+      }
     }
-  }
-
-  console.log(`🧑 PASSENGERS TO INSERT: ${passengersToInsert.length}`);
-
-  if (passengersToInsert.length > 0) {
-    const { error: passengersError } = await supabase
-      .from("tour_booking_passengers")
-      .insert(passengersToInsert);
-
-    if (passengersError) {
-      console.error("Tour passengers insert error:", JSON.stringify(passengersError));
-    } else {
-      console.log("✅ PASSENGERS SAVED:", passengersToInsert.length);
-    }
+  } catch (e) {
+    console.error("Passengers JSON parse error:", e);
   }
 
   // ── Redirect to confirmation ──────────────────────────────
