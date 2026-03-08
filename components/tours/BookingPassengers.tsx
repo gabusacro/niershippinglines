@@ -107,7 +107,7 @@ export default function BookingPassengers({
   return (
     <div className="space-y-3">
       {/* Single hidden input with all passenger data as JSON */}
-      <input type="hidden" name="passengers_json" value={JSON.stringify(passengers)} />
+      <input type="hidden" name="passengers_json" value={JSON.stringify(passengers)} readOnly />
 
       <div className="flex items-center justify-between mb-1">
         <h3 className="font-bold text-[#134e4a] text-base">🧑‍🤝‍🧑 Tourist Details</h3>

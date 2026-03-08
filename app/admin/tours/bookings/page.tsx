@@ -110,7 +110,7 @@ export default async function AdminTourBookingsPage({
               <div className="min-w-[160px]">
                 <div className="font-mono font-bold text-emerald-700">{b.reference}</div>
                 <div className="text-xs text-gray-400 mt-0.5">
-                  {new Date(b.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {new Date(b.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}
                 </div>
               </div>
 
