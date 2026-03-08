@@ -46,10 +46,9 @@ export default async function TourBookPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, mobile")
+    .select("full_name, mobile, address, birthdate")
     .eq("id", user.id)
     .single();
-     console.log("PROFILE:", profile);
 
   function formatDate(dateStr: string) {
     return new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", {
@@ -74,6 +73,8 @@ export default async function TourBookPage({
         bookingType={bookingType}
         profileName={profile?.full_name ?? ""}
         profileMobile={profile?.mobile ?? ""}
+        profileAddress={profile?.address ?? ""}
+        profileBirthdate={profile?.birthdate ?? ""}
         userEmail={user.email ?? ""}
         userId={user.id}
       />

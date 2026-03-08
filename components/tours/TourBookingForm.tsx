@@ -23,6 +23,8 @@ interface Props {
   bookingType: "joiner" | "private" | "both";
   profileName: string;
   profileMobile: string;
+  profileAddress: string;
+  profileBirthdate: string;
   userEmail: string;
   userId: string;
 }
@@ -33,6 +35,8 @@ export default function TourBookingForm({
   bookingType,
   profileName,
   profileMobile,
+  profileAddress,
+  profileBirthdate,
   userEmail,
   userId,
 }: Props) {
@@ -50,12 +54,10 @@ export default function TourBookingForm({
 
   return (
     <form action="/api/tours/book" method="POST" encType="multipart/form-data" className="space-y-6">
-      {/* Hidden fields */}
       <input type="hidden" name="tour_id" value={tour.id} />
       <input type="hidden" name="schedule_id" value={schedule?.id ?? ""} />
       <input type="hidden" name="booked_by" value={userId} />
 
-      {/* Booking Calculator */}
       <BookingCalculator
         bookingType={bookingType}
         joinerPriceCents={tour.joiner_price_cents}
@@ -67,52 +69,34 @@ export default function TourBookingForm({
         onTypeChange={setSelectedType}
       />
 
-      {/* Contact Info */}
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 space-y-4">
         <h2 className="font-bold text-[#134e4a]">📋 Contact Information</h2>
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">
             Full Name <span className="text-red-400">*</span>
           </label>
-          <input
-            type="text"
-            name="customer_name"
-            defaultValue={profileName}
-            required
+          <input type="text" name="customer_name" defaultValue={profileName} required
             placeholder="Juan Dela Cruz"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300"
-          />
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">
             Email Address <span className="text-red-400">*</span>
           </label>
-          <input
-            type="email"
-            name="customer_email"
-            defaultValue={userEmail}
-            required
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300"
-          />
+          <input type="email" name="customer_email" defaultValue={userEmail} required
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">
             Phone Number <span className="text-red-400">*</span>
           </label>
-          <input
-            type="tel"
-            name="customer_phone"
-            defaultValue={profileMobile}
-            required
+          <input type="tel" name="customer_phone" defaultValue={profileMobile} required
             placeholder="09XX XXX XXXX"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300"
-          />
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#134e4a] focus:outline-none focus:ring-2 focus:ring-emerald-300" />
         </div>
       </section>
 
-      {/* Tourist Manifest */}
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6">
-        {/* For private — show note about actual headcount vs billing */}
         {selectedType === "private" && (
           <div className="mb-4 rounded-xl bg-teal-50 border border-teal-200 p-3">
             <p className="text-xs text-teal-700 font-semibold">
@@ -125,10 +109,11 @@ export default function TourBookingForm({
           totalPax={actualPax}
           profileName={profileName}
           profileMobile={profileMobile}
+          profileAddress={profileAddress}
+          profileBirthdate={profileBirthdate}
         />
       </section>
 
-      {/* GCash Payment */}
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 space-y-4">
         <h2 className="font-bold text-[#134e4a]">💚 GCash Payment</h2>
         <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
@@ -140,17 +125,11 @@ export default function TourBookingForm({
           <label className="block text-xs font-semibold text-gray-500 mb-1">
             Upload GCash Screenshot <span className="text-red-400">*</span>
           </label>
-          <input
-            type="file"
-            name="gcash_screenshot"
-            accept="image/*"
-            required
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-1 file:text-emerald-700 file:font-semibold hover:file:bg-emerald-100"
-          />
+          <input type="file" name="gcash_screenshot" accept="image/*" required
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-1 file:text-emerald-700 file:font-semibold hover:file:bg-emerald-100" />
         </div>
       </section>
 
-      {/* Health Declaration */}
       {tour.requires_health_declaration && (
         <section className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-6">
           <h2 className="font-bold text-amber-900 mb-3">⚕️ Health Declaration</h2>
@@ -161,13 +140,8 @@ export default function TourBookingForm({
             We understand that participants must be between 6–65 years old.
           </p>
           <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              name="health_declaration_accepted"
-              value="true"
-              required
-              className="mt-0.5 h-4 w-4 rounded border-amber-300 text-emerald-600 focus:ring-emerald-300"
-            />
+            <input type="checkbox" name="health_declaration_accepted" value="true" required
+              className="mt-0.5 h-4 w-4 rounded border-amber-300 text-emerald-600 focus:ring-emerald-300" />
             <span className="text-sm font-semibold text-amber-900">
               I confirm the above health declaration for all tourists in this booking.
             </span>
@@ -175,11 +149,8 @@ export default function TourBookingForm({
         </section>
       )}
 
-      {/* Submit */}
-      <button
-        type="submit"
-        className="w-full rounded-2xl bg-emerald-600 py-4 text-base font-bold text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100"
-      >
+      <button type="submit"
+        className="w-full rounded-2xl bg-emerald-600 py-4 text-base font-bold text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100">
         Submit Booking →
       </button>
       <p className="text-center text-xs text-gray-400">
