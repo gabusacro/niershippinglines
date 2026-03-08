@@ -148,9 +148,11 @@ export async function POST(request: NextRequest) {
   }
 
   if (passengersToInsert.length > 0) {
-    const { error: passengersError } = await supabase
-      .from("tour_booking_passengers")
-      .insert(passengersToInsert);
+console.log("🧑 PASSENGERS TO INSERT", JSON.stringify(passengersToInsert));
+
+const { error: passengersError } = await supabase
+  .from("tour_booking_passengers")
+  .insert(passengersToInsert);
 
 if (passengersError) {
   console.error("Tour passengers insert error:", JSON.stringify(passengersError));
