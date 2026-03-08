@@ -56,6 +56,7 @@ export default async function AccountPage({ searchParams }: Props) {
             birthdate: user.birthdate,
             nationality: user.nationality,
             recovery_email: user.recoveryEmail,
+            mobile: user.mobile,
           }}
           authEmail={user.email ?? ""}
         />

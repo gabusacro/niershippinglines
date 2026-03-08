@@ -47,6 +47,7 @@ type Props = {
     birthdate: string | null;
     nationality: string | null;
     recovery_email: string | null;
+    mobile: string | null;
   };
   authEmail: string;
 };
@@ -61,6 +62,7 @@ export function ProfileForm({ initialData, authEmail }: Props) {
   const [birthdate, setBirthdate] = useState(initialData.birthdate ?? "");
   const [nationality, setNationality] = useState(initialData.nationality ?? "Filipino");
   const [address, setAddress] = useState(initialData.address ?? "");
+  const [mobile, setMobile] = useState(initialData.mobile ?? "");
   const [recoveryEmail, setRecoveryEmail] = useState(initialData.recovery_email ?? "");
   const [newEmail, setNewEmail] = useState("");
   const [saving, setSaving] = useState(false);
@@ -90,6 +92,7 @@ export function ProfileForm({ initialData, authEmail }: Props) {
         birthdate: birthdate || null,
         nationality: nationality || "Filipino",
         recovery_email: recoveryEmail.trim() || null,
+        mobile: mobile.trim() || null,
       };
       if (newEmail.trim()) body.email = newEmail.trim();
 
@@ -176,6 +179,19 @@ export function ProfileForm({ initialData, authEmail }: Props) {
             <label className={labelClass}>Address</label>
             <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} placeholder="For tickets and manifest" />
           </div>
+
+          <div>
+            <label className={labelClass}>Mobile number</label>
+            <input
+              type="tel"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              className={inputClass}
+              placeholder="09XX XXX XXXX"
+            />
+            <p className="mt-1 text-xs text-[#0f766e]/80">Used to pre-fill tour booking forms.</p>
+          </div>
+
         </div>
       </div>
 
