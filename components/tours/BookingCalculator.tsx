@@ -9,6 +9,8 @@ interface Props {
   privateIsNegotiable: boolean;
   joinersLeft: number;
   privateLeft: number;
+  onPaxChange?: (pax: number) => void;
+  onTypeChange?: (type: "joiner" | "private") => void;
 }
 
 export function BookingCalculator({
@@ -18,6 +20,8 @@ export function BookingCalculator({
   privateIsNegotiable,
   joinersLeft,
   privateLeft,
+  onPaxChange,
+  onTypeChange,
 }: Props) {
   const [selectedType, setSelectedType] = useState<"joiner" | "private">(
     bookingType === "private" ? "private" : "joiner"
@@ -31,7 +35,7 @@ export function BookingCalculator({
     ? joinerPrice * pax
     : privatePrice ?? null;
 
-  const maxPax = selectedType === "joiner" ? Math.min(joinersLeft, 20) : 10;
+  const maxPax = selectedType === "joiner" ? Math.min(joinersLeft, 20) : 12;
 
   return (
     <div className="space-y-4">
@@ -45,7 +49,12 @@ export function BookingCalculator({
               <label className={`cursor-pointer rounded-xl border-2 p-4 transition-colors ${selectedType === "joiner" ? "border-emerald-500 bg-emerald-50" : "border-emerald-200 hover:border-emerald-400"}`}>
                 <input type="radio" name="booking_type" value="joiner"
                   checked={selectedType === "joiner"}
-                  onChange={() => { setSelectedType("joiner"); setPax(1); }}
+                  onChange={() => {
+                    setSelectedType("joiner");
+                    setPax(1);
+                    onTypeChange?.("joiner");
+                    onPaxChange?.(1);
+                  }}
                   className="sr-only" />
                 <div className="font-bold text-emerald-800 mb-1">👥 Joiner</div>
                 <div className="text-xs text-gray-500 mb-2">Join a shared group trip</div>
@@ -59,7 +68,12 @@ export function BookingCalculator({
               <label className={`cursor-pointer rounded-xl border-2 p-4 transition-colors ${selectedType === "private" ? "border-teal-500 bg-teal-50" : "border-teal-200 hover:border-teal-400"}`}>
                 <input type="radio" name="booking_type" value="private"
                   checked={selectedType === "private"}
-                  onChange={() => { setSelectedType("private"); setPax(1); }}
+                  onChange={() => {
+                    setSelectedType("private");
+                    setPax(1);
+                    onTypeChange?.("private");
+                    onPaxChange?.(1);
+                  }}
                   className="sr-only" />
                 <div className="font-bold text-teal-800 mb-1">🔒 Private</div>
                 <div className="text-xs text-gray-500 mb-2">Exclusive trip for your group</div>
@@ -80,18 +94,35 @@ export function BookingCalculator({
 
       {/* Pax counter */}
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6">
-        <h2 className="font-bold text-[#134e4a] mb-4">Number of Guests</h2>
+        <h2 className="font-bold text-[#134e4a] mb-4">
+          {selectedType === "private"
+            ? "Actual Number of Guests Coming"
+            : "Number of Guests"}
+        </h2>
+        {selectedType === "private" && (
+          <p className="text-xs text-teal-600 mb-3">
+            Private tour is billed for 12 pax. Enter your actual headcount for the tourist manifest.
+          </p>
+        )}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
             <button type="button"
-              onClick={() => setPax(p => Math.max(1, p - 1))}
+              onClick={() => {
+                const n = Math.max(1, pax - 1);
+                setPax(n);
+                onPaxChange?.(n);
+              }}
               className="w-10 h-10 rounded-full border-2 border-emerald-200 text-emerald-700 font-bold text-lg hover:bg-emerald-50 transition-colors flex items-center justify-center">
               −
             </button>
             <input type="number" name="total_pax" value={pax} readOnly
               className="w-16 rounded-xl border-2 border-emerald-200 px-2 py-2 text-center text-xl font-bold focus:outline-none" />
             <button type="button"
-              onClick={() => setPax(p => Math.min(maxPax, p + 1))}
+              onClick={() => {
+                const n = Math.min(maxPax, pax + 1);
+                setPax(n);
+                onPaxChange?.(n);
+              }}
               className="w-10 h-10 rounded-full border-2 border-emerald-200 text-emerald-700 font-bold text-lg hover:bg-emerald-50 transition-colors flex items-center justify-center">
               +
             </button>
@@ -115,23 +146,31 @@ export function BookingCalculator({
             </div>
           </div>
         ) : (
-          <div className="text-sm">
+          <div className="text-sm space-y-2">
             {privateIsNegotiable || !privatePrice ? (
               <p className="text-teal-700 font-semibold">
                 Private tour price is negotiable. Send a message to confirm the rate before paying.
               </p>
             ) : (
-              <div className="flex justify-between">
-                <span className="font-bold text-emerald-900">Total to pay via GCash</span>
-                <span className="text-xl font-bold text-emerald-700">₱{privatePrice.toLocaleString()}</span>
-              </div>
+              <>
+                <div className="flex justify-between text-gray-600">
+                  <span>Private rate (billed as 12 pax)</span>
+                  <span className="font-semibold">₱{privatePrice.toLocaleString()}</span>
+                </div>
+                <div className="border-t border-emerald-200 pt-2 flex justify-between">
+                  <span className="font-bold text-emerald-900">Total to pay via GCash</span>
+                  <span className="text-xl font-bold text-emerald-700">₱{privatePrice.toLocaleString()}</span>
+                </div>
+              </>
             )}
           </div>
         )}
 
         {/* Total amount hidden input for backend */}
         <input type="hidden" name="total_amount_cents"
-          value={selectedType === "joiner" ? joinerPrice * pax * 100 : (privatePrice ?? 0) * 100} />
+          value={selectedType === "joiner"
+            ? joinerPrice * pax * 100
+            : (privatePrice ?? 0) * 100} />
       </section>
 
     </div>

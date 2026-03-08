@@ -15,7 +15,7 @@ interface PassengerData {
 interface Props {
   totalPax: number;
   profileName?: string;
-  profilePhone?: string;
+  profileMobile?: string;
 }
 
 function calculateAge(birthdate: string): number {
@@ -38,7 +38,7 @@ const emptyPassenger = (): PassengerData => ({
   emergency_contact_number: "",
 });
 
-export default function BookingPassengers({ totalPax, profileName = "", profilePhone = "" }: Props) {
+export default function BookingPassengers({ totalPax, profileName = "", profileMobile = "" }: Props) {
   const [passengers, setPassengers] = useState<PassengerData[]>(() => {
     const list: PassengerData[] = [];
     for (let i = 0; i < totalPax; i++) {
@@ -51,18 +51,18 @@ export default function BookingPassengers({ totalPax, profileName = "", profileP
 
   // Auto-fill passenger 1 from profile
   useEffect(() => {
-    if (profileName || profilePhone) {
+    if (profileName || profileMobile) {
       setPassengers(prev => {
         const updated = [...prev];
         updated[0] = {
           ...updated[0],
           full_name: profileName || updated[0].full_name,
-          contact_number: profilePhone || updated[0].contact_number,
+          contact_number: profileMobile || updated[0].contact_number,
         };
         return updated;
       });
     }
-  }, [profileName, profilePhone]);
+  }, [profileName, profileMobile]);
 
   // Sync list size if totalPax changes
   useEffect(() => {
