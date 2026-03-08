@@ -7,7 +7,7 @@ import BookingPassengers from "@/components/tours/BookingPassengers";
 interface Props {
   tour: {
     id: string;
-    price_per_pax_cents: number | null;
+    joiner_price_cents: number | null;
     private_price_cents: number | null;
     private_is_negotiable: boolean;
     requires_health_declaration: boolean;
@@ -58,7 +58,7 @@ export default function TourBookingForm({
       {/* Booking Calculator */}
       <BookingCalculator
         bookingType={bookingType}
-        joinerPriceCents={tour.price_per_pax_cents}
+        joinerPriceCents={tour.joiner_price_cents}
         privatePriceCents={tour.private_price_cents}
         privateIsNegotiable={tour.private_is_negotiable ?? false}
         joinersLeft={joinersLeft}

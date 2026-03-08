@@ -49,6 +49,7 @@ export default async function TourBookPage({
     .select("full_name, mobile")
     .eq("id", user.id)
     .single();
+     console.log("PROFILE:", profile);
 
   function formatDate(dateStr: string) {
     return new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", {
