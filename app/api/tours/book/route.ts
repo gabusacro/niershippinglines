@@ -152,10 +152,12 @@ export async function POST(request: NextRequest) {
       .from("tour_booking_passengers")
       .insert(passengersToInsert);
 
-    if (passengersError) {
-      console.error("Tour passengers insert error:", passengersError);
-      // Don't fail the whole booking — log it but continue
-    }
+if (passengersError) {
+  console.error("Tour passengers insert error:", JSON.stringify(passengersError));
+} else {
+  console.log("✅ PASSENGERS SAVED", passengersToInsert.length);
+}
+
   }
 
   // ── Redirect to confirmation ──────────────────────────────
