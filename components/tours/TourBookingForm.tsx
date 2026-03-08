@@ -42,14 +42,23 @@ export default function TourBookingForm({
     bookingType === "private" ? "private" : "joiner"
   );
 
+
   const joinersLeft = schedule ? schedule.joiner_slots_total - schedule.joiner_slots_booked : 20;
   const privateLeft = schedule ? schedule.private_slots_total - schedule.private_slots_booked : 1;
 
+  // Billing pax: private always bills as 12
+  const billingPax = selectedType === "private" ? 12 : actualPax;
+
   return (
     <form action="/api/tours/book" method="POST" encType="multipart/form-data" className="space-y-6">
+      {/* Hidden fields the API needs */}
       <input type="hidden" name="tour_id" value={tour.id} />
       <input type="hidden" name="schedule_id" value={schedule?.id ?? ""} />
       <input type="hidden" name="booked_by" value={userId} />
+      <input type="hidden" name="booking_type" value={selectedType} />
+      <input type="hidden" name="total_pax" value={actualPax} />
+      <input type="hidden" name="billing_pax" value={billingPax} />
+      
 
       <BookingCalculator
         bookingType={bookingType}
@@ -60,6 +69,7 @@ export default function TourBookingForm({
         privateLeft={privateLeft}
         onPaxChange={setActualPax}
         onTypeChange={setSelectedType}
+        
       />
 
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 space-y-4">

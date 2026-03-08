@@ -28,6 +28,13 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const formData = await request.formData();
 
+  // DEBUG: log all form keys and values
+  const allKeys: string[] = [];
+  formData.forEach((value, key) => {
+    if (key !== "gcash_screenshot") allKeys.push(`${key}=${value}`);
+  });
+  console.log("📋 FORM DATA KEYS:", allKeys.join(" | "));
+
   // ── Core booking fields ──────────────────────────────────
   const tour_id      = formData.get("tour_id") as string;
   const schedule_id  = formData.get("schedule_id") as string;
@@ -38,6 +45,8 @@ export async function POST(request: NextRequest) {
   const customer_email = formData.get("customer_email") as string;
   const customer_phone = formData.get("customer_phone") as string;
   const health_declaration_accepted = formData.get("health_declaration_accepted") === "true";
+
+  console.log(`📊 total_pax=${total_pax} booking_type=${booking_type} total_amount_cents=${total_amount_cents}`);
 
   // ── Upload GCash screenshot ──────────────────────────────
   const gcashFile = formData.get("gcash_screenshot") as File | null;
@@ -108,7 +117,6 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Save passenger manifest ───────────────────────────────
-  // Parse passengers[0][full_name], passengers[1][full_name], etc.
   const passengerFields = [
     "full_name", "address", "birthdate", "age",
     "contact_number", "emergency_contact_name", "emergency_contact_number"
@@ -126,8 +134,9 @@ export async function POST(request: NextRequest) {
       if (value) hasData = true;
     }
 
+    console.log(`👤 Passenger ${i}: hasData=${hasData} name=${passenger.full_name}`);
+
     if (hasData) {
-      // Recalculate age server-side from birthdate (don't trust client)
       const age = passenger.birthdate
         ? calculateAge(passenger.birthdate as string)
         : 0;
@@ -137,29 +146,28 @@ export async function POST(request: NextRequest) {
         passenger_number: i + 1,
         full_name: passenger.full_name as string,
         address: passenger.address as string,
-        birthdate: passenger.birthdate as string,
+        birthdate: passenger.birthdate as string || null,
         age,
         contact_number: passenger.contact_number as string,
         emergency_contact_name: passenger.emergency_contact_name as string,
         emergency_contact_number: passenger.emergency_contact_number as string,
-        linked_profile_id: i === 0 ? user.id : null, // link lead passenger to profile
+        linked_profile_id: i === 0 ? user.id : null,
       });
     }
   }
 
+  console.log(`🧑 PASSENGERS TO INSERT: ${passengersToInsert.length}`);
+
   if (passengersToInsert.length > 0) {
-console.log("🧑 PASSENGERS TO INSERT", JSON.stringify(passengersToInsert));
+    const { error: passengersError } = await supabase
+      .from("tour_booking_passengers")
+      .insert(passengersToInsert);
 
-const { error: passengersError } = await supabase
-  .from("tour_booking_passengers")
-  .insert(passengersToInsert);
-
-if (passengersError) {
-  console.error("Tour passengers insert error:", JSON.stringify(passengersError));
-} else {
-  console.log("✅ PASSENGERS SAVED", passengersToInsert.length);
-}
-
+    if (passengersError) {
+      console.error("Tour passengers insert error:", JSON.stringify(passengersError));
+    } else {
+      console.log("✅ PASSENGERS SAVED:", passengersToInsert.length);
+    }
   }
 
   // ── Redirect to confirmation ──────────────────────────────
