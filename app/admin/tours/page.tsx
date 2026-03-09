@@ -33,23 +33,23 @@ export default async function AdminToursPage() {
     .select("*", { count: "exact", head: true })
     .eq("status", "confirmed");
 
-  // Online revenue (all time) — booking_source = online
+  // Online revenue (all time) — is_walk_in = false
   const { data: onlineRevData } = await supabase
     .from("tour_bookings")
     .select("total_amount_cents")
     .eq("payment_status", "verified")
-    .eq("booking_source", "online");
+    .eq("is_walk_in", false);
 
   const onlineRevenue = (onlineRevData ?? []).reduce(
     (sum, b) => sum + (b.total_amount_cents ?? 0), 0
   );
 
-  // Walk-in revenue (all time) — booking_source = walk_in
+  // Walk-in revenue (all time) — is_walk_in = true
   const { data: walkinRevData } = await supabase
     .from("tour_bookings")
     .select("total_amount_cents")
     .eq("payment_status", "verified")
-    .eq("booking_source", "walk_in");
+    .eq("is_walk_in", true);
 
   const walkinRevenue = (walkinRevData ?? []).reduce(
     (sum, b) => sum + (b.total_amount_cents ?? 0), 0
@@ -60,7 +60,7 @@ export default async function AdminToursPage() {
     .from("tour_bookings")
     .select("total_amount_cents")
     .eq("payment_status", "verified")
-    .eq("booking_source", "online")
+    .eq("is_walk_in", false)
     .gte("paid_at", todayPH + "T00:00:00+08:00")
     .lte("paid_at", todayPH + "T23:59:59+08:00");
 
@@ -73,7 +73,7 @@ export default async function AdminToursPage() {
     .from("tour_bookings")
     .select("total_amount_cents")
     .eq("payment_status", "verified")
-    .eq("booking_source", "walk_in")
+    .eq("is_walk_in", true)
     .gte("paid_at", todayPH + "T00:00:00+08:00")
     .lte("paid_at", todayPH + "T23:59:59+08:00");
 
@@ -130,14 +130,14 @@ export default async function AdminToursPage() {
       {/* Nav grid */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {[
-          { href: "/admin/tours/packages",      label: "Packages"       },
-          { href: "/admin/tours/bookings",       label: "Bookings"       },
-          { href: "/admin/tours/manual-booking", label: "Walk-in Booking"},
-          { href: "/admin/tours/reviews",        label: "Reviews"        },
-          { href: "/admin/tours/refunds",        label: "Refunds"        },
-          { href: "/admin/tours/expenses",       label: "Expenses"       },
-          { href: "/admin/tours/categories",     label: "Categories"     },
-          { href: "/admin/tours/settings",       label: "Settings"       },
+          { href: "/admin/tours/packages",      label: "Packages"        },
+          { href: "/admin/tours/bookings",       label: "Bookings"        },
+          { href: "/admin/tours/manual-booking", label: "Walk-in Booking" },
+          { href: "/admin/tours/reviews",        label: "Reviews"         },
+          { href: "/admin/tours/refunds",        label: "Refunds"         },
+          { href: "/admin/tours/expenses",       label: "Expenses"        },
+          { href: "/admin/tours/categories",     label: "Categories"      },
+          { href: "/admin/tours/settings",       label: "Settings"        },
         ].map(({ href, label }) => (
           <Link key={href} href={href}
             className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 text-center transition-colors hover:border-emerald-400 hover:bg-emerald-50">
@@ -246,7 +246,7 @@ export default async function AdminToursPage() {
                   <p className="text-sm font-bold text-emerald-700">
                     P{(b.total_amount_cents / 100).toLocaleString()}
                   </p>
-                  {b.booking_source === "walk_in" && (
+                  {b.is_walk_in && (
                     <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
                       Walk-in
                     </span>
@@ -291,7 +291,7 @@ export default async function AdminToursPage() {
                       ? "P" + (b.total_amount_cents / 100).toLocaleString()
                       : "Negotiable"}
                   </p>
-                  {b.booking_source === "walk_in" && (
+                  {b.is_walk_in && (
                     <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
                       Walk-in
                     </span>
