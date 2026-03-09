@@ -15,10 +15,8 @@ export default async function TourGuideDashboard() {
   if (!user || user.role !== "tour_guide") redirect("/dashboard");
 
   const supabase = await createClient();
+  const todayPH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
-  console.log("TOUR GUIDE USER ID:", user.id);
-
-  // My operator assignment
   const { data: myAssignment } = await supabase
     .from("tour_guide_assignments")
     .select("tour_operator_id, is_active")
@@ -26,7 +24,6 @@ export default async function TourGuideDashboard() {
     .eq("is_active", true)
     .single();
 
-  // Fetch operator profile separately
   const { data: operatorProfile } = myAssignment?.tour_operator_id
     ? await supabase
         .from("profiles")
@@ -35,14 +32,12 @@ export default async function TourGuideDashboard() {
         .single()
     : { data: null };
 
-  // Today's assigned schedules
   const { data: mySchedules } = await supabase
     .from("tour_schedule_assignments")
     .select("*, schedule:tour_schedules(id, available_date, departure_time, tour:tour_packages(title))")
     .eq("tour_guide_id", user.id)
     .eq("schedule.available_date", todayPH);
 
-  // Today bookings for my assigned schedules
   const scheduleIds = (mySchedules ?? [])
     .map((s) => (s.schedule as { id?: string } | null)?.id)
     .filter(Boolean) as string[];
@@ -55,7 +50,6 @@ export default async function TourGuideDashboard() {
         .in("schedule_id", scheduleIds)
     : { data: [] };
 
-  // Tracking status for today passengers
   const bookingIds = (todayBookings ?? []).map((b) => b.id);
   const { data: tracking } = bookingIds.length > 0
     ? await supabase
@@ -67,12 +61,10 @@ export default async function TourGuideDashboard() {
 
   const totalGuests = (todayBookings ?? []).reduce((sum, b) => sum + (b.total_pax ?? 0), 0);
   const pickedUp = (tracking ?? []).filter((t) => t.status !== "assigned").length;
-
   const operator = operatorProfile as { full_name: string | null; email: string | null; mobile: string | null } | null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
-
       <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-teal-600 px-6 py-8 text-white shadow-lg sm:px-8">
         <p className="text-sm font-medium uppercase tracking-wider text-white/80">Tour Guide</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
@@ -116,7 +108,6 @@ export default async function TourGuideDashboard() {
           Today&apos;s Guests
           <span className="ml-2 text-sm font-normal text-gray-400">{totalGuests} total</span>
         </h2>
-
         {!todayBookings || todayBookings.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">No bookings assigned to you today.</p>
         ) : (
@@ -173,7 +164,6 @@ export default async function TourGuideDashboard() {
           My Account
         </Link>
       </div>
-
     </div>
   );
 }
