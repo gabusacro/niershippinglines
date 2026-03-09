@@ -69,6 +69,8 @@ export default async function DashboardPage({
   const role = user.role as string;
   if (role === "admin")        redirect(ROUTES.admin);
   if (role === "investor")     redirect("/investor");
+  if (role === "tour_operator") redirect("/dashboard/tour-operator");
+  if (role === "tour_guide")    redirect("/dashboard/tour-guide");
   if (role === "vessel_owner") redirect("/vessel-owner");
 
   const params = await searchParams;
