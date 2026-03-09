@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
@@ -18,13 +18,22 @@ export default async function TourGuideDashboard() {
 
   const todayPH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
-  // My operator
-const { data: myAssignment } = await supabase
-  .from("tour_guide_assignments")
-  .select("*, operator:profiles!tour_operator_id(full_name, email, mobile)")
-  .eq("tour_guide_id", user.id)
-  .eq("is_active", true)
-  .single();
+  // My operator assignment
+  const { data: myAssignment } = await supabase
+    .from("tour_guide_assignments")
+    .select("tour_operator_id, is_active")
+    .eq("tour_guide_id", user.id)
+    .eq("is_active", true)
+    .single();
+
+  // Fetch operator profile separately
+  const { data: operatorProfile } = myAssignment?.tour_operator_id
+    ? await supabase
+        .from("profiles")
+        .select("full_name, email, mobile")
+        .eq("id", myAssignment.tour_operator_id)
+        .single()
+    : { data: null };
 
   // Today's assigned schedules
   const { data: mySchedules } = await supabase
@@ -33,7 +42,7 @@ const { data: myAssignment } = await supabase
     .eq("tour_guide_id", user.id)
     .eq("schedule.available_date", todayPH);
 
-  // Today's bookings for my assigned schedules
+  // Today bookings for my assigned schedules
   const scheduleIds = (mySchedules ?? [])
     .map((s) => (s.schedule as { id?: string } | null)?.id)
     .filter(Boolean) as string[];
@@ -46,7 +55,7 @@ const { data: myAssignment } = await supabase
         .in("schedule_id", scheduleIds)
     : { data: [] };
 
-  // Tracking status for today's passengers
+  // Tracking status for today passengers
   const bookingIds = (todayBookings ?? []).map((b) => b.id);
   const { data: tracking } = bookingIds.length > 0
     ? await supabase
@@ -59,12 +68,11 @@ const { data: myAssignment } = await supabase
   const totalGuests = (todayBookings ?? []).reduce((sum, b) => sum + (b.total_pax ?? 0), 0);
   const pickedUp = (tracking ?? []).filter((t) => t.status !== "assigned").length;
 
-  const operator = myAssignment?.operator as { full_name: string | null; email: string | null; mobile: string | null } | null;
+  const operator = operatorProfile as { full_name: string | null; email: string | null; mobile: string | null } | null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
 
-      {/* Header */}
       <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-teal-600 px-6 py-8 text-white shadow-lg sm:px-8">
         <p className="text-sm font-medium uppercase tracking-wider text-white/80">Tour Guide</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
@@ -83,7 +91,6 @@ const { data: myAssignment } = await supabase
         </div>
       </div>
 
-      {/* Operator info */}
       {operator ? (
         <div className="mt-5 rounded-2xl border-2 border-emerald-100 bg-emerald-50 px-5 py-4">
           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">My Operator</p>
@@ -100,12 +107,10 @@ const { data: myAssignment } = await supabase
         </div>
       )}
 
-      {/* Scanner */}
       <div className="mt-5">
         <TourGuideScanner guideId={user.id} todayPH={todayPH} />
       </div>
 
-      {/* Today's bookings */}
       <div className="mt-5 rounded-2xl border-2 border-gray-100 bg-white p-6">
         <h2 className="font-bold text-[#134e4a] mb-4">
           Today&apos;s Guests
@@ -113,9 +118,7 @@ const { data: myAssignment } = await supabase
         </h2>
 
         {!todayBookings || todayBookings.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-6">
-            No bookings assigned to you today.
-          </p>
+          <p className="text-sm text-gray-400 text-center py-6">No bookings assigned to you today.</p>
         ) : (
           <div className="space-y-3">
             {todayBookings.map((b) => {
