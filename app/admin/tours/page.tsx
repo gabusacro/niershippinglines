@@ -57,12 +57,12 @@ export default async function AdminToursPage() {
 
   // Today's online bookings
   const { data: todayOnlineData } = await supabase
-    .from("tour_bookings")
-    .select("total_amount_cents")
-    .eq("payment_status", "verified")
-    .eq("is_walk_in", false)
-    .gte("paid_at", todayPH + "T00:00:00+08:00")
-    .lte("paid_at", todayPH + "T23:59:59+08:00");
+  .from("tour_bookings")
+  .select("total_amount_cents")
+  .eq("payment_status", "verified")
+  .eq("is_walk_in", false)
+  .gte("payment_verified_at", todayPH + "T00:00:00+08:00")
+  .lte("payment_verified_at", todayPH + "T23:59:59+08:00");
 
   const todayOnlineRevenue = (todayOnlineData ?? []).reduce(
     (sum, b) => sum + (b.total_amount_cents ?? 0), 0
@@ -70,12 +70,12 @@ export default async function AdminToursPage() {
 
   // Today's walk-in bookings
   const { data: todayWalkinData } = await supabase
-    .from("tour_bookings")
-    .select("total_amount_cents")
-    .eq("payment_status", "verified")
-    .eq("is_walk_in", true)
-    .gte("paid_at", todayPH + "T00:00:00+08:00")
-    .lte("paid_at", todayPH + "T23:59:59+08:00");
+  .from("tour_bookings")
+  .select("total_amount_cents")
+  .eq("payment_status", "verified")
+  .eq("is_walk_in", true)
+  .gte("payment_verified_at", todayPH + "T00:00:00+08:00")
+  .lte("payment_verified_at", todayPH + "T23:59:59+08:00");
 
   const todayWalkinRevenue = (todayWalkinData ?? []).reduce(
     (sum, b) => sum + (b.total_amount_cents ?? 0), 0
