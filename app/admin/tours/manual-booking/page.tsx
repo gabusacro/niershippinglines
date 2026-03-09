@@ -60,6 +60,14 @@ export default function ManualBookingPage() {
   const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
+const [healthText, setHealthText] = useState("I confirm that all passengers are in good health, have no known heart conditions, and are between 6 and 65 years old. Passengers aged 6-17 are accompanied by a parent or guardian.");
+
+useEffect(() => {
+  fetch("/api/admin/tours/settings")
+    .then((r) => r.json())
+    .then((d) => { if (d.settings?.health_declaration_text) setHealthText(d.settings.health_declaration_text); })
+    .catch(() => {});
+}, []);
 
   // Load tours on mount
   useEffect(() => {
@@ -655,24 +663,22 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Health declaration */}
-          <div className="rounded-2xl border-2 border-amber-100 bg-amber-50 p-6">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={healthDeclaration}
-                onChange={(e) => setHealthDeclaration(e.target.checked)}
-                className="mt-0.5 w-4 h-4 accent-emerald-600"
-              />
-              <span className="text-sm text-amber-800">
-                <strong>Health Declaration — </strong>
-                I confirm that all passengers are in good health, have no known heart conditions,
-                and are between 6 and 65 years old. Passengers aged 6-17 are accompanied by a
-                parent or guardian. Cash payment of{" "}
-                <strong>₱{(getTotalAmount() / 100).toLocaleString()}</strong> has been collected.
-              </span>
-            </label>
-          </div>
+     {/* Health declaration */}
+<div className="rounded-2xl border-2 border-amber-100 bg-amber-50 p-6">
+  <label className="flex items-start gap-3 cursor-pointer">
+    <input
+      type="checkbox"
+      checked={healthDeclaration}
+      onChange={(e) => setHealthDeclaration(e.target.checked)}
+      className="mt-0.5 w-4 h-4 accent-emerald-600"
+    />
+    <span className="text-sm text-amber-800">
+      <strong>Health Declaration — </strong>
+      {healthText} Cash payment of{" "}
+      <strong>₱{(getTotalAmount() / 100).toLocaleString()}</strong> has been collected.
+    </span>
+  </label>
+</div>
 
           <div className="flex gap-3">
             <button
