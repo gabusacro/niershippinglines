@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-const VALID_ROLES = ["admin", "captain", "crew", "ticket_booth", "passenger", "vessel_owner", "investor"];
+const VALID_ROLES = ["admin", "captain", "crew", "ticket_booth", "passenger", "vessel_owner", "investor", "tour_operator", "tour_guide"];
 
 // PATCH /api/admin/users/[userId]/role
 export async function PATCH(
@@ -38,7 +38,8 @@ export async function PATCH(
     const { data: targetProfile } = await supabase
       .from("profiles").select("role").eq("id", userId).single();
 
-    if (targetProfile?.role === "admin" && (count ?? 0) <= 1) {
+    if (targetProfile?.role === "admin"
+&& (count ?? 0) <= 1) {
       return NextResponse.json({
         error: "Cannot remove the last admin. Promote another user to admin first."
       }, { status: 400 });
