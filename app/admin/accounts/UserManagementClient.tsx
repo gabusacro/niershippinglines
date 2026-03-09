@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-type AppRole = "admin" | "captain" | "crew" | "ticket_booth" | "passenger" | "vessel_owner" | "investor";
+type AppRole = "admin" | "captain" | "crew" | "ticket_booth" | "passenger" | "vessel_owner" | "investor" | "tour_operator" | "tour_guide";
 
 interface UserRow {
   id: string;
@@ -25,27 +25,30 @@ interface Props {
 
 const ROLE_OPTIONS: AppRole[] = [
   "passenger", "crew", "captain", "ticket_booth",
-  "vessel_owner", "investor", "admin",
+  "vessel_owner", "investor", "tour_operator", "tour_guide", "admin",
 ];
 
 const ROLE_STYLES: Record<string, string> = {
-  admin:        "bg-red-100 text-red-800",
-  captain:      "bg-[#0c7b93]/15 text-[#0c7b93]",
-  crew:         "bg-teal-100 text-teal-800",
-  ticket_booth: "bg-purple-100 text-purple-800",
-  vessel_owner: "bg-amber-100 text-amber-800",
-  investor:     "bg-green-100 text-green-800",
-  passenger:    "bg-gray-100 text-gray-700",
+  admin:         "bg-red-100 text-red-800",
+  captain:       "bg-[#0c7b93]/15 text-[#0c7b93]",
+  crew:          "bg-teal-100 text-teal-800",
+  ticket_booth:  "bg-purple-100 text-purple-800",
+  vessel_owner:  "bg-amber-100 text-amber-800",
+  investor:      "bg-green-100 text-green-800",
+  passenger:     "bg-gray-100 text-gray-700",
+  tour_operator: "bg-emerald-100 text-emerald-800",
+  tour_guide:    "bg-blue-100 text-blue-800",
 };
-
 const ROLE_LABELS: Record<string, string> = {
-  admin:        "Admin",
-  captain:      "Captain",
-  crew:         "Deck Crew",
-  ticket_booth: "Ticket Booth",
-  vessel_owner: "Vessel Owner",
-  investor:     "Investor",
-  passenger:    "Passenger",
+  admin:         "Admin",
+  captain:       "Captain",
+  crew:          "Deck Crew",
+  ticket_booth:  "Ticket Booth",
+  vessel_owner:  "Vessel Owner",
+  investor:      "Investor",
+  passenger:     "Passenger",
+  tour_operator: "Tour Operator",
+  tour_guide:    "Tour Guide",
 };
 
 function formatDate(iso: string) {
