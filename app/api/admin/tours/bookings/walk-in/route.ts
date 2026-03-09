@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const customer_email = formData.get("customer_email") as string;
     const customer_phone = formData.get("customer_phone") as string;
     const total_pax      = parseInt(formData.get("total_pax") as string) || 1;
-    const unit_price_cents  = parseInt(formData.get("unit_price_cents") as string) || 0;
+    const unit_price_cents   = parseInt(formData.get("unit_price_cents") as string) || 0;
     const total_amount_cents = parseInt(formData.get("total_amount_cents") as string) || 0;
     const health_declaration_accepted = formData.get("health_declaration_accepted") === "true";
 
@@ -71,57 +71,31 @@ export async function POST(request: NextRequest) {
       attempts++;
     }
 
-    // Fetch schedule + tour snapshot data
-    const { data: schedule } = await supabase
-      .from("tour_schedules")
-      .select("available_date, departure_time")
-      .eq("id", schedule_id)
-      .single();
-
-    const { data: tour } = await supabase
-      .from("tour_packages")
-      .select("title, pickup_time_label")
-      .eq("id", tour_id)
-      .single();
-
-    // Insert booking — immediately paid + confirmed (walk-in cash)
+    // Insert booking — only real columns
     const { data: booking, error: bookingError } = await supabase
       .from("tour_bookings")
       .insert({
         reference,
-        schedule_id,
         tour_id,
+        schedule_id,
+        booked_by:                    user.id,
         booking_type,
-        customer_name,
-        customer_email: customer_email || null,
-        customer_phone: customer_phone || null,
         total_pax,
-        unit_price_cents,
         total_amount_cents,
-        subtotal_cents: total_amount_cents,
-        admin_fee_cents: 0,
-        gcash_fee_cents: 0,
-        discount_cents: 0,
-        payment_method: "cash",
-        payment_status: "verified",
-        status: "confirmed",
-        is_walk_in: true,
-        booking_source: "walk_in",
+        customer_name,
+        customer_email:               customer_email || null,
+        customer_phone:               customer_phone || null,
         health_declaration_accepted,
         health_declaration_accepted_at: health_declaration_accepted
           ? new Date().toISOString()
           : null,
-        paid_at: new Date().toISOString(),
-        payment_verified_by: user.id,
-        payment_verified_at: new Date().toISOString(),
-        // Snapshots
-        tour_snapshot_title: tour?.title ?? null,
-        tour_snapshot_date: schedule?.available_date ?? null,
-        tour_snapshot_time: schedule?.departure_time ?? null,
-        tour_snapshot_price_cents: unit_price_cents,
-        tour_snapshot_booking_type: booking_type,
-        booked_by: user.id,
-        updated_at: new Date().toISOString(),
+        payment_status:               "verified",
+        payment_verified_by:          user.id,
+        payment_verified_at:          new Date().toISOString(),
+        status:                       "confirmed",
+        is_walk_in:                   true,
+        booking_source:               "walk_in",
+        updated_at:                   new Date().toISOString(),
       })
       .select("id")
       .single();
@@ -138,17 +112,17 @@ export async function POST(request: NextRequest) {
 
     // Insert passengers
     const passengerRows = passengers.map((p, i) => ({
-      booking_id: booking.id,
-      passenger_number: i + 1,
-      full_name: p.full_name,
-      birthdate: p.birthdate || null,
-      age: p.age || null,
-      address: p.address || null,
-      contact_number: p.contact_number || null,
-      emergency_contact_name: p.emergency_contact_name || null,
+      booking_id:               booking.id,
+      passenger_number:         i + 1,
+      full_name:                p.full_name,
+      birthdate:                p.birthdate || null,
+      age:                      p.age || null,
+      address:                  p.address || null,
+      contact_number:           p.contact_number || null,
+      emergency_contact_name:   p.emergency_contact_name || null,
       emergency_contact_number: p.emergency_contact_number || null,
-      fare_type: "adult",
-      fare_cents: unit_price_cents,
+      fare_type:                "adult",
+      fare_cents:               unit_price_cents,
     }));
 
     const { error: passengerError } = await supabase
@@ -159,7 +133,7 @@ export async function POST(request: NextRequest) {
       console.error("Passenger insert error:", passengerError);
     }
 
-    // Update slot counts — simple direct update, no RPC needed
+    // Update slot counts
     if (booking_type === "joiner") {
       const { data: sched } = await supabase
         .from("tour_schedules")
@@ -190,22 +164,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Log the event
-    await supabase.from("tour_booking_logs").insert({
-      booking_id: booking.id,
-      event_type: "walk_in_created",
-      performed_by: user.id,
-      notes: "Walk-in booking created and confirmed by " + user.role,
-      metadata: { booking_source: "walk_in", created_by_role: user.role },
-    });
-
     return NextResponse.redirect(
-      new URL(
-        "/admin/tours/bookings/" + booking.id + "?walkin=success",
-        request.url
-      ),
+      new URL("/admin/tours/bookings/" + booking.id + "?walkin=success", request.url),
       { status: 303 }
     );
+
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Walk-in route error:", message);
