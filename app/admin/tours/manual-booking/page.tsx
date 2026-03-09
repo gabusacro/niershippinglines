@@ -82,11 +82,11 @@ export default function ManualBookingPage() {
   }, [selectedTour]);
 
   // Auto-fill customer name from first passenger
-  useEffect(() => {
-    if (passengers[0]?.full_name && !customerName) {
-      setCustomerName(passengers[0].full_name);
-    }
-  }, [passengers[0]?.full_name]);
+useEffect(() => {
+  if (passengers[0]?.full_name) {
+    setCustomerName(passengers[0].full_name);
+  }
+}, [passengers[0]?.full_name]);
 
   function updatePassenger(index: number, field: keyof Passenger, value: string) {
     setPassengers((prev) => {
