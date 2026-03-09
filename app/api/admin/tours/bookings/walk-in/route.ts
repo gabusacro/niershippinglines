@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
         tour_snapshot_time: schedule?.departure_time ?? null,
         tour_snapshot_price_cents: unit_price_cents,
         tour_snapshot_booking_type: booking_type,
-        created_by: user.id,
+        booked_by: user.id,
         updated_at: new Date().toISOString(),
       })
       .select("id")
