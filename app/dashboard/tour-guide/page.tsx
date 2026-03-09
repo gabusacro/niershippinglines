@@ -19,12 +19,12 @@ export default async function TourGuideDashboard() {
   const todayPH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
   // My operator
-  const { data: myAssignment } = await supabase
-    .from("tour_guide_assignments")
-    .select("*, operator:tour_operator_id(full_name, email, mobile)")
-    .eq("tour_guide_id", user.id)
-    .eq("is_active", true)
-    .single();
+const { data: myAssignment } = await supabase
+  .from("tour_guide_assignments")
+  .select("*, operator:profiles!tour_operator_id(full_name, email, mobile)")
+  .eq("tour_guide_id", user.id)
+  .eq("is_active", true)
+  .single();
 
   // Today's assigned schedules
   const { data: mySchedules } = await supabase
