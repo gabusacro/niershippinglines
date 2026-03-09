@@ -111,19 +111,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert passengers
-    const passengerRows = passengers.map((p, i) => ({
-      booking_id:               booking.id,
-      passenger_number:         i + 1,
-      full_name:                p.full_name,
-      birthdate:                p.birthdate || null,
-      age:                      p.age || null,
-      address:                  p.address || null,
-      contact_number:           p.contact_number || null,
-      emergency_contact_name:   p.emergency_contact_name || null,
-      emergency_contact_number: p.emergency_contact_number || null,
-      fare_type:                "adult",
-      fare_cents:               unit_price_cents,
-    }));
+const passengerRows = passengers.map((p, i) => ({
+  booking_id:               booking.id,
+  passenger_number:         i + 1,
+  full_name:                p.full_name,
+  birthdate:                p.birthdate || null,
+  age:                      p.age || null,
+  address:                  p.address || null,
+  contact_number:           p.contact_number || null,
+  emergency_contact_name:   p.emergency_contact_name || null,
+  emergency_contact_number: p.emergency_contact_number || null,
+}));
 
     const { error: passengerError } = await supabase
       .from("tour_booking_passengers")
