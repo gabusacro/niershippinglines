@@ -137,6 +137,7 @@ export default async function AdminToursPage() {
           { href: "/admin/tours/refunds",        label: "Refunds"         },
           { href: "/admin/tours/expenses",       label: "Expenses"        },
           { href: "/admin/tours/categories",     label: "Categories"      },
+          { href: "/admin/tours/team", label: "Team" },
           { href: "/admin/tours/settings",       label: "Settings"        },
         ].map(({ href, label }) => (
           <Link key={href} href={href}
