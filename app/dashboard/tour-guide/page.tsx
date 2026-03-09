@@ -16,7 +16,7 @@ export default async function TourGuideDashboard() {
 
   const supabase = await createClient();
 
-  const todayPH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+  console.log("TOUR GUIDE USER ID:", user.id);
 
   // My operator assignment
   const { data: myAssignment } = await supabase
