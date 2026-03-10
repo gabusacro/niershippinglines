@@ -62,7 +62,7 @@ export default function ManualBookingPage() {
   const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
-const [healthText, setHealthText] = useState("I confirm that all passengers are in good health, have no known heart conditions, and are between 6 and 65 years old. Passengers aged 6-17 are accompanied by a parent or guardian.");
+const [healthText, setHealthText] = useState("I confirm that all guests are in good health, have no known heart conditions, and are between 6 and 65 years old. Guests aged 6-17 are accompanied by a parent or guardian.");
 
 useEffect(() => {
   fetch("/api/admin/tours/settings")
@@ -97,7 +97,7 @@ useEffect(() => {
       .finally(() => setLoadingSchedules(false));
   }, [selectedTour]);
 
-  // Auto-fill customer name from first passenger
+  // Auto-fill customer name from first guest
 useEffect(() => {
   if (passengers[0]?.full_name) {
     setCustomerName(passengers[0].full_name);
@@ -165,7 +165,7 @@ useEffect(() => {
       return;
     }
     if (passengers.some((p) => !p.full_name || !p.birthdate || !p.address || !p.contact_number || !p.emergency_contact_name || !p.emergency_contact_number)) {
-      setError("All passenger fields are required.");
+      setError("All guest fields are required.");
       return;
     }
 
@@ -442,12 +442,12 @@ useEffect(() => {
                 : "bg-gray-200 text-gray-400 cursor-not-allowed")
             }
           >
-            Next: Add Passengers
+            Next: Add Guests
           </button>
         </div>
       )}
 
-      {/* ── STEP 2: Passengers ── */}
+      {/* ── STEP 2: Guests ── */}
       {step === 2 && (
         <div className="space-y-4">
           <div className="rounded-2xl border-2 border-emerald-100 bg-white p-6">
@@ -674,7 +674,7 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Passengers preview */}
+          {/* Guests preview */}
           <div className="rounded-2xl border-2 border-emerald-100 bg-white p-6">
             <h2 className="font-bold text-[#134e4a] mb-3">Guests</h2>
             <div className="space-y-2">
