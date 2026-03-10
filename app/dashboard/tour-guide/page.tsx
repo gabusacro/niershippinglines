@@ -17,21 +17,19 @@ export default async function TourGuideDashboard() {
   const supabase = await createClient();
   const todayPH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
-const { data: myAssignment, error: assignmentError } = await supabase
+  const { data: myAssignment } = await supabase
     .from("tour_guide_assignments")
     .select("tour_operator_id, is_active")
     .eq("tour_guide_id", user.id)
     .eq("is_active", true)
     .maybeSingle();
 
-console.log("ASSIGNMENT:", myAssignment, "ERROR:", assignmentError);
-
   const { data: operatorProfile } = myAssignment?.tour_operator_id
     ? await supabase
         .from("profiles")
         .select("full_name, email, mobile")
         .eq("id", myAssignment.tour_operator_id)
-        .single()
+        .maybeSingle()
     : { data: null };
 
   const { data: mySchedules } = await supabase
