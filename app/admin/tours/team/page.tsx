@@ -28,9 +28,9 @@ export default async function TourTeamPage() {
     .order("full_name");
 
   // Get all guide assignments
-  const { data: assignments } = await supabase
+const { data: assignments } = await supabase
     .from("tour_guide_assignments")
-    .select("*, operator:tour_operator_id(full_name, email), guide:tour_guide_id(full_name, email)")
+    .select("*, operator:profiles!tour_operator_id(full_name, email), guide:profiles!tour_guide_id(full_name, email)")
     .eq("is_active", true)
     .order("created_at", { ascending: false });
 

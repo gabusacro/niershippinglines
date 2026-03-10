@@ -48,7 +48,7 @@ export default async function TourOperatorDashboard() {
   // My tour guides
   const { data: myGuides } = await supabase
     .from("tour_guide_assignments")
-    .select("*, guide:tour_guide_id(id, full_name, email, mobile)")
+    .select("*, guide:profiles!tour_guide_id(id, full_name, email, mobile)")
     .eq("tour_operator_id", user.id)
     .eq("is_active", true);
 
