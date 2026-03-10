@@ -99,6 +99,20 @@ export default async function TourGuideDashboard() {
         </div>
       )}
 
+{/* Quick actions */}
+<div className="mt-6 grid grid-cols-2 gap-3">
+  {[
+    { href: "/dashboard/account", label: "My Account" },
+    { href: "/dashboard/tour-guide/manifest", label: "Print Manifest" },
+  ].map(({ href, label }) => (
+    <Link key={href} href={href}
+      className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-50">
+      {label}
+    </Link>
+  ))}
+</div>
+
+
       <div className="mt-5">
         <TourGuideScanner guideId={user.id} todayPH={todayPH} />
       </div>
@@ -159,11 +173,7 @@ export default async function TourGuideDashboard() {
         )}
       </div>
 
-      <div className="mt-4 text-center">
-        <Link href="/dashboard/account" className="text-sm text-gray-400 hover:text-emerald-600">
-          My Account
-        </Link>
-      </div>
+
     </div>
   );
 }
