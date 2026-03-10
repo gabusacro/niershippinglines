@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
         status:                       "confirmed",
         is_walk_in:                   true,
         booking_source:               "walk_in",
+        tour_operator_id:             (formData.get("tour_operator_id") as string) || null,
         updated_at:                   new Date().toISOString(),
       })
       .select("id")

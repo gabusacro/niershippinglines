@@ -56,6 +56,8 @@ export default function ManualBookingPage() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [healthDeclaration, setHealthDeclaration] = useState(false);
   const [customPrice, setCustomPrice] = useState("");
+  const [selectedOperatorId, setSelectedOperatorId] = useState("");
+  const [operators, setOperators] = useState<{id: string; full_name: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +72,12 @@ useEffect(() => {
 }, []);
 
   // Load tours on mount
+  useEffect(() => {
+  fetch("/api/admin/tours/team/operators")
+    .then((r) => r.json())
+    .then((d) => setOperators(d.operators ?? []))
+    .catch(() => {});
+}, []);
   useEffect(() => {
     fetch("/api/tours")
       .then((r) => r.json())
@@ -176,6 +184,8 @@ useEffect(() => {
     formData.append("total_amount_cents", String(getTotalAmount()));
     formData.append("health_declaration_accepted", "true");
     formData.append("passengers", JSON.stringify(passengers));
+    if (selectedOperatorId) formData.append("tour_operator_id", selectedOperatorId);
+
 
     const response = await fetch("/api/admin/tours/bookings/walk-in", {
       method: "POST",
@@ -404,6 +414,23 @@ useEffect(() => {
               </div>
             </div>
           )}
+
+{/* Assign Operator */}
+          <div className="rounded-2xl border-2 border-emerald-100 bg-white p-6">
+            <h2 className="font-bold text-[#134e4a] mb-1">Assign Tour Operator <span className="text-gray-400 font-normal text-sm">(Optional)</span></h2>
+            <p className="text-xs text-gray-500 mb-3">Assign this booking to a tour operator. They will see it in their dashboard.</p>
+            <select
+              value={selectedOperatorId}
+              onChange={(e) => setSelectedOperatorId(e.target.value)}
+              className="w-full rounded-xl border-2 border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-emerald-400">
+              <option value="">— No operator assigned —</option>
+              {operators.map((op) => (
+                <option key={op.id} value={op.id}>{op.full_name}</option>
+              ))}
+            </select>
+          </div>
+
+
 
           <button
             disabled={!canProceedStep1}
