@@ -51,6 +51,20 @@ export async function PATCH(
     .update({ role: body.role, updated_at: new Date().toISOString() })
     .eq("id", userId);
 
+    // Deactivate tour assignments if role is no longer tour_guide or tour_operator
+if (body.role !== "tour_guide") {
+  await supabase
+    .from("tour_guide_assignments")
+    .update({ is_active: false })
+    .eq("tour_guide_id", userId);
+}
+if (body.role !== "tour_operator") {
+  await supabase
+    .from("tour_guide_assignments")
+    .update({ is_active: false })
+    .eq("tour_operator_id", userId);
+}
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
