@@ -461,7 +461,7 @@ useEffect(() => {
                 <div key={i} className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-bold text-emerald-700">
-                      Passenger {i + 1} {i === 0 ? "(Lead)" : ""}
+                      Guest/s {i + 1} {i === 0 ? "(Lead)" : ""}
                     </span>
                     {i > 0 && (
                       <button
