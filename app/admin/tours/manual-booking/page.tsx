@@ -227,7 +227,7 @@ useEffect(() => {
 
       {/* Step indicator */}
       <div className="flex items-center gap-2 mb-8">
-        {["Tour & Date", "Passengers", "Review & Confirm"].map((label, i) => (
+        {["Tour & Date", "Guests", "Review & Confirm"].map((label, i) => (
           <div key={label} className="flex items-center gap-2">
             <div className={
               "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold " +
@@ -452,8 +452,8 @@ useEffect(() => {
         <div className="space-y-4">
           <div className="rounded-2xl border-2 border-emerald-100 bg-white p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-[#134e4a]">Passenger Details</h2>
-              <span className="text-xs text-gray-400">{passengers.length} passenger/s</span>
+              <h2 className="font-bold text-[#134e4a]">Guest Details</h2>
+              <span className="text-xs text-gray-400">{passengers.length} guest/s</span>
             </div>
 
             <div className="space-y-6">
@@ -553,7 +553,7 @@ useEffect(() => {
                 onClick={addPassenger}
                 className="mt-4 w-full rounded-xl border-2 border-dashed border-emerald-300 py-2.5 text-sm font-semibold text-emerald-600 hover:border-emerald-400 hover:bg-emerald-50 transition-all"
               >
-                + Add Another Passenger
+                + Add Another Guest
               </button>
             )}
           </div>
@@ -569,7 +569,7 @@ useEffect(() => {
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
-                  placeholder="Auto-filled from Passenger 1"
+                  placeholder="Auto-filled from Guest 1"
                 />
               </div>
               <div>
@@ -643,7 +643,7 @@ useEffect(() => {
                 <p className="font-semibold text-[#134e4a] capitalize">{bookingType}</p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs mb-0.5">Passengers</p>
+                <p className="text-gray-400 text-xs mb-0.5">Guests</p>
                 <p className="font-semibold text-[#134e4a]">{passengers.length}</p>
               </div>
               <div>
@@ -676,7 +676,7 @@ useEffect(() => {
 
           {/* Passengers preview */}
           <div className="rounded-2xl border-2 border-emerald-100 bg-white p-6">
-            <h2 className="font-bold text-[#134e4a] mb-3">Passengers</h2>
+            <h2 className="font-bold text-[#134e4a] mb-3">Guests</h2>
             <div className="space-y-2">
               {passengers.map((p, i) => (
                 <div key={i} className="flex items-start justify-between text-sm py-2 border-b border-gray-100 last:border-0">
