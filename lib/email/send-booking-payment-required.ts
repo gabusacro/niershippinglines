@@ -60,7 +60,8 @@ function buildHtml(params: SendPaymentRequiredParams, branding: SiteBranding): s
                 ` : ""}
               </ul>
               <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.55; color: #0f766e;"><strong>Tip:</strong> Take a screenshot of your payment (before and after) so you can show it at the ticket booth.</p>
-              <p style="margin: 0; font-size: 14px; color: #0f766e;">If you did not make this booking, please ignore this email or contact support.</p>
+              <p style="margin: 0 0 12px 0; font-size: 14px; color: #0f766e;">If you did not make this booking, please ignore this email.</p>
+<p style="margin: 0; font-size: 14px; color: #134e4a;">Need help? Email us at <a href="mailto:support@travelasiargao.com" style="color: #0c7b93; font-weight: 600;">support@travelasiargao.com</a></p>
             </td>
           </tr>
         </table>

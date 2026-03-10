@@ -51,7 +51,8 @@ function buildHtml(params: SendBookingConfirmedParams, branding: SiteBranding): 
                 </tr>
               </table>
               <p style="margin: 0 0 16px 0; font-size: 15px; color: #134e4a;">You can now print your tickets from your account (My Bookings → Print tickets).</p>
-              <p style="margin: 0; font-size: 14px; color: #0f766e;">If you did not make this booking, please contact support.</p>
+              <p style="margin: 0 0 12px 0; font-size: 14px; color: #0f766e;">If you did not make this booking, please contact us immediately.</p>
+<p style="margin: 0; font-size: 14px; color: #134e4a;">Need help? Email us at <a href="mailto:support@travelasiargao.com" style="color: #0c7b93; font-weight: 600;">support@travelasiargao.com</a></p>
             </td>
           </tr>
         </table>
