@@ -37,10 +37,6 @@ const myGuides = (rawGuides ?? []).map((g) => ({
   guide: (guideProfiles ?? []).find((p) => p.id === g.tour_guide_id) ?? null,
 }));
 
-console.log("RAW GUIDES:", JSON.stringify(rawGuides));
-console.log("GUIDE PROFILES:", JSON.stringify(guideProfiles));
-console.log("MY GUIDES:", JSON.stringify(myGuides));
-
 
   const { count: pendingCount } = await supabase
     .from("tour_bookings")
