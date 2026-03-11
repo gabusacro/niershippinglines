@@ -7,12 +7,12 @@ export async function GET() {
     .from("promo_popup")
     .select("*")
     .limit(1)
-    .single();
+    .maybeSingle();
   if (error) return NextResponse.json(null);
   return NextResponse.json(data);
 }
 
-export async function POST(req: Request) {
+export async function PATCH(req: Request) {
   const supabase = await createClient();
   const body = await req.json();
 
@@ -20,9 +20,9 @@ export async function POST(req: Request) {
     .from("promo_popup")
     .select("id")
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (existing) {
+  if (existing?.id) {
     const { data, error } = await supabase
       .from("promo_popup")
       .update({ ...body, updated_at: new Date().toISOString() })
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       .select()
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
+    return NextResponse.json({ data, message: "Promo popup saved." });
   }
 
   const { data, error } = await supabase
@@ -39,5 +39,5 @@ export async function POST(req: Request) {
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  return NextResponse.json({ data, message: "Promo popup created." });
 }
