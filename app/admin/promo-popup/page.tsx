@@ -404,7 +404,7 @@ export default function PromoPopupPage() {
                       <div className="w-full bg-[#0c7b93] text-white text-center font-bold py-2.5 rounded-xl text-sm cursor-default">
                         {form.button_label}
                       </div>
-                      <p className="text-center text-xs text-gray-400 mt-2 cursor-default">No thanks</p>
+                      <p className="text-center text-xs text-gray-400 mt-2 cursor-default">Thank you!</p>
                     </div>
                   )}
 
