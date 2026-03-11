@@ -80,10 +80,10 @@ export default function PromoPopupPage() {
       const ext = file.name.split(".").pop();
       const path = `promo-popup/banner-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
-        .from("branding")
+        .from("promo-media")
         .upload(path, file, { upsert: true });
       if (uploadError) throw new Error(uploadError.message);
-      const { data: { publicUrl } } = supabase.storage.from("branding").getPublicUrl(path);
+      const { data: { publicUrl } } = supabase.storage.from("promo-media").getPublicUrl(path);
       setForm((f) => ({ ...f, image_url: publicUrl }));
       toast.showSuccess("Image uploaded!");
     } catch (err) {
