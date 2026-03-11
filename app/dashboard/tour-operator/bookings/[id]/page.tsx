@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
+import AssignGuideButton from "./AssignGuideButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Booking Detail — Tour Operator" };
@@ -31,6 +32,26 @@ export default async function OperatorBookingDetailPage({
     .select("*")
     .eq("booking_id", id)
     .order("passenger_number", { ascending: true });
+
+
+// Fetch current assigned guide for this booking
+  const { data: existingBatch } = await supabase
+    .from("tour_batch_bookings")
+    .select("batch_id, batch:tour_batches(tour_guide_id)")
+    .eq("booking_id", id)
+    .single();
+
+
+
+  const currentGuideId = (existingBatch?.batch as { tour_guide_id?: string } | null)?.tour_guide_id ?? null;
+  let currentGuideName: string | null = null;
+  if (currentGuideId) {
+    const { data: gp } = await supabase.from("profiles").select("full_name").eq("id", currentGuideId).single();
+    currentGuideName = gp?.full_name ?? null;
+  }
+
+
+
 
   // Fetch assigned guides for this operator
   const { data: rawGuides } = await supabase
@@ -264,24 +285,12 @@ export default async function OperatorBookingDetailPage({
         )}
       </section>
 
-      {/* Assign Guide — placeholder for next step */}
-      <section className="rounded-2xl border-2 border-blue-100 bg-white p-6 mb-4">
-        <h2 className="font-bold text-[#134e4a] mb-1">🧭 Assign Tour Guide</h2>
-        <p className="text-xs text-gray-400 mb-4">Assign a guide to handle this booking's guests.</p>
-        {myGuides.length === 0 ? (
-          <p className="text-sm text-gray-400">No guides assigned to you yet. Contact admin.</p>
-        ) : (
-          <div className="space-y-2">
-            {myGuides.map((g) => (
-              <div key={g.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                <p className="text-sm font-semibold text-[#134e4a]">{g.guide?.full_name ?? "—"}</p>
-                <span className="text-xs text-gray-400">Guide</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <p className="text-xs text-amber-600 mt-3 font-medium">⚙️ Full dispatch/batch assignment coming soon.</p>
-      </section>
+      <AssignGuideButton
+        bookingId={booking.id}
+        guides={myGuides}
+        currentGuideId={currentGuideId}
+        currentGuideName={currentGuideName}
+      />
 
       <div className="mt-4">
         <Link href="/dashboard/tour-operator/bookings"
