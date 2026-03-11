@@ -9,10 +9,10 @@ function toEmbedUrl(url: string): string | null {
     const u = new URL(url);
     if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
       const id = u.searchParams.get("v") ?? u.pathname.replace("/", "");
-      return `https://www.youtube.com/embed/${id}?autoplay=1&rel=0`;
+      return `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&mute=0`;
     }
     if (u.hostname.includes("facebook.com") || u.hostname.includes("fb.watch")) {
-      return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&autoplay=true&show_text=false`;
+      return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&autoplay=true&show_text=false&mute=false`;
     }
     return null;
   } catch { return null; }
@@ -73,7 +73,7 @@ function ExpandedCard({
           <iframe src={embedUrl} className="h-full w-full" allow="autoplay; fullscreen" allowFullScreen title={item.title} />
         </div>
       ) : hasVideo && isDirect ? (
-        <video src={item.video_url!} className="absolute inset-0 h-full w-full object-cover" autoPlay muted loop poster={cover ?? undefined} />
+        <video src={item.video_url!} className="absolute inset-0 h-full w-full object-cover" autoPlay loop poster={cover ?? undefined} />
       ) : cover ? (
         <img src={cover} alt={item.title} className="absolute inset-0 h-full w-full object-cover" style={{ animation: "slowZoom 8s ease-out both" }} />
       ) : (
@@ -378,9 +378,8 @@ export function DiscoverSiargaoPublic({ items }: { items: DiscoverItem[] }) {
                 return (
                   <div
                     key={item.id}
-                    className="col-span-2 row-span-2"
                     style={{
-                      gridColumn: "span 2",
+                      gridColumn: "1 / -1",
                     }}
                   >
                     <ExpandedCard
