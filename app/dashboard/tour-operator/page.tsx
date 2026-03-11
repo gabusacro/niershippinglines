@@ -30,14 +30,14 @@ export default async function TourOperatorDashboard() {
     guide: (guideProfiles ?? []).find((p) => p.id === g.tour_guide_id) ?? null,
   }));
 
-  // My pending bookings (assigned to me, payment not yet verified)
+  // My pending bookings
   const { count: pendingCount } = await supabase
     .from("tour_bookings")
     .select("*", { count: "exact", head: true })
     .eq("tour_operator_id", user.id)
     .eq("payment_status", "pending");
 
-  // My upcoming bookings (assigned to me, confirmed)
+  // My upcoming confirmed bookings
   const { data: upcomingBookings } = await supabase
     .from("tour_bookings")
     .select("*, tour:tour_packages(title), schedule:tour_schedules(available_date, departure_time)")
@@ -46,7 +46,7 @@ export default async function TourOperatorDashboard() {
     .order("created_at", { ascending: true })
     .limit(10);
 
-  // Today's revenue (my bookings only)
+  // Today's revenue
   const { data: todayRevData } = await supabase
     .from("tour_bookings")
     .select("total_amount_cents")
@@ -57,52 +57,83 @@ export default async function TourOperatorDashboard() {
 
   const todayRevenue = (todayRevData ?? []).reduce((s, b) => s + (b.total_amount_cents ?? 0), 0);
 
-  // Operator's own profile
+  // Total assigned bookings count
+  const { count: totalBookings } = await supabase
+    .from("tour_bookings")
+    .select("*", { count: "exact", head: true })
+    .eq("tour_operator_id", user.id)
+    .eq("status", "confirmed");
+
+  // Profile
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name")
     .eq("id", user.id)
     .single();
 
+  const displayName = profile?.full_name ?? user.email ?? "Operator";
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#134e4a]">🧑‍💼 Tour Operator</h1>
-        <p className="text-sm text-gray-500 mt-1">{profile?.full_name ?? user.email}</p>
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+
+      {/* ── HERO BANNER ── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-8 text-white shadow-lg mb-6">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='120' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 40 Q30 20 60 40 Q90 60 120 40' stroke='white' fill='none' stroke-width='2'/%3E%3Cpath d='M0 50 Q30 30 60 50 Q90 70 120 50' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E")`,
+            backgroundSize: "240px 120px",
+            backgroundRepeat: "repeat",
+          }}
+        />
+        <span className="pointer-events-none absolute -right-4 top-0 select-none text-[8rem] leading-none opacity-[0.07]">🌴</span>
+
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/60">
+              Tour Operator Dashboard
+            </p>
+            <h1 className="mt-1 font-bold text-3xl leading-tight">
+              Welcome, {displayName}! 👋
+            </h1>
+            <p className="mt-1 text-sm text-white/70">Manage your bookings, dispatch guides, and track revenue.</p>
+          </div>
+          <div className="flex gap-3 shrink-0">
+            <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center backdrop-blur-sm">
+              <div className="text-2xl font-bold leading-none">{totalBookings ?? 0}</div>
+              <div className="mt-1 text-xs text-white/65 tracking-wide">Bookings</div>
+            </div>
+            <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center backdrop-blur-sm">
+              <div className="text-2xl font-bold leading-none">{myGuides.length}</div>
+              <div className="mt-1 text-xs text-white/65 tracking-wide">Guides</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Today's revenue strip */}
+        <div className="relative mt-4 border-t border-white/15 pt-4 flex items-center justify-between">
+          <p className="text-xs font-semibold text-white/70">Today&apos;s Revenue</p>
+          <p className="text-xl font-bold text-white">₱{(todayRevenue / 100).toLocaleString()}</p>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="rounded-2xl border-2 border-emerald-100 bg-white p-5">
-          <p className="text-xs text-gray-400 mb-1">My Guides</p>
-          <p className="text-3xl font-bold text-[#134e4a]">{myGuides.length}</p>
-        </div>
-        <div className="rounded-2xl border-2 border-emerald-100 bg-white p-5">
-          <p className="text-xs text-gray-400 mb-1">Today's Revenue</p>
-          <p className="text-2xl font-bold text-emerald-600">
-            ₱{(todayRevenue / 100).toLocaleString()}
-          </p>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 mb-2">
+      {/* ── QUICK ACTIONS ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-5">
         {[
-          { href: "/dashboard/tour-operator/bookings", label: "📋 My Bookings" },
-          { href: "/dashboard/tour-operator/walk-in",  label: "✏️ Walk-in Booking" },
-          { href: "/dashboard/account",                label: "👤 My Account" },
-        ].map(({ href, label }) => (
+          { href: "/dashboard/tour-operator/bookings", label: "📋 My Bookings",    color: "border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50" },
+          { href: "/dashboard/tour-operator/walk-in",  label: "✏️ Walk-in Booking", color: "border-teal-200 hover:border-teal-400 hover:bg-teal-50" },
+          { href: "/dashboard/account",                label: "👤 My Account",      color: "border-gray-200 hover:border-gray-400 hover:bg-gray-50" },
+        ].map(({ href, label, color }) => (
           <Link key={href} href={href}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 text-center transition-colors hover:border-emerald-400 hover:bg-emerald-50">
+            className={`flex min-h-[48px] items-center justify-center rounded-xl border-2 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] text-center transition-colors ${color}`}>
             {label}
           </Link>
         ))}
       </div>
 
-      {/* Pending payments alert */}
+      {/* ── PENDING ALERT ── */}
       {(pendingCount ?? 0) > 0 && (
-        <div className="mt-5 rounded-2xl border-2 border-amber-200 bg-amber-50 px-6 py-4 flex items-center justify-between">
+        <div className="mb-5 rounded-2xl border-2 border-amber-200 bg-amber-50 px-6 py-4 flex items-center justify-between">
           <div>
             <p className="font-bold text-amber-800">{pendingCount} booking{(pendingCount ?? 0) > 1 ? "s" : ""} awaiting payment verification</p>
             <p className="text-sm text-amber-700 mt-0.5">These bookings are pending admin confirmation.</p>
@@ -114,13 +145,11 @@ export default async function TourOperatorDashboard() {
         </div>
       )}
 
-      {/* Upcoming Bookings */}
-      <div className="mt-5 rounded-2xl border-2 border-gray-100 bg-white p-6">
+      {/* ── UPCOMING BOOKINGS ── */}
+      <div className="rounded-2xl border-2 border-gray-100 bg-white p-6 mb-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-[#134e4a]">Upcoming Bookings</h2>
-          <Link href="/dashboard/tour-operator/bookings" className="text-xs text-emerald-600 hover:underline">
-            View all
-          </Link>
+          <Link href="/dashboard/tour-operator/bookings" className="text-xs text-emerald-600 hover:underline">View all</Link>
         </div>
         {!upcomingBookings || upcomingBookings.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">No bookings assigned yet.</p>
@@ -140,9 +169,7 @@ export default async function TourOperatorDashboard() {
                       {schedDate ? " · " + new Date(schedDate + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : ""}
                     </p>
                   </div>
-                  <p className="text-sm font-bold text-emerald-700">
-                    ₱{(b.total_amount_cents / 100).toLocaleString()}
-                  </p>
+                  <p className="text-sm font-bold text-emerald-700">₱{(b.total_amount_cents / 100).toLocaleString()}</p>
                 </Link>
               );
             })}
@@ -150,15 +177,11 @@ export default async function TourOperatorDashboard() {
         )}
       </div>
 
-      {/* My Tour Guides */}
-      <div className="mt-5 rounded-2xl border-2 border-gray-100 bg-white p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-[#134e4a]">My Tour Guides</h2>
-        </div>
+      {/* ── MY TOUR GUIDES ── */}
+      <div className="rounded-2xl border-2 border-gray-100 bg-white p-6">
+        <h2 className="font-bold text-[#134e4a] mb-4">My Tour Guides</h2>
         {myGuides.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">
-            No guides assigned yet. Contact admin to add guides.
-          </p>
+          <p className="text-sm text-gray-400 text-center py-4">No guides assigned yet. Contact admin to add guides.</p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {myGuides.map((a) => (
@@ -171,6 +194,7 @@ export default async function TourOperatorDashboard() {
           </div>
         )}
       </div>
+
     </div>
   );
 }
