@@ -5,10 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import TourGuideScanner from "./TourGuideScanner";
 
 export const dynamic = "force-dynamic";
-
-export const metadata = {
-  title: "Tour Guide Dashboard",
-};
+export const metadata = { title: "Tour Guide Dashboard" };
 
 export default async function TourGuideDashboard() {
   const user = await getAuthUser();
@@ -17,6 +14,7 @@ export default async function TourGuideDashboard() {
   const supabase = await createClient();
   const todayPH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
+  // My operator
   const { data: myAssignment } = await supabase
     .from("tour_guide_assignments")
     .select("tour_operator_id, is_active")
@@ -32,25 +30,43 @@ export default async function TourGuideDashboard() {
         .maybeSingle()
     : { data: null };
 
-  const { data: mySchedules } = await supabase
-    .from("tour_schedule_assignments")
-    .select("*, schedule:tour_schedules(id, available_date, departure_time, tour:tour_packages(title))")
-    .eq("tour_guide_id", user.id)
-    .eq("schedule.available_date", todayPH);
+  // My assigned batches — via tour_batches where tour_guide_id = me
+  const { data: myBatches } = await supabase
+    .from("tour_batches")
+    .select("id, schedule_id, guide_payment_status")
+    .eq("tour_guide_id", user.id);
 
-  const scheduleIds = (mySchedules ?? [])
-    .map((s) => (s.schedule as { id?: string } | null)?.id)
-    .filter(Boolean) as string[];
+  const batchIds = (myBatches ?? []).map((b) => b.id);
 
-  const { data: todayBookings } = scheduleIds.length > 0
+  // Get booking IDs from my batches
+  const { data: batchBookings } = batchIds.length > 0
     ? await supabase
-        .from("tour_bookings")
-        .select("*, tour:tour_packages(title), passengers:tour_booking_passengers(*)")
-        .eq("status", "confirmed")
-        .in("schedule_id", scheduleIds)
+        .from("tour_batch_bookings")
+        .select("booking_id, batch_id")
+        .in("batch_id", batchIds)
     : { data: [] };
 
-  const bookingIds = (todayBookings ?? []).map((b) => b.id);
+  const bookingIds = (batchBookings ?? []).map((bb) => bb.booking_id);
+
+  // Get today's bookings from my batches
+  const { data: todayBookings } = bookingIds.length > 0
+    ? await supabase
+        .from("tour_bookings")
+        .select("*, tour:tour_packages(title), schedule:tour_schedules(available_date, departure_time), passengers:tour_booking_passengers(*)")
+        .in("id", bookingIds)
+        .eq("status", "confirmed")
+        .eq("schedule.available_date" as never, todayPH)
+    : { data: [] };
+
+  // All assigned bookings (not just today) for history count
+  const { data: allAssignedBookings } = bookingIds.length > 0
+    ? await supabase
+        .from("tour_bookings")
+        .select("id, status")
+        .in("id", bookingIds)
+    : { data: [] };
+
+  // Tracking
   const { data: tracking } = bookingIds.length > 0
     ? await supabase
         .from("tour_passenger_tracking")
@@ -65,26 +81,44 @@ export default async function TourGuideDashboard() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-teal-600 px-6 py-8 text-white shadow-lg sm:px-8">
-        <p className="text-sm font-medium uppercase tracking-wider text-white/80">Tour Guide</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-          Welcome, {user.fullName?.split(" ")[0] ?? "Guide"}!
-        </h1>
-        <p className="mt-2 text-sm text-white/90">
-          {new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" })}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3 text-sm">
-          <span className="bg-white/20 px-3 py-1 rounded-full font-semibold">
-            {totalGuests} guest{totalGuests !== 1 ? "s" : ""} today
-          </span>
-          <span className="bg-white/20 px-3 py-1 rounded-full font-semibold">
-            {pickedUp} picked up
-          </span>
+
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-8 text-white shadow-lg mb-5">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='120' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 40 Q30 20 60 40 Q90 60 120 40' stroke='white' fill='none' stroke-width='2'/%3E%3Cpath d='M0 50 Q30 30 60 50 Q90 70 120 50' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E")`,
+            backgroundSize: "240px 120px",
+            backgroundRepeat: "repeat",
+          }}
+        />
+        <span className="pointer-events-none absolute -right-4 top-0 select-none text-[8rem] leading-none opacity-[0.07]">🌴</span>
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/60">Tour Guide Dashboard</p>
+            <h1 className="mt-1 font-bold text-3xl leading-tight">
+              Welcome, {user.fullName?.split(" ")[0] ?? "Guide"}! 👋
+            </h1>
+            <p className="mt-1 text-sm text-white/70">
+              {new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" })}
+            </p>
+          </div>
+          <div className="flex gap-3 shrink-0">
+            <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center backdrop-blur-sm">
+              <div className="text-2xl font-bold leading-none">{totalGuests}</div>
+              <div className="mt-1 text-xs text-white/65 tracking-wide">Today's Guests</div>
+            </div>
+            <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center backdrop-blur-sm">
+              <div className="text-2xl font-bold leading-none">{pickedUp}</div>
+              <div className="mt-1 text-xs text-white/65 tracking-wide">Picked Up</div>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* My Operator */}
       {operator ? (
-        <div className="mt-5 rounded-2xl border-2 border-emerald-100 bg-emerald-50 px-5 py-4">
+        <div className="mb-5 rounded-2xl border-2 border-emerald-100 bg-emerald-50 px-5 py-4">
           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">My Operator</p>
           <p className="font-bold text-emerald-900">{operator.full_name ?? "—"}</p>
           <div className="flex flex-wrap gap-3 mt-1 text-xs text-emerald-700">
@@ -93,31 +127,32 @@ export default async function TourGuideDashboard() {
           </div>
         </div>
       ) : (
-        <div className="mt-5 rounded-2xl border-2 border-amber-100 bg-amber-50 px-5 py-4">
+        <div className="mb-5 rounded-2xl border-2 border-amber-100 bg-amber-50 px-5 py-4">
           <p className="text-sm text-amber-700 font-semibold">Not linked to an operator yet.</p>
           <p className="text-xs text-amber-600 mt-0.5">Contact admin to get linked to your tour operator.</p>
         </div>
       )}
 
-{/* Quick actions */}
-<div className="mt-6 grid grid-cols-2 gap-3">
-  {[
-    { href: "/dashboard/account", label: "My Account" },
-    { href: "/dashboard/tour-guide/manifest", label: "Print Manifest" },
-  ].map(({ href, label }) => (
-    <Link key={href} href={href}
-      className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-50">
-      {label}
-    </Link>
-  ))}
-</div>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        {[
+          { href: "/dashboard/account",              label: "👤 My Account" },
+          { href: "/dashboard/tour-guide/history",   label: "📋 My History" },
+        ].map(({ href, label }) => (
+          <Link key={href} href={href}
+            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-50">
+            {label}
+          </Link>
+        ))}
+      </div>
 
-
-      <div className="mt-5">
+      {/* Scanner */}
+      <div className="mb-5">
         <TourGuideScanner guideId={user.id} todayPH={todayPH} />
       </div>
 
-      <div className="mt-5 rounded-2xl border-2 border-gray-100 bg-white p-6">
+      {/* Today's Guests */}
+      <div className="rounded-2xl border-2 border-gray-100 bg-white p-6">
         <h2 className="font-bold text-[#134e4a] mb-4">
           Today&apos;s Guests
           <span className="ml-2 text-sm font-normal text-gray-400">{totalGuests} total</span>
@@ -138,7 +173,7 @@ export default async function TourGuideDashboard() {
                       <p className="font-mono text-xs text-emerald-600">{b.reference}</p>
                     </div>
                     <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">
-                      {b.total_pax} pax
+                      {b.total_pax} guest{b.total_pax > 1 ? "s" : ""}
                     </span>
                   </div>
                   <div className="space-y-1">
@@ -172,7 +207,6 @@ export default async function TourGuideDashboard() {
           </div>
         )}
       </div>
-
 
     </div>
   );
