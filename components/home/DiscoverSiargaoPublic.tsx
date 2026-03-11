@@ -284,9 +284,7 @@ export function DiscoverSiargaoPublic({ items }: { items: DiscoverItem[] }) {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
         {/* ── Hero header ── */}
-        <div className="relative mb-10 overflow-hidden rounded-3xl">
-          {/* Beach gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]" />
+        <div className="relative mb-10 overflow-hidden rounded-3xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]">
           {/* Wave pattern overlay */}
           <div className="absolute inset-0 opacity-10"
             style={{
@@ -373,7 +371,7 @@ export function DiscoverSiargaoPublic({ items }: { items: DiscoverItem[] }) {
               const aspectKey = "portrait";
               const aspectClass = ASPECT_CLASSES[aspectKey];
 
-              
+
               const isExpanded = expandedId === item.id;
 
               if (isExpanded) {
