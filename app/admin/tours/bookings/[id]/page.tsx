@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
+import AssignOperatorButton from "./AssignOperatorButton";
 
 export const metadata = { title: "Tour Booking Detail — Admin" };
 
@@ -29,6 +30,27 @@ export default async function AdminTourBookingDetailPage({
   .select("*")
   .eq("booking_id", id)
   .order("passenger_number", { ascending: true });
+
+
+// Fetch operators for assignment dropdown
+  const { data: operators } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("role", "tour_operator")
+    .order("full_name");
+
+  // Fetch current assigned operator name
+  let currentOperatorName: string | null = null;
+  if (booking.tour_operator_id) {
+    const { data: op } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", booking.tour_operator_id)
+      .single();
+    currentOperatorName = op?.full_name ?? null;
+  }
+
+
 
   // Generate signed URL for GCash screenshot
   let gcashSignedUrl: string | null = null;
@@ -80,6 +102,15 @@ export default async function AdminTourBookingDetailPage({
           </span>
         </div>
       </div>
+
+
+      <AssignOperatorButton
+        bookingId={booking.id}
+        currentOperatorId={booking.tour_operator_id ?? null}
+        currentOperatorName={currentOperatorName}
+        operators={operators ?? []}
+      />
+
 
       {/* Tour + Schedule */}
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 mb-4">
