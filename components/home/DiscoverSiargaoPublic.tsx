@@ -368,13 +368,12 @@ export function DiscoverSiargaoPublic({ items }: { items: DiscoverItem[] }) {
             <p className="text-sm font-semibold text-[#0f766e]">No results found. Try a different search.</p>
           </div>
         ) : (
-          <div
-            className="grid gap-3 sm:gap-4"
-            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
-          >
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {filtered.map((item, idx) => {
-              const aspectKey = ASPECT_PATTERN[idx % ASPECT_PATTERN.length] ?? "square";
+              const aspectKey = "portrait";
               const aspectClass = ASPECT_CLASSES[aspectKey];
+
+              
               const isExpanded = expandedId === item.id;
 
               if (isExpanded) {
