@@ -7,6 +7,7 @@ import { ExtensionFriendlyHandlers } from "@/components/ExtensionFriendlyHandler
 import { ActionToastProvider } from "@/components/ui/ActionToast";
 import { getSiteBranding } from "@/lib/site-branding";
 import Script from "next/script";
+import PromoPopup from "@/components/PromoPopup";
 
 
 const nunito = Nunito({
