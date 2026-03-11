@@ -14,6 +14,7 @@ import { AcknowledgeRefundButton } from "./AcknowledgeRefundButton";
 import { RequestRefundButton } from "./RequestRefundButton";
 import { RequestRescheduleButton } from "./RequestRescheduleButton";
 import { ClaimGuestBookingButton } from "./ClaimGuestBookingButton";
+import { BookingShareSection } from "@/components/booking/BookingShareSection";
 
 export async function generateMetadata() {
   const branding = await getSiteBranding();
@@ -213,6 +214,17 @@ export default async function BookingDetailPage({
     booking.status === "checked_in" ||
     booking.status === "boarded" ||
     booking.status === "completed";
+
+
+
+// inside JSX, after the print tickets button:
+{canPrintTickets && (
+  <BookingShareSection
+    routeName={routeName}
+    origin={b.trip_snapshot_route_name ?? ""}
+    destination=""
+  />
+)}
 
   const canReschedule =
     ["confirmed", "checked_in", "boarded", "pending_payment"].includes(booking.status) &&

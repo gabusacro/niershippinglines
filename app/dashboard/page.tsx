@@ -27,6 +27,7 @@ import { getPassengerRestrictions, isBlockedNow } from "@/lib/dashboard/get-pass
 import { CrewCaptainManifestSection } from "@/app/dashboard/CrewCaptainManifestSection";
 import { DiscoverSiargao } from "@/components/dashboard/DiscoverSiargao";
 import { getDiscoverItems } from "@/lib/dashboard/get-discover-items";
+import { DashboardShareWidget } from "@/components/dashboard/DashboardShareWidget";
 
 export async function generateMetadata() {
   const branding = await getSiteBranding();
@@ -508,7 +509,12 @@ export default async function DashboardPage({
             </div>
           </div>
 
+          {/* ⑧ SHARE */}
+          <DashboardShareWidget />
+
         </div>
+
+        
 
       ) : isAdmin ? (
         /* ── ADMIN (redirected above, kept for safety) ── */
