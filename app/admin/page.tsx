@@ -119,18 +119,20 @@ export default async function AdminDashboardPage() {
       {/* Admin nav */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {[
+          { href: ROUTES.adminBranding,         label: "Site branding"             },
+          { href: "/admin/promo-popup", label: "📢 Promo Popup" },
+          { href: ROUTES.account,               label: "My Profile"                },
+          { href: "/admin/expenses",            label: "Expenses"                  },
+          { href: ROUTES.adminFees,             label: "Fees & charges"            },
+          { href: "/admin/investor-shares",     label: "Investor Shares"           },
           { href: ROUTES.adminReports,         label: "Reports (per vessel)"      },
           { href: ROUTES.adminVessels,          label: "Vessels & Fleet"           },
           { href: ROUTES.adminPendingPayments,  label: "Pending payments"          },
-          { href: ROUTES.adminBookings,         label: "Booking history"           },
-          { href: ROUTES.adminBranding,         label: "Site branding"             },
-          { href: ROUTES.adminFees,             label: "Fees & charges"            },
-          { href: "/admin/expenses",            label: "Expenses"                  },
-          { href: "/admin/investor-shares",     label: "Investor Shares"           },
+          { href: ROUTES.adminBookings,         label: "Booking history"           },         
           { href: "/admin/investor-payouts",    label: "💼 Investor Payouts"       },
           { href: "/admin/vessel-owners",       label: "Vessel Owners"             },
           { href: ROUTES.adminFlagged,          label: "Flagged accounts"          },
-          { href: ROUTES.account,               label: "My Profile"                },
+          
         ].map(({ href, label }) => (
           <Link key={href} href={href}
             className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] text-center transition-colors hover:border-[#0c7b93] hover:bg-teal-50">

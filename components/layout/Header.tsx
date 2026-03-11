@@ -11,6 +11,18 @@ import { createClient } from "@/lib/supabase/client";
 
 type HeaderProps = { siteName?: string };
 
+// Staff roles that should NOT see Home & Attractions
+const STAFF_ROLES = [
+  "admin",
+  "crew",
+  "captain",
+  "ticket_booth",
+  "tour_guide",
+  "tour_operator",
+  "pay_parking_owner",
+  "pay_parking_crew",
+];
+
 function ScheduleLink({ pathname, onClick }: { pathname: string; onClick?: () => void }) {
   const isHome = pathname === "/";
   const href = isHome ? "#schedule" : "/#schedule";
@@ -83,8 +95,12 @@ export function Header({ siteName }: HeaderProps = {}) {
     router.push(ROUTES.home);
   }
 
-  // Only show Book A Trip to logged-out visitors
+  // Show Book A Trip only to logged-out visitors
   const showBookATrip = !user;
+
+  // Show Home & Attractions to: logged-out visitors and passengers only
+  // Hidden for all staff roles (admin, crew, captain, ticket_booth, tour_guide, tour_operator, pay_parking_owner, pay_parking_crew)
+  const showPublicLinks = !role || role === "passenger";
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0c7b93] shadow-sm safe-area-pad md:bg-[#0c7b93]/95 md:backdrop-blur-md">
@@ -106,14 +122,18 @@ export function Header({ siteName }: HeaderProps = {}) {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1 lg:gap-2 text-sm font-medium">
-          <Link
-            href={ROUTES.home}
-            className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
-              pathname === ROUTES.home ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
-            }`}
-          >
-            Home
-          </Link>
+
+          {/* Logged-out visitors + passengers only */}
+          {showPublicLinks && (
+            <Link
+              href={ROUTES.home}
+              className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+                pathname === ROUTES.home ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+              }`}
+            >
+              Home
+            </Link>
+          )}
 
           {showBookATrip && (
             <Link
@@ -126,14 +146,17 @@ export function Header({ siteName }: HeaderProps = {}) {
             </Link>
           )}
 
-          <Link
-            href={ROUTES.attractions}
-            className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
-              pathname === ROUTES.attractions ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
-            }`}
-          >
-            Attractions
-          </Link>
+          {/* Logged-out visitors + passengers only */}
+          {showPublicLinks && (
+            <Link
+              href={ROUTES.attractions}
+              className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+                pathname === ROUTES.attractions ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
+              }`}
+            >
+              Attractions
+            </Link>
+          )}
 
           {user ? (
             <>
@@ -193,14 +216,18 @@ export function Header({ siteName }: HeaderProps = {}) {
       <div className={`md:hidden overflow-hidden transition-[height] duration-200 ease-out ${menuOpen ? "h-auto" : "h-0"}`} aria-hidden={!menuOpen}>
         <nav className="border-t border-white/15 bg-[#0f766e]/98 backdrop-blur-md px-4 py-3">
           <ul className="flex flex-col gap-0.5">
-            <li>
-              <Link href={ROUTES.home} onClick={() => setMenuOpen(false)}
-                className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
-                  pathname === ROUTES.home ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
-                }`}>
-                Home
-              </Link>
-            </li>
+
+            {/* Logged-out visitors + passengers only */}
+            {showPublicLinks && (
+              <li>
+                <Link href={ROUTES.home} onClick={() => setMenuOpen(false)}
+                  className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                    pathname === ROUTES.home ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                  }`}>
+                  Home
+                </Link>
+              </li>
+            )}
 
             {showBookATrip && (
               <li>
@@ -213,14 +240,17 @@ export function Header({ siteName }: HeaderProps = {}) {
               </li>
             )}
 
-            <li>
-              <Link href={ROUTES.attractions} onClick={() => setMenuOpen(false)}
-                className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
-                  pathname === ROUTES.attractions ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
-                }`}>
-                Attractions
-              </Link>
-            </li>
+            {/* Logged-out visitors + passengers only */}
+            {showPublicLinks && (
+              <li>
+                <Link href={ROUTES.attractions} onClick={() => setMenuOpen(false)}
+                  className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                    pathname === ROUTES.attractions ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
+                  }`}>
+                  Attractions
+                </Link>
+              </li>
+            )}
 
             {user ? (
               <>
