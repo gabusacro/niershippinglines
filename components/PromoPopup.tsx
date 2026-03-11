@@ -55,7 +55,7 @@ export default function PromoPopup() {
   return (
     <div
       onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-all duration-300 ${
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}
       style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
@@ -63,14 +63,6 @@ export default function PromoPopup() {
       <div className={`relative max-w-sm w-full rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${
         visible ? "scale-100 translate-y-0" : "scale-95 translate-y-4"
       }`}>
-
-        {/* Close */}
-        <button
-          onClick={dismiss}
-          className="absolute top-3 right-3 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full w-8 h-8 flex items-center justify-center text-lg font-bold transition-colors"
-        >
-          ×
-        </button>
 
         {/* Image with text overlay */}
         {popup.image_url ? (
@@ -100,15 +92,18 @@ export default function PromoPopup() {
             >
               {popup.button_label}
             </a>
-            <button
-              onClick={dismiss}
-              className="block w-full text-center text-sm text-gray-400 hover:text-gray-600 mt-2 transition-colors"
-            >
-              No thanks
-            </button>
           </div>
         )}
       </div>
+
+      {/* Close button — outside the box, centered below */}
+      <button
+        onClick={dismiss}
+        className="mt-5 flex items-center justify-center bg-white/20 hover:bg-white/40 text-white rounded-full w-10 h-10 text-2xl font-bold transition-colors backdrop-blur-sm"
+        aria-label="Close"
+      >
+        ×
+      </button>
     </div>
   );
 }

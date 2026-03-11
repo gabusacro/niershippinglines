@@ -57,6 +57,7 @@ export default async function RootLayout({
           <Header siteName={branding.site_name} />
           <main className="flex-1">{children}</main>
           <Footer siteName={branding.site_name} />
+          <PromoPopup />
         </ActionToastProvider>
       </body>
     </html>
