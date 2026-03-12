@@ -25,6 +25,7 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [debugVal, setDebugVal] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -102,33 +103,34 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Use BarcodeDetector if available (modern browsers)
     if ("BarcodeDetector" in window) {
       // @ts-expect-error BarcodeDetector not in TS types yet
       const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
       detector.detect(canvas).then((barcodes: Array<{ rawValue: string }>) => {
         if (barcodes.length > 0) {
+          const rawOriginal = barcodes[0].rawValue;
+          console.log("QR RAW VALUE:", rawOriginal);
+          setDebugVal(rawOriginal); // show on screen for mobile debugging
 
-let raw = barcodes[0].rawValue.trim().toUpperCase();
-// Extract reference from full URL if needed
-if (raw.includes("TRV-TOUR-")) {
-  const match = raw.match(/TRV-TOUR-[A-Z0-9]+/);
-  if (match) raw = match[0];
-}
-if (raw.startsWith("TRV-")) {
-  setReference(raw);
-  handleSubmit(raw);
-  return;
-}
+          let raw = rawOriginal.trim().toUpperCase();
 
+          // Extract reference from full URL if needed
+          if (raw.includes("TRV-TOUR-")) {
+            const match = raw.match(/TRV-TOUR-[A-Z0-9]+/);
+            if (match) raw = match[0];
+          }
 
+          if (raw.startsWith("TRV-")) {
+            setReference(raw);
+            handleSubmit(raw);
+            return;
+          }
         }
         animFrameRef.current = requestAnimationFrame(scanFrame);
       }).catch(() => {
         animFrameRef.current = requestAnimationFrame(scanFrame);
       });
     } else {
-      // Fallback: just keep scanning, user can manually trigger
       animFrameRef.current = requestAnimationFrame(scanFrame);
     }
   }, [handleSubmit]);
@@ -137,6 +139,7 @@ if (raw.startsWith("TRV-")) {
     setCameraError(null);
     setCameraOpen(true);
     setScanning(true);
+    setDebugVal(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
@@ -186,15 +189,9 @@ if (raw.startsWith("TRV-")) {
       {/* Camera viewfinder */}
       {cameraOpen && (
         <div className="mb-4 relative rounded-xl overflow-hidden bg-black">
-          <video
-            ref={videoRef}
-            className="w-full rounded-xl"
-            playsInline
-            muted
-          />
+          <video ref={videoRef} className="w-full rounded-xl" playsInline muted />
           <canvas ref={canvasRef} className="hidden" />
 
-          {/* Scanning overlay */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-48 h-48 border-4 border-white/70 rounded-2xl relative">
               <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-400 rounded-tl-lg" />
@@ -210,9 +207,16 @@ if (raw.startsWith("TRV-")) {
             Close Camera
           </button>
 
-          {scanning && (
+          {scanning && !debugVal && (
             <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs font-semibold">
               Point camera at QR code...
+            </p>
+          )}
+
+          {/* Debug — shows raw QR value on screen */}
+          {debugVal && (
+            <p className="absolute bottom-2 left-0 right-0 text-center text-yellow-300 text-xs font-bold px-2 break-all">
+              QR: {debugVal}
             </p>
           )}
         </div>
@@ -224,7 +228,6 @@ if (raw.startsWith("TRV-")) {
 
       {/* Input row */}
       <div className="flex gap-2">
-        {/* Camera button */}
         {!cameraOpen && (
           <button
             onClick={openCamera}
@@ -233,7 +236,6 @@ if (raw.startsWith("TRV-")) {
             📷
           </button>
         )}
-
         <input
           value={reference}
           onChange={(e) => setReference(e.target.value.toUpperCase())}
