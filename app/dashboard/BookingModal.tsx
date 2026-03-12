@@ -183,7 +183,7 @@ function VerifiedTravelerBadge({
 // PassengerExtraFields
 function PassengerExtraFields({
   extra, onChange, savedTravelers, onSelectTraveler,
-  isLoggedIn, fareType, fare, onSuggestSwitch,
+  isLoggedIn, fareType, fare, onSuggestSwitch, usedNames,
 }: {
   extra: PassengerExtra;
   onChange: (u: PassengerExtra) => void;
@@ -193,6 +193,7 @@ function PassengerExtraFields({
   fareType: string;
   fare: FareRow | null;
   onSuggestSwitch?: (to: FareTypeValue) => void;
+  usedNames?: string[];
 }) {
   const age       = extra.birthdate ? calcAge(extra.birthdate) : null;
   const suggested = fare && age !== null ? getAutoFareType(age, fare) : null;
@@ -212,7 +213,9 @@ function PassengerExtraFields({
             className="w-full rounded-lg border border-teal-200 px-2 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
           >
             <option value="">— Select saved traveler —</option>
-            {savedTravelers.map(t => (
+            {savedTravelers
+              .filter(t => !(usedNames ?? []).includes(t.full_name.trim()))
+              .map(t => (
               <option key={t.id} value={t.id}>
                 {t.full_name}
                 {t.id_verified && !( t.id_expires_at && new Date(t.id_expires_at) < new Date() )
@@ -785,6 +788,12 @@ export function BookingModal({
   ) => {
     if (count === 0) return null;
     const baseColorIdx = FARE_BASE_COLOR[fareType] ?? 0;
+
+    // All names currently filled across every passenger slot
+    const allFilledNames = [
+      ...adultNames, ...seniorNames, ...pwdNames,
+      ...studentNames, ...childNames, ...infantNames,
+    ].map(n => n.trim()).filter(Boolean);
     return (
       <div className="space-y-3">
         <p className="text-sm font-semibold text-[#134e4a]">{label} Passengers</p>
@@ -850,6 +859,7 @@ export function BookingModal({
                 fareType={fareType}
                 fare={fare}
                 onSuggestSwitch={to => switchFareType(fareType, i, to)}
+                usedNames={allFilledNames.filter(n => n !== (names[i] ?? "").trim())}
               />
 
               {/* Verified badge — shown after name is filled and matches a verified traveler */}
