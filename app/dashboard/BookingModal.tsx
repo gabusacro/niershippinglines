@@ -578,18 +578,46 @@ export function BookingModal({
   const adminFeeCents = totalPassengers * adminFeePerPax;
   const totalCents    = fareSubtotalCents + gcashFee + adminFeeCents;
 
+  // Pre-check verified IDs — fetched once on load, stored in state
+  const [verifiedRecords, setVerifiedRecords] = useState<{
+    passenger_name: string; discount_type: string; expires_at: string | null;
+  }[]>([]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetch("/api/passenger-id")
+      .then(r => r.json())
+      .then(d => {
+        const now = new Date();
+        const verified = (d.verifications ?? []).filter((v: {
+          verification_status: string; expires_at: string | null;
+        }) =>
+          v.verification_status === "verified" &&
+          (!v.expires_at || new Date(v.expires_at) > now)
+        );
+        setVerifiedRecords(verified);
+      })
+      .catch(() => {});
+  }, [isLoggedIn]);
+
+  const isNameVerified = useCallback((name: string, fareType: string): boolean => {
+    if (!name.trim() || !requiresId(fareType)) return false;
+    return verifiedRecords.some(v =>
+      v.discount_type === fareType &&
+      v.passenger_name?.trim().toLowerCase() === name.trim().toLowerCase()
+    );
+  }, [verifiedRecords]);
+
+
+
   const idUploadRequired = useMemo(() => {
     let offset = countAdult;
     const list: { key: string; fareType: string; name: string; passengerIndex: number }[] = [];
     const check = (count: number, fareType: string, names: string[]) => {
       for (let i = 0; i < count; i++) {
         const key = `${fareType}-${i}`;
-        // Skip if verified saved traveler (non-expired)
-        const isVerified = savedTravelers.some(
-          t => t.full_name === names[i] &&
-               t.id_verified &&
-               (!t.id_expires_at || new Date(t.id_expires_at) > new Date())
-        );
+        // Skip if passenger has a verified ID on file
+        const isVerified = isNameVerified(names[i] ?? "", fareType);
         if (requiresId(fareType) && !(waivers[key] ?? false) && !isVerified) {
           list.push({ key, fareType, name: names[i] || `${fareType} ${i+1}`, passengerIndex: offset + i });
         }
@@ -601,7 +629,7 @@ export function BookingModal({
     check(countStudent, "student", studentNames);
     check(countChild,   "child",   childNames);
     return list;
-  }, [countAdult,countSenior,countPwd,countStudent,countChild,seniorNames,pwdNames,studentNames,childNames,waivers,savedTravelers]);
+  }, [countAdult,countSenior,countPwd,countStudent,countChild,seniorNames,pwdNames,studentNames,childNames,waivers,isNameVerified]);
 
   const setWaiver = useCallback((key: string, val: boolean) => {
     setWaivers(prev => ({ ...prev, [key]: val }));
@@ -663,37 +691,6 @@ export function BookingModal({
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result?.reference]);
-
-  // Pre-check verified status in FORM STEP (before booking)
-  const [preVerifiedKeys, setPreVerifiedKeys] = useState<Record<string, boolean>>({});
-
-  const checkPreVerified = useCallback(async (fareType: string, index: number, name: string) => {
-    const key = `${fareType}-${index}`;
-    if (!name.trim() || !requiresId(fareType)) {
-      setPreVerifiedKeys(prev => ({ ...prev, [key]: false }));
-      return;
-    }
-    try {
-      // Use GET endpoint — fetch all verified IDs for this user, check if name+type match
-      const res  = await fetch("/api/passenger-id");
-      const data = await res.json().catch(() => ({}));
-      const verifications: { passenger_name: string; discount_type: string; verification_status: string; expires_at: string | null }[] =
-        data.verifications ?? [];
-      const now = new Date();
-      const isVerified = verifications.some(v =>
-        v.verification_status === "verified" &&
-        v.discount_type === fareType &&
-        v.passenger_name?.trim().toLowerCase() === name.trim().toLowerCase() &&
-        (!v.expires_at || new Date(v.expires_at) > now)
-      );
-      setPreVerifiedKeys(prev => ({ ...prev, [key]: isVerified }));
-    } catch { /* silent */ }
-  }, []);
-
-  useEffect(() => { seniorNames.forEach((n, i)  => checkPreVerified("senior",  i, n)); }, [seniorNames,  checkPreVerified]);
-  useEffect(() => { pwdNames.forEach((n, i)     => checkPreVerified("pwd",     i, n)); }, [pwdNames,     checkPreVerified]);
-  useEffect(() => { studentNames.forEach((n, i) => checkPreVerified("student", i, n)); }, [studentNames, checkPreVerified]);
-  useEffect(() => { childNames.forEach((n, i)   => checkPreVerified("child",   i, n)); }, [childNames,   checkPreVerified]);
 
   const switchFareType = useCallback((fromType: string, fromIndex: number, toType: FareTypeValue) => {
     const getName = (t: string, i: number) => {
@@ -833,11 +830,13 @@ export function BookingModal({
           const colorIdx = (baseColorIdx + i) % PAX_COLORS.length;
           const color    = PAX_COLORS[colorIdx];
 
-          // Check verified via API pre-check (reliable — not just name matching)
-          const isPreVerified = preVerifiedKeys[key] ?? false;
-          // Also check saved travelers for badge display info (fare_type, expires_at)
+          // Check if this passenger has a verified ID on file
+          const isPreVerified = isNameVerified(names[i] ?? "", fareType);
+          // Find saved traveler record for badge display (fare_type, expires_at)
           const verifiedTraveler = isPreVerified
-            ? (savedTravelers.find(t => t.id_verified && t.full_name.trim().toLowerCase() === (names[i] ?? "").trim().toLowerCase()) ?? null)
+            ? (savedTravelers.find(t =>
+                t.full_name.trim().toLowerCase() === (names[i] ?? "").trim().toLowerCase()
+              ) ?? { full_name: names[i] ?? "", fare_type: fareType, id_verified: true, id_verified_at: null, id_expires_at: null, id: "", gender: null, birthdate: null, nationality: null, address: null, phone: null })
             : null;
 
           return (
