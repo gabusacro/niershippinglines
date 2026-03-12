@@ -45,13 +45,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "This booking is not assigned to you" }, { status: 403 });
   }
 
-  // Check tour date matches today (using schedule date)
-  const scheduleDate = (booking.schedule as { available_date?: string } | null)?.available_date;
-  if (scheduleDate && scheduleDate !== today) {
-    return NextResponse.json({
-      error: `This booking is scheduled for ${scheduleDate}, not today`,
-    }, { status: 400 });
-  }
 
   const now = new Date().toISOString();
   const passengers = booking.passengers as Array<{ id: string; full_name: string }> ?? [];
