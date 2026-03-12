@@ -9,7 +9,6 @@ export async function POST(request: NextRequest) {
   }
 
   const { reference, guide_id, action, today } = await request.json();
-
   if (!reference || !action) {
     return NextResponse.json({ error: "Missing reference or action" }, { status: 400 });
   }
@@ -24,7 +23,7 @@ export async function POST(request: NextRequest) {
   // Find the booking
   const { data: booking, error: bookingError } = await supabase
     .from("tour_bookings")
-    .select("*, tour:tour_packages(title), passengers:tour_booking_passengers(id, full_name, passenger_number)")
+    .select("*, tour:tour_packages(title), schedule:tour_schedules(available_date), passengers:tour_booking_passengers(id, full_name, passenger_number)")
     .eq("reference", reference)
     .eq("status", "confirmed")
     .single();
@@ -33,10 +32,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Booking not found or not confirmed" }, { status: 404 });
   }
 
-  // Check tour date matches today
-  if (booking.tour_snapshot_date && booking.tour_snapshot_date !== today) {
+  // Verify this guide is assigned to this booking via tour_batches
+  const { data: batchBooking } = await supabase
+    .from("tour_batch_bookings")
+    .select("batch_id, batch:tour_batches(tour_guide_id)")
+    .eq("booking_id", booking.id)
+    .single();
+
+  const assignedGuideId = (batchBooking?.batch as { tour_guide_id?: string } | null)?.tour_guide_id;
+
+  if (!batchBooking || assignedGuideId !== user.id) {
+    return NextResponse.json({ error: "This booking is not assigned to you" }, { status: 403 });
+  }
+
+  // Check tour date matches today (using schedule date)
+  const scheduleDate = (booking.schedule as { available_date?: string } | null)?.available_date;
+  if (scheduleDate && scheduleDate !== today) {
     return NextResponse.json({
-      error: "This booking is not scheduled for today (" + booking.tour_snapshot_date + ")"
+      error: `This booking is scheduled for ${scheduleDate}, not today`,
     }, { status: 400 });
   }
 
@@ -57,11 +70,10 @@ export async function POST(request: NextRequest) {
       status: action,
       updated_at: now,
     };
-
-    if (action === "picked_up") updateData.picked_up_at = now;
-    if (action === "on_tour") updateData.on_tour_at = now;
+    if (action === "picked_up")   updateData.picked_up_at = now;
+    if (action === "on_tour")     updateData.on_tour_at = now;
     if (action === "dropped_off") updateData.dropped_off_at = now;
-    if (action === "no_show") updateData.no_show_at = now;
+    if (action === "no_show")     updateData.no_show_at = now;
 
     if (existing) {
       await supabase
@@ -82,9 +94,9 @@ export async function POST(request: NextRequest) {
   }
 
   const actionMessages: Record<string, string> = {
-    picked_up:   "Picked up! " + booking.total_pax + " guest(s) marked as picked up.",
-    on_tour:     "On tour! " + booking.total_pax + " guest(s) marked as on tour.",
-    dropped_off: "Dropped off! " + booking.total_pax + " guest(s) marked as dropped off.",
+    picked_up:   `Picked up! ${booking.total_pax} guest(s) marked as picked up.`,
+    on_tour:     `On tour! ${booking.total_pax} guest(s) marked as on tour.`,
+    dropped_off: `Dropped off! ${booking.total_pax} guest(s) marked as dropped off.`,
     no_show:     "Marked as no show.",
   };
 
