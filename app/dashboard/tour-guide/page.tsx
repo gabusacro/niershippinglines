@@ -137,7 +137,7 @@ export default async function TourGuideDashboard() {
       <div className="grid grid-cols-2 gap-3 mb-5">
         {[
           { href: "/dashboard/account",              label: "👤 My Account" },
-          { href: "/dashboard/tour-guide/history",   label: "📋 My History" },
+          { href: "/dashboard/tour-guide/bookings", label: "📋 My Bookings" },
         ].map(({ href, label }) => (
           <Link key={href} href={href}
             className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-50">

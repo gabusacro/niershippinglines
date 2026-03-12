@@ -108,12 +108,20 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
       const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
       detector.detect(canvas).then((barcodes: Array<{ rawValue: string }>) => {
         if (barcodes.length > 0) {
-          const raw = barcodes[0].rawValue.trim().toUpperCase();
-          if (raw.startsWith("TRV-")) {
-            setReference(raw);
-            handleSubmit(raw);
-            return;
-          }
+
+let raw = barcodes[0].rawValue.trim().toUpperCase();
+// Extract reference from full URL if needed
+if (raw.includes("TRV-TOUR-")) {
+  const match = raw.match(/TRV-TOUR-[A-Z0-9]+/);
+  if (match) raw = match[0];
+}
+if (raw.startsWith("TRV-")) {
+  setReference(raw);
+  handleSubmit(raw);
+  return;
+}
+
+
         }
         animFrameRef.current = requestAnimationFrame(scanFrame);
       }).catch(() => {
