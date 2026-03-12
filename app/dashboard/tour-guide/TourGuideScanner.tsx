@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface Props {
   guideId: string;
@@ -24,20 +25,9 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
   const [action, setAction] = useState<"picked_up" | "on_tour" | "dropped_off" | "no_show">("picked_up");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [debugVal, setDebugVal] = useState<string | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const animFrameRef = useRef<number | null>(null);
-
-  const actionLabels = {
-    picked_up:   "Mark as Picked Up",
-    on_tour:     "Mark as On Tour",
-    dropped_off: "Mark as Dropped Off",
-    no_show:     "Mark as No Show",
-  };
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerDivId = "tour-guide-qr-scanner";
 
   const actionColors = {
     picked_up:   "bg-blue-600 hover:bg-blue-700",
@@ -66,7 +56,7 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
       if (!res.ok) throw new Error(data.error ?? "Scan failed");
       setResult({ success: true, message: data.message, booking: data.booking });
       setReference("");
-      closeCamera();
+      stopCamera();
     } catch (err) {
       setResult({ success: false, message: err instanceof Error ? err.message : "Failed" });
     } finally {
@@ -74,91 +64,61 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
     }
   }
 
-  const stopCamera = useCallback(() => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  const closeCamera = useCallback(() => {
-    stopCamera();
-    setCameraOpen(false);
+  async function startCamera() {
     setCameraError(null);
-    setScanning(false);
-  }, [stopCamera]);
+    setCameraOpen(true);
+    setResult(null);
 
-  const scanFrame = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
-      animFrameRef.current = requestAnimationFrame(scanFrame);
-      return;
-    }
+    // Wait for div to be in DOM
+    await new Promise((r) => setTimeout(r, 100));
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    try {
+      const scanner = new Html5Qrcode(scannerDivId);
+      scannerRef.current = scanner;
 
-    if ("BarcodeDetector" in window) {
-      // @ts-expect-error BarcodeDetector not in TS types yet
-      const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-      detector.detect(canvas).then((barcodes: Array<{ rawValue: string }>) => {
-        if (barcodes.length > 0) {
-          const rawOriginal = barcodes[0].rawValue;
-          console.log("QR RAW VALUE:", rawOriginal);
-          setDebugVal(rawOriginal); // show on screen for mobile debugging
-
-          let raw = rawOriginal.trim().toUpperCase();
-
-          // Extract reference from full URL if needed
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText) => {
+          let raw = decodedText.trim().toUpperCase();
+          // Extract from full URL if needed
           if (raw.includes("TRV-TOUR-")) {
             const match = raw.match(/TRV-TOUR-[A-Z0-9]+/);
             if (match) raw = match[0];
           }
-
           if (raw.startsWith("TRV-")) {
-            setReference(raw);
             handleSubmit(raw);
-            return;
           }
-        }
-        animFrameRef.current = requestAnimationFrame(scanFrame);
-      }).catch(() => {
-        animFrameRef.current = requestAnimationFrame(scanFrame);
-      });
-    } else {
-      animFrameRef.current = requestAnimationFrame(scanFrame);
-    }
-  }, [handleSubmit]);
-
-  async function openCamera() {
-    setCameraError(null);
-    setCameraOpen(true);
-    setScanning(true);
-    setDebugVal("BarcodeDetector: " + ("BarcodeDetector" in window ? "YES" : "NO"));
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        animFrameRef.current = requestAnimationFrame(scanFrame);
-      }
-    } catch {
+        },
+        undefined
+      );
+    } catch (err) {
       setCameraError("Camera access denied. Please allow camera permission and try again.");
-      setScanning(false);
+      setCameraOpen(false);
     }
   }
 
+  async function stopCamera() {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+      } catch {
+        // ignore
+      }
+      scannerRef.current = null;
+    }
+    setCameraOpen(false);
+  }
+
   useEffect(() => {
-    return () => stopCamera();
-  }, [stopCamera]);
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-6">
@@ -169,7 +129,7 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
 
       {/* Action selector */}
       <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-4">
-        {(Object.keys(actionLabels) as Array<keyof typeof actionLabels>).map((a) => (
+        {(["picked_up", "on_tour", "dropped_off", "no_show"] as const).map((a) => (
           <button
             key={a}
             onClick={() => setAction(a)}
@@ -186,39 +146,15 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
         ))}
       </div>
 
-      {/* Camera viewfinder */}
+      {/* Camera viewfinder — Html5Qrcode renders into this div */}
       {cameraOpen && (
-        <div className="mb-4 relative rounded-xl overflow-hidden bg-black">
-          <video ref={videoRef} className="w-full rounded-xl" playsInline muted />
-          <canvas ref={canvasRef} className="hidden" />
-
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-48 h-48 border-4 border-white/70 rounded-2xl relative">
-              <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-400 rounded-tl-lg" />
-              <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-400 rounded-tr-lg" />
-              <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-400 rounded-bl-lg" />
-              <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-400 rounded-br-lg" />
-            </div>
-          </div>
-
+        <div className="mb-4">
+          <div id={scannerDivId} className="rounded-xl overflow-hidden" />
           <button
-            onClick={closeCamera}
-            className="absolute top-2 right-2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full font-semibold">
+            onClick={stopCamera}
+            className="mt-2 w-full rounded-xl bg-gray-800 text-white text-xs font-semibold py-2 hover:bg-gray-700">
             Close Camera
           </button>
-
-          {scanning && !debugVal && (
-            <p className="absolute bottom-2 left-0 right-0 text-center text-white text-xs font-semibold">
-              Point camera at QR code...
-            </p>
-          )}
-
-          {/* Debug — shows raw QR value on screen */}
-          {debugVal && (
-            <p className="absolute bottom-2 left-0 right-0 text-center text-yellow-300 text-xs font-bold px-2 break-all">
-              QR: {debugVal}
-            </p>
-          )}
         </div>
       )}
 
@@ -230,7 +166,7 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
       <div className="flex gap-2">
         {!cameraOpen && (
           <button
-            onClick={openCamera}
+            onClick={startCamera}
             className="px-4 py-3 rounded-xl bg-white border-2 border-blue-200 text-blue-700 text-sm font-bold hover:border-blue-400 transition-colors"
             title="Open camera scanner">
             📷
