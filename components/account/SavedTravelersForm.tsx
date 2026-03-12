@@ -7,6 +7,8 @@ type Traveler = {
   gender: string | null;
   birthdate: string | null;
   nationality: string | null;
+  address: string | null;
+  phone: string | null;
 };
 
 const NATIONALITIES = [
@@ -37,13 +39,16 @@ function TravelerForm({
   onCancel: () => void;
   saving: boolean;
 }) {
-  const [fullName, setFullName] = useState(initial?.full_name ?? "");
-  const [gender, setGender] = useState(initial?.gender ?? "");
-  const [birthdate, setBirthdate] = useState(initial?.birthdate ?? "");
-  const [nationality, setNationality] = useState(initial?.nationality ?? "");
+  const [fullName,    setFullName]    = useState(initial?.full_name    ?? "");
+  const [gender,      setGender]      = useState(initial?.gender       ?? "");
+  const [birthdate,   setBirthdate]   = useState(initial?.birthdate    ?? "");
+  const [nationality, setNationality] = useState(initial?.nationality  ?? "");
+  const [address,     setAddress]     = useState(initial?.address      ?? "");
+  const [phone,       setPhone]       = useState(initial?.phone        ?? "");
 
   return (
     <div className="rounded-xl border border-teal-200 bg-teal-50/30 p-4 space-y-3">
+      {/* Full name */}
       <div>
         <label className="block text-xs text-[#0f766e] mb-1">Full Name *</label>
         <input
@@ -55,6 +60,8 @@ function TravelerForm({
           className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
         />
       </div>
+
+      {/* Gender / Birthdate / Nationality */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div>
           <label className="block text-xs text-[#0f766e] mb-1">Gender</label>
@@ -89,10 +96,42 @@ function TravelerForm({
           </select>
         </div>
       </div>
+
+      {/* Address */}
+      <div>
+        <label className="block text-xs text-[#0f766e] mb-1">Address</label>
+        <input
+          type="text"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="e.g. Brgy. Dapa, General Luna, Siargao"
+          className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+        />
+      </div>
+
+      {/* Phone */}
+      <div>
+        <label className="block text-xs text-[#0f766e] mb-1">Phone / Mobile</label>
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="e.g. 09XX XXX XXXX"
+          className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+        />
+      </div>
+
       <div className="flex gap-2 pt-1">
         <button
           type="button"
-          onClick={() => onSave({ full_name: fullName.trim(), gender: gender || null, birthdate: birthdate || null, nationality: nationality || null })}
+          onClick={() => onSave({
+            full_name:   fullName.trim(),
+            gender:      gender      || null,
+            birthdate:   birthdate   || null,
+            nationality: nationality || null,
+            address:     address     || null,
+            phone:       phone       || null,
+          })}
           disabled={saving || !fullName.trim()}
           className="rounded-lg bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50"
         >
@@ -112,12 +151,12 @@ function TravelerForm({
 
 export function SavedTravelersForm() {
   const [travelers, setTravelers] = useState<Traveler[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
+  const [loading,   setLoading]   = useState(true);
+  const [showAdd,   setShowAdd]   = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [saving,    setSaving]    = useState(false);
+  const [deleting,  setDeleting]  = useState<string | null>(null);
+  const [error,     setError]     = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/saved-travelers")
@@ -223,15 +262,24 @@ export function SavedTravelersForm() {
                   saving={saving}
                 />
               ) : (
-                <div className="flex items-center justify-between rounded-xl border border-teal-200 bg-teal-50/20 px-4 py-3">
-                  <div>
+                <div className="flex items-start justify-between rounded-xl border border-teal-200 bg-teal-50/20 px-4 py-3 gap-3">
+                  <div className="min-w-0">
                     <p className="font-medium text-[#134e4a]">{t.full_name}</p>
                     <p className="text-xs text-[#0f766e] mt-0.5">
-                      {[t.gender, t.birthdate ? calcAge(t.birthdate) : null, t.nationality]
-                        .filter(Boolean).join(" · ") || "No details saved"}
+                      {[
+                        t.gender,
+                        t.birthdate ? calcAge(t.birthdate) : null,
+                        t.nationality,
+                      ].filter(Boolean).join(" · ") || "No details saved"}
                     </p>
+                    {t.address && (
+                      <p className="text-xs text-[#0f766e] mt-0.5 truncate">📍 {t.address}</p>
+                    )}
+                    {t.phone && (
+                      <p className="text-xs text-[#0f766e] mt-0.5">📞 {t.phone}</p>
+                    )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={() => setEditingId(t.id)}

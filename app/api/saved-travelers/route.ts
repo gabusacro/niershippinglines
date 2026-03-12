@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+const SELECT_FIELDS = "id, full_name, gender, birthdate, nationality, address, phone";
+
 // GET: list saved travelers for logged-in user
 export async function GET() {
   const supabase = await createClient();
@@ -9,7 +11,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("saved_travelers")
-    .select("id, full_name, gender, birthdate, nationality")
+    .select(SELECT_FIELDS)
     .eq("profile_id", user.id)
     .order("created_at", { ascending: true });
 
@@ -31,13 +33,15 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from("saved_travelers")
     .insert({
-      profile_id: user.id,
-      full_name: body.full_name.trim(),
-      gender: body.gender || null,
-      birthdate: body.birthdate || null,
+      profile_id:  user.id,
+      full_name:   body.full_name.trim(),
+      gender:      body.gender      || null,
+      birthdate:   body.birthdate   || null,
       nationality: body.nationality || null,
+      address:     body.address     || null,
+      phone:       body.phone       || null,
     })
-    .select("id, full_name, gender, birthdate, nationality")
+    .select(SELECT_FIELDS)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

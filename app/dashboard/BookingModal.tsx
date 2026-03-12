@@ -42,6 +42,7 @@ type FareRow = {
 type SavedTraveler = {
   id: string; full_name: string;
   gender: string|null; birthdate: string|null; nationality: string|null;
+  address: string|null; phone: string|null;
 };
 type PassengerExtra = { gender: string; birthdate: string; nationality: string };
 
@@ -748,6 +749,7 @@ export function BookingModal({
                 placeholder={`${label} ${i+1} — Full Name`}
                 className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
               />
+              
               <input
                 type="text"
                 value={addresses[i] ?? ""}
@@ -755,6 +757,7 @@ export function BookingModal({
                 placeholder="Different address (optional)"
                 className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
               />
+
               <PassengerExtraFields
                 extra={extras[i] ?? { gender:"", birthdate:"", nationality:"" }}
                 onChange={u => { const n=[...extras]; n[i]=u; setExtras(n); }}
@@ -762,7 +765,17 @@ export function BookingModal({
                 onSelectTraveler={t => {
                   const nn=[...names]; nn[i]=t.full_name; setNames(nn);
                   const ne=[...extras]; ne[i]={ gender:t.gender??"", birthdate:t.birthdate??"", nationality:t.nationality??"" }; setExtras(ne);
+                  // Auto-fill address if passenger has one saved and the field is empty
+                  if (t.address) {
+                    const na=[...addresses]; na[i]=t.address; setAddresses(na);
+                  }
+                  // Auto-fill customer mobile if it's empty and traveler has phone
+                  if (t.phone && !customerMobile.trim()) {
+                    setCustomerMobile(t.phone);
+                  }
                 }}
+                
+                
                 isLoggedIn={isLoggedIn}
                 fareType={fareType}
                 fare={fare}
