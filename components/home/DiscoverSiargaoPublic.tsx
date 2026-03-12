@@ -165,7 +165,7 @@ function ExpandedCard({
           )}
 
           <div className="flex items-center gap-2">
-            {item.href && (
+            {item.href ? (
               <a
                 href={item.href}
                 target={item.href.startsWith("http") ? "_blank" : undefined}
@@ -174,6 +174,14 @@ function ExpandedCard({
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#0c7b93] px-4 py-2 text-xs font-black text-white hover:bg-[#0f766e] transition-colors shadow-lg"
               >
                 Learn more →
+              </a>
+            ) : (
+              <a
+                href="/book"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#0c7b93] px-4 py-2 text-xs font-black text-white hover:bg-[#0f766e] transition-colors shadow-lg"
+              >
+                🚢 Book your trip →
               </a>
             )}
             {item.photos.length > 1 && !hasVideo && (

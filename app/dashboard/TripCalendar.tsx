@@ -148,7 +148,7 @@ export function TripCalendar({
           {/* Legend */}
           <div className="mt-3 rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 text-xs text-[#0f766e]">
             <p>🎟️ <strong>Online seats</strong> = slots reserved for online booking (limited by design)</p>
-            <p className="mt-0.5">🚢 <strong>Vessel capacity</strong> = total passengers the boat can carry (walk-in seats available at the pier)</p>
+            <p className="mt-0.5">🚢 <strong>Vessel capacity</strong> = total passengers the boat can carry (walk-in seats may be available at the pier)</p>
           </div>
 
           {selectedTrips.length === 0 ? (

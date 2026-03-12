@@ -1,3 +1,5 @@
+
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ROUTES } from "@/lib/constants";
 import { getSiteBranding } from "@/lib/site-branding";
@@ -13,6 +15,48 @@ import { getFaqs } from "@/lib/home/get-faqs";
 import { getTodayInManila } from "@/lib/admin/ph-time";
 import { getFeeSettings } from "@/lib/get-fee-settings";
 import { TripCheckerForm } from "@/components/home/TripCheckerForm";
+
+
+export const metadata: Metadata = {
+  title: "Travela Siargao | Ferry Booking — Siargao Island to Surigao City",
+  description:
+    "Book your ferry to Siargao Island online. Daily trips from Surigao City to Dapa, Siargao and Dinagat. Real-time seat availability, GCash payment, instant e-ticket. Senior, PWD & student discounts.",
+  keywords: [
+    "siargao island",
+    "siargao ferry",
+    "surigao to siargao",
+    "siargao boat",
+    "dapa siargao ferry",
+    "siargao island travel",
+    "general luna siargao",
+    "siargao philippines",
+    "siargao island hopping",
+    "manila to siargao",
+    "siargao beach",
+    "cloud 9 siargao",
+    "naked island siargao",
+    "ferry booking siargao",
+    "siargao island ferry schedule",
+  ],
+  openGraph: {
+    title: "Travela Siargao | Ferry Booking — Siargao Island",
+    description:
+      "Daily ferry trips to Siargao Island. Book online in 2 minutes, pay via GCash, get instant e-ticket.",
+    url: "https://www.travelasiargao.com",
+    siteName: "Travela Siargao",
+    type: "website",
+    locale: "en_PH",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Travela Siargao | Ferry Booking",
+    description: "Book your ferry to Siargao Island. Daily trips, real-time seats, GCash payment.",
+  },
+  alternates: {
+    canonical: "https://www.travelasiargao.com",
+  },
+};
+
 
 export const dynamic = "force-dynamic";
 
