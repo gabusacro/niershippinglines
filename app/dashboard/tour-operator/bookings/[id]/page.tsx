@@ -33,15 +33,12 @@ export default async function OperatorBookingDetailPage({
     .eq("booking_id", id)
     .order("passenger_number", { ascending: true });
 
-
-// Fetch current assigned guide for this booking
+  // Fetch current assigned guide for this booking
   const { data: existingBatch } = await supabase
     .from("tour_batch_bookings")
     .select("batch_id, batch:tour_batches(tour_guide_id)")
     .eq("booking_id", id)
     .single();
-
-
 
   const currentGuideId = (existingBatch?.batch as { tour_guide_id?: string } | null)?.tour_guide_id ?? null;
   let currentGuideName: string | null = null;
@@ -50,8 +47,15 @@ export default async function OperatorBookingDetailPage({
     currentGuideName = gp?.full_name ?? null;
   }
 
+  // Fetch tracking status for all passengers in this booking
+  const { data: tracking } = await supabase
+    .from("tour_passenger_tracking")
+    .select("passenger_id, status, picked_up_at, on_tour_at, dropped_off_at, no_show_at")
+    .eq("booking_id", id);
 
-
+  const trackingMap = Object.fromEntries(
+    (tracking ?? []).map((t) => [t.passenger_id, t])
+  );
 
   // Fetch assigned guides for this operator
   const { data: rawGuides } = await supabase
@@ -84,6 +88,28 @@ export default async function OperatorBookingDetailPage({
     completed: "bg-blue-100 text-blue-700 border-blue-200",
     no_show:   "bg-red-100 text-red-700 border-red-200",
   };
+
+  const trackingStatusBadge = (passengerId: string) => {
+    const t = trackingMap[passengerId];
+    const s = t?.status;
+    if (!s || s === "assigned") return (
+      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">
+        ⏳ Waiting
+      </span>
+    );
+    if (s === "picked_up")   return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">✅ Picked Up</span>;
+    if (s === "on_tour")     return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">🚐 On Tour</span>;
+    if (s === "dropped_off") return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">📍 Dropped Off</span>;
+    if (s === "no_show")     return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">❌ No Show</span>;
+    return null;
+  };
+
+  // Overall tour progress summary
+  const totalPassengers = passengers?.length ?? 0;
+  const droppedOff = (tracking ?? []).filter(t => t.status === "dropped_off").length;
+  const onTour     = (tracking ?? []).filter(t => t.status === "on_tour").length;
+  const pickedUp   = (tracking ?? []).filter(t => t.status === "picked_up").length;
+  const noShow     = (tracking ?? []).filter(t => t.status === "no_show").length;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
@@ -152,6 +178,36 @@ export default async function OperatorBookingDetailPage({
         </div>
       </section>
 
+      {/* Tour Progress */}
+      {totalPassengers > 0 && (
+        <section className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-6 mb-4">
+          <h2 className="font-bold text-[#134e4a] mb-3">🚐 Tour Progress</h2>
+          <div className="grid grid-cols-4 gap-3 text-center">
+            <div className="rounded-xl bg-white border border-blue-100 py-3">
+              <p className="text-xl font-bold text-blue-700">{pickedUp}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Picked Up</p>
+            </div>
+            <div className="rounded-xl bg-white border border-emerald-100 py-3">
+              <p className="text-xl font-bold text-emerald-700">{onTour}</p>
+              <p className="text-xs text-gray-400 mt-0.5">On Tour</p>
+            </div>
+            <div className="rounded-xl bg-white border border-teal-100 py-3">
+              <p className="text-xl font-bold text-teal-700">{droppedOff}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Dropped Off</p>
+            </div>
+            <div className="rounded-xl bg-white border border-red-100 py-3">
+              <p className="text-xl font-bold text-red-500">{noShow}</p>
+              <p className="text-xs text-gray-400 mt-0.5">No Show</p>
+            </div>
+          </div>
+          {droppedOff === totalPassengers && totalPassengers > 0 && (
+            <p className="mt-3 text-sm font-bold text-teal-700 text-center">
+              🎉 All guests dropped off — tour complete!
+            </p>
+          )}
+        </section>
+      )}
+
       {/* Payment Status */}
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 mb-4">
         <h2 className="font-bold text-[#134e4a] mb-4">💳 Payment Status</h2>
@@ -214,7 +270,7 @@ export default async function OperatorBookingDetailPage({
         </section>
       )}
 
-      {/* Tourist Manifest */}
+      {/* Guest Manifest with tracking status */}
       <section className="rounded-2xl border-2 border-emerald-100 bg-white p-6 mb-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-[#134e4a]">🧑‍🤝‍🧑 Guest Manifest</h2>
@@ -237,6 +293,9 @@ export default async function OperatorBookingDetailPage({
                       Lead
                     </span>
                   )}
+                  <span className="ml-auto">
+                    {trackingStatusBadge(p.id)}
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
                   <div>
