@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-const SELECT_FIELDS = "id, full_name, gender, birthdate, nationality, address, phone";
+const SELECT_FIELDS = "id, full_name, gender, birthdate, nationality, address, phone, fare_type, id_verified, id_verified_at, id_expires_at";
 
 // PATCH: update a saved traveler
 export async function PATCH(

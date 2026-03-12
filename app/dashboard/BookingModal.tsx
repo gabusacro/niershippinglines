@@ -24,6 +24,20 @@ const NATIONALITIES = ["Filipino","American","Australian","British","Canadian","
   "French","German","Japanese","Korean","Singaporean","Other"];
 const GENDERS = ["Male","Female","Other"];
 
+// ── Passenger box color palette (cycles per slot) ──
+const PAX_COLORS = [
+  { border: "border-l-blue-500",   bg: "bg-blue-50/60",   badge: "bg-blue-500",   label: "text-blue-700"   },
+  { border: "border-l-violet-500", bg: "bg-violet-50/60", badge: "bg-violet-500", label: "text-violet-700" },
+  { border: "border-l-teal-500",   bg: "bg-teal-50/60",   badge: "bg-teal-500",   label: "text-teal-700"   },
+  { border: "border-l-amber-500",  bg: "bg-amber-50/60",  badge: "bg-amber-500",  label: "text-amber-700"  },
+  { border: "border-l-rose-500",   bg: "bg-rose-50/60",   badge: "bg-rose-500",   label: "text-rose-700"   },
+];
+
+// Base color index per fare type so same type is always the same hue family
+const FARE_BASE_COLOR: Record<string, number> = {
+  adult: 0, senior: 1, pwd: 2, student: 3, child: 4, infant: 0,
+};
+
 // Types
 type FareRow = {
   base_fare_cents: number;
@@ -43,6 +57,11 @@ type SavedTraveler = {
   id: string; full_name: string;
   gender: string|null; birthdate: string|null; nationality: string|null;
   address: string|null; phone: string|null;
+  // Verification fields
+  fare_type: string|null;
+  id_verified: boolean|null;
+  id_verified_at: string|null;
+  id_expires_at: string|null;
 };
 type PassengerExtra = { gender: string; birthdate: string; nationality: string };
 
@@ -74,13 +93,11 @@ function getAutoFareType(age: number|null, f: FareRow|null): FareTypeValue {
   return "adult";
 }
 
-/** Fare types that require ID on boarding */
 const ID_REQUIRED_TYPES = ["senior","pwd","student","child"] as const;
 function requiresId(fareType: string): boolean {
   return (ID_REQUIRED_TYPES as readonly string[]).includes(fareType);
 }
 
-/** What ID text to show */
 function idHint(fareType: string): string {
   if (fareType === "senior")  return "Senior Citizen ID, OSCA ID, or any gov-issued ID showing birthdate";
   if (fareType === "pwd")     return "PWD ID issued by NCDA or LGU";
@@ -89,7 +106,6 @@ function idHint(fareType: string): string {
   return "Valid government-issued ID";
 }
 
-/** Discount % for a fare type */
 function discountPct(fareType: string, f: FareRow): number {
   if (fareType === "infant")  return 100;
   if (fareType === "child")   return f.child_discount_percent  ?? 50;
@@ -117,6 +133,51 @@ function ensureExtraLength(arr: PassengerExtra[], len: number): PassengerExtra[]
   const e: PassengerExtra = { gender:"", birthdate:"", nationality:"" };
   if (arr.length >= len) return arr.slice(0, len);
   return [...arr, ...Array(len - arr.length).fill(null).map(() => ({...e}))];
+}
+
+// ── Verified Traveler Badge ──
+function VerifiedTravelerBadge({
+  traveler, fareType,
+}: {
+  traveler: SavedTraveler; fareType: string;
+}) {
+  if (!traveler.id_verified) return null;
+
+  const isExpired = traveler.id_expires_at
+    ? new Date(traveler.id_expires_at) < new Date()
+    : false;
+
+  if (isExpired) {
+    return (
+      <div className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5">
+        <span className="text-amber-500 text-sm">⚠</span>
+        <span className="text-xs font-semibold text-amber-700">
+          ID expired — please upload a new one on boarding
+        </span>
+      </div>
+    );
+  }
+
+  const savedFare = traveler.fare_type;
+  const mismatch  = savedFare && savedFare !== fareType;
+
+  return (
+    <div className="flex items-start gap-1.5 rounded-lg border border-green-300 bg-green-50 px-2.5 py-1.5">
+      <span className="text-green-600 text-sm mt-0.5">✓</span>
+      <div className="flex-1 min-w-0">
+        <span className="text-xs font-bold text-green-700">
+          {savedFare
+            ? `${savedFare.charAt(0).toUpperCase() + savedFare.slice(1)} ID on file — verified`
+            : "ID verified — no upload needed"}
+        </span>
+        {mismatch && (
+          <p className="text-[10px] text-amber-700 mt-0.5">
+            ⚠ Saved as <strong>{savedFare}</strong> but booking as <strong>{fareType}</strong> — present ID at terminal.
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // PassengerExtraFields
@@ -151,7 +212,15 @@ function PassengerExtraFields({
             className="w-full rounded-lg border border-teal-200 px-2 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
           >
             <option value="">— Select saved traveler —</option>
-            {savedTravelers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+            {savedTravelers.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.full_name}
+                {t.id_verified && !( t.id_expires_at && new Date(t.id_expires_at) < new Date() )
+                  ? ` ✓ verified`
+                  : ""}
+                {t.fare_type ? ` (${t.fare_type})` : ""}
+              </option>
+            ))}
           </select>
         </div>
       )}
@@ -184,7 +253,6 @@ function PassengerExtraFields({
         </div>
       </div>
 
-      {/* Age-based fare type suggestion */}
       {showTip && onSuggestSwitch && (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5">
           <p className="text-xs text-amber-800">
@@ -204,7 +272,7 @@ function PassengerExtraFields({
   );
 }
 
-// IdWaiverCard — shown BEFORE booking to decide discount vs waive
+// IdWaiverCard
 function IdWaiverCard({
   paxKey, fareType, name, waived, onWaiverChange,
 }: {
@@ -250,7 +318,7 @@ function IdWaiverCard({
   );
 }
 
-// IdUploadCard — shown AFTER booking to upload the ID
+// IdUploadCard
 function IdUploadCard({
   paxKey, fareType, name, passengerIndex,
   upload, onFileChange, onUpload,
@@ -273,7 +341,6 @@ function IdUploadCard({
         </p>
       ) : (
         <div className="space-y-2">
-          {/* Proper label+input — works on iOS Safari, Android, desktop */}
           <div className="flex items-center gap-2 flex-wrap">
             <label
               htmlFor={inputId}
@@ -330,7 +397,6 @@ export function BookingModal({
   const router     = useRouter();
   const isLoggedIn = !!loggedInEmail?.trim();
 
-  // Fare rules
   const [fare, setFare] = useState<FareRow|null>(null);
   const [autoFareApplied, setAutoFareApplied] = useState(false);
   const loggedInAge  = loggedInBirthdate ? calcAge(loggedInBirthdate) : null;
@@ -338,7 +404,6 @@ export function BookingModal({
     gender: loggedInGender, birthdate: loggedInBirthdate, nationality: loggedInNationality,
   };
 
-  // Passenger counts
   const [countAdult,   setCountAdult]   = useState(1);
   const [countSenior,  setCountSenior]  = useState(0);
   const [countPwd,     setCountPwd]     = useState(0);
@@ -346,7 +411,6 @@ export function BookingModal({
   const [countChild,   setCountChild]   = useState(0);
   const [countInfant,  setCountInfant]  = useState(0);
 
-  // Names
   const [adultNames,   setAdultNames]   = useState<string[]>([passengerName ?? ""]);
   const [seniorNames,  setSeniorNames]  = useState<string[]>([]);
   const [pwdNames,     setPwdNames]     = useState<string[]>([]);
@@ -354,7 +418,6 @@ export function BookingModal({
   const [childNames,   setChildNames]   = useState<string[]>([]);
   const [infantNames,  setInfantNames]  = useState<string[]>([]);
 
-  // Addresses
   const [adultAddresses,   setAdultAddresses]   = useState<string[]>([]);
   const [seniorAddresses,  setSeniorAddresses]  = useState<string[]>([]);
   const [pwdAddresses,     setPwdAddresses]     = useState<string[]>([]);
@@ -362,7 +425,6 @@ export function BookingModal({
   const [childAddresses,   setChildAddresses]   = useState<string[]>([]);
   const [infantAddresses,  setInfantAddresses]  = useState<string[]>([]);
 
-  // Extras (gender/birthdate/nationality)
   const [adultExtras,   setAdultExtras]   = useState<PassengerExtra[]>([firstExtra]);
   const [seniorExtras,  setSeniorExtras]  = useState<PassengerExtra[]>([]);
   const [pwdExtras,     setPwdExtras]     = useState<PassengerExtra[]>([]);
@@ -370,14 +432,10 @@ export function BookingModal({
   const [childExtras,   setChildExtras]   = useState<PassengerExtra[]>([]);
   const [infantExtras,  setInfantExtras]  = useState<PassengerExtra[]>([]);
 
-  // Waivers — decided BEFORE booking
-  const [waivers, setWaivers] = useState<Record<string, boolean>>({});
-
-  // ID uploads — happen AFTER booking
-  const [idUploads, setIdUploads] = useState<Record<string, IdUpload>>({});
+  const [waivers,    setWaivers]    = useState<Record<string, boolean>>({});
+  const [idUploads,  setIdUploads]  = useState<Record<string, IdUpload>>({});
   const idFiles = useRef<Record<string, File|null>>({});
 
-  // Contact / booking state
   const [savedTravelers,  setSavedTravelers]  = useState<SavedTraveler[]>([]);
   const [customerEmail,   setCustomerEmail]   = useState(loggedInEmail);
   const [customerMobile,  setCustomerMobile]  = useState("");
@@ -387,11 +445,10 @@ export function BookingModal({
   const [submitting,      setSubmitting]      = useState(false);
   const [formError,       setFormError]       = useState("");
 
-  // Payment proof
-  const [proofFile,       setProofFile]       = useState<File|null>(null);
-  const [proofUploading,  setProofUploading]  = useState(false);
-  const [proofUploaded,   setProofUploaded]   = useState(false);
-  const [proofError,      setProofError]      = useState("");
+  const [proofFile,      setProofFile]      = useState<File|null>(null);
+  const [proofUploading, setProofUploading] = useState(false);
+  const [proofUploaded,  setProofUploaded]  = useState(false);
+  const [proofError,     setProofError]     = useState("");
   const proofInputRef = useRef<HTMLInputElement>(null);
 
   const [result, setResult] = useState<{
@@ -404,7 +461,6 @@ export function BookingModal({
     };
   }|null>(null);
 
-  // Load saved travelers
   useEffect(() => {
     if (!isLoggedIn) return;
     fetch("/api/saved-travelers")
@@ -413,7 +469,6 @@ export function BookingModal({
       .catch(() => {});
   }, [isLoggedIn]);
 
-  // Load fare rules
   const routeId = trip.route?.id;
   useEffect(() => {
     if (!routeId) return;
@@ -439,7 +494,6 @@ export function BookingModal({
       .catch(() => {});
   }, [routeId]);
 
-  // Auto-set logged-in user fare type once fare loads
   useEffect(() => {
     if (!fare || autoFareApplied) { if (fare) setAutoFareApplied(true); return; }
     if (!loggedInBirthdate) { setAutoFareApplied(true); return; }
@@ -459,7 +513,6 @@ export function BookingModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fare]);
 
-  // Sync array lengths when counts change
   useEffect(() => { setAdultNames(p=>ensureLength(p,countAdult));     setAdultAddresses(p=>ensureLength(p,countAdult));     setAdultExtras(p=>ensureExtraLength(p,countAdult));     }, [countAdult]);
   useEffect(() => { setSeniorNames(p=>ensureLength(p,countSenior));   setSeniorAddresses(p=>ensureLength(p,countSenior));   setSeniorExtras(p=>ensureExtraLength(p,countSenior));   }, [countSenior]);
   useEffect(() => { setPwdNames(p=>ensureLength(p,countPwd));         setPwdAddresses(p=>ensureLength(p,countPwd));         setPwdExtras(p=>ensureExtraLength(p,countPwd));         }, [countPwd]);
@@ -467,13 +520,11 @@ export function BookingModal({
   useEffect(() => { setChildNames(p=>ensureLength(p,countChild));     setChildAddresses(p=>ensureLength(p,countChild));     setChildExtras(p=>ensureExtraLength(p,countChild));     }, [countChild]);
   useEffect(() => { setInfantNames(p=>ensureLength(p,countInfant));   setInfantAddresses(p=>ensureLength(p,countInfant));   setInfantExtras(p=>ensureExtraLength(p,countInfant));   }, [countInfant]);
 
-  // Fares
   const base           = fare?.base_fare_cents          ?? 55000;
   const adminFeePerPax = fare?.admin_fee_cents_per_passenger ?? 2000;
   const gcashFee       = fare?.gcash_fee_cents           ?? 1500;
   const totalPassengers = countAdult + countSenior + countPwd + countStudent + countChild + countInfant;
 
-  // Build flat passenger list for API + fare calculation
   const passengerDetails = useMemo(() => {
     const list: {
       fare_type: string; full_name: string; address: string;
@@ -514,7 +565,6 @@ export function BookingModal({
     waivers,
   ]);
 
-  // Fare subtotal — respects waivers (waived = adult rate)
   const fareSubtotalCents = useMemo(() => {
     if (!fare) return 0;
     return passengerDetails.reduce((sum, p) =>
@@ -525,14 +575,19 @@ export function BookingModal({
   const adminFeeCents = totalPassengers * adminFeePerPax;
   const totalCents    = fareSubtotalCents + gcashFee + adminFeeCents;
 
-  // Passengers needing ID upload (after booking) — only those who did NOT waive
   const idUploadRequired = useMemo(() => {
     let offset = countAdult;
     const list: { key: string; fareType: string; name: string; passengerIndex: number }[] = [];
     const check = (count: number, fareType: string, names: string[]) => {
       for (let i = 0; i < count; i++) {
         const key = `${fareType}-${i}`;
-        if (requiresId(fareType) && !(waivers[key] ?? false)) {
+        // Skip if verified saved traveler (non-expired)
+        const isVerified = savedTravelers.some(
+          t => t.full_name === names[i] &&
+               t.id_verified &&
+               (!t.id_expires_at || new Date(t.id_expires_at) > new Date())
+        );
+        if (requiresId(fareType) && !(waivers[key] ?? false) && !isVerified) {
           list.push({ key, fareType, name: names[i] || `${fareType} ${i+1}`, passengerIndex: offset + i });
         }
       }
@@ -543,14 +598,12 @@ export function BookingModal({
     check(countStudent, "student", studentNames);
     check(countChild,   "child",   childNames);
     return list;
-  }, [countAdult,countSenior,countPwd,countStudent,countChild,seniorNames,pwdNames,studentNames,childNames,waivers]);
+  }, [countAdult,countSenior,countPwd,countStudent,countChild,seniorNames,pwdNames,studentNames,childNames,waivers,savedTravelers]);
 
-  // Waiver helpers
   const setWaiver = useCallback((key: string, val: boolean) => {
     setWaivers(prev => ({ ...prev, [key]: val }));
   }, []);
 
-  // ID upload helpers
   const getUpload = useCallback((key: string): IdUpload => {
     return idUploads[key] ?? { fileName:"", uploading:false, uploaded:false, preVerified:false, error:"" };
   }, [idUploads]);
@@ -586,7 +639,6 @@ export function BookingModal({
     }
   }, [result, patchUpload, toast]);
 
-  // Auto-check verified IDs when booking is created
   useEffect(() => {
     if (!result?.reference || idUploadRequired.length === 0) return;
     idUploadRequired.forEach(async (pax) => {
@@ -604,12 +656,11 @@ export function BookingModal({
         if (res.ok && data.already_verified) {
           patchUpload(pax.key, { uploaded: true, preVerified: true, fileName: "", error: "" });
         }
-      } catch { /* silent — user can still upload manually */ }
+      } catch { /* silent */ }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result?.reference]);
 
-  // Switch passenger fare type
   const switchFareType = useCallback((fromType: string, fromIndex: number, toType: FareTypeValue) => {
     const getName = (t: string, i: number) => {
       if (t==="adult")   return adultNames[i]   ?? "";
@@ -656,7 +707,6 @@ export function BookingModal({
     if (toType==="infant")  add(infantNames,  setInfantNames,  setCountInfant,  infantExtras,  setInfantExtras);
   }, [adultNames,seniorNames,pwdNames,studentNames,childNames,infantNames,adultExtras,seniorExtras,pwdExtras,studentExtras,childExtras,infantExtras]);
 
-  // Submit booking
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -703,7 +753,6 @@ export function BookingModal({
     }
   };
 
-  // Confirm booking (upload proof)
   const handleConfirmBooking = async () => {
     setProofError("");
     if (!proofFile) { setProofError("Please select your GCash screenshot first."); return; }
@@ -727,7 +776,7 @@ export function BookingModal({
     }
   };
 
-  // Render passenger block
+  // ── Colored numbered passenger block renderer ──
   const renderBlock = (
     label: string, fareType: string, count: number,
     names: string[], setNames: (v:string[])=>void,
@@ -735,27 +784,56 @@ export function BookingModal({
     extras: PassengerExtra[], setExtras: (v:PassengerExtra[])=>void,
   ) => {
     if (count === 0) return null;
+    const baseColorIdx = FARE_BASE_COLOR[fareType] ?? 0;
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         <p className="text-sm font-semibold text-[#134e4a]">{label} Passengers</p>
         {Array.from({ length: count }, (_, i) => {
-          const key = `${fareType}-${i}`;
+          const key      = `${fareType}-${i}`;
+          const colorIdx = (baseColorIdx + i) % PAX_COLORS.length;
+          const color    = PAX_COLORS[colorIdx];
+
+          // Find matching verified saved traveler
+          const verifiedTraveler = savedTravelers.find(
+            t => t.id_verified &&
+                 t.full_name.trim().toLowerCase() === (names[i] ?? "").trim().toLowerCase() &&
+                 (!t.id_expires_at || new Date(t.id_expires_at) > new Date())
+          ) ?? null;
+
           return (
-            <div key={i} className="rounded-xl border border-teal-200 bg-white p-3 space-y-2">
+            <div
+              key={i}
+              className={`rounded-xl border-2 border-l-4 ${color.border} border-teal-100 ${color.bg} p-3 space-y-2 transition-all`}
+            >
+              {/* Numbered header */}
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${color.badge} text-white text-xs font-black shadow-sm`}>
+                  {i + 1}
+                </span>
+                <span className={`text-xs font-bold uppercase tracking-wide ${color.label}`}>
+                  {label}{count > 1 ? ` ${i + 1}` : ""}
+                </span>
+                {verifiedTraveler && (
+                  <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-green-100 border border-green-300 px-2 py-0.5 text-[10px] font-bold text-green-700 shrink-0">
+                    ✓ Verified
+                  </span>
+                )}
+              </div>
+
               <input
                 type="text" required
                 value={names[i] ?? ""}
                 onChange={e => { const n=[...names]; n[i]=e.target.value; setNames(n); }}
                 placeholder={`${label} ${i+1} — Full Name`}
-                className="w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                className="w-full rounded-lg border border-teal-200 bg-white px-3 py-2 text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
               />
-              
+
               <input
                 type="text"
                 value={addresses[i] ?? ""}
                 onChange={e => { const n=[...addresses]; n[i]=e.target.value; setAddresses(n); }}
                 placeholder="Different address (optional)"
-                className="w-full rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
+                className="w-full rounded-lg border border-teal-200 bg-white px-3 py-1.5 text-sm text-[#134e4a] focus:ring-2 focus:ring-[#0c7b93]"
               />
 
               <PassengerExtraFields
@@ -765,25 +843,22 @@ export function BookingModal({
                 onSelectTraveler={t => {
                   const nn=[...names]; nn[i]=t.full_name; setNames(nn);
                   const ne=[...extras]; ne[i]={ gender:t.gender??"", birthdate:t.birthdate??"", nationality:t.nationality??"" }; setExtras(ne);
-                  // Auto-fill address if passenger has one saved and the field is empty
-                  if (t.address) {
-                    const na=[...addresses]; na[i]=t.address; setAddresses(na);
-                  }
-                  // Auto-fill customer mobile if it's empty and traveler has phone
-                  if (t.phone && !customerMobile.trim()) {
-                    setCustomerMobile(t.phone);
-                  }
+                  if (t.address) { const na=[...addresses]; na[i]=t.address; setAddresses(na); }
+                  if (t.phone && !customerMobile.trim()) setCustomerMobile(t.phone);
                 }}
-                
-                
                 isLoggedIn={isLoggedIn}
                 fareType={fareType}
                 fare={fare}
                 onSuggestSwitch={to => switchFareType(fareType, i, to)}
               />
 
-              {/* Waiver decision — only for discount types, shown inline before booking */}
-              {requiresId(fareType) && (
+              {/* Verified badge — shown after name is filled and matches a verified traveler */}
+              {verifiedTraveler && requiresId(fareType) && (
+                <VerifiedTravelerBadge traveler={verifiedTraveler} fareType={fareType} />
+              )}
+
+              {/* ID waiver — only show if NOT already verified */}
+              {requiresId(fareType) && !verifiedTraveler && (
                 <IdWaiverCard
                   paxKey={key}
                   fareType={fareType}
@@ -799,7 +874,6 @@ export function BookingModal({
     );
   };
 
-  // Auto-fare banner
   const autoType = fare ? getAutoFareType(loggedInAge, fare) : "adult";
   const autoFareBanner = autoFareApplied && autoType !== "adult" && loggedInBirthdate ? (
     <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
@@ -849,10 +923,9 @@ export function BookingModal({
 
           {autoFareBanner}
 
-          {/* PAYMENT STEP — after booking created */}
+          {/* PAYMENT STEP */}
           {result ? (
             <div className="space-y-4">
-              {/* Booking confirmed banner */}
               <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4">
                 <p className="font-semibold text-[#134e4a]">✓ Booking created</p>
                 <p className="mt-1 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
@@ -863,7 +936,6 @@ export function BookingModal({
                 </p>
               </div>
 
-              {/* Fare breakdown */}
               <div className="rounded-lg border border-teal-200 bg-white p-3">
                 <p className="text-xs font-semibold uppercase text-[#0f766e] mb-2">Fare breakdown</p>
                 {result.fare_breakdown?.passenger_details?.map((p, i) => {
@@ -912,7 +984,6 @@ export function BookingModal({
                 </div>
               )}
 
-              {/* ID uploads — optional, only for non-waived discount passengers */}
               {idUploadRequired.length > 0 && (
                 <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 space-y-3">
                   <p className="text-sm font-bold text-blue-900">🪪 Upload Discount IDs (Optional)</p>
@@ -935,7 +1006,6 @@ export function BookingModal({
                 </div>
               )}
 
-              {/* Payment proof upload */}
               <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 space-y-2">
                 <p className="text-sm font-semibold text-amber-900">
                   🔎 Upload Payment Proof <span className="text-red-600">*</span>
@@ -989,10 +1059,7 @@ export function BookingModal({
             </div>
 
           ) : (
-            /* BOOKING FORM */
             <form onSubmit={handleSubmit} className="space-y-4">
-
-              {/* Passenger counts */}
               <p className="text-sm font-semibold text-[#134e4a]">Number of passengers by type</p>
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
                 {FARE_TYPE_OPTIONS.map(({ value, label }) => {
@@ -1022,7 +1089,6 @@ export function BookingModal({
                 })}
               </div>
 
-              {/* Discount summary */}
               {fare && (
                 <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 space-y-0.5 text-xs text-[#0f766e]">
                   <p className="font-semibold text-[#134e4a] mb-1">Discounted fares — ID required on boarding</p>
@@ -1035,7 +1101,6 @@ export function BookingModal({
                 </div>
               )}
 
-              {/* Fare preview */}
               {totalPassengers > 0 && fare && (
                 <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 space-y-1">
                   <p className="text-xs font-semibold uppercase text-[#0f766e]">Amount breakdown</p>
@@ -1067,11 +1132,15 @@ export function BookingModal({
                 <div className="rounded-lg border border-teal-200 bg-teal-50/20 px-3 py-2">
                   <p className="text-xs text-[#0f766e]">
                     💡 You have {savedTravelers.length} saved traveler{savedTravelers.length!==1?"s":""}. Use the dropdowns in each passenger slot to auto-fill.
+                    {savedTravelers.some(t => t.id_verified) && (
+                      <span className="ml-1 text-green-700 font-semibold">
+                        ✓ Some travelers have verified IDs — no upload needed!
+                      </span>
+                    )}
                   </p>
                 </div>
               )}
 
-              {/* Address */}
               <div>
                 <label className="block text-sm font-medium text-[#134e4a] mb-1">
                   Address (for tickets and manifest)
@@ -1086,7 +1155,6 @@ export function BookingModal({
                 {loggedInAddress && <p className="mt-0.5 text-xs text-[#0f766e]">Pre-filled from your account.</p>}
               </div>
 
-              {/* Passenger blocks */}
               {renderBlock("Adult",   "adult",   countAdult,   adultNames,   setAdultNames,   adultAddresses,   setAdultAddresses,   adultExtras,   setAdultExtras)}
               {renderBlock("Senior",  "senior",  countSenior,  seniorNames,  setSeniorNames,  seniorAddresses,  setSeniorAddresses,  seniorExtras,  setSeniorExtras)}
               {renderBlock("PWD",     "pwd",     countPwd,     pwdNames,     setPwdNames,     pwdAddresses,     setPwdAddresses,     pwdExtras,     setPwdExtras)}
@@ -1094,7 +1162,6 @@ export function BookingModal({
               {renderBlock("Child",   "child",   countChild,   childNames,   setChildNames,   childAddresses,   setChildAddresses,   childExtras,   setChildExtras)}
               {renderBlock("Infant",  "infant",  countInfant,  infantNames,  setInfantNames,  infantAddresses,  setInfantAddresses,  infantExtras,  setInfantExtras)}
 
-              {/* Contact */}
               <div className="border-t border-teal-200 pt-4 space-y-3">
                 <p className="text-sm font-semibold text-[#134e4a]">Contact</p>
                 <div>
@@ -1130,7 +1197,6 @@ export function BookingModal({
                 </div>
               </div>
 
-              {/* Terms */}
               <div className={`rounded-xl border-2 p-4 ${termsAccepted ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"}`}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
