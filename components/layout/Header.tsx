@@ -60,6 +60,7 @@ export function Header({ siteName }: HeaderProps = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const toast = useToast();
@@ -69,19 +70,21 @@ export function Header({ siteName }: HeaderProps = {}) {
     supabase.auth.getUser().then(({ data: { user: u } }) => {
       setUser(u ?? null);
       if (u?.id) {
-        supabase.from("profiles").select("role").eq("id", u.id).maybeSingle().then(({ data: p }) => {
+        supabase.from("profiles").select("role, avatar_url").eq("id", u.id).maybeSingle().then(({ data: p }) => {
           setRole((p as { role?: string } | null)?.role ?? null);
+          setAvatarUrl((p as { role?: string; avatar_url?: string } | null)?.avatar_url ?? null);
         });
-      } else setRole(null);
+      } else { setRole(null); setAvatarUrl(null); }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u?.id) {
-        supabase.from("profiles").select("role").eq("id", u.id).maybeSingle().then(({ data: p }) => {
+        supabase.from("profiles").select("role, avatar_url").eq("id", u.id).maybeSingle().then(({ data: p }) => {
           setRole((p as { role?: string } | null)?.role ?? null);
+          setAvatarUrl((p as { role?: string; avatar_url?: string } | null)?.avatar_url ?? null);
         });
-      } else setRole(null);
+      } else { setRole(null); setAvatarUrl(null); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -169,9 +172,16 @@ export function Header({ siteName }: HeaderProps = {}) {
                 </Link>
               )}
               <Link href={ROUTES.dashboard}
-                className={`min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
+                className={`min-h-[44px] flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
                   pathname === ROUTES.dashboard ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
                 }`}>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Profile" className="h-7 w-7 rounded-full object-cover border-2 border-white/40 shrink-0" />
+                ) : (
+                  <div className="h-7 w-7 rounded-full bg-white/20 border-2 border-white/30 flex items-center justify-center text-xs font-black text-white shrink-0">
+                    {(user as unknown as {email?:string})?.email?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
                 Dashboard
               </Link>
               <button type="button" onClick={handleSignOut}
@@ -266,9 +276,16 @@ export function Header({ siteName }: HeaderProps = {}) {
                 )}
                 <li>
                   <Link href={ROUTES.dashboard} onClick={() => setMenuOpen(false)}
-                    className={`flex min-h-[48px] items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
+                    className={`flex min-h-[48px] items-center gap-2 rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] ${
                       pathname === ROUTES.dashboard ? "bg-white/20" : "hover:bg-white/10 active:bg-white/15"
                     }`}>
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Profile" className="h-7 w-7 rounded-full object-cover border-2 border-white/40 shrink-0" />
+                    ) : (
+                      <div className="h-7 w-7 rounded-full bg-white/20 border-2 border-white/30 flex items-center justify-center text-xs font-black text-white shrink-0">
+                        {(user as unknown as {email?:string})?.email?.[0]?.toUpperCase() ?? "?"}
+                      </div>
+                    )}
                     Dashboard
                   </Link>
                 </li>

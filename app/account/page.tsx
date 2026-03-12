@@ -4,6 +4,7 @@ import { ROUTES } from "@/lib/constants";
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
 import { ProfileForm } from "@/components/account/ProfileForm";
 import { SavedTravelersForm } from "@/components/account/SavedTravelersForm";
+import { AvatarUpload } from "@/components/account/AvatarUpload";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -58,10 +59,13 @@ export default async function AccountPage({ searchParams }: Props) {
               backgroundSize: "80px 40px",
             }}
           />
-          <div className="relative flex items-center gap-4">
-            {/* Avatar */}
-            <div className="shrink-0 flex h-16 w-16 items-center justify-center rounded-full bg-white/20 border-2 border-white/30 text-2xl font-black text-white backdrop-blur-sm">
-              {(user.fullName ?? user.email ?? "?")[0].toUpperCase()}
+          <div className="relative flex items-center gap-5">
+            {/* Avatar with upload */}
+            <div className="shrink-0">
+              <AvatarUpload
+                currentAvatarUrl={user.avatarUrl ?? null}
+                initials={(user.fullName ?? user.email ?? "?")[0].toUpperCase()}
+              />
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-0.5">
