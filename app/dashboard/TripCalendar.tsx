@@ -144,27 +144,76 @@ export function TripCalendar({
           <p className="text-xs text-[#0f766e] sm:text-sm">
             {parseDateString(selectedDate)?.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", weekday: "long", month: "long", day: "numeric", year: "numeric" }) ?? selectedDate}
           </p>
+
+          {/* Legend */}
+          <div className="mt-3 rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 text-xs text-[#0f766e]">
+            <p>🎟️ <strong>Online seats</strong> = slots reserved for online booking (limited by design)</p>
+            <p className="mt-0.5">🚢 <strong>Vessel capacity</strong> = total passengers the boat can carry (walk-in seats available at the pier)</p>
+          </div>
+
           {selectedTrips.length === 0 ? (
             <p className="mt-4 text-sm text-[#0f766e]">No scheduled trips on this day.</p>
           ) : (
             <ul className="mt-4 space-y-3">
               {selectedTrips.map((t) => {
-                const ob = t.online_booked ?? 0;
-                const wb = t.walk_in_booked ?? 0;
-                const capacity = (t.boat as { capacity?: number })?.capacity ?? (t.online_quota ?? 0) + (t.walk_in_quota ?? 0);
-                const available = Math.max(0, capacity - ob - wb);
+                // ✅ FIXED: Use online_quota - online_booked (NOT boat.capacity)
+                const onlineQuota   = t.online_quota  ?? 0;
+                const onlineBooked  = t.online_booked ?? 0;
+                const onlineLeft    = Math.max(0, onlineQuota - onlineBooked);
+                const vesselCapacity = (t.boat as { capacity?: number })?.capacity ?? null;
+                const isFull        = onlineLeft === 0;
                 const directionLabel = getDirectionLabel(t);
-                const vesselName = t.boat?.name ?? "—";
+                const vesselName    = t.boat?.name ?? "—";
+
                 return (
-                  <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-[#fef9e7]/30 px-4 py-3">
-                    <div className="min-w-0">
+                  <li
+                    key={t.id}
+                    className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+                      isFull
+                        ? "border-slate-200 bg-slate-50/50 opacity-80"
+                        : "border-teal-200 bg-[#fef9e7]/30"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[#134e4a]">{formatTime(t.departure_time)}</p>
                       <p className="text-sm text-[#0f766e]">{vesselName} · {directionLabel}</p>
+
+                      {/* ✅ Seat info row */}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        {isFull ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                            🔒 Full Online Booking
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-[#0f766e]">
+                            🎟️ {onlineLeft} of {onlineQuota} online seat{onlineQuota !== 1 ? "s" : ""} left
+                          </span>
+                        )}
+                        {vesselCapacity && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                            🚢 {vesselCapacity} capacity
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Walk-in note when full */}
+                      {isFull && (
+                        <p className="mt-1 text-xs text-[#0f766e]">
+                          Walk-in tickets may be available at the pier.
+                        </p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="rounded-full bg-teal-100 px-3 py-1 text-sm font-medium text-[#0f766e]">{available} seat{available !== 1 ? "s" : ""} left</span>
-                      <button type="button" onClick={() => setBookingTrip(t)} className="rounded-lg bg-[#0c7b93] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#0f766e]">Book</button>
-                    </div>
+
+                    {/* Book button — hidden when full */}
+                    {!isFull && (
+                      <button
+                        type="button"
+                        onClick={() => setBookingTrip(t)}
+                        className="shrink-0 rounded-lg bg-[#0c7b93] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors"
+                      >
+                        Book
+                      </button>
+                    )}
                   </li>
                 );
               })}
