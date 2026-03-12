@@ -1,17 +1,31 @@
 "use client";
+
+/**
+ * PromoPopup — visitor-facing promotional popup
+ * - Shows once per session, hides for expires_days after dismissal
+ * - Image displayed with object-contain so PNGs are never cropped
+ * - Text overlay appears between image and close button
+ * - Close button always centered below popup
+ * - Clicking backdrop dismisses
+ */
+
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 type PopupData = {
+  id: string;
   is_active: boolean;
-  image_url?: string;
-  headline?: string;
-  subtext?: string;
-  button_label?: string;
-  button_url?: string;
+  image_url?: string | null;
+  headline?: string | null;
+  subtext?: string | null;
+  button_label?: string | null;
+  button_url?: string | null;
   show_on: string[];
   expires_days: number;
 };
+
+const STORAGE_KEY = "travela_promo_seen_at";
+const STORAGE_VER = "travela_promo_id";
 
 export default function PromoPopup() {
   const [popup, setPopup] = useState<PopupData | null>(null);
@@ -19,76 +33,153 @@ export default function PromoPopup() {
   const pathname = usePathname();
 
   useEffect(() => {
-    fetch("/api/admin/promo-popup")
-      .then((r) => r.json())
-      .then((data: PopupData) => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch("/api/admin/promo-popup", {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (!res.ok) return;
+        const data: PopupData | null = await res.json();
+        if (cancelled) return;
         if (!data?.is_active) return;
 
+        // Page filter
         const showOn = data.show_on ?? ["all"];
-        const shouldShow = showOn.includes("all") || showOn.includes(pathname);
+        const shouldShow =
+          showOn.includes("all") ||
+          showOn.some((p) => pathname === p || pathname.startsWith(p + "/"));
         if (!shouldShow) return;
 
-        // Check expiry in localStorage
-        const key = "promo_popup_seen";
+        // Expiry check — also reset if popup ID changed (new promo)
         try {
-          const seen = localStorage.getItem(key);
-          if (seen) {
-            const daysDiff = (Date.now() - new Date(seen).getTime()) / (1000 * 60 * 60 * 24);
-            if (daysDiff < (data.expires_days ?? 7)) return;
+          const seenAt = localStorage.getItem(STORAGE_KEY);
+          const seenId = localStorage.getItem(STORAGE_VER);
+
+          // If popup ID changed, always show the new promo
+          if (seenId && seenId !== data.id) {
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(STORAGE_VER);
+          } else if (seenAt) {
+            const daysSince =
+              (Date.now() - new Date(seenAt).getTime()) /
+              (1000 * 60 * 60 * 24);
+            if (daysSince < (data.expires_days ?? 7)) return;
           }
-        } catch {}
+        } catch {
+          // localStorage blocked (private browsing) — show anyway
+        }
 
         setPopup(data);
-        setTimeout(() => setVisible(true), 900);
-      })
-      .catch(() => {});
+        // Small delay so page has loaded before popup appears
+        setTimeout(() => {
+          if (!cancelled) setVisible(true);
+        }, 1000);
+      } catch {
+        // Silently fail — never break the page
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
   }, [pathname]);
 
-  const dismiss = () => {
+  function dismiss() {
     setVisible(false);
-    try { localStorage.setItem("promo_popup_seen", new Date().toISOString()); } catch {}
-    setTimeout(() => setPopup(null), 300);
-  };
+    try {
+      localStorage.setItem(STORAGE_KEY, new Date().toISOString());
+      if (popup?.id) localStorage.setItem(STORAGE_VER, popup.id);
+    } catch {}
+    setTimeout(() => setPopup(null), 350);
+  }
 
   if (!popup) return null;
 
+  const hasImage = Boolean(popup.image_url);
+  const hasText = Boolean(popup.headline || popup.subtext);
+  const hasButton = Boolean(popup.button_label && popup.button_url);
+  const hasContent = hasImage || hasText || hasButton;
+  if (!hasContent) return null;
+
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Promotional offer"
       onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 transition-all duration-300 ${
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center p-6 transition-opacity duration-300 ${
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}
-      style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      style={{
+        backgroundColor: "rgba(0,0,0,0.65)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+      }}
     >
-      <div className={`relative max-w-sm w-full rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${
-        visible ? "scale-100 translate-y-0" : "scale-95 translate-y-4"
-      }`}>
+      {/* Popup card */}
+      <div
+        className={`relative w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl bg-white transition-all duration-350 ${
+          visible ? "scale-100 translate-y-0" : "scale-90 translate-y-6"
+        }`}
+        style={{ maxWidth: 340 }}
+      >
+        {/* Image — object-contain so PNG shapes are never cropped */}
+        {hasImage && (
+          <div className="w-full bg-[#f0fdfa] flex items-center justify-center p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={popup.image_url!}
+              alt={popup.headline ?? "Promo"}
+              className="w-full rounded-2xl"
+              style={{
+                maxHeight: 320,
+                objectFit: "contain",
+                objectPosition: "center",
+              }}
+              loading="eager"
+            />
+          </div>
+        )}
 
-        {/* Image with text overlay */}
-        {popup.image_url ? (
-          <div className="relative">
-            <img src={popup.image_url} alt="Promo" className="w-full object-cover max-h-64" />
-            {(popup.headline || popup.subtext) && (
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                {popup.headline && <p className="text-white font-bold text-xl leading-tight">{popup.headline}</p>}
-                {popup.subtext && <p className="text-white/90 text-sm mt-1">{popup.subtext}</p>}
-              </div>
+        {/* Text overlay — between image and button */}
+        {hasText && (
+          <div
+            className={`px-5 py-4 ${
+              hasImage
+                ? "bg-white border-t border-teal-50"
+                : "bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]"
+            }`}
+          >
+            {popup.headline && (
+              <p
+                className={`font-extrabold text-lg leading-tight ${
+                  hasImage ? "text-[#134e4a]" : "text-white"
+                }`}
+              >
+                {popup.headline}
+              </p>
+            )}
+            {popup.subtext && (
+              <p
+                className={`text-sm mt-1 leading-relaxed ${
+                  hasImage ? "text-[#0f766e]" : "text-white/85"
+                }`}
+              >
+                {popup.subtext}
+              </p>
             )}
           </div>
-        ) : (popup.headline || popup.subtext) ? (
-          <div className="bg-gradient-to-br from-[#0c7b93] to-[#0f766e] p-6">
-            {popup.headline && <p className="text-white font-bold text-xl">{popup.headline}</p>}
-            {popup.subtext && <p className="text-white/90 text-sm mt-2">{popup.subtext}</p>}
-          </div>
-        ) : null}
+        )}
 
         {/* Button */}
-        {popup.button_label && popup.button_url && (
-          <div className="bg-white p-4">
+        {hasButton && (
+          <div className="px-5 pb-5 pt-3 bg-white">
             <a
-              href={popup.button_url}
+              href={popup.button_url!}
               onClick={dismiss}
-              className="block w-full bg-[#0c7b93] hover:bg-[#0f766e] text-white text-center font-bold py-3 rounded-xl transition-colors"
+              className="block w-full bg-gradient-to-r from-[#0c7b93] to-[#0f766e] hover:from-[#0f766e] hover:to-[#085C52] text-white text-center font-bold py-3 rounded-2xl transition-all shadow-md hover:shadow-lg text-sm"
             >
               {popup.button_label}
             </a>
@@ -96,11 +187,12 @@ export default function PromoPopup() {
         )}
       </div>
 
-      {/* Close button — outside the box, centered below */}
+      {/* Close button — always centered below popup */}
       <button
         onClick={dismiss}
-        className="mt-5 flex items-center justify-center bg-white/20 hover:bg-white/40 text-white rounded-full w-10 h-10 text-2xl font-bold transition-colors backdrop-blur-sm"
-        aria-label="Close"
+        aria-label="Close promotional popup"
+        className="mt-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 text-white transition-colors backdrop-blur-sm"
+        style={{ width: 44, height: 44, fontSize: 24, lineHeight: 1 }}
       >
         ×
       </button>
