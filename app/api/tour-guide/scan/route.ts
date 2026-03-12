@@ -35,13 +35,21 @@ export async function POST(request: NextRequest) {
   // Verify this guide is assigned to this booking via tour_batches
   const { data: batchBooking } = await supabase
     .from("tour_batch_bookings")
-    .select("batch_id, batch:tour_batches(tour_guide_id)")
+    .select("batch_id")
     .eq("booking_id", booking.id)
     .single();
 
-  const assignedGuideId = (batchBooking?.batch as { tour_guide_id?: string } | null)?.tour_guide_id;
+  if (!batchBooking) {
+    return NextResponse.json({ error: "This booking has no assigned batch yet" }, { status: 403 });
+  }
 
-  if (!batchBooking || assignedGuideId !== user.id) {
+  const { data: batch } = await supabase
+    .from("tour_batches")
+    .select("tour_guide_id")
+    .eq("id", batchBooking.batch_id)
+    .single();
+
+  if (!batch || batch.tour_guide_id !== user.id) {
     return NextResponse.json({ error: "This booking is not assigned to you" }, { status: 403 });
   }
 
