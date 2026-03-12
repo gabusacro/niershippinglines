@@ -664,6 +664,37 @@ export function BookingModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result?.reference]);
 
+  // Pre-check verified status in FORM STEP (before booking)
+  const [preVerifiedKeys, setPreVerifiedKeys] = useState<Record<string, boolean>>({});
+
+  const checkPreVerified = useCallback(async (fareType: string, index: number, name: string) => {
+    const key = `${fareType}-${index}`;
+    if (!name.trim() || !requiresId(fareType)) {
+      setPreVerifiedKeys(prev => ({ ...prev, [key]: false }));
+      return;
+    }
+    try {
+      // Use GET endpoint — fetch all verified IDs for this user, check if name+type match
+      const res  = await fetch("/api/passenger-id");
+      const data = await res.json().catch(() => ({}));
+      const verifications: { passenger_name: string; discount_type: string; verification_status: string; expires_at: string | null }[] =
+        data.verifications ?? [];
+      const now = new Date();
+      const isVerified = verifications.some(v =>
+        v.verification_status === "verified" &&
+        v.discount_type === fareType &&
+        v.passenger_name?.trim().toLowerCase() === name.trim().toLowerCase() &&
+        (!v.expires_at || new Date(v.expires_at) > now)
+      );
+      setPreVerifiedKeys(prev => ({ ...prev, [key]: isVerified }));
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => { seniorNames.forEach((n, i)  => checkPreVerified("senior",  i, n)); }, [seniorNames,  checkPreVerified]);
+  useEffect(() => { pwdNames.forEach((n, i)     => checkPreVerified("pwd",     i, n)); }, [pwdNames,     checkPreVerified]);
+  useEffect(() => { studentNames.forEach((n, i) => checkPreVerified("student", i, n)); }, [studentNames, checkPreVerified]);
+  useEffect(() => { childNames.forEach((n, i)   => checkPreVerified("child",   i, n)); }, [childNames,   checkPreVerified]);
+
   const switchFareType = useCallback((fromType: string, fromIndex: number, toType: FareTypeValue) => {
     const getName = (t: string, i: number) => {
       if (t==="adult")   return adultNames[i]   ?? "";
@@ -802,12 +833,12 @@ export function BookingModal({
           const colorIdx = (baseColorIdx + i) % PAX_COLORS.length;
           const color    = PAX_COLORS[colorIdx];
 
-          // Find matching verified saved traveler
-          const verifiedTraveler = savedTravelers.find(
-            t => t.id_verified &&
-                 t.full_name.trim().toLowerCase() === (names[i] ?? "").trim().toLowerCase() &&
-                 (!t.id_expires_at || new Date(t.id_expires_at) > new Date())
-          ) ?? null;
+          // Check verified via API pre-check (reliable — not just name matching)
+          const isPreVerified = preVerifiedKeys[key] ?? false;
+          // Also check saved travelers for badge display info (fare_type, expires_at)
+          const verifiedTraveler = isPreVerified
+            ? (savedTravelers.find(t => t.id_verified && t.full_name.trim().toLowerCase() === (names[i] ?? "").trim().toLowerCase()) ?? null)
+            : null;
 
           return (
             <div
