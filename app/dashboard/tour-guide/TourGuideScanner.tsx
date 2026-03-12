@@ -139,7 +139,7 @@ export default function TourGuideScanner({ guideId, todayPH }: Props) {
     setCameraError(null);
     setCameraOpen(true);
     setScanning(true);
-    setDebugVal(null);
+    setDebugVal("BarcodeDetector: " + ("BarcodeDetector" in window ? "YES" : "NO"));
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
