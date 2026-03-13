@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
+import AdminToursRevenueClient from "./AdminToursRevenueClient";
 
 export const metadata = {
   title: "Tours — Admin",
@@ -21,80 +22,35 @@ export default async function AdminToursPage() {
     .select("*", { count: "exact", head: true })
     .neq("booking_source", "operator_walk_in");
 
-  // Pending payment bookings — exclude operator walk-ins
+  // Pending payment bookings
   const { count: pendingCount } = await supabase
     .from("tour_bookings")
     .select("*", { count: "exact", head: true })
     .eq("status", "pending")
     .neq("booking_source", "operator_walk_in");
 
-  // Confirmed bookings — exclude operator walk-ins
+  // Confirmed bookings
   const { count: confirmedCount } = await supabase
     .from("tour_bookings")
     .select("*", { count: "exact", head: true })
     .eq("status", "confirmed")
     .neq("booking_source", "operator_walk_in");
 
-  // Online revenue (all time) — online bookings only (money YOU received)
-  const { data: onlineRevData } = await supabase
+  // All verified bookings for revenue dashboard (all sources)
+  const { data: allBookings } = await supabase
     .from("tour_bookings")
-    .select("total_amount_cents")
+    .select("id, reference, total_amount_cents, booking_source, payment_status, payment_verified_at, tour_operator_id, operator_payment_status, operator_payment_ref, operator_paid_at, status, customer_name, total_pax, tour:tour_packages(title), schedule:tour_schedules(available_date)")
     .eq("payment_status", "verified")
-    .eq("booking_source", "online");
+    .order("payment_verified_at", { ascending: false })
+    .limit(500);
 
-  const onlineRevenue = (onlineRevData ?? []).reduce(
-    (sum, b) => sum + (b.total_amount_cents ?? 0), 0
-  );
+  // All operator profiles
+  const operatorIds = [...new Set((allBookings ?? []).map(b => b.tour_operator_id).filter(Boolean))];
+  const { data: operatorProfiles } = operatorIds.length > 0
+    ? await supabase.from("profiles").select("id, full_name").in("id", operatorIds)
+    : { data: [] };
 
-  // Walk-in revenue (all time) — YOUR walk-ins only (money YOU collected)
-  const { data: walkinRevData } = await supabase
-    .from("tour_bookings")
-    .select("total_amount_cents")
-    .eq("payment_status", "verified")
-    .eq("booking_source", "walk_in");
-
-  const walkinRevenue = (walkinRevData ?? []).reduce(
-    (sum, b) => sum + (b.total_amount_cents ?? 0), 0
-  );
-
-  // Operator walk-in revenue (all time) — money the OPERATOR collected, NOT yours
-  const { data: opWalkinRevData } = await supabase
-    .from("tour_bookings")
-    .select("total_amount_cents")
-    .eq("payment_status", "verified")
-    .eq("booking_source", "operator_walk_in");
-
-  const opWalkinRevenue = (opWalkinRevData ?? []).reduce(
-    (sum, b) => sum + (b.total_amount_cents ?? 0), 0
-  );
-
-  // Today's online revenue
-  const { data: todayOnlineData } = await supabase
-    .from("tour_bookings")
-    .select("total_amount_cents")
-    .eq("payment_status", "verified")
-    .eq("booking_source", "online")
-    .gte("payment_verified_at", todayPH + "T00:00:00+08:00")
-    .lte("payment_verified_at", todayPH + "T23:59:59+08:00");
-
-  const todayOnlineRevenue = (todayOnlineData ?? []).reduce(
-    (sum, b) => sum + (b.total_amount_cents ?? 0), 0
-  );
-
-  // Today's walk-in revenue (YOUR walk-ins)
-  const { data: todayWalkinData } = await supabase
-    .from("tour_bookings")
-    .select("total_amount_cents")
-    .eq("payment_status", "verified")
-    .eq("booking_source", "walk_in")
-    .gte("payment_verified_at", todayPH + "T00:00:00+08:00")
-    .lte("payment_verified_at", todayPH + "T23:59:59+08:00");
-
-  const todayWalkinRevenue = (todayWalkinData ?? []).reduce(
-    (sum, b) => sum + (b.total_amount_cents ?? 0), 0
-  );
-
-  // Upcoming tours (next 7 days) — using schedule join, exclude operator walk-ins
+  // Upcoming tours (next 7 days)
   const in7Days = new Date();
   in7Days.setDate(in7Days.getDate() + 7);
   const in7DaysStr = in7Days.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
@@ -105,15 +61,14 @@ export default async function AdminToursPage() {
     .eq("status", "confirmed")
     .neq("booking_source", "operator_walk_in")
     .order("created_at", { ascending: true })
-    .limit(5);
+    .limit(20);
 
-  // Filter upcoming by schedule date on client side (since we can't filter on joined column easily)
   const filteredUpcoming = (upcomingBookings ?? []).filter((b) => {
     const d = (b.schedule as { available_date?: string } | null)?.available_date;
     return d && d >= todayPH && d <= in7DaysStr;
   });
 
-  // Recent bookings — exclude operator walk-ins
+  // Recent bookings
   const { data: recentBookings } = await supabase
     .from("tour_bookings")
     .select("*, tour:tour_packages(title)")
@@ -121,11 +76,28 @@ export default async function AdminToursPage() {
     .order("created_at", { ascending: false })
     .limit(5);
 
-  function formatDate(dateStr: string) {
-    return new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", {
-      month: "short", day: "numeric", year: "numeric",
-    });
-  }
+  // Serialize bookings for client
+  const bookingsForClient = (allBookings ?? []).map(b => ({
+    id: b.id,
+    reference: b.reference,
+    total_amount_cents: b.total_amount_cents,
+    booking_source: b.booking_source,
+    payment_verified_at: b.payment_verified_at,
+    tour_operator_id: b.tour_operator_id ?? null,
+    operator_payment_status: b.operator_payment_status ?? "pending",
+    operator_payment_ref: b.operator_payment_ref ?? null,
+    operator_paid_at: b.operator_paid_at ?? null,
+    status: b.status,
+    customer_name: b.customer_name,
+    total_pax: b.total_pax,
+    tour_title: (b.tour as { title?: string } | null)?.title ?? "—",
+    schedule_date: (b.schedule as { available_date?: string } | null)?.available_date ?? null,
+  }));
+
+  const operatorsForClient = (operatorProfiles ?? []).map(o => ({
+    id: o.id,
+    full_name: o.full_name ?? "—",
+  }));
 
   const statusColor: Record<string, string> = {
     pending:   "bg-amber-100 text-amber-700",
@@ -134,7 +106,11 @@ export default async function AdminToursPage() {
     completed: "bg-blue-100 text-blue-700",
   };
 
-  const totalYourRevenue = onlineRevenue + walkinRevenue;
+  function formatDate(dateStr: string) {
+    return new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", {
+      month: "short", day: "numeric", year: "numeric",
+    });
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
@@ -188,66 +164,24 @@ export default async function AdminToursPage() {
           <p className="text-3xl font-bold text-emerald-700">{confirmedCount ?? 0}</p>
         </div>
         <div className="rounded-2xl border-2 border-blue-100 bg-white p-5">
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Today (Online)</p>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Pending Payout</p>
           <p className="text-2xl font-bold text-blue-700">
-            ₱{(todayOnlineRevenue / 100).toLocaleString()}
+            {bookingsForClient.filter(b =>
+              b.operator_payment_status === "pending" &&
+              b.booking_source !== "operator_walk_in" &&
+              b.tour_operator_id
+            ).length}
           </p>
+          <p className="text-xs text-gray-400 mt-1">Bookings unpaid to operators</p>
         </div>
       </div>
 
-      {/* Revenue split */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-
-        {/* Online Revenue — YOU received this */}
-        <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-emerald-900">Online Revenue</h2>
-            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-semibold">Online</span>
-          </div>
-          <p className="text-3xl font-bold text-emerald-700">₱{(onlineRevenue / 100).toLocaleString()}</p>
-          <p className="text-xs text-emerald-600 mt-1">All time · GCash payments</p>
-          {todayOnlineRevenue > 0 && (
-            <p className="text-sm font-semibold text-emerald-700 mt-2">
-              Today: ₱{(todayOnlineRevenue / 100).toLocaleString()}
-            </p>
-          )}
-        </div>
-
-        {/* Walk-in Revenue — YOU received this */}
-        <div className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-blue-900">Walk-in Revenue</h2>
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">Your Walk-in</span>
-          </div>
-          <p className="text-3xl font-bold text-blue-700">₱{(walkinRevenue / 100).toLocaleString()}</p>
-          <p className="text-xs text-blue-600 mt-1">All time · Cash you collected</p>
-          {todayWalkinRevenue > 0 && (
-            <p className="text-sm font-semibold text-blue-700 mt-2">
-              Today: ₱{(todayWalkinRevenue / 100).toLocaleString()}
-            </p>
-          )}
-        </div>
-
-        {/* Operator Walk-in — NOT your money */}
-        <div className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-purple-900">Operator Walk-ins</h2>
-            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-semibold">Not Yours</span>
-          </div>
-          <p className="text-3xl font-bold text-purple-700">₱{(opWalkinRevenue / 100).toLocaleString()}</p>
-          <p className="text-xs text-purple-600 mt-1">Cash collected by operator directly</p>
-          <p className="text-xs text-purple-500 mt-1 font-semibold">⚠️ You did not receive this</p>
-        </div>
-      </div>
-
-      {/* Your total revenue summary */}
-      <div className="mt-4 rounded-2xl border-2 border-emerald-300 bg-emerald-700 px-6 py-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-semibold text-emerald-200 uppercase tracking-wide">Your Total Revenue (All Time)</p>
-          <p className="text-xs text-emerald-300 mt-0.5">Online + Your Walk-ins only</p>
-        </div>
-        <p className="text-3xl font-bold text-white">₱{(totalYourRevenue / 100).toLocaleString()}</p>
-      </div>
+      {/* Revenue Dashboard — Client Component */}
+      <AdminToursRevenueClient
+        bookings={bookingsForClient}
+        operators={operatorsForClient}
+        todayPH={todayPH}
+      />
 
       {/* Upcoming tours */}
       {filteredUpcoming.length > 0 && (
@@ -278,9 +212,7 @@ export default async function AdminToursPage() {
                       ₱{(b.total_amount_cents / 100).toLocaleString()}
                     </p>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                      b.booking_source === "walk_in"
-                        ? "bg-blue-100 text-blue-600"
-                        : "bg-emerald-100 text-emerald-600"
+                      b.booking_source === "walk_in" ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600"
                     }`}>
                       {b.booking_source === "walk_in" ? "Walk-in" : "Online"}
                     </span>
@@ -298,7 +230,6 @@ export default async function AdminToursPage() {
           <h2 className="font-bold text-[#134e4a]">Recent Bookings</h2>
           <Link href="/admin/tours/bookings" className="text-xs text-emerald-600 hover:underline">View all</Link>
         </div>
-
         {!recentBookings || recentBookings.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">No bookings yet.</p>
         ) : (
@@ -318,16 +249,12 @@ export default async function AdminToursPage() {
                     {b.status.toUpperCase()}
                   </span>
                   <p className="text-sm font-bold text-emerald-700">
-                    {b.total_amount_cents > 0
-                      ? "₱" + (b.total_amount_cents / 100).toLocaleString()
-                      : "Negotiable"}
+                    {b.total_amount_cents > 0 ? "₱" + (b.total_amount_cents / 100).toLocaleString() : "Negotiable"}
                   </p>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                    b.booking_source === "walk_in"
-                      ? "bg-blue-100 text-blue-600"
-                      : b.booking_source === "operator_walk_in"
-                      ? "bg-purple-100 text-purple-600"
-                      : "bg-emerald-100 text-emerald-600"
+                    b.booking_source === "walk_in" ? "bg-blue-100 text-blue-600" :
+                    b.booking_source === "operator_walk_in" ? "bg-purple-100 text-purple-600" :
+                    "bg-emerald-100 text-emerald-600"
                   }`}>
                     {b.booking_source === "walk_in" ? "Walk-in" :
                      b.booking_source === "operator_walk_in" ? "Op. Walk-in" : "Online"}
