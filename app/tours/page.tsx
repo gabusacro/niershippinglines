@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import ToursContactForm from "@/components/ToursContactForm";
 
 export const metadata = {
   title: "Tours — Travela Siargao",
@@ -125,15 +126,18 @@ export default async function ToursPage() {
           </div>
         )}
 
+        <ToursContactForm />
+
         {/* Contact footer */}
         <div className="mt-12 rounded-2xl bg-gradient-to-br from-[#0c7b93] to-[#0f766e] p-6 text-center text-white">
           <p className="font-bold text-lg mb-1">Need a custom tour?</p>
-          <p className="text-sm text-white/80 mb-4">Contact Kuya Gab directly for group rates, special requests, or same-day bookings.</p>
+          <p className="text-sm text-white/80 mb-4">Email us directly for group rates, special requests, or same-day bookings.</p>
           <a href="https://m.me/travelasiargao" target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-[#0c7b93] hover:bg-white/90 transition-colors">
             💬 Message on Facebook
           </a>
         </div>
+
 
       </div>
     </div>
