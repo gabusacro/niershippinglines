@@ -564,7 +564,7 @@ export default function PromoPopupPage() {
                             <img
                               src={form.image_url}
                               alt="Preview"
-                              className={`w-full ${(hasText || hasButton) ? "rounded-t-2xl" : "rounded-2xl"}`}
+                              className="w-full rounded-2xl"
                               style={{ maxHeight: 150, objectFit: "contain", display: "block" }}
                               onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                             />
@@ -572,9 +572,9 @@ export default function PromoPopupPage() {
                         )}
                         {/* Card only when there's text or CTA */}
                         {(hasText || hasButton) && (
-                          <div className={`bg-white overflow-hidden ${hasImage ? "rounded-b-2xl" : "rounded-2xl"}`}>
+                          <div className={`bg-white rounded-2xl overflow-hidden${hasImage ? " mt-1.5" : ""}`}>
                             {hasText && (
-                              <div className={`px-3 py-2.5 ${!hasImage ? "bg-gradient-to-br from-[#085C52] to-[#0c7b93]" : "bg-white"}`}>
+                              <div className={`px-3 pt-2.5 pb-1 text-center ${!hasImage ? "bg-gradient-to-br from-[#085C52] to-[#0c7b93]" : "bg-white"}`}>
                                 {form.headline && (
                                   <p className={`font-bold text-xs leading-tight ${!hasImage ? "text-white" : "text-[#134e4a]"}`}>
                                     {form.headline}
