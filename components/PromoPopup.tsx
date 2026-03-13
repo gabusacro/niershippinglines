@@ -2,11 +2,10 @@
 
 /**
  * PromoPopup — visitor-facing promotional popup
- * - Shows once per session, hides for expires_days after dismissal
- * - Image displayed with object-contain so PNGs are never cropped
- * - Text overlay appears between image and close button
- * - Close button always centered below popup
- * - Clicking backdrop dismisses
+ * - Fetches from /api/admin/promo-popup on mount
+ * - Shows once, then hides for expires_days
+ * - Re-shows automatically if admin saves new content (updated_at changed)
+ * - Toggling is_active off → popup never shows regardless of localStorage
  */
 
 import { useEffect, useState } from "react";
@@ -22,13 +21,14 @@ type PopupData = {
   button_url?: string | null;
   show_on: string[];
   expires_days: number;
+  updated_at?: string | null;
 };
 
-const STORAGE_KEY = "travela_promo_seen_at";
-const STORAGE_VER = "travela_promo_id";
+const LS_SEEN_AT  = "travela_promo_seen_at";
+const LS_VER      = "travela_promo_ver"; // stores updated_at so content changes re-trigger
 
 export default function PromoPopup() {
-  const [popup, setPopup] = useState<PopupData | null>(null);
+  const [popup, setPopup]   = useState<PopupData | null>(null);
   const [visible, setVisible] = useState(false);
   const pathname = usePathname();
 
@@ -37,48 +37,43 @@ export default function PromoPopup() {
 
     async function load() {
       try {
-        const res = await fetch("/api/admin/promo-popup", {
-          cache: "no-store",
-          headers: { "Cache-Control": "no-cache" },
-        });
+        const res = await fetch("/api/admin/promo-popup", { cache: "no-store" });
         if (!res.ok) return;
         const data: PopupData | null = await res.json();
-        if (cancelled) return;
-        if (!data?.is_active) return;
+        if (cancelled || !data) return;
+
+        // If admin turned it off — never show
+        if (!data.is_active) return;
 
         // Page filter
-        const showOn = data.show_on ?? ["all"];
-        const shouldShow =
+        const showOn = Array.isArray(data.show_on) ? data.show_on : ["all"];
+        const onThisPage =
           showOn.includes("all") ||
           showOn.some((p) => pathname === p || pathname.startsWith(p + "/"));
-        if (!shouldShow) return;
+        if (!onThisPage) return;
 
-        // Expiry check — also reset if popup ID changed (new promo)
+        // Check localStorage — skip if seen recently AND content hasn't changed
         try {
-          const seenAt = localStorage.getItem(STORAGE_KEY);
-          const seenId = localStorage.getItem(STORAGE_VER);
+          const lsVer    = localStorage.getItem(LS_VER);
+          const lsSeenAt = localStorage.getItem(LS_SEEN_AT);
+          const currentVer = data.updated_at ?? data.id;
 
-          // If popup ID changed, always show the new promo
-          if (seenId && seenId !== data.id) {
-            localStorage.removeItem(STORAGE_KEY);
-            localStorage.removeItem(STORAGE_VER);
-          } else if (seenAt) {
-            const daysSince =
-              (Date.now() - new Date(seenAt).getTime()) /
-              (1000 * 60 * 60 * 24);
-            if (daysSince < (data.expires_days ?? 7)) return;
+          // Content changed since last seen → always show again
+          if (lsVer && lsVer !== currentVer) {
+            localStorage.removeItem(LS_SEEN_AT);
+            localStorage.removeItem(LS_VER);
+          } else if (lsSeenAt) {
+            const daysSince = (Date.now() - new Date(lsSeenAt).getTime()) / 86_400_000;
+            if (daysSince < (data.expires_days ?? 7)) return; // still within cooldown
           }
         } catch {
-          // localStorage blocked (private browsing) — show anyway
+          // localStorage blocked → show anyway
         }
 
         setPopup(data);
-        // Small delay so page has loaded before popup appears
-        setTimeout(() => {
-          if (!cancelled) setVisible(true);
-        }, 1000);
+        setTimeout(() => { if (!cancelled) setVisible(true); }, 800);
       } catch {
-        // Silently fail — never break the page
+        // Never break the page
       }
     }
 
@@ -89,19 +84,20 @@ export default function PromoPopup() {
   function dismiss() {
     setVisible(false);
     try {
-      localStorage.setItem(STORAGE_KEY, new Date().toISOString());
-      if (popup?.id) localStorage.setItem(STORAGE_VER, popup.id);
+      localStorage.setItem(LS_SEEN_AT, new Date().toISOString());
+      if (popup?.updated_at ?? popup?.id) {
+        localStorage.setItem(LS_VER, popup?.updated_at ?? popup?.id ?? "");
+      }
     } catch {}
     setTimeout(() => setPopup(null), 350);
   }
 
   if (!popup) return null;
 
-  const hasImage = Boolean(popup.image_url);
-  const hasText = Boolean(popup.headline || popup.subtext);
+  const hasImage  = Boolean(popup.image_url);
+  const hasText   = Boolean(popup.headline || popup.subtext);
   const hasButton = Boolean(popup.button_label && popup.button_url);
-  const hasContent = hasImage || hasText || hasButton;
-  if (!hasContent) return null;
+  if (!hasImage && !hasText && !hasButton) return null;
 
   return (
     <div
@@ -120,12 +116,11 @@ export default function PromoPopup() {
     >
       {/* Popup card */}
       <div
-        className={`relative w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl bg-white transition-all duration-350 ${
+        className={`relative w-full rounded-3xl overflow-hidden shadow-2xl bg-white transition-all duration-300 ${
           visible ? "scale-100 translate-y-0" : "scale-90 translate-y-6"
         }`}
         style={{ maxWidth: 340 }}
       >
-        {/* Image — object-contain so PNG shapes are never cropped */}
         {hasImage && (
           <div className="w-full bg-[#f0fdfa] flex items-center justify-center p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -133,53 +128,37 @@ export default function PromoPopup() {
               src={popup.image_url!}
               alt={popup.headline ?? "Promo"}
               className="w-full rounded-2xl"
-              style={{
-                maxHeight: 320,
-                objectFit: "contain",
-                objectPosition: "center",
-              }}
+              style={{ maxHeight: 320, objectFit: "contain", objectPosition: "center" }}
               loading="eager"
             />
           </div>
         )}
 
-        {/* Text overlay — between image and button */}
         {hasText && (
-          <div
-            className={`px-5 py-4 ${
-              hasImage
-                ? "bg-white border-t border-teal-50"
-                : "bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]"
-            }`}
-          >
+          <div className={`px-5 py-4 ${
+            hasImage
+              ? "bg-white border-t border-teal-50"
+              : "bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]"
+          }`}>
             {popup.headline && (
-              <p
-                className={`font-extrabold text-lg leading-tight ${
-                  hasImage ? "text-[#134e4a]" : "text-white"
-                }`}
-              >
+              <p className={`font-extrabold text-lg leading-tight ${hasImage ? "text-[#134e4a]" : "text-white"}`}>
                 {popup.headline}
               </p>
             )}
             {popup.subtext && (
-              <p
-                className={`text-sm mt-1 leading-relaxed ${
-                  hasImage ? "text-[#0f766e]" : "text-white/85"
-                }`}
-              >
+              <p className={`text-sm mt-1 leading-relaxed ${hasImage ? "text-[#0f766e]" : "text-white/85"}`}>
                 {popup.subtext}
               </p>
             )}
           </div>
         )}
 
-        {/* Button */}
         {hasButton && (
           <div className="px-5 pb-5 pt-3 bg-white">
             <a
               href={popup.button_url!}
               onClick={dismiss}
-              className="block w-full bg-gradient-to-r from-[#0c7b93] to-[#0f766e] hover:from-[#0f766e] hover:to-[#085C52] text-white text-center font-bold py-3 rounded-2xl transition-all shadow-md hover:shadow-lg text-sm"
+              className="block w-full bg-gradient-to-r from-[#0c7b93] to-[#0f766e] hover:from-[#0f766e] hover:to-[#085C52] text-white text-center font-bold py-3 rounded-2xl text-sm shadow-md hover:shadow-lg transition-all"
             >
               {popup.button_label}
             </a>
@@ -187,11 +166,10 @@ export default function PromoPopup() {
         )}
       </div>
 
-      {/* Close button — always centered below popup */}
       <button
         onClick={dismiss}
         aria-label="Close promotional popup"
-        className="mt-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 text-white transition-colors backdrop-blur-sm"
+        className="mt-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 text-white transition-colors"
         style={{ width: 44, height: 44, fontSize: 24, lineHeight: 1 }}
       >
         ×
