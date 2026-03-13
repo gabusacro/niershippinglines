@@ -185,6 +185,12 @@ export default async function AdminDashboardPage() {
           className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 transition-colors hover:bg-blue-100">
           🚗 Pay Parking
         </Link>
+
+        <Link href="/admin/inquiries"
+        className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100">
+       📩 Customer Inquiries
+        </Link>
+
       </div>
 
       {/* ── ALERT CARDS ── */}
