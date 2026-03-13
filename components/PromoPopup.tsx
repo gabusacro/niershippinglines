@@ -121,7 +121,7 @@ export default function PromoPopup() {
       }}
     >
       <div
-        className={`relative w-full transition-all duration-650 ${
+        className={`relative w-full transition-all duration-750 ${
           visible ? "scale-100 translate-y-0" : "scale-90 translate-y-6"
         }`}
         style={{ maxWidth: 340 }}
@@ -166,7 +166,7 @@ export default function PromoPopup() {
                   </p>
                 )}
                 {popup.subtext && (
-                  <p className={`text-sm mt-2 leading-relaxed text-center ${
+                  <p className={`text-sm mt-1 leading-relaxed text-center ${
                     !hasImage ? "text-white/85" : "text-[#0f766e]"
                   }`}>
                     {popup.subtext}
