@@ -4,88 +4,121 @@ import { useState } from "react";
 
 export default function ToursContactForm() {
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  async function handleSubmit(e: any) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
     setLoading(true);
+    setError(null);
 
-    const form = new FormData(e.target);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
 
-    const data = {
-      name: form.get("name"),
-      email: form.get("email"),
-      phone: form.get("phone"),
-      inquiry_type: form.get("type"),
-      message: form.get("message"),
+    const payload = {
+      name: formData.get("name"),
+      email: formData.get("email"),
+      phone: formData.get("phone"),
+      type: formData.get("type"),
+      message: formData.get("message"),
     };
 
-    const res = await fetch("/api/inquiry", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
+    try {
+      const res = await fetch("/api/inquiry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
-    setLoading(false);
+      if (!res.ok) throw new Error("Failed to send inquiry");
 
-    if (res.ok) {
-      setSent(true);
-      e.target.reset();
+      setSuccess(true);
+      form.reset();
+    } catch (err: any) {
+      setError(err.message || "Something went wrong.");
+    } finally {
+      setLoading(false);
     }
   }
 
-  if (sent) {
+  if (success) {
     return (
-      <div className="mt-12 rounded-2xl bg-emerald-600 p-6 text-center text-white">
-        ✅ Your inquiry has been sent!  
-        Our team will contact you shortly.
+      <div className="bg-emerald-500 text-white rounded-2xl p-6 text-center shadow">
+        <h3 className="text-lg font-semibold">Inquiry Sent</h3>
+        <p className="text-sm opacity-90 mt-1">
+          Our support team will contact you shortly.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="mt-12 rounded-2xl bg-gradient-to-br from-[#0c7b93] to-[#0f766e] p-6 text-white">
+    <div className="bg-white shadow-xl rounded-2xl p-8 border mt-12">
 
-      <p className="font-bold text-lg text-center">
-        Need help planning your trip?
-      </p>
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold">Trip Assistance</h2>
+        <p className="text-gray-500 text-sm">
+          Send our team a message and we'll help plan your trip.
+        </p>
+      </div>
 
-      <p className="text-sm text-white/80 text-center mb-6">
-        Contact our support team.
-      </p>
+      <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
 
-      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+        <input
+          name="name"
+          required
+          placeholder="Full name"
+          className="border rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500"
+        />
 
-        <input name="name" placeholder="Full Name" required
-          className="rounded-xl px-4 py-2.5 text-gray-800" />
+        <input
+          name="phone"
+          placeholder="Phone number"
+          className="border rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-500"
+        />
 
-        <input name="phone" placeholder="Contact Number"
-          className="rounded-xl px-4 py-2.5 text-gray-800" />
+        <input
+          name="email"
+          type="email"
+          required
+          placeholder="Email address"
+          className="border rounded-lg px-4 py-2 md:col-span-2 focus:ring-2 focus:ring-teal-500"
+        />
 
-        <input name="email" type="email" placeholder="Email Address" required
-          className="rounded-xl px-4 py-2.5 text-gray-800 sm:col-span-2" />
-
-        <select name="type" required
-          className="rounded-xl px-4 py-2.5 text-gray-800 sm:col-span-2">
-          <option value="">Select Inquiry Type</option>
-          <option value="Tours Inquiry">Tours Inquiry</option>
-          <option value="Boat Ticket">Boat Ticket</option>
-          <option value="Pay Parking">Pay Parking</option>
-          <option value="Support">General Support</option>
+        <select
+          name="type"
+          required
+          className="border rounded-lg px-4 py-2 md:col-span-2 focus:ring-2 focus:ring-teal-500"
+        >
+          <option value="">Select inquiry type</option>
+          <option value="tour">Tour booking</option>
+          <option value="boat">Boat ticket</option>
+          <option value="parking">Parking</option>
+          <option value="support">General support</option>
         </select>
 
-        <textarea name="message" rows={4} required
-          placeholder="Write your inquiry..."
-          className="rounded-xl px-4 py-2.5 text-gray-800 sm:col-span-2"
+        <textarea
+          name="message"
+          rows={4}
+          required
+          placeholder="How can we help?"
+          className="border rounded-lg px-4 py-2 md:col-span-2 focus:ring-2 focus:ring-teal-500"
         />
+
+        {error && (
+          <div className="text-red-500 text-sm md:col-span-2">
+            {error}
+          </div>
+        )}
 
         <button
           disabled={loading}
-          className="sm:col-span-2 rounded-xl bg-white px-5 py-2.5 font-semibold text-[#0c7b93] hover:bg-white/90"
+          className="bg-teal-600 hover:bg-teal-700 text-white rounded-lg py-2 font-medium md:col-span-2 transition"
         >
-          {loading ? "Sending..." : "Send Inquiry"}
+          {loading ? "Sending..." : "Send Message"}
         </button>
 
       </form>
