@@ -13,75 +13,88 @@ export default async function AdminToursPage() {
   if (!user || user.role !== "admin") redirect("/dashboard");
 
   const supabase = await createClient();
-
   const todayPH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
-  // Total bookings count
+  // Total bookings count — exclude operator walk-ins
   const { count: totalBookings } = await supabase
     .from("tour_bookings")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .neq("booking_source", "operator_walk_in");
 
-  // Pending payment bookings
+  // Pending payment bookings — exclude operator walk-ins
   const { count: pendingCount } = await supabase
     .from("tour_bookings")
     .select("*", { count: "exact", head: true })
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .neq("booking_source", "operator_walk_in");
 
-  // Confirmed bookings
+  // Confirmed bookings — exclude operator walk-ins
   const { count: confirmedCount } = await supabase
     .from("tour_bookings")
     .select("*", { count: "exact", head: true })
-    .eq("status", "confirmed");
+    .eq("status", "confirmed")
+    .neq("booking_source", "operator_walk_in");
 
-  // Online revenue (all time) — is_walk_in = false
+  // Online revenue (all time) — online bookings only (money YOU received)
   const { data: onlineRevData } = await supabase
     .from("tour_bookings")
     .select("total_amount_cents")
     .eq("payment_status", "verified")
-    .eq("is_walk_in", false);
+    .eq("booking_source", "online");
 
   const onlineRevenue = (onlineRevData ?? []).reduce(
     (sum, b) => sum + (b.total_amount_cents ?? 0), 0
   );
 
-  // Walk-in revenue (all time) — is_walk_in = true
+  // Walk-in revenue (all time) — YOUR walk-ins only (money YOU collected)
   const { data: walkinRevData } = await supabase
     .from("tour_bookings")
     .select("total_amount_cents")
     .eq("payment_status", "verified")
-    .eq("is_walk_in", true);
+    .eq("booking_source", "walk_in");
 
   const walkinRevenue = (walkinRevData ?? []).reduce(
     (sum, b) => sum + (b.total_amount_cents ?? 0), 0
   );
 
-  // Today's online bookings
+  // Operator walk-in revenue (all time) — money the OPERATOR collected, NOT yours
+  const { data: opWalkinRevData } = await supabase
+    .from("tour_bookings")
+    .select("total_amount_cents")
+    .eq("payment_status", "verified")
+    .eq("booking_source", "operator_walk_in");
+
+  const opWalkinRevenue = (opWalkinRevData ?? []).reduce(
+    (sum, b) => sum + (b.total_amount_cents ?? 0), 0
+  );
+
+  // Today's online revenue
   const { data: todayOnlineData } = await supabase
-  .from("tour_bookings")
-  .select("total_amount_cents")
-  .eq("payment_status", "verified")
-  .eq("is_walk_in", false)
-  .gte("payment_verified_at", todayPH + "T00:00:00+08:00")
-  .lte("payment_verified_at", todayPH + "T23:59:59+08:00");
+    .from("tour_bookings")
+    .select("total_amount_cents")
+    .eq("payment_status", "verified")
+    .eq("booking_source", "online")
+    .gte("payment_verified_at", todayPH + "T00:00:00+08:00")
+    .lte("payment_verified_at", todayPH + "T23:59:59+08:00");
 
   const todayOnlineRevenue = (todayOnlineData ?? []).reduce(
     (sum, b) => sum + (b.total_amount_cents ?? 0), 0
   );
 
-  // Today's walk-in bookings
+  // Today's walk-in revenue (YOUR walk-ins)
   const { data: todayWalkinData } = await supabase
-  .from("tour_bookings")
-  .select("total_amount_cents")
-  .eq("payment_status", "verified")
-  .eq("is_walk_in", true)
-  .gte("payment_verified_at", todayPH + "T00:00:00+08:00")
-  .lte("payment_verified_at", todayPH + "T23:59:59+08:00");
+    .from("tour_bookings")
+    .select("total_amount_cents")
+    .eq("payment_status", "verified")
+    .eq("booking_source", "walk_in")
+    .gte("payment_verified_at", todayPH + "T00:00:00+08:00")
+    .lte("payment_verified_at", todayPH + "T23:59:59+08:00");
 
   const todayWalkinRevenue = (todayWalkinData ?? []).reduce(
     (sum, b) => sum + (b.total_amount_cents ?? 0), 0
   );
 
-  // Upcoming tours (next 7 days)
+  // Upcoming tours (next 7 days) — using schedule join, exclude operator walk-ins
   const in7Days = new Date();
   in7Days.setDate(in7Days.getDate() + 7);
   const in7DaysStr = in7Days.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
@@ -90,15 +103,21 @@ export default async function AdminToursPage() {
     .from("tour_bookings")
     .select("*, tour:tour_packages(title), schedule:tour_schedules(available_date, departure_time)")
     .eq("status", "confirmed")
-    .gte("tour_snapshot_date", todayPH)
-    .lte("tour_snapshot_date", in7DaysStr)
-    .order("tour_snapshot_date", { ascending: true })
+    .neq("booking_source", "operator_walk_in")
+    .order("created_at", { ascending: true })
     .limit(5);
 
-  // Recent bookings
+  // Filter upcoming by schedule date on client side (since we can't filter on joined column easily)
+  const filteredUpcoming = (upcomingBookings ?? []).filter((b) => {
+    const d = (b.schedule as { available_date?: string } | null)?.available_date;
+    return d && d >= todayPH && d <= in7DaysStr;
+  });
+
+  // Recent bookings — exclude operator walk-ins
   const { data: recentBookings } = await supabase
     .from("tour_bookings")
     .select("*, tour:tour_packages(title)")
+    .neq("booking_source", "operator_walk_in")
     .order("created_at", { ascending: false })
     .limit(5);
 
@@ -114,6 +133,8 @@ export default async function AdminToursPage() {
     cancelled: "bg-gray-100 text-gray-500",
     completed: "bg-blue-100 text-blue-700",
   };
+
+  const totalYourRevenue = onlineRevenue + walkinRevenue;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
@@ -137,7 +158,7 @@ export default async function AdminToursPage() {
           { href: "/admin/tours/refunds",        label: "Refunds"         },
           { href: "/admin/tours/expenses",       label: "Expenses"        },
           { href: "/admin/tours/categories",     label: "Categories"      },
-          { href: "/admin/tours/team", label: "Team" },
+          { href: "/admin/tours/team",           label: "Team"            },
           { href: "/admin/tours/settings",       label: "Settings"        },
         ].map(({ href, label }) => (
           <Link key={href} href={href}
@@ -156,6 +177,7 @@ export default async function AdminToursPage() {
         <div className="rounded-2xl border-2 border-emerald-100 bg-white p-5">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total Bookings</p>
           <p className="text-3xl font-bold text-emerald-700">{totalBookings ?? 0}</p>
+          <p className="text-xs text-gray-400 mt-1">Excl. operator walk-ins</p>
         </div>
         <div className="rounded-2xl border-2 border-amber-100 bg-white p-5">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Pending Payment</p>
@@ -168,93 +190,104 @@ export default async function AdminToursPage() {
         <div className="rounded-2xl border-2 border-blue-100 bg-white p-5">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Today (Online)</p>
           <p className="text-2xl font-bold text-blue-700">
-            {todayOnlineRevenue > 0
-              ? "P" + (todayOnlineRevenue / 100).toLocaleString()
-              : "P0"}
+            ₱{(todayOnlineRevenue / 100).toLocaleString()}
           </p>
         </div>
       </div>
 
-      {/* Revenue split — Online vs Walk-in */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* Revenue split */}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
 
-        {/* Online Revenue */}
+        {/* Online Revenue — YOU received this */}
         <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-emerald-900">Online Bookings Revenue</h2>
-            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-semibold">
-              Online
-            </span>
+            <h2 className="font-bold text-emerald-900">Online Revenue</h2>
+            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-semibold">Online</span>
           </div>
-          <p className="text-3xl font-bold text-emerald-700">
-            P{(onlineRevenue / 100).toLocaleString()}
-          </p>
-          <p className="text-xs text-emerald-600 mt-1">All time · Verified payments only</p>
+          <p className="text-3xl font-bold text-emerald-700">₱{(onlineRevenue / 100).toLocaleString()}</p>
+          <p className="text-xs text-emerald-600 mt-1">All time · GCash payments</p>
           {todayOnlineRevenue > 0 && (
             <p className="text-sm font-semibold text-emerald-700 mt-2">
-              Today: P{(todayOnlineRevenue / 100).toLocaleString()}
+              Today: ₱{(todayOnlineRevenue / 100).toLocaleString()}
             </p>
           )}
         </div>
 
-        {/* Walk-in Revenue */}
+        {/* Walk-in Revenue — YOU received this */}
         <div className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-blue-900">Walk-in Revenue</h2>
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">
-              Walk-in / Cash
-            </span>
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">Your Walk-in</span>
           </div>
-          <p className="text-3xl font-bold text-blue-700">
-            P{(walkinRevenue / 100).toLocaleString()}
-          </p>
-          <p className="text-xs text-blue-600 mt-1">All time · Cash collected in person</p>
+          <p className="text-3xl font-bold text-blue-700">₱{(walkinRevenue / 100).toLocaleString()}</p>
+          <p className="text-xs text-blue-600 mt-1">All time · Cash you collected</p>
           {todayWalkinRevenue > 0 && (
             <p className="text-sm font-semibold text-blue-700 mt-2">
-              Today: P{(todayWalkinRevenue / 100).toLocaleString()}
+              Today: ₱{(todayWalkinRevenue / 100).toLocaleString()}
             </p>
           )}
         </div>
+
+        {/* Operator Walk-in — NOT your money */}
+        <div className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-purple-900">Operator Walk-ins</h2>
+            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-semibold">Not Yours</span>
+          </div>
+          <p className="text-3xl font-bold text-purple-700">₱{(opWalkinRevenue / 100).toLocaleString()}</p>
+          <p className="text-xs text-purple-600 mt-1">Cash collected by operator directly</p>
+          <p className="text-xs text-purple-500 mt-1 font-semibold">⚠️ You did not receive this</p>
+        </div>
+      </div>
+
+      {/* Your total revenue summary */}
+      <div className="mt-4 rounded-2xl border-2 border-emerald-300 bg-emerald-700 px-6 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-emerald-200 uppercase tracking-wide">Your Total Revenue (All Time)</p>
+          <p className="text-xs text-emerald-300 mt-0.5">Online + Your Walk-ins only</p>
+        </div>
+        <p className="text-3xl font-bold text-white">₱{(totalYourRevenue / 100).toLocaleString()}</p>
       </div>
 
       {/* Upcoming tours */}
-      {upcomingBookings && upcomingBookings.length > 0 && (
+      {filteredUpcoming.length > 0 && (
         <div className="mt-6 rounded-2xl border-2 border-emerald-100 bg-white p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-[#134e4a]">Upcoming Tours (Next 7 Days)</h2>
             <Link href="/admin/tours/bookings?status=confirmed"
-              className="text-xs text-emerald-600 hover:underline">
-              View all
-            </Link>
+              className="text-xs text-emerald-600 hover:underline">View all</Link>
           </div>
           <div className="space-y-3">
-            {upcomingBookings.map((b) => (
-              <Link key={b.id} href={"/admin/tours/bookings/" + b.id}
-                className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/40 px-4 py-3 hover:border-emerald-300 transition-all">
-                <div>
-                  <p className="font-semibold text-sm text-[#134e4a]">
-                    {(b.tour as { title?: string } | null)?.title ?? b.tour_snapshot_title ?? "—"}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {b.tour_snapshot_date ? formatDate(b.tour_snapshot_date) : "—"}
-                    {" · "}
-                    {b.total_pax} guest{b.total_pax > 1 ? "s" : ""}
-                    {" · "}
-                    {b.customer_name}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-emerald-700">
-                    P{(b.total_amount_cents / 100).toLocaleString()}
-                  </p>
-                  {b.is_walk_in && (
-                    <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
-                      Walk-in
+            {filteredUpcoming.map((b) => {
+              const schedDate = (b.schedule as { available_date?: string } | null)?.available_date;
+              return (
+                <Link key={b.id} href={"/admin/tours/bookings/" + b.id}
+                  className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/40 px-4 py-3 hover:border-emerald-300 transition-all">
+                  <div>
+                    <p className="font-semibold text-sm text-[#134e4a]">
+                      {(b.tour as { title?: string } | null)?.title ?? "—"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {schedDate ? formatDate(schedDate) : "—"}
+                      {" · "}{b.total_pax} guest{b.total_pax > 1 ? "s" : ""}
+                      {" · "}{b.customer_name}
+                    </p>
+                  </div>
+                  <div className="text-right flex flex-col items-end gap-1">
+                    <p className="text-sm font-bold text-emerald-700">
+                      ₱{(b.total_amount_cents / 100).toLocaleString()}
+                    </p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      b.booking_source === "walk_in"
+                        ? "bg-blue-100 text-blue-600"
+                        : "bg-emerald-100 text-emerald-600"
+                    }`}>
+                      {b.booking_source === "walk_in" ? "Walk-in" : "Online"}
                     </span>
-                  )}
-                </div>
-              </Link>
-            ))}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}
@@ -263,10 +296,7 @@ export default async function AdminToursPage() {
       <div className="mt-6 rounded-2xl border-2 border-gray-100 bg-white p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-[#134e4a]">Recent Bookings</h2>
-          <Link href="/admin/tours/bookings"
-            className="text-xs text-emerald-600 hover:underline">
-            View all
-          </Link>
+          <Link href="/admin/tours/bookings" className="text-xs text-emerald-600 hover:underline">View all</Link>
         </div>
 
         {!recentBookings || recentBookings.length === 0 ? (
@@ -279,7 +309,7 @@ export default async function AdminToursPage() {
                 <div>
                   <p className="font-mono text-xs text-emerald-600 font-bold">{b.reference}</p>
                   <p className="font-semibold text-sm text-[#134e4a] mt-0.5">
-                    {(b.tour as { title?: string } | null)?.title ?? b.tour_snapshot_title ?? "—"}
+                    {(b.tour as { title?: string } | null)?.title ?? "—"}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">{b.customer_name}</p>
                 </div>
@@ -289,14 +319,19 @@ export default async function AdminToursPage() {
                   </span>
                   <p className="text-sm font-bold text-emerald-700">
                     {b.total_amount_cents > 0
-                      ? "P" + (b.total_amount_cents / 100).toLocaleString()
+                      ? "₱" + (b.total_amount_cents / 100).toLocaleString()
                       : "Negotiable"}
                   </p>
-                  {b.is_walk_in && (
-                    <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
-                      Walk-in
-                    </span>
-                  )}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                    b.booking_source === "walk_in"
+                      ? "bg-blue-100 text-blue-600"
+                      : b.booking_source === "operator_walk_in"
+                      ? "bg-purple-100 text-purple-600"
+                      : "bg-emerald-100 text-emerald-600"
+                  }`}>
+                    {b.booking_source === "walk_in" ? "Walk-in" :
+                     b.booking_source === "operator_walk_in" ? "Op. Walk-in" : "Online"}
+                  </span>
                 </div>
               </Link>
             ))}
