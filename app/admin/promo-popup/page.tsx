@@ -554,45 +554,51 @@ export default function PromoPopupPage() {
                 <div
                   className="bg-[#f0fdfa] px-4 pb-4 pt-2"
                   style={{ background: "linear-gradient(rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.45) 100%), #f0fdfa" }}>
-                  <div className="rounded-2xl overflow-hidden shadow-2xl bg-white max-w-[220px] mx-auto">
+                  <div className="max-w-[220px] mx-auto">
                     {hasContent ? (
                       <>
+                        {/* Image — no background, transparent just like real popup */}
                         {hasImage && (
-                          <div className="bg-[#f0fdfa] p-1.5 flex items-center justify-center">
+                          <div className="flex items-center justify-center">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={form.image_url}
                               alt="Preview"
-                              className="w-full rounded-xl"
-                              style={{ maxHeight: 150, objectFit: "contain" }}
+                              className={`w-full ${(hasText || hasButton) ? "rounded-t-2xl" : "rounded-2xl"}`}
+                              style={{ maxHeight: 150, objectFit: "contain", display: "block" }}
                               onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                             />
                           </div>
                         )}
-                        {hasText && (
-                          <div className={`px-3 py-2.5 ${!hasImage ? "bg-gradient-to-br from-[#085C52] to-[#0c7b93]" : "bg-white border-t border-teal-50"}`}>
-                            {form.headline && (
-                              <p className={`font-bold text-xs leading-tight ${!hasImage ? "text-white" : "text-[#134e4a]"}`}>
-                                {form.headline}
-                              </p>
+                        {/* Card only when there's text or CTA */}
+                        {(hasText || hasButton) && (
+                          <div className={`bg-white overflow-hidden ${hasImage ? "rounded-b-2xl" : "rounded-2xl"}`}>
+                            {hasText && (
+                              <div className={`px-3 py-2.5 ${!hasImage ? "bg-gradient-to-br from-[#085C52] to-[#0c7b93]" : "bg-white"}`}>
+                                {form.headline && (
+                                  <p className={`font-bold text-xs leading-tight ${!hasImage ? "text-white" : "text-[#134e4a]"}`}>
+                                    {form.headline}
+                                  </p>
+                                )}
+                                {form.subtext && (
+                                  <p className={`text-[11px] mt-0.5 ${!hasImage ? "text-white/80" : "text-[#0f766e]"}`}>
+                                    {form.subtext}
+                                  </p>
+                                )}
+                              </div>
                             )}
-                            {form.subtext && (
-                              <p className={`text-[11px] mt-0.5 ${!hasImage ? "text-white/80" : "text-[#0f766e]"}`}>
-                                {form.subtext}
-                              </p>
+                            {hasButton && (
+                              <div className="px-2.5 pb-2.5 pt-2 bg-white">
+                                <div className="w-full bg-[#0c7b93] text-white text-center font-bold py-1.5 rounded-xl text-[11px]">
+                                  {form.button_label}
+                                </div>
+                              </div>
                             )}
-                          </div>
-                        )}
-                        {hasButton && (
-                          <div className="px-2.5 pb-2.5 pt-2 bg-white">
-                            <div className="w-full bg-[#0c7b93] text-white text-center font-bold py-1.5 rounded-xl text-[11px]">
-                              {form.button_label}
-                            </div>
                           </div>
                         )}
                       </>
                     ) : (
-                      <div className="bg-gradient-to-br from-[#0c7b93] to-[#0f766e] p-6 flex items-center justify-center">
+                      <div className="rounded-2xl bg-gradient-to-br from-[#0c7b93] to-[#0f766e] p-6 flex items-center justify-center">
                         <p className="text-white/50 text-[11px] text-center leading-relaxed">
                           Add image, text, or button to preview
                         </p>
