@@ -149,13 +149,11 @@ export default function PromoPopup() {
 
         {/* ── Text + CTA card — only rendered if there's content ────────── */}
         {hasCard && (
-          <div className={`bg-white shadow-2xl ${
-            hasImage ? "rounded-b-3xl border-t-0" : "rounded-3xl"
-          } overflow-hidden`}>
+          <div className={`bg-white shadow-2xl rounded-3xl overflow-hidden${hasImage ? " mt-3" : ""}`}>
 
             {/* Text section */}
             {hasText && (
-              <div className={`px-5 py-4 ${
+              <div className={`px-6 pt-5 pb-1 text-center ${
                 !hasImage
                   ? "bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]"
                   : "bg-white"
@@ -168,7 +166,7 @@ export default function PromoPopup() {
                   </p>
                 )}
                 {popup.subtext && (
-                  <p className={`text-sm mt-1 leading-relaxed ${
+                  <p className={`text-sm mt-1.5 leading-relaxed ${
                     !hasImage ? "text-white/85" : "text-[#0f766e]"
                   }`}>
                     {popup.subtext}
@@ -179,7 +177,7 @@ export default function PromoPopup() {
 
             {/* CTA button */}
             {hasButton && (
-              <div className={`px-5 pb-5 ${hasText ? "pt-3" : "pt-5"} bg-white`}>
+              <div className={`px-5 pb-5 ${hasText ? "pt-4" : "pt-5"} bg-white`}>
                 <a
                   href={popup.button_url!}
                   onClick={dismiss}
