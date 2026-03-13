@@ -20,6 +20,8 @@ export default async function Page() {
             <div className="font-semibold">{i.name}</div>
             <div className="text-sm text-gray-500">{i.email}</div>
             <div className="text-sm text-gray-500">{i.phone}</div>
+            <div className="text-sm text-gray-500">{i.inquiry_type}</div>
+            <div className="text-sm text-gray-500">{i.created_at}</div>
 
             <p className="mt-3 text-sm">{i.message}</p>
 
