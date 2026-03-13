@@ -449,6 +449,8 @@ export function BookingModal({
   const [formError,       setFormError]       = useState("");
 
   const [proofFile,      setProofFile]      = useState<File|null>(null);
+  const [saveTravelerChecked, setSaveTravelerChecked] = useState<Record<string, boolean>>({});
+  const [savedJustNow,        setSavedJustNow]        = useState<Record<string, boolean>>({});
   const [proofUploading, setProofUploading] = useState(false);
   const [proofUploaded,  setProofUploaded]  = useState(false);
   const [proofError,     setProofError]     = useState("");
@@ -578,35 +580,19 @@ export function BookingModal({
   const adminFeeCents = totalPassengers * adminFeePerPax;
   const totalCents    = fareSubtotalCents + gcashFee + adminFeeCents;
 
-  // Pre-check verified IDs — fetched once on load, stored in state
-  const [verifiedRecords, setVerifiedRecords] = useState<{
-    passenger_name: string; discount_type: string; expires_at: string | null;
-  }[]>([]);
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    fetch("/api/passenger-id")
-      .then(r => r.json())
-      .then(d => {
-        const now = new Date();
-        const verified = (d.verifications ?? []).filter((v: {
-          verification_status: string; expires_at: string | null;
-        }) =>
-          v.verification_status === "verified" &&
-          (!v.expires_at || new Date(v.expires_at) > now)
-        );
-        setVerifiedRecords(verified);
-      })
-      .catch(() => {});
-  }, [isLoggedIn]);
-
+  // ── Option C: verified = in savedTravelers AND id_verified=true AND not expired ──
+  // This means: only passengers the logged-in user has explicitly saved get recognition
+  // Prevents strangers from typing any name and getting a discount
   const isNameVerified = useCallback((name: string, fareType: string): boolean => {
     if (!name.trim() || !requiresId(fareType)) return false;
-    return verifiedRecords.some(v =>
-      v.discount_type === fareType &&
-      v.passenger_name?.trim().toLowerCase() === name.trim().toLowerCase()
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
+    const now  = new Date();
+    return savedTravelers.some(t =>
+      t.id_verified &&
+      norm(t.full_name) === norm(name) &&
+      (!t.id_expires_at || new Date(t.id_expires_at) > now)
     );
-  }, [verifiedRecords]);
+  }, [savedTravelers]);
 
 
 
@@ -783,6 +769,45 @@ export function BookingModal({
       setSubmitting(false);
     }
   };
+
+  // Save passengers to saved_travelers after proof uploaded
+  const handleSaveTravelers = useCallback(async () => {
+    if (!result) return;
+    const toSave = passengerDetails.filter((p, i) => {
+      const key = `${p.fare_type}-${i}`;
+      return (
+        p.fare_type !== "infant" &&
+        p.full_name.trim() &&
+        saveTravelerChecked[key] &&
+        !savedJustNow[key]
+      );
+    });
+    for (let i = 0; i < toSave.length; i++) {
+      const p   = toSave[i];
+      const key = `${p.fare_type}-${i}`;
+      try {
+        await fetch("/api/saved-travelers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            full_name:          p.full_name,
+            gender:             p.gender      || null,
+            birthdate:          p.birthdate   || null,
+            nationality:        p.nationality || null,
+            address:            p.address     || null,
+            fare_type:          p.fare_type,
+            booking_reference:  result.reference,
+          }),
+        });
+        setSavedJustNow(prev => ({ ...prev, [key]: true }));
+      } catch { /* silent — non-critical */ }
+    }
+    // Refresh saved travelers list so new entries show in dropdown
+    fetch("/api/saved-travelers")
+      .then(r => r.json())
+      .then(d => setSavedTravelers(d.travelers ?? []))
+      .catch(() => {});
+  }, [result, passengerDetails, saveTravelerChecked, savedJustNow]);
 
   const handleConfirmBooking = async () => {
     setProofError("");
@@ -1089,6 +1114,70 @@ export function BookingModal({
               >
                 {proofUploading ? "Uploading…" : proofUploaded ? "✓ Done" : "Confirm Booking"}
               </button>
+              {/* ── Save to travelers — shown after proof uploaded ── */}
+              {proofUploaded && isLoggedIn && (() => {
+                const saveable = passengerDetails.filter((p, idx) => {
+                  if (p.fare_type === "infant" || !p.full_name.trim()) return false;
+                  // Already in saved travelers?
+                  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+                  const alreadySaved = savedTravelers.some(
+                    t => norm(t.full_name) === norm(p.full_name)
+                  );
+                  return !alreadySaved;
+                });
+                if (saveable.length === 0) return null;
+                return (
+                  <div className="rounded-xl border-2 border-teal-200 bg-teal-50 p-4 space-y-3">
+                    <p className="text-sm font-bold text-teal-900">
+                      💾 Save passengers for future bookings?
+                    </p>
+                    <p className="text-xs text-teal-700">
+                      Saved passengers auto-fill your next booking. Verified IDs are recognized automatically — no re-upload needed.
+                    </p>
+                    <div className="space-y-2">
+                      {saveable.map((p, idx) => {
+                        const key         = `${p.fare_type}-${idx}`;
+                        const isSaved     = savedJustNow[key] ?? false;
+                        const isChecked   = saveTravelerChecked[key] ?? false;
+                        return (
+                          <label key={key} className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                            isSaved
+                              ? "border-green-300 bg-green-50"
+                              : isChecked
+                                ? "border-teal-400 bg-teal-100"
+                                : "border-teal-200 bg-white hover:bg-teal-50"
+                          }`}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked || isSaved}
+                              disabled={isSaved}
+                              onChange={e => setSaveTravelerChecked(prev => ({ ...prev, [key]: e.target.checked }))}
+                              className="h-4 w-4 rounded border-teal-400 text-teal-600"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-teal-900 truncate">{p.full_name}</p>
+                              <p className="text-xs text-teal-600 capitalize">{p.fare_type}</p>
+                            </div>
+                            {isSaved && (
+                              <span className="text-xs font-bold text-green-700 shrink-0">✓ Saved</span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {saveable.some((_, idx) => saveTravelerChecked[`${saveable[idx]?.fare_type}-${idx}`]) && (
+                      <button
+                        type="button"
+                        onClick={handleSaveTravelers}
+                        className="w-full rounded-xl bg-teal-600 px-4 py-2 text-sm font-bold text-white hover:bg-teal-700"
+                      >
+                        Save selected travelers
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
               <button
                 type="button"
                 onClick={onClose}
