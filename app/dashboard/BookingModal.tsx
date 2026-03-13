@@ -580,19 +580,39 @@ export function BookingModal({
   const adminFeeCents = totalPassengers * adminFeePerPax;
   const totalCents    = fareSubtotalCents + gcashFee + adminFeeCents;
 
-  // ── Option C: verified = in savedTravelers AND id_verified=true AND not expired ──
-  // This means: only passengers the logged-in user has explicitly saved get recognition
-  // Prevents strangers from typing any name and getting a discount
+  // ── Verified records — loaded once from passenger_id_verifications via API ──
+  // Source of truth: never depends on saved_travelers name matching
+  const [verifiedRecords, setVerifiedRecords] = useState<{
+    passenger_name: string; discount_type: string; expires_at: string | null;
+  }[]>([]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetch("/api/passenger-id")
+      .then(r => r.json())
+      .then(d => {
+        const now = new Date();
+        setVerifiedRecords(
+          (d.verifications ?? []).filter((v: {
+            verification_status: string; expires_at: string | null;
+          }) =>
+            v.verification_status === "verified" &&
+            (!v.expires_at || new Date(v.expires_at) > now)
+          )
+        );
+      })
+      .catch(() => {});
+  }, [isLoggedIn]);
+
   const isNameVerified = useCallback((name: string, fareType: string): boolean => {
     if (!name.trim() || !requiresId(fareType)) return false;
-    const norm = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
-    const now  = new Date();
-    return savedTravelers.some(t =>
-      t.id_verified &&
-      norm(t.full_name) === norm(name) &&
-      (!t.id_expires_at || new Date(t.id_expires_at) > now)
+    const norm = (s: string) =>
+      s.toLowerCase().replace(/[^a-z]/g, " ").replace(/\s+/g, " ").trim();
+    return verifiedRecords.some(v =>
+      v.discount_type === fareType &&
+      norm(v.passenger_name ?? "") === norm(name)
     );
-  }, [savedTravelers]);
+  }, [verifiedRecords]);
 
 
 
@@ -615,7 +635,7 @@ export function BookingModal({
     check(countStudent, "student", studentNames);
     check(countChild,   "child",   childNames);
     return list;
-  }, [countAdult,countSenior,countPwd,countStudent,countChild,seniorNames,pwdNames,studentNames,childNames,waivers,isNameVerified]);
+  }, [countAdult,countSenior,countPwd,countStudent,countChild,seniorNames,pwdNames,studentNames,childNames,waivers,isNameVerified]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setWaiver = useCallback((key: string, val: boolean) => {
     setWaivers(prev => ({ ...prev, [key]: val }));
