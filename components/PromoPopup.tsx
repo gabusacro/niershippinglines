@@ -134,7 +134,7 @@ export default function PromoPopup() {
             <img
               src={popup.image_url!}
               alt={popup.headline ?? "Promo"}
-              className={`w-full ${hasCard ? "rounded-t-3xl" : "rounded-3xl"}`}
+              className="w-full rounded-3xl"
               style={{
                 maxHeight: 340,
                 objectFit: "contain",
@@ -149,9 +149,7 @@ export default function PromoPopup() {
 
         {/* ── Text + CTA card — only rendered if there's content ────────── */}
         {hasCard && (
-          <div className={`bg-white shadow-2xl ${
-            hasImage ? "rounded-b-3xl border-t-0" : "rounded-3xl"
-          } overflow-hidden`}>
+        <div className="bg-white shadow-2xl rounded-3xl overflow-hidden">
 
             {/* Text section */}
             {hasText && (
