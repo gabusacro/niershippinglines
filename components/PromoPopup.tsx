@@ -121,7 +121,7 @@ export default function PromoPopup() {
       }}
     >
       <div
-        className={`relative w-full transition-all duration-300 ${
+        className={`relative w-full transition-all duration-500 ${
           visible ? "scale-100 translate-y-0" : "scale-90 translate-y-6"
         }`}
         style={{ maxWidth: 340 }}
