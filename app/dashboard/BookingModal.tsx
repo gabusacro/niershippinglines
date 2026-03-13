@@ -183,7 +183,7 @@ function VerifiedTravelerBadge({
 // PassengerExtraFields
 function PassengerExtraFields({
   extra, onChange, savedTravelers, onSelectTraveler,
-  isLoggedIn, fareType, fare, onSuggestSwitch, usedNames,
+  isLoggedIn, fareType, fare, onSuggestSwitch, usedNames, isVerified,
 }: {
   extra: PassengerExtra;
   onChange: (u: PassengerExtra) => void;
@@ -194,10 +194,15 @@ function PassengerExtraFields({
   fare: FareRow | null;
   onSuggestSwitch?: (to: FareTypeValue) => void;
   usedNames?: string[];
+  isVerified?: boolean;
 }) {
   const age       = extra.birthdate ? calcAge(extra.birthdate) : null;
   const suggested = fare && age !== null ? getAutoFareType(age, fare) : null;
-  const showTip   = suggested && suggested !== fareType && suggested !== "adult";
+  // Hide switch tip if:
+  // 1. Already in the correct verified slot (no need to switch)
+  // 2. Suggested type matches current fare type
+  // 3. No suggestion or suggestion is adult
+  const showTip   = !isVerified && suggested && suggested !== fareType && suggested !== "adult";
 
   return (
     <div className="mt-1 rounded-lg border border-teal-100 bg-teal-50/30 p-2 space-y-2">
@@ -935,6 +940,7 @@ export function BookingModal({
                 fare={fare}
                 onSuggestSwitch={to => switchFareType(fareType, i, to)}
                 usedNames={allFilledNames.filter(n => n !== (names[i] ?? "").trim())}
+                isVerified={isPreVerified}
               />
 
               {/* Verified badge — shown after name is filled and matches a verified traveler */}
