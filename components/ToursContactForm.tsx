@@ -20,7 +20,7 @@ export default function ToursContactForm() {
       name: formData.get("name"),
       email: formData.get("email"),
       phone: formData.get("phone"),
-      type: formData.get("type"),
+      inquiry_type: formData.get("inquiry_type"),
       message: formData.get("message"),
     };
 
@@ -57,7 +57,6 @@ export default function ToursContactForm() {
 
   return (
     <div className="bg-white shadow-xl rounded-2xl p-8 border mt-12">
-
       <div className="mb-6">
         <h2 className="text-xl font-semibold">Trip Assistance</h2>
         <p className="text-gray-500 text-sm">
@@ -89,7 +88,7 @@ export default function ToursContactForm() {
         />
 
         <select
-          name="type"
+          name="inquiry_type"
           required
           className="border rounded-lg px-4 py-2 md:col-span-2 focus:ring-2 focus:ring-teal-500"
         >
