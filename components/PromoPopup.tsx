@@ -153,11 +153,11 @@ export default function PromoPopup() {
 
             {/* Text section */}
             {hasText && (
-              <div className={`px-5 py-4 ${
-                !hasImage
-                  ? "bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]"
-                  : "bg-white"
-              }`}>
+<div className={`px-5 py-4 text-center ${
+  !hasImage
+    ? "bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]"
+    : "bg-white"
+}`}>
                 {popup.headline && (
                   <p className={`font-extrabold text-lg leading-tight ${
                     !hasImage ? "text-white" : "text-[#134e4a]"
@@ -166,7 +166,7 @@ export default function PromoPopup() {
                   </p>
                 )}
                 {popup.subtext && (
-                  <p className={`text-sm mt-1 leading-relaxed ${
+                  <p className={`text-sm mt-2 leading-relaxed text-center ${
                     !hasImage ? "text-white/85" : "text-[#0f766e]"
                   }`}>
                     {popup.subtext}
