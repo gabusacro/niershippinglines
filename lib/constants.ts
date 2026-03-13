@@ -7,6 +7,7 @@ export const ROUTES = {
   schedule: "/schedule",
   book: "/book",
   attractions: "/attractions",
+  tours: "/tours",
   weather: "/weather",
   login: "/login",
   signup: "/signup",
