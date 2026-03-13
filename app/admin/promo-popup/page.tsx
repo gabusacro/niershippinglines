@@ -162,21 +162,25 @@ export default function PromoPopupPage() {
   }
 
   // ── Quick toggle active (saves immediately) ───────────────────
+  const formRef = useRef<PopupForm>(form);
+  useEffect(() => { formRef.current = form; }, [form]);
+
   async function quickToggleActive() {
-    const newActive = !form.is_active;
+    const current = formRef.current;
+    const newActive = !current.is_active;
     setForm((f) => ({ ...f, is_active: newActive }));
     try {
       const res = await fetch("/api/admin/promo-popup", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
+          ...current,
           is_active:    newActive,
-          image_url:    form.image_url.trim()    || null,
-          headline:     form.headline.trim()     || null,
-          subtext:      form.subtext.trim()      || null,
-          button_label: form.button_label.trim() || "Book Now",
-          button_url:   form.button_url.trim()   || null,
+          image_url:    current.image_url.trim()    || null,
+          headline:     current.headline.trim()     || null,
+          subtext:      current.subtext.trim()      || null,
+          button_label: current.button_label.trim() || "Book Now",
+          button_url:   current.button_url.trim()   || null,
         }),
       });
       const data = await res.json();
@@ -184,7 +188,6 @@ export default function PromoPopupPage() {
       setSaved((s) => ({ ...s, is_active: newActive }));
       toast.showSuccess(newActive ? "🟢 Popup is now LIVE!" : "⚫ Popup turned OFF.");
     } catch (err) {
-      // Revert on failure
       setForm((f) => ({ ...f, is_active: !newActive }));
       toast.showError(err instanceof Error ? err.message : "Toggle failed.");
     }
@@ -199,7 +202,8 @@ export default function PromoPopupPage() {
     window.open("/", "_blank");
   }
 
-  const isDirty = JSON.stringify(form) !== JSON.stringify(saved);
+  // isDirty ignores is_active — that's handled by quickToggleActive which saves instantly
+  const isDirty = JSON.stringify({ ...form, is_active: false }) !== JSON.stringify({ ...saved, is_active: false });
 
   if (loading) {
     return (
@@ -319,16 +323,30 @@ export default function PromoPopupPage() {
               />
             )}
 
+            {/* Image preview — always shown when image_url is set, regardless of mode */}
             {hasImage && (
-              <div className="relative rounded-xl overflow-hidden border border-teal-100 bg-[#f0fdfa] p-3 flex items-center justify-center">
+              <div className="relative rounded-xl overflow-hidden border-2 border-teal-200 bg-[#f0fdfa] p-3 flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={form.image_url} alt="Preview" className="max-h-48 w-full rounded-lg"
+                <img
+                  src={form.image_url}
+                  alt="Preview"
+                  className="max-h-48 w-full rounded-lg"
                   style={{ objectFit: "contain" }}
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                <button type="button" onClick={() => setForm((f) => ({ ...f, image_url: "" }))}
-                  className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full w-7 h-7 text-sm flex items-center justify-center">
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, image_url: "" }))}
+                  className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full w-7 h-7 text-sm flex items-center justify-center"
+                  title="Remove image"
+                >
                   ×
                 </button>
+                <span className="absolute bottom-2 left-2 text-xs bg-black/40 text-white px-2 py-0.5 rounded-full">
+                  ✓ Image ready
+                </span>
               </div>
             )}
           </div>
