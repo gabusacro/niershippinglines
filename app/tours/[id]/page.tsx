@@ -19,6 +19,16 @@ export default async function TourDetailPage({
 
   if (!pkg) notFound();
 
+  // Fetch markup — only needed for operator packages
+  const isOperator = pkg.owner_type === "operator";
+  const markupCents = isOperator ? await supabase
+    .from("tour_settings")
+    .select("admin_markup_per_pax_cents")
+    .eq("id", 1)
+    .single()
+    .then(r => r.data?.admin_markup_per_pax_cents ?? 9900)
+    : 0;
+
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: schedules } = await supabase
@@ -30,12 +40,16 @@ export default async function TourDetailPage({
     .order("available_date", { ascending: true });
 
   function formatPrice(): string {
-    if (pkg.joiner_price_cents)
-      return `₱${(pkg.joiner_price_cents / 100).toLocaleString()}/pax`;
+    if (pkg.joiner_price_cents) {
+      const cents = pkg.joiner_price_cents + markupCents;
+      return `₱${(cents / 100).toLocaleString()}/pax`;
+    }
     if (pkg.exclusive_price_cents)
       return `₱${(pkg.exclusive_price_cents / 100).toLocaleString()}/${pkg.exclusive_unit_label}`;
-    if (pkg.per_person_price_cents)
-      return `₱${(pkg.per_person_price_cents / 100).toLocaleString()}/person`;
+    if (pkg.per_person_price_cents) {
+      const cents = pkg.per_person_price_cents + markupCents;
+      return `₱${(cents / 100).toLocaleString()}/person`;
+    }
     if (pkg.hourly_price_min_cents) {
       const min = pkg.hourly_price_min_cents / 100;
       const max = pkg.hourly_price_max_cents ? pkg.hourly_price_max_cents / 100 : null;
@@ -65,19 +79,11 @@ export default async function TourDetailPage({
           <Link href="/tours" className="text-sm text-white/70 hover:text-white mb-4 inline-block">
             ← Back to Tours
           </Link>
-          <div className="flex flex-wrap items-start gap-3 mb-2">
-            <h1 className="text-2xl font-bold sm:text-3xl">{pkg.title}</h1>
-            {pkg.is_featured && (
-              <span className="rounded-full bg-amber-400 px-3 py-0.5 text-xs font-bold text-amber-900">⭐ Popular</span>
-            )}
-            {pkg.is_weather_dependent && (
-              <span className="rounded-full bg-blue-400/30 px-3 py-0.5 text-xs font-semibold text-white">🌤 Weather dependent</span>
-            )}
-          </div>
-          <p className="text-white/80 text-sm max-w-xl">{pkg.short_description}</p>
-
-          {/* Quick info strip */}
-          <div className="flex flex-wrap gap-4 mt-5 text-sm text-white/80">
+          <h1 className="text-3xl font-bold mb-3">{pkg.title}</h1>
+          {pkg.short_description && (
+            <p className="text-white/80 text-sm mb-4">{pkg.short_description}</p>
+          )}
+          <div className="flex flex-wrap gap-4 text-sm text-white/70">
             {pkg.pickup_time_label && (
               <span>🕐 Pickup: <strong className="text-white">{pkg.pickup_time_label}</strong></span>
             )}
@@ -109,7 +115,7 @@ export default async function TourDetailPage({
               {pkg.accepts_private && (
                 <span className="rounded-full bg-teal-50 border border-teal-200 px-3 py-0.5 text-xs font-semibold text-teal-700">
                   🔒 Private booking available
-                  {pkg.private_is_negotiable ? " (negotiable)" : pkg.private_price_cents ? ` — ₱${(pkg.private_price_cents / 100).toLocaleString()}` : ""}
+                  {pkg.private_is_negotiable ? " (negotiable)" : pkg.private_price_cents ? ` – ₱${(pkg.private_price_cents / 100).toLocaleString()}` : ""}
                 </span>
               )}
             </div>
@@ -130,13 +136,13 @@ export default async function TourDetailPage({
           </div>
         )}
 
-        {/* Health / age requirements */}
-        {(pkg.requires_health_declaration || pkg.min_age || pkg.max_age) && (
+        {/* Requirements */}
+        {(pkg.requires_health_declaration || pkg.min_age_override || pkg.max_age_override || pkg.is_weather_dependent) && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 mb-6">
             <h2 className="font-bold text-amber-900 mb-2">⚠️ Requirements</h2>
             <ul className="text-sm text-amber-800 space-y-1">
-              {pkg.min_age && <li>• Minimum age: {pkg.min_age} years old</li>}
-              {pkg.max_age && <li>• Maximum age: {pkg.max_age} years old</li>}
+              {pkg.min_age_override && <li>• Minimum age: {pkg.min_age_override} years old</li>}
+              {pkg.max_age_override && <li>• Maximum age: {pkg.max_age_override} years old</li>}
               {pkg.requires_health_declaration && (
                 <li>• Health declaration required — guests with heart conditions or serious medical issues are advised not to join</li>
               )}
@@ -174,7 +180,6 @@ export default async function TourDetailPage({
               {availableSchedules.map(s => {
                 const joinersLeft = s.joiner_slots_total - s.joiner_slots_booked;
                 const privateLeft = s.private_slots_total - s.private_slots_booked;
-
                 return (
                   <div key={s.id}
                     className="rounded-2xl border-2 border-emerald-100 bg-white p-5 flex flex-wrap items-center gap-4">

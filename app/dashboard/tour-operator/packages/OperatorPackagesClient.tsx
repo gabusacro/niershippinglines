@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 type AdminPackage = {
   id: string;
@@ -287,7 +288,11 @@ export default function OperatorPackagesClient({
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    <button onClick={() => openEdit(pkg)}
+                    <a href={`/dashboard/tour-operator/packages/${pkg.id}/schedules`}
+                      className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition-colors">
+                      📅 Schedules
+                    </a>
+                  <button onClick={() => openEdit(pkg)}
                       className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
                       Edit
                     </button>

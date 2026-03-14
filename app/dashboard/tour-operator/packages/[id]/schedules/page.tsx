@@ -1,29 +1,34 @@
 import { redirect, notFound } from "next/navigation";
-import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
-import SchedulesPageClient from "./SchedulesPageClient";
+import Link from "next/link";
+import SchedulesPageClient from "@/app/admin/tours/packages/[id]/schedules/SchedulesPageClient";
+import BulkScheduleClient from "@/app/admin/tours/packages/[id]/schedules/BulkScheduleClient";
 
-export const metadata = { title: "Tour Schedules — Admin" };
+export const dynamic = "force-dynamic";
+export const metadata = { title: "My Package Schedules" };
 
-export default async function TourSchedulesPage({
+export default async function OperatorPackageSchedulesPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const user = await getAuthUser();
-  if (!user || user.role !== "admin") redirect("/dashboard");
+  if (!user || user.role !== "tour_operator") redirect("/dashboard");
 
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: pkg, error: pkgError } = await supabase
+  // Verify ownership
+  const { data: pkg } = await supabase
     .from("tour_packages")
-    .select("id, title, accepts_joiners, accepts_private, accepts_exclusive, exclusive_unit_label, pickup_time_label, owner_type, owner_id")
+    .select("id, title, accepts_joiners, accepts_private, accepts_exclusive, exclusive_unit_label, pickup_time_label, owner_type, owner_id, approval_status")
     .eq("id", id)
+    .eq("owner_type", "operator")
+    .eq("owner_id", user.id)
     .single();
 
-  if (!pkg || pkgError) notFound();
+  if (!pkg) notFound();
 
   const { data: schedules } = await supabase
     .from("tour_schedules")
@@ -37,16 +42,24 @@ export default async function TourSchedulesPage({
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-emerald-700 mb-4 flex-wrap">
-        <Link href="/admin" className="hover:underline">Admin</Link>
+        <Link href="/dashboard/tour-operator" className="hover:underline">Dashboard</Link>
         <span>/</span>
-        <Link href="/admin/tours" className="hover:underline">Tours</Link>
+        <Link href="/dashboard/tour-operator/packages" className="hover:underline">My Packages</Link>
         <span>/</span>
-        <Link href="/admin/tours/packages" className="hover:underline">Packages</Link>
-        <span>/</span>
-        <Link href={`/admin/tours/packages/${id}`} className="hover:underline truncate max-w-[160px]">{pkg.title}</Link>
+        <span className="font-semibold truncate max-w-[200px]">{pkg.title}</span>
         <span>/</span>
         <span className="font-semibold">Schedules</span>
       </div>
+
+      {/* Approval warning */}
+      {pkg.approval_status !== "approved" && (
+        <div className="mb-5 rounded-2xl border-2 border-amber-200 bg-amber-50 px-5 py-4">
+          <p className="font-bold text-amber-800">⏳ Package pending admin approval</p>
+          <p className="text-sm text-amber-700 mt-0.5">
+            You can add schedules now, but guests won&apos;t see this package until admin approves it.
+          </p>
+        </div>
+      )}
 
       <SchedulesPageClient
         pkg={{
