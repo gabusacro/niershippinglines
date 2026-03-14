@@ -8,6 +8,21 @@ import { useToast } from "@/components/ui/ActionToast";
 
 type Mode = "login" | "signup" | "forgot";
 
+// ── Password strength ─────────────────────────────────────────────────────────
+function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
+  if (!pw) return { score: 0, label: "", color: "" };
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  if (score <= 1) return { score, label: "Weak", color: "bg-red-400" };
+  if (score <= 2) return { score, label: "Fair", color: "bg-amber-400" };
+  if (score <= 3) return { score, label: "Good", color: "bg-blue-400" };
+  return { score, label: "Strong", color: "bg-emerald-500" };
+}
+
 export function AuthForm() {
   const router = useRouter();
   const toast = useToast();
@@ -22,11 +37,14 @@ export function AuthForm() {
   const [fullName, setFullName] = useState("");
   const [mobile, setMobile] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const strength = getPasswordStrength(password);
 
   const inputClass = "mt-1 block w-full rounded-lg border-2 border-teal-200 bg-white px-3 py-2 text-[#134e4a] shadow-sm focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30";
   const labelClass = "block text-sm font-medium text-[#134e4a]";
@@ -34,13 +52,16 @@ export function AuthForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setIsDuplicate(false);
     setLoading(true);
     try {
       const supabase = createClient();
 
       if (mode === "forgot") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(`${ROUTES.account}?reset=1`)}` : undefined,
+          redirectTo: typeof window !== "undefined"
+            ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(`${ROUTES.account}?reset=1`)}`
+            : undefined,
         });
         if (resetError) {
           const msg = /rate limit|too many requests/i.test(resetError.message)
@@ -68,6 +89,14 @@ export function AuthForm() {
           setError(signUpError.message);
           return;
         }
+
+        // ── Duplicate email detection ────────────────────────────────────
+        if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+          setIsDuplicate(true);
+          setError("An account with this email already exists.");
+          return;
+        }
+
         if (data.user) {
           await supabase.from("profiles").upsert({
             id: data.user.id,
@@ -101,9 +130,15 @@ export function AuthForm() {
 
   if (success) {
     return (
-      <p className="mt-6 rounded-md bg-teal-100 px-3 py-2 text-sm text-teal-800">
-        Account created. Check your email to confirm, then sign in below.
-      </p>
+      <div className="mt-6 rounded-xl bg-teal-50 border-2 border-teal-200 px-5 py-6 text-center space-y-2">
+        <div className="text-4xl">📧</div>
+        <p className="font-bold text-[#134e4a]">Check your email</p>
+        <p className="text-sm text-[#0f766e]">
+          We sent a confirmation link to <strong>{email}</strong>.
+          Click it to activate your account, then sign in.
+        </p>
+        <p className="text-xs text-[#0f766e]/60">Don&apos;t see it? Check your spam folder.</p>
+      </div>
     );
   }
 
@@ -115,11 +150,8 @@ export function AuthForm() {
           <p className="rounded-md bg-teal-100 px-3 py-2 text-sm text-teal-800">
             Check your email for a link to reset your password. If you don&apos;t see it, check spam.
           </p>
-          <button
-            type="button"
-            onClick={() => { setMode("login"); setResetSent(false); }}
-            className="w-full min-h-[48px] rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors touch-target"
-          >
+          <button type="button" onClick={() => { setMode("login"); setResetSent(false); }}
+            className="w-full min-h-[48px] rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors touch-target">
             Back to Sign In
           </button>
         </div>
@@ -134,7 +166,8 @@ export function AuthForm() {
           <label htmlFor="forgot-email" className={labelClass}>Email</label>
           <input id="forgot-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" className={inputClass} />
         </div>
-        <button type="submit" disabled={loading} className="w-full min-h-[48px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors touch-target">
+        <button type="submit" disabled={loading}
+          className="w-full min-h-[48px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors touch-target">
           {loading ? "Sending..." : "Send reset link"}
         </button>
         <p className="text-center text-sm text-[#0f766e]">
@@ -150,7 +183,24 @@ export function AuthForm() {
         {mode === "signup" ? "Create Account" : "Sign In"}
       </h1>
 
-      {error && <p className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{error}</p>}
+      {/* Error message */}
+      {error && (
+        <div className="rounded-xl bg-red-50 border-2 border-red-200 px-4 py-3 text-sm text-red-800">
+          <p className="font-semibold">{error}</p>
+          {isDuplicate && (
+            <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+              <button type="button" onClick={() => { setMode("login"); setError(null); setIsDuplicate(false); }}
+                className="font-bold underline text-red-700 hover:text-red-900">
+                Log in instead →
+              </button>
+              <button type="button" onClick={() => { setMode("forgot"); setError(null); setIsDuplicate(false); }}
+                className="font-bold underline text-red-700 hover:text-red-900">
+                Reset your password →
+              </button>
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Full Name - signup only */}
       {mode === "signup" && (
@@ -163,19 +213,17 @@ export function AuthForm() {
       {/* Email */}
       <div>
         <label htmlFor="email" className={labelClass}>Email <span className="text-red-600">*</span></label>
-        <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" className={inputClass} />
+        <input id="email" type="email" value={email}
+          onChange={(e) => { setEmail(e.target.value); setIsDuplicate(false); setError(null); }}
+          required autoComplete="email" className={inputClass} />
       </div>
 
-      {/* Mobile Number - signup only */}
+      {/* Mobile - signup only */}
       {mode === "signup" && (
         <div>
           <label htmlFor="mobile" className={labelClass}>Mobile Number <span className="text-red-600">*</span></label>
-          <input
-            id="mobile" type="tel" value={mobile}
-            onChange={(e) => setMobile(e.target.value)}
-            required placeholder="+63 912 345 6789"
-            className={inputClass}
-          />
+          <input id="mobile" type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)}
+            required placeholder="+63 912 345 6789" className={inputClass} />
         </div>
       )}
 
@@ -183,13 +231,12 @@ export function AuthForm() {
       <div>
         <label htmlFor="password" className={labelClass}>Password <span className="text-red-600">*</span></label>
         <div className="relative">
-          <input
-            id="password" type={showPassword ? "text" : "password"} value={password}
+          <input id="password" type={showPassword ? "text" : "password"} value={password}
             onChange={(e) => setPassword(e.target.value)}
             required minLength={6} autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            className={inputClass}
-          />
-          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0f766e]">
+            className={inputClass} />
+          <button type="button" onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0f766e]">
             {showPassword ? (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
             ) : (
@@ -197,7 +244,33 @@ export function AuthForm() {
             )}
           </button>
         </div>
-        {mode === "signup" && <p className="mt-1 text-xs text-[#0f766e]/80">At least 6 characters</p>}
+
+        {/* Password strength meter — signup only */}
+        {mode === "signup" && password.length > 0 && (
+          <div className="mt-2 space-y-1">
+            <div className="flex gap-1">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${
+                  strength.score >= i ? strength.color : "bg-gray-200"
+                }`} />
+              ))}
+            </div>
+            <p className={`text-xs font-semibold ${
+              strength.label === "Weak" ? "text-red-500" :
+              strength.label === "Fair" ? "text-amber-500" :
+              strength.label === "Good" ? "text-blue-500" : "text-emerald-600"
+            }`}>
+              {strength.label}
+              {strength.label === "Weak" && " — add uppercase, numbers, or symbols"}
+              {strength.label === "Fair" && " — try making it longer"}
+              {strength.label === "Good" && " — almost there!"}
+              {strength.label === "Strong" && " — great password ✓"}
+            </p>
+          </div>
+        )}
+        {mode === "signup" && !password && (
+          <p className="mt-1 text-xs text-[#0f766e]/80">At least 6 characters</p>
+        )}
       </div>
 
       {/* Confirm Password - signup only */}
@@ -205,13 +278,11 @@ export function AuthForm() {
         <div>
           <label htmlFor="confirmPassword" className={labelClass}>Confirm Password <span className="text-red-600">*</span></label>
           <div className="relative">
-            <input
-              id="confirmPassword" type={showConfirmPassword ? "text" : "password"} value={confirmPassword}
+            <input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              required minLength={6} autoComplete="new-password"
-              className={inputClass}
-            />
-            <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0f766e]">
+              required minLength={6} autoComplete="new-password" className={inputClass} />
+            <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0f766e]">
               {showConfirmPassword ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
               ) : (
@@ -237,7 +308,8 @@ export function AuthForm() {
         </p>
       )}
 
-      <button type="submit" disabled={loading} className="w-full min-h-[48px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors touch-target">
+      <button type="submit" disabled={loading}
+        className="w-full min-h-[48px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors touch-target">
         {loading ? (mode === "signup" ? "Creating account..." : "Signing in...") : (mode === "signup" ? "Create Account" : "Sign In")}
       </button>
 

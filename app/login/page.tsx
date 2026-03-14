@@ -230,21 +230,6 @@ export default function LoginPage() {
         </svg>
       </div>
 
-      {/* ── Site name top left ── */}
-      <div className="absolute top-6 left-8 z-20">
-        <Link href={ROUTES.home} className="flex items-center gap-2">
-          <span className="text-white font-bold text-lg tracking-wide drop-shadow-md">
-            🏝 Travela Siargao
-          </span>
-        </Link>
-      </div>
-
-      {/* ── Floating tagline ── */}
-      <div className="absolute top-6 right-8 z-20 hidden sm:block">
-        <span className="text-white/80 text-sm font-medium drop-shadow">
-          Ferry Booking · Siargao Island
-        </span>
-      </div>
 
       {/* ── Form card — centered over background ── */}
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-12">
