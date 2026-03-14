@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
+import AdminPackagesApprovalClient from "./AdminPackagesApprovalClient";
 
 export const metadata = {
   title: "Tour Packages — Admin",
@@ -45,125 +46,111 @@ export default async function AdminTourPackagesPage({
   const { updated, error: updateError } = await searchParams;
 
   const supabase = await createClient();
+
+  // Admin markup setting
+  const { data: settings } = await supabase
+    .from("tour_settings")
+    .select("admin_markup_per_pax_cents")
+    .eq("id", 1)
+    .single();
+  const markupCents = settings?.admin_markup_per_pax_cents ?? 9900;
+
+  // All packages
   const { data: packages, error } = await supabase
     .from("tour_packages")
     .select("*")
+    .order("owner_type", { ascending: true }) // admin packages first
     .order("sort_order", { ascending: true });
+
+  // Pending operator packages — need operator name
+  const pendingRaw = (packages ?? []).filter(
+    p => p.owner_type === "operator" && p.approval_status === "pending"
+  );
+
+  const operatorIds = [...new Set(pendingRaw.map(p => p.owner_id).filter(Boolean))];
+  const { data: operatorProfiles } = operatorIds.length > 0
+    ? await supabase.from("profiles").select("id, full_name").in("id", operatorIds)
+    : { data: [] };
+
+  const profileMap = Object.fromEntries((operatorProfiles ?? []).map(p => [p.id, p.full_name ?? "—"]));
+
+  const pendingPackages = pendingRaw.map(p => ({
+    id: p.id,
+    title: p.title ?? "",
+    short_description: p.short_description ?? null,
+    description: p.description ?? null,
+    joiner_price_cents: p.joiner_price_cents ?? null,
+    private_price_cents: p.private_price_cents ?? null,
+    private_is_negotiable: p.private_is_negotiable ?? false,
+    pickup_time_label: p.pickup_time_label ?? null,
+    end_time_label: p.end_time_label ?? null,
+    duration_label: p.duration_label ?? null,
+    meeting_point: p.meeting_point ?? null,
+    cancellation_policy: p.cancellation_policy ?? null,
+    accepts_joiners: p.accepts_joiners ?? true,
+    accepts_private: p.accepts_private ?? false,
+    approval_status: p.approval_status ?? "pending",
+    operator_name: p.owner_id ? (profileMap[p.owner_id] ?? "—") : "—",
+    created_at: p.created_at,
+  }));
+
+  // Separate admin vs operator packages for display
+  const adminPackages = (packages ?? []).filter(p => !p.owner_type || p.owner_type === "admin");
+  const operatorPackages = (packages ?? []).filter(p => p.owner_type === "operator" && p.approval_status === "approved");
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
 
-      {/* ── SUCCESS TOAST ── */}
+      {/* Header */}
+      <div className="rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 px-6 py-8 text-white shadow-lg sm:px-8 mb-6">
+        <p className="text-sm font-medium uppercase tracking-wider text-white/80">Admin — Tours</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Tour Packages</h1>
+        <p className="mt-2 text-sm text-white/90">
+          Manage your packages and review operator submissions.
+        </p>
+      </div>
+
+      {/* Toasts */}
       {updated && (
         <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
           ✅ &quot;{updated}&quot; updated successfully.
         </div>
       )}
-
-      {/* ── ERROR TOAST ── */}
       {updateError && (
         <div className="mb-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
-          ❌ Error: {updateError}
+          ⚠️ {updateError}
         </div>
       )}
 
-      {/* ── HEADER ── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-emerald-700 mb-1">
-            <Link href="/admin" className="hover:underline">Admin</Link>
-            <span>/</span>
-            <Link href="/admin/tours" className="hover:underline">Tours</Link>
-            <span>/</span>
-            <span className="font-semibold">Packages</span>
-          </div>
-          <h1 className="text-2xl font-bold text-[#134e4a]">📦 Tour Packages</h1>
-          <p className="text-sm text-[#0f766e]/80 mt-1">
-            {packages?.length ?? 0} packages · All prices editable from each package
-          </p>
-        </div>
+      {/* Pending approval queue — client component */}
+      {pendingPackages.length > 0 && (
+        <AdminPackagesApprovalClient
+          pendingPackages={pendingPackages}
+          markupCents={markupCents}
+        />
+      )}
+
+      {/* Actions row */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-bold text-[#134e4a]">
+          Admin Packages
+          <span className="ml-2 text-sm font-normal text-gray-400">({adminPackages.length})</span>
+        </h2>
         <Link href="/admin/tours/packages/new"
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
+          className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-bold transition-colors">
           + New Package
         </Link>
       </div>
 
-      {/* ── DB ERROR ── */}
+      {/* Admin packages list */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 mb-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 mb-4">
           Failed to load packages: {error.message}
         </div>
       )}
 
-      {/* ── PACKAGE LIST ── */}
-      <div className="space-y-3">
-        {(packages ?? []).map((pkg) => (
-          <div key={pkg.id}
-            className="rounded-2xl border-2 border-emerald-100 bg-white p-5 flex flex-wrap items-center gap-4 hover:border-emerald-300 hover:shadow-sm transition-all">
-
-            {/* Sort order badge */}
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-sm font-bold text-emerald-700 flex-shrink-0">
-              {pkg.sort_order}
-            </div>
-
-            {/* Main info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="font-bold text-[#134e4a] text-base">{pkg.title}</span>
-                {pkg.is_featured && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">⭐ Featured</span>
-                )}
-                {!pkg.is_active && (
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">Inactive</span>
-                )}
-                {pkg.is_weather_dependent && (
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-600">🌤 Weather dependent</span>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 truncate">{pkg.short_description}</p>
-              <div className="flex flex-wrap gap-3 mt-2 text-xs text-[#0f766e]">
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium border border-emerald-100">
-                  {formatBookingType(pkg as Record<string, unknown>)}
-                </span>
-                {pkg.pickup_time_label && (
-                  <span className="text-gray-400">🕐 {pkg.pickup_time_label} → {pkg.end_time_label}</span>
-                )}
-                {pkg.duration_label && (
-                  <span className="text-gray-400">⏱ {pkg.duration_label}</span>
-                )}
-              </div>
-            </div>
-
-            {/* Price */}
-            <div className="text-right flex-shrink-0">
-              <div className="text-lg font-bold text-emerald-700">
-                {formatPrice(pkg as Record<string, unknown>)}
-              </div>
-              {pkg.accepts_private && (
-                <div className="text-xs text-gray-400 mt-0.5">
-                  Private: {pkg.private_is_negotiable ? "Negotiable" : pkg.private_price_cents ? `₱${(pkg.private_price_cents / 100).toLocaleString()}` : "Admin-set"}
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 flex-shrink-0">
-              <Link href={`/admin/tours/packages/${pkg.id}`}
-                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
-                Edit
-              </Link>
-              <Link href={`/admin/tours/packages/${pkg.id}/schedules`}
-                className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition-colors">
-                Schedules
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── EMPTY STATE ── */}
-      {(packages ?? []).length === 0 && !error && (
-        <div className="rounded-2xl border-2 border-dashed border-emerald-200 p-12 text-center">
+      {adminPackages.length === 0 && !error ? (
+        <div className="rounded-2xl border-2 border-dashed border-emerald-200 p-12 text-center mb-6">
           <div className="text-4xl mb-3">📦</div>
           <p className="font-semibold text-[#134e4a]">No packages yet</p>
           <p className="text-sm text-gray-500 mt-1">Create your first tour package to get started.</p>
@@ -172,13 +159,96 @@ export default async function AdminTourPackagesPage({
             + New Package
           </Link>
         </div>
+      ) : (
+        <div className="rounded-2xl border-2 border-gray-100 bg-white overflow-hidden mb-6">
+          <div className="divide-y divide-gray-50">
+            {adminPackages.map((pkg) => (
+              <div key={pkg.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-sm text-[#134e4a]">{pkg.title}</p>
+                    {!pkg.is_active && (
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>
+                    )}
+                    {pkg.is_featured && (
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">⭐ Featured</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{formatBookingType(pkg as Record<string, unknown>)}</p>
+                  {pkg.duration_label && (
+                    <p className="text-xs text-gray-400">⏱ {pkg.duration_label}</p>
+                  )}
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-sm font-bold text-emerald-700">
+                    {formatPrice(pkg as Record<string, unknown>)}
+                  </div>
+                  {pkg.accepts_private && (
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Private: {pkg.private_is_negotiable ? "Negotiable" : pkg.private_price_cents
+                        ? `₱${(pkg.private_price_cents / 100).toLocaleString()}` : "Admin-set"}
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Link href={`/admin/tours/packages/${pkg.id}`}
+                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
+                    Edit
+                  </Link>
+                  <Link href={`/admin/tours/packages/${pkg.id}/schedules`}
+                    className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition-colors">
+                    Schedules
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
-      {/* ── BACK ── */}
+      {/* Approved operator packages */}
+      {operatorPackages.length > 0 && (
+        <>
+          <h2 className="font-bold text-[#134e4a] mb-4">
+            Operator Packages (Approved)
+            <span className="ml-2 text-sm font-normal text-gray-400">({operatorPackages.length})</span>
+          </h2>
+          <div className="rounded-2xl border-2 border-purple-100 bg-white overflow-hidden mb-6">
+            <div className="divide-y divide-gray-50">
+              {operatorPackages.map((pkg) => {
+                const opName = pkg.owner_id ? (profileMap[pkg.owner_id] ?? "—") : "—";
+                return (
+                  <div key={pkg.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-sm text-[#134e4a]">{pkg.title}</p>
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">
+                          {opName}
+                        </span>
+                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">✅ Approved</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatBookingType(pkg as Record<string, unknown>)}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm font-bold text-emerald-700">
+                        {formatPrice(pkg as Record<string, unknown>)}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        +₱{(markupCents / 100)} markup → ₱{((( pkg.joiner_price_cents ?? 0) + markupCents) / 100).toLocaleString()} guest
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Back */}
       <div className="mt-6">
-        <Link href="/admin/tours"
-          className="text-sm font-medium text-emerald-700 hover:underline">
-          ← Back to Tours
+        <Link href="/admin/tours" className="text-sm font-medium text-emerald-700 hover:underline">
+          ← Back to Tour Management
         </Link>
       </div>
 
