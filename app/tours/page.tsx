@@ -126,7 +126,8 @@ export default async function ToursPage() {
           </div>
         )}
 
-        <ToursContactForm />
+
+
 
         {/* Contact footer */}
         <div className="mt-12 rounded-2xl bg-gradient-to-br from-[#0c7b93] to-[#0f766e] p-6 text-center text-white">
@@ -138,6 +139,8 @@ export default async function ToursPage() {
           </a>
         </div>
 
+        
+        <ToursContactForm />
 
       </div>
     </div>

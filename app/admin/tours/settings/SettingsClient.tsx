@@ -11,6 +11,7 @@ interface Settings {
   guardian_min_age: number;
   booking_cutoff_hours: number;
   health_declaration_text: string;
+  admin_markup_per_pax_cents: number;
   updated_at: string;
 }
 
@@ -25,6 +26,9 @@ export default function SettingsClient({ settings }: Props) {
   const [guardianMinAge, setGuardianMinAge] = useState(settings.guardian_min_age);
   const [cutoffHours, setCutoffHours] = useState(settings.booking_cutoff_hours);
   const [healthText, setHealthText] = useState(settings.health_declaration_text);
+  const [markupPesos, setMarkupPesos] = useState(
+    Math.round((settings.admin_markup_per_pax_cents ?? 9900) / 100)
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -44,6 +48,7 @@ export default function SettingsClient({ settings }: Props) {
           guardian_min_age: guardianMinAge,
           booking_cutoff_hours: cutoffHours,
           health_declaration_text: healthText,
+          admin_markup_per_pax_cents: Math.round(markupPesos * 100),
         }),
       });
       const data = await res.json();
@@ -65,7 +70,7 @@ export default function SettingsClient({ settings }: Props) {
         <p className="text-sm font-medium uppercase tracking-wider text-white/80">Admin — Tours</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Tour Settings</h1>
         <p className="mt-2 text-sm text-white/90">
-          Configure booking rules, age limits, and health declaration text.
+          Configure booking rules, age limits, markup pricing, and health declaration text.
         </p>
       </div>
 
@@ -85,7 +90,60 @@ export default function SettingsClient({ settings }: Props) {
 
       <div className="mt-6 space-y-6">
 
-        {/* Booking cutoff */}
+        {/* ── PRICING MARKUP ── */}
+        <div className="rounded-2xl border-2 border-emerald-100 bg-white p-6">
+          <h2 className="font-bold text-[#134e4a] mb-1">💰 Admin Markup per Pax</h2>
+          <p className="text-xs text-gray-400 mb-4">
+            This amount is added on top of the tour operator&apos;s price per person.
+            Tour operators set their own base price — your markup is added automatically when shown to guests.
+          </p>
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Markup Amount (₱ per pax)
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-gray-500">₱</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={5000}
+                  value={markupPesos}
+                  onChange={(e) => setMarkupPesos(parseInt(e.target.value) || 0)}
+                  className="w-36 rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-400 font-bold"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Default: ₱99 per person
+              </p>
+            </div>
+
+            {/* Example calculation */}
+            <div className="rounded-xl border-2 border-emerald-100 bg-emerald-50 px-5 py-4 min-w-[200px]">
+              <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">Example</p>
+              <div className="space-y-1 text-xs text-gray-600">
+                <div className="flex justify-between">
+                  <span>Operator price</span>
+                  <span className="font-semibold">₱1,000</span>
+                </div>
+                <div className="flex justify-between text-emerald-700">
+                  <span>Your markup</span>
+                  <span className="font-semibold">+₱{markupPesos.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between border-t border-emerald-200 pt-1 mt-1 font-bold text-[#134e4a]">
+                  <span>Guest pays</span>
+                  <span>₱{(1000 + markupPesos).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-emerald-600 font-semibold mt-1">
+                  <span>You earn (10 pax)</span>
+                  <span>₱{(markupPesos * 10).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── BOOKING RULES ── */}
         <div className="rounded-2xl border-2 border-gray-100 bg-white p-6">
           <h2 className="font-bold text-[#134e4a] mb-4">Booking Rules</h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -108,7 +166,7 @@ export default function SettingsClient({ settings }: Props) {
           </div>
         </div>
 
-        {/* Age limits */}
+        {/* ── AGE REQUIREMENTS ── */}
         <div className="rounded-2xl border-2 border-gray-100 bg-white p-6">
           <h2 className="font-bold text-[#134e4a] mb-4">Age Requirements</h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -135,7 +193,6 @@ export default function SettingsClient({ settings }: Props) {
               />
             </div>
 
-            {/* Guardian toggle */}
             <div className="sm:col-span-2">
               <div className="flex items-center gap-3">
                 <button
@@ -168,7 +225,7 @@ export default function SettingsClient({ settings }: Props) {
           </div>
         </div>
 
-        {/* Health declaration */}
+        {/* ── HEALTH DECLARATION ── */}
         <div className="rounded-2xl border-2 border-gray-100 bg-white p-6">
           <h2 className="font-bold text-[#134e4a] mb-1">Health Declaration Text</h2>
           <p className="text-xs text-gray-400 mb-3">

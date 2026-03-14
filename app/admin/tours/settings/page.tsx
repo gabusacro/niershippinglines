@@ -20,5 +20,11 @@ export default async function TourSettingsPage() {
 
   if (!settings) redirect("/admin/tours");
 
-  return <SettingsClient settings={settings} />;
+  // Ensure markup has a default if column was just added
+  const settingsWithDefaults = {
+    ...settings,
+    admin_markup_per_pax_cents: settings.admin_markup_per_pax_cents ?? 9900,
+  };
+
+  return <SettingsClient settings={settingsWithDefaults} />;
 }
