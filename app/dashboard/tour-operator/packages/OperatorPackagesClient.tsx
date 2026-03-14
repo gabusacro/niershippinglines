@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import PackagePhotoUpload from "@/components/PackagePhotoUpload";
 
 type AdminPackage = {
   id: string;
@@ -30,6 +31,8 @@ type MyPackage = {
   accepts_joiners: boolean;
   accepts_private: boolean;
   created_at: string;
+  cover_image_url: string | null;
+  gallery_urls: string[];
 };
 
 interface Props {
@@ -55,6 +58,8 @@ const emptyForm = {
   accepts_joiners: true,
   accepts_private: false,
   is_active: true,
+  cover_image_url: null as string | null,
+  gallery_urls: [] as string[],
 };
 
 type FormState = typeof emptyForm;
@@ -108,6 +113,8 @@ export default function OperatorPackagesClient({
       accepts_joiners: pkg.accepts_joiners,
       accepts_private: pkg.accepts_private,
       is_active: pkg.is_active,
+      cover_image_url: pkg.cover_image_url ?? null,
+      gallery_urls: pkg.gallery_urls ?? [],
     });
     setEditingId(pkg.id);
     setShowForm(true);
@@ -480,6 +487,22 @@ export default function OperatorPackagesClient({
                   <p className="text-xs font-semibold text-amber-700">
                     ⚠️ Editing will reset approval status to Pending. Admin will need to re-approve.
                   </p>
+                </div>
+              )}
+
+              {/* Photos — only when editing an existing package */}
+              {editingId && (
+                <div className="border-t border-gray-100 pt-5">
+                  <PackagePhotoUpload
+                    packageId={editingId}
+                    currentCoverUrl={packages.find(p => p.id === editingId)?.cover_image_url ?? null}
+                    currentGalleryUrls={packages.find(p => p.id === editingId)?.gallery_urls ?? []}
+                    onUpdate={(coverUrl, galleryUrls) => {
+                      setPackages(prev => prev.map(p =>
+                        p.id === editingId ? { ...p, cover_image_url: coverUrl, gallery_urls: galleryUrls } : p
+                      ));
+                    }}
+                  />
                 </div>
               )}
             </div>

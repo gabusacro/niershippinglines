@@ -73,6 +73,8 @@ export default async function OperatorPackagesPage() {
         accepts_joiners: p.accepts_joiners ?? true,
         accepts_private: p.accepts_private ?? false,
         created_at: p.created_at,
+        cover_image_url: p.cover_image_url ?? null,
+        gallery_urls: p.gallery_urls ?? [],
       }))}
       markupCents={markupCents}
     />
