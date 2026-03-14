@@ -1,137 +1,223 @@
 import { createClient } from "@/lib/supabase/server";
 import { getTodayInManila } from "./ph-time";
 
-const PAYMENT_STATUSES = ["confirmed", "checked_in", "boarded", "completed"] as const;
+const PAID_STATUSES = ["confirmed", "checked_in", "boarded", "completed"] as const;
 
-export interface TodayDashboardStats {
-  totalPassengerBoard: number;
-  totalPassengerConfirmed: number;
-  vesselsActive: number;
-  totalTripsToday: number;
-  revenueSiargaoSurigao: number;
-  revenueSurigaoDinagat: number;
-  totalRevenue: number;
-  pendingPayments: number;
-  refundRequests: number;
-  onlineBookingsToday: number;
-  walkinBookingsToday: number;
+export interface VesselDayStats {
+  boat_id: string;
+  boat_name: string;
+  // passengers
+  boarded: number;
+  confirmed: number;
+  total_passengers: number;
+  // revenue breakdown
+  fare_cents: number;
+  platform_fee_cents: number;
+  processing_fee_cents: number;
+  total_revenue_cents: number;
+  // booking counts
+  online_count: number;
+  walkin_count: number;
+  pending_count: number;
 }
 
-export async function getTodayDashboardStats(): Promise<TodayDashboardStats> {
+export interface PeriodDashboardStats {
+  period: string;
+  vessels: VesselDayStats[];
+  // totals across all vessels
+  total_boarded: number;
+  total_confirmed: number;
+  total_passengers: number;
+  total_fare_cents: number;
+  total_platform_fee_cents: number;
+  total_processing_fee_cents: number;
+  total_revenue_cents: number;
+  total_online: number;
+  total_walkin: number;
+  total_pending: number;
+  total_refund_requests: number;
+  vessels_active: number;
+  trips_today: number;
+}
+
+export async function getDashboardStats(
+  period: "today" | "week" | "month" | "year" = "today",
+  customStart?: string,
+  customEnd?: string
+): Promise<PeriodDashboardStats> {
   const supabase = await createClient();
   const today = getTodayInManila();
 
-  const [passengerRes, vesselsRes, routesRes, tripsRes, pendingRes, refundRes] = await Promise.all([
-    supabase.from("trips").select("boarded_count").eq("departure_date", today),
-    supabase.from("boats").select("id").eq("status", "running"),
-    supabase.from("routes").select("id, origin, destination, display_name"),
-    supabase.from("trips").select("id").eq("departure_date", today),
-    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "pending"),
-    supabase.from("refunds").select("id", { count: "exact", head: true }).in("status", ["requested", "under_review"]),
-  ]);
+  // ── Date range ────────────────────────────────────────────────────────────
+  let startDate: string;
+  let endDate: string = today;
 
-  const totalPassengerBoard = (passengerRes.data ?? []).reduce((s, t) => s + (t.boarded_count ?? 0), 0);
-  const vesselsActive = (vesselsRes.data ?? []).length;
-  const totalTripsToday = (tripsRes.data ?? []).length;
-  const pendingPayments = pendingRes.count ?? 0;
-  const refundRequests = refundRes.count ?? 0;
+  if (period === "today") {
+    startDate = today;
+    endDate = today;
+  } else if (period === "week") {
+    const d = new Date(today + "T00:00:00");
+    d.setDate(d.getDate() - 6);
+    startDate = d.toISOString().slice(0, 10);
+  } else if (period === "month") {
+    startDate = today.slice(0, 7) + "-01";
+    const [y, m] = today.split("-").map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    endDate = `${y}-${String(m).padStart(2, "0")}-${lastDay}`;
+  } else if (period === "year") {
+    startDate = today.slice(0, 4) + "-01-01";
+    endDate = today.slice(0, 4) + "-12-31";
+  } else {
+    startDate = customStart ?? today;
+    endDate = customEnd ?? today;
+  }
 
-  const routes = routesRes.data ?? [];
-  const siargaoRouteIds = routes
-    .filter((r) => (r.origin === "Siargao Island" || r.destination === "Siargao Island") && !String(r.display_name).includes("Dinagat"))
-    .map((r) => r.id);
-  const dinagatRouteIds = routes
-    .filter((r) => r.origin === "Dinagat" || r.destination === "Dinagat")
-    .map((r) => r.id);
+  // ── Fetch trips in range ──────────────────────────────────────────────────
+  const { data: trips } = await supabase
+    .from("trips")
+    .select("id, boat_id, departure_date, boats:boat_id(id, name)")
+    .gte("departure_date", startDate)
+    .lte("departure_date", endDate);
 
-  // Get all today's trip IDs for booking queries
-  const todayTripIds = (tripsRes.data ?? []).map((t) => t.id);
+  const tripIds = (trips ?? []).map((t) => t.id);
+  const todayTripIds = (trips ?? [])
+    .filter((t) => t.departure_date === today)
+    .map((t) => t.id);
 
-  let revenueSiargaoSurigao = 0;
-  let revenueSurigaoDinagat = 0;
-  let totalPassengerConfirmed = 0;
-  let onlineBookingsToday = 0;
-  let walkinBookingsToday = 0;
+  // ── Fetch all boats ───────────────────────────────────────────────────────
+  const { data: boats } = await supabase
+    .from("boats")
+    .select("id, name")
+    .eq("status", "running");
 
-  if (todayTripIds.length > 0) {
-    const { data: allBookings } = await supabase
+  const boatMap = new Map<string, string>();
+  for (const b of boats ?? []) boatMap.set(b.id, b.name);
+
+  // ── Fetch bookings ────────────────────────────────────────────────────────
+  let bookings: {
+    trip_id: string;
+    status: string;
+    passenger_count: number;
+    total_amount_cents: number;
+    admin_fee_cents: number;
+    gcash_fee_cents: number;
+    is_walk_in: boolean;
+    booking_source: string | null;
+  }[] = [];
+
+  if (tripIds.length > 0) {
+    const { data: bk } = await supabase
       .from("bookings")
-      .select("trip_id, total_amount_cents, status, is_walk_in, booking_source, passenger_count")
-      .in("trip_id", todayTripIds)
-      .in("status", PAYMENT_STATUSES);
+      .select("trip_id, status, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents, is_walk_in, booking_source")
+      .in("trip_id", tripIds)
+      .not("status", "in", '("cancelled","refunded")');
+    bookings = (bk ?? []) as typeof bookings;
+  }
 
-    const bookings = allBookings ?? [];
+  // ── Pending payments (all, not trip-scoped) ───────────────────────────────
+  const { count: pendingCount } = await supabase
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending_payment");
 
-    // Confirmed passengers (not yet boarded)
-    totalPassengerConfirmed = bookings
-      .filter((b) => b.status === "confirmed")
-      .reduce((s, b) => s + (b.passenger_count ?? 1), 0);
+  // ── Refund requests ───────────────────────────────────────────────────────
+  const { count: refundCount } = await supabase
+    .from("refunds")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["requested", "under_review"]);
 
-    // Online vs walk-in
-    onlineBookingsToday = bookings.filter(
-      (b) => !b.is_walk_in && b.booking_source !== "walk_in"
-    ).length;
-    walkinBookingsToday = bookings.filter(
-      (b) => b.is_walk_in || b.booking_source === "walk_in"
-    ).length;
+  // ── Build trip → boat map ─────────────────────────────────────────────────
+  const tripBoatMap = new Map<string, string>();
+  for (const t of trips ?? []) {
+    const boat = Array.isArray(t.boats) ? t.boats[0] : t.boats;
+    const boatId = (boat as { id: string } | null)?.id ?? t.boat_id;
+    tripBoatMap.set(t.id, boatId);
+  }
 
-    // Revenue by route
-    const siargaoTripIds = new Set(
-      (tripsRes.data ?? [])
-        .filter((t) => siargaoRouteIds.includes((t as { id: string; route_id?: string }).route_id ?? ""))
-        .map((t) => t.id)
-    );
-    const dinagatTripIds = new Set(
-      (tripsRes.data ?? [])
-        .filter((t) => dinagatRouteIds.includes((t as { id: string; route_id?: string }).route_id ?? ""))
-        .map((t) => t.id)
-    );
+  // ── Per-vessel aggregation ────────────────────────────────────────────────
+  const vesselMap = new Map<string, VesselDayStats>();
 
-    for (const b of bookings) {
-      if (siargaoTripIds.has(b.trip_id)) revenueSiargaoSurigao += b.total_amount_cents ?? 0;
-      if (dinagatTripIds.has(b.trip_id)) revenueSurigaoDinagat += b.total_amount_cents ?? 0;
+  for (const b of bookings) {
+    const boatId = tripBoatMap.get(b.trip_id);
+    if (!boatId) continue;
+
+    if (!vesselMap.has(boatId)) {
+      vesselMap.set(boatId, {
+        boat_id: boatId,
+        boat_name: boatMap.get(boatId) ?? "Unknown",
+        boarded: 0, confirmed: 0, total_passengers: 0,
+        fare_cents: 0, platform_fee_cents: 0, processing_fee_cents: 0, total_revenue_cents: 0,
+        online_count: 0, walkin_count: 0, pending_count: 0,
+      });
+    }
+
+    const v = vesselMap.get(boatId)!;
+    const pax = b.passenger_count ?? 1;
+    const adminFee = b.admin_fee_cents ?? 0;
+    const gcashFee = b.gcash_fee_cents ?? 0;
+    const fare = Math.max(0, (b.total_amount_cents ?? 0) - adminFee - gcashFee);
+    const isWalkIn = b.is_walk_in || b.booking_source === "walk_in" ||
+      b.booking_source === "admin_walk_in" || b.booking_source === "ticket_booth_walk_in" ||
+      b.booking_source === "deck_crew_walk_in" || b.booking_source === "captain_walk_in";
+
+    if (PAID_STATUSES.includes(b.status as typeof PAID_STATUSES[number])) {
+      v.total_passengers += pax;
+      v.fare_cents += fare;
+      v.platform_fee_cents += adminFee;
+      v.processing_fee_cents += gcashFee;
+      v.total_revenue_cents += b.total_amount_cents ?? 0;
+      if (isWalkIn) v.walkin_count++; else v.online_count++;
+    }
+
+    if (b.status === "boarded") v.boarded += pax;
+    if (b.status === "confirmed") v.confirmed += pax;
+    if (b.status === "pending_payment") v.pending_count++;
+  }
+
+  // ── Boarded count from trips table (today only for accuracy) ─────────────
+  if (period === "today" && todayTripIds.length > 0) {
+    const { data: boardedTrips } = await supabase
+      .from("trips")
+      .select("boat_id, boarded_count")
+      .in("id", todayTripIds);
+
+    // Reset boarded from trips boarded_count
+    for (const [boatId, v] of vesselMap) {
+      v.boarded = 0;
+    }
+    for (const t of boardedTrips ?? []) {
+      const v = vesselMap.get(t.boat_id);
+      if (v) v.boarded += t.boarded_count ?? 0;
     }
   }
 
-  // Fallback for route revenue if trip IDs don't have route_id
-  // (re-fetch with route_id if needed)
-  if (revenueSiargaoSurigao === 0 && siargaoRouteIds.length > 0) {
-    const { data: siargaoTrips } = await supabase
-      .from("trips").select("id").eq("departure_date", today).in("route_id", siargaoRouteIds);
-    const ids = (siargaoTrips ?? []).map((t) => t.id);
-    if (ids.length > 0) {
-      const { data: bk } = await supabase
-        .from("bookings").select("total_amount_cents")
-        .in("trip_id", ids).in("status", PAYMENT_STATUSES);
-      revenueSiargaoSurigao = (bk ?? []).reduce((s, b) => s + (b.total_amount_cents ?? 0), 0);
-    }
-  }
+  const vessels = Array.from(vesselMap.values()).sort((a, b) => b.total_revenue_cents - a.total_revenue_cents);
 
-  if (revenueSurigaoDinagat === 0 && dinagatRouteIds.length > 0) {
-    const { data: dinagatTrips } = await supabase
-      .from("trips").select("id").eq("departure_date", today).in("route_id", dinagatRouteIds);
-    const ids = (dinagatTrips ?? []).map((t) => t.id);
-    if (ids.length > 0) {
-      const { data: bk } = await supabase
-        .from("bookings").select("total_amount_cents")
-        .in("trip_id", ids).in("status", PAYMENT_STATUSES);
-      revenueSurigaoDinagat = (bk ?? []).reduce((s, b) => s + (b.total_amount_cents ?? 0), 0);
-    }
-  }
-
-  const totalRevenue = revenueSiargaoSurigao + revenueSurigaoDinagat;
+  // ── Totals ────────────────────────────────────────────────────────────────
+  const totals = vessels.reduce((acc, v) => ({
+    total_boarded: acc.total_boarded + v.boarded,
+    total_confirmed: acc.total_confirmed + v.confirmed,
+    total_passengers: acc.total_passengers + v.total_passengers,
+    total_fare_cents: acc.total_fare_cents + v.fare_cents,
+    total_platform_fee_cents: acc.total_platform_fee_cents + v.platform_fee_cents,
+    total_processing_fee_cents: acc.total_processing_fee_cents + v.processing_fee_cents,
+    total_revenue_cents: acc.total_revenue_cents + v.total_revenue_cents,
+    total_online: acc.total_online + v.online_count,
+    total_walkin: acc.total_walkin + v.walkin_count,
+    total_pending: acc.total_pending + v.pending_count,
+  }), {
+    total_boarded: 0, total_confirmed: 0, total_passengers: 0,
+    total_fare_cents: 0, total_platform_fee_cents: 0, total_processing_fee_cents: 0,
+    total_revenue_cents: 0, total_online: 0, total_walkin: 0, total_pending: 0,
+  });
 
   return {
-    totalPassengerBoard,
-    totalPassengerConfirmed,
-    vesselsActive,
-    totalTripsToday,
-    revenueSiargaoSurigao,
-    revenueSurigaoDinagat,
-    totalRevenue,
-    pendingPayments,
-    refundRequests,
-    onlineBookingsToday,
-    walkinBookingsToday,
+    period,
+    vessels,
+    ...totals,
+    total_pending: pendingCount ?? 0,
+    total_refund_requests: refundCount ?? 0,
+    vessels_active: (boats ?? []).length,
+    trips_today: todayTripIds.length,
   };
 }
