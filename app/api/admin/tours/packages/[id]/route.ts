@@ -4,7 +4,7 @@ import { getAuthUser } from "@/lib/auth/get-user";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   const user = await getAuthUser();
   if (!user || user.role !== "admin") {
