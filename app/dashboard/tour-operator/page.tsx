@@ -30,14 +30,12 @@ export default async function TourOperatorDashboard() {
     guide: (guideProfiles ?? []).find((p) => p.id === g.tour_guide_id) ?? null,
   }));
 
-  // Pending bookings count
   const { count: pendingCount } = await supabase
     .from("tour_bookings")
     .select("*", { count: "exact", head: true })
     .eq("tour_operator_id", user.id)
     .eq("payment_status", "pending");
 
-  // All confirmed bookings for dashboard (upcoming + status view)
   const { data: allBookings } = await supabase
     .from("tour_bookings")
     .select("*, tour:tour_packages(title), schedule:tour_schedules(available_date, departure_time)")
@@ -46,7 +44,7 @@ export default async function TourOperatorDashboard() {
     .order("created_at", { ascending: false })
     .limit(100);
 
-  // All VERIFIED bookings for revenue dashboard (all sources assigned to this operator)
+  // All verified bookings for revenue
   const { data: revenueBookings } = await supabase
     .from("tour_bookings")
     .select("id, reference, total_amount_cents, booking_source, payment_status, payment_verified_at, operator_payment_status, operator_payment_ref, operator_paid_at, customer_name, total_pax, tour:tour_packages(title), schedule:tour_schedules(available_date)")
@@ -55,31 +53,30 @@ export default async function TourOperatorDashboard() {
     .order("payment_verified_at", { ascending: false })
     .limit(500);
 
-  // All booking IDs for tracking
   const allBookingIds = (allBookings ?? []).map((b) => b.id);
 
-  // Batch → guide mapping
   const { data: allBatchBookings } = allBookingIds.length > 0
     ? await supabase.from("tour_batch_bookings").select("booking_id, batch_id").in("booking_id", allBookingIds)
     : { data: [] };
 
-  const batchIds = (allBatchBookings ?? []).map((bb) => bb.batch_id);
+  const batchIds = [...new Set((allBatchBookings ?? []).map((bb) => bb.batch_id))];
   const { data: allBatches } = batchIds.length > 0
-    ? await supabase.from("tour_batches").select("id, tour_guide_id, guide_payment_status, guide_payment_ref, guide_paid_at, schedule_id").in("id", batchIds)
+    ? await supabase
+        .from("tour_batches")
+        .select("id, tour_guide_id, guide_payment_status, guide_payment_ref, guide_paid_at, service_fee_cents")
+        .in("id", batchIds)
     : { data: [] };
 
-  // Build bookingId → batch map
-  const batchMap: Record<string, any> = Object.fromEntries((allBatches ?? []).map((b) => [b.id, b]));
-  const bookingBatchMap: Record<string, any> = {};
+  type BatchRecord = { id: string; tour_guide_id: string | null; guide_payment_status: string | null; guide_payment_ref: string | null; guide_paid_at: string | null; service_fee_cents: number | null };
+  const batchMap = Object.fromEntries((allBatches ?? []).map((b) => [b.id, b as BatchRecord]));
+  const bookingBatchMap: Record<string, BatchRecord> = {};
   for (const bb of allBatchBookings ?? []) {
     const batch = batchMap[bb.batch_id];
     if (batch) bookingBatchMap[bb.booking_id] = batch;
   }
 
-  // Guide profile map
   const guideProfileMap = Object.fromEntries((guideProfiles ?? []).map((p) => [p.id, p]));
 
-  // Tracking
   const { data: allTracking } = allBookingIds.length > 0
     ? await supabase.from("tour_passenger_tracking").select("booking_id, passenger_id, status").in("booking_id", allBookingIds)
     : { data: [] };
@@ -97,7 +94,6 @@ export default async function TourOperatorDashboard() {
     else                          trackingSummary[t.booking_id].waiting++;
   }
 
-  // Today's revenue (all sources — for hero banner)
   const { data: todayRevData } = await supabase
     .from("tour_bookings")
     .select("total_amount_cents")
@@ -119,7 +115,6 @@ export default async function TourOperatorDashboard() {
 
   const displayName = profile?.full_name ?? user.email ?? "Operator";
 
-  // Serialize bookings for client
   const bookingsWithMeta = (allBookings ?? []).map((b) => {
     const batch = bookingBatchMap[b.id] ?? null;
     const guideId = batch?.tour_guide_id ?? null;
@@ -142,9 +137,29 @@ export default async function TourOperatorDashboard() {
     };
   });
 
-  // Revenue bookings for the audit sections
+  // Revenue bookings — now includes service_fee_cents from batch
+  const revenueBookingIds = (revenueBookings ?? []).map(b => b.id);
+  const { data: revBatchBookings } = revenueBookingIds.length > 0
+    ? await supabase.from("tour_batch_bookings").select("booking_id, batch_id").in("booking_id", revenueBookingIds)
+    : { data: [] };
+
+  const revBatchIds = [...new Set((revBatchBookings ?? []).map(bb => bb.batch_id))];
+  const { data: revBatches } = revBatchIds.length > 0
+    ? await supabase
+        .from("tour_batches")
+        .select("id, tour_guide_id, guide_payment_status, guide_payment_ref, guide_paid_at, service_fee_cents")
+        .in("id", revBatchIds)
+    : { data: [] };
+
+  const revBatchMap = Object.fromEntries((revBatches ?? []).map(b => [b.id, b as BatchRecord]));
+  const revBookingBatchMap: Record<string, BatchRecord> = {};
+  for (const bb of revBatchBookings ?? []) {
+    const batch = revBatchMap[bb.batch_id];
+    if (batch) revBookingBatchMap[bb.booking_id] = batch;
+  }
+
   const revenueBookingsForClient = (revenueBookings ?? []).map((b) => {
-    const batch = bookingBatchMap[b.id] ?? null;
+    const batch = revBookingBatchMap[b.id] ?? null;
     const guideId = batch?.tour_guide_id ?? null;
     return {
       id: b.id,
@@ -159,13 +174,13 @@ export default async function TourOperatorDashboard() {
       total_pax: b.total_pax,
       tour_title: (b.tour as { title?: string } | null)?.title ?? "—",
       schedule_date: (b.schedule as { available_date?: string } | null)?.available_date ?? null,
-      // Guide payment (from batch)
       guide_id: guideId,
       guide_name: guideId ? (guideProfileMap[guideId]?.full_name ?? "—") : null,
       guide_payment_status: batch?.guide_payment_status ?? "pending",
       guide_payment_ref: batch?.guide_payment_ref ?? null,
       guide_paid_at: batch?.guide_paid_at ?? null,
       batch_id: batch?.id ?? null,
+      service_fee_cents: batch?.service_fee_cents ?? null,
     };
   });
 

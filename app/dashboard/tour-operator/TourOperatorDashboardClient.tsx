@@ -40,6 +40,7 @@ type RevenueBooking = {
   guide_payment_ref: string | null;
   guide_paid_at: string | null;
   batch_id: string | null;
+  service_fee_cents: number | null;
 };
 
 type Guide = {
@@ -70,15 +71,10 @@ function getWeekStart(dateStr: string): string {
   d.setDate(d.getDate() + diff);
   return d.toLocaleDateString("en-CA");
 }
-
-function getMonthStart(dateStr: string): string {
-  return dateStr.slice(0, 7) + "-01";
-}
-
+function getMonthStart(dateStr: string): string { return dateStr.slice(0, 7) + "-01"; }
 function getMonthEnd(dateStr: string): string {
   const [y, m] = dateStr.split("-").map(Number);
-  const lastDay = new Date(y, m, 0).getDate();
-  return `${y}-${String(m).padStart(2, "0")}-${lastDay}`;
+  return `${y}-${String(m).padStart(2, "0")}-${new Date(y, m, 0).getDate()}`;
 }
 
 function TrackingBadges({ t }: { t: Booking["tracking"] }) {
@@ -100,9 +96,9 @@ function CollapseSection({ title, count, children, defaultOpen = false, accent =
   title: string; count?: number; children: React.ReactNode; defaultOpen?: boolean; accent?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const accentClass = accent === "amber" ? "border-amber-100" : accent === "emerald" ? "border-emerald-100" : "border-gray-100";
+  const border = accent === "amber" ? "border-amber-100" : accent === "emerald" ? "border-emerald-100" : "border-gray-100";
   return (
-    <div className={`rounded-2xl border-2 ${accentClass} bg-white mb-5 overflow-hidden`}>
+    <div className={`rounded-2xl border-2 ${border} bg-white mb-5 overflow-hidden`}>
       <button onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
         <div className="flex items-center gap-2">
@@ -118,15 +114,15 @@ function CollapseSection({ title, count, children, defaultOpen = false, accent =
   );
 }
 
-function MarkPaidButton({ id, type, loading, onMark }: {
-  id: string; type: "guide"; loading: boolean; onMark: (ref: string) => void;
+function MarkPaidButton({ id, loading, onMark }: {
+  id: string; loading: boolean; onMark: (ref: string) => void;
 }) {
   const [showInput, setShowInput] = useState(false);
   const [ref, setRef] = useState("");
   if (!showInput) {
     return (
       <button onClick={() => setShowInput(true)}
-        className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-full font-bold transition-colors">
+        className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-full font-bold transition-colors whitespace-nowrap">
         Mark Paid
       </button>
     );
@@ -147,6 +143,66 @@ function MarkPaidButton({ id, type, loading, onMark }: {
   );
 }
 
+// ── Service fee input per guide (per day) ──────────────────────────────────
+function ServiceFeeInput({ batchIds, guideName, currentFeeCents, onSave }: {
+  batchIds: string[];
+  guideName: string;
+  currentFeeCents: number | null;
+  onSave: (feeCents: number) => Promise<void>;
+}) {
+  const stored = typeof window !== "undefined"
+    ? localStorage.getItem(`fee_suggest_${guideName}`)
+    : null;
+  const defaultVal = currentFeeCents != null
+    ? Math.round(currentFeeCents / 100)
+    : stored ? parseInt(stored) : 0;
+
+  const [pesos, setPesos] = useState(defaultVal);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(currentFeeCents != null && currentFeeCents > 0);
+
+  async function handleSave() {
+    if (pesos <= 0) return;
+    setSaving(true);
+    try {
+      await onSave(pesos * 100);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`fee_suggest_${guideName}`, String(pesos));
+      }
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-xs text-gray-500 font-semibold">Service fee:</span>
+      <div className="flex items-center gap-1">
+        <span className="text-xs font-bold text-gray-400">₱</span>
+        <input
+          type="number"
+          min={0}
+          value={pesos}
+          onChange={e => { setPesos(parseInt(e.target.value) || 0); setSaved(false); }}
+          className="w-24 rounded-lg border-2 border-gray-200 px-2 py-1 text-xs font-bold focus:outline-none focus:border-amber-400"
+          placeholder="0"
+        />
+      </div>
+      {!saved ? (
+        <button
+          onClick={handleSave}
+          disabled={saving || pesos <= 0}
+          className="text-xs bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded-full font-bold disabled:opacity-40 transition-colors">
+          {saving ? "Saving..." : "Set Fee"}
+        </button>
+      ) : (
+        <span className="text-xs text-emerald-600 font-bold">✅ ₱{pesos.toLocaleString()} set</span>
+      )}
+    </div>
+  );
+}
+
 export default function TourOperatorDashboardClient({
   displayName, totalBookings, guidesCount, todayRevenue,
   pendingCount, bookings, revenueBookings, guides, todayPH,
@@ -157,8 +213,10 @@ export default function TourOperatorDashboardClient({
   const [customEnd, setCustomEnd] = useState(todayPH);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [guidePaidMap, setGuidePaidMap] = useState<Record<string, { ref: string; at: string }>>({});
+  // Track service fees set this session: batchId → feeCents
+  const [feeMap, setFeeMap] = useState<Record<string, number>>({});
 
-  // ── Revenue period range ──────────────────────────────────────────────
+  // ── Period range ─────────────────────────────────────────────────────
   const { startDate, endDate, periodLabel } = useMemo(() => {
     if (revPeriod === "today") return {
       startDate: todayPH, endDate: todayPH,
@@ -183,7 +241,7 @@ export default function TourOperatorDashboardClient({
     return { startDate: customStart, endDate: customEnd, periodLabel: customStart + " to " + customEnd };
   }, [revPeriod, todayPH, customStart, customEnd]);
 
-  // ── Filter revenue bookings by period ────────────────────────────────
+  // ── Filter bookings by period ─────────────────────────────────────────
   const periodBookings = useMemo(() =>
     revenueBookings.filter(b => {
       if (!b.payment_verified_at) return false;
@@ -195,62 +253,104 @@ export default function TourOperatorDashboardClient({
   const onlineRev   = periodBookings.filter(b => b.booking_source === "online").reduce((s, b) => s + b.total_amount_cents, 0);
   const adminWalkin = periodBookings.filter(b => b.booking_source === "walk_in").reduce((s, b) => s + b.total_amount_cents, 0);
   const opWalkin    = periodBookings.filter(b => b.booking_source === "operator_walk_in").reduce((s, b) => s + b.total_amount_cents, 0);
-  // What admin owes me = online + admin walk-ins assigned to me
   const adminOwesMe = onlineRev + adminWalkin;
-  // What I owe guides = from batches for operator_walk_in + online/walk_in bookings I handled
-  const guideOwed   = periodBookings.filter(b => b.guide_id).reduce((s, b) => s + b.total_amount_cents, 0);
 
-  // ── What admin owes me (read-only) ────────────────────────────────────
+  // ── Admin owes me — using live paidMap for accurate balance ──────────
   const adminOwedBookings = periodBookings.filter(b => b.booking_source !== "operator_walk_in");
-  const adminPaidTotal    = adminOwedBookings.filter(b => b.operator_payment_status === "paid").reduce((s, b) => s + b.total_amount_cents, 0);
-  const adminBalance      = adminOwedBookings.reduce((s, b) => s + b.total_amount_cents, 0) - adminPaidTotal;
+  
+  // FIXED: use live paidMap state to calculate paid total
+  const adminPaidTotal = adminOwedBookings.reduce((s, b) => {
+    const isPaid = b.operator_payment_status === "paid";
+    return isPaid ? s + b.total_amount_cents : s;
+  }, 0);
+  
+  // FIXED: live balance reads from DB status (admin marks paid, operator reads)
+  const adminBalance = adminOwedBookings.reduce((s, b) => {
+    const isPaid = b.operator_payment_status === "paid";
+    return isPaid ? s : s + b.total_amount_cents;
+  }, 0);
 
-  // ── What I owe guides (grouped by guide) ─────────────────────────────
+  // ── Guide audit — grouped by guide, uses service_fee_cents ────────────
   const guideAudit = useMemo(() => {
+    // Group by guide_id — collect unique batch per guide for fee input
     const map: Record<string, {
+      guide_id: string;
       guide_name: string;
       bookings: RevenueBooking[];
-      totalOwed: number;
-      totalPaid: number;
-      balance: number;
+      // All unique batch_ids for this guide in this period
+      batchIds: string[];
+      // Service fee: use feeMap (session) or sum of batch service_fee_cents
+      serviceFee: number | null;
+      isPaid: boolean;
     }> = {};
 
     for (const b of periodBookings) {
       if (!b.guide_id || !b.guide_name) continue;
       if (!map[b.guide_id]) {
-        map[b.guide_id] = { guide_name: b.guide_name, bookings: [], totalOwed: 0, totalPaid: 0, balance: 0 };
+        map[b.guide_id] = {
+          guide_id: b.guide_id,
+          guide_name: b.guide_name,
+          bookings: [],
+          batchIds: [],
+          serviceFee: null,
+          isPaid: false,
+        };
       }
       map[b.guide_id].bookings.push(b);
-      map[b.guide_id].totalOwed += b.total_amount_cents;
-
-      const isPaid = guidePaidMap[b.batch_id ?? b.id] || b.guide_payment_status === "paid";
-      if (isPaid) map[b.guide_id].totalPaid += b.total_amount_cents;
+      if (b.batch_id && !map[b.guide_id].batchIds.includes(b.batch_id)) {
+        map[b.guide_id].batchIds.push(b.batch_id);
+      }
     }
 
+    // Compute service fee and paid status per guide
     for (const entry of Object.values(map)) {
-      entry.balance = entry.totalOwed - entry.totalPaid;
+      // Check feeMap (session overrides DB)
+      const sessionFee = entry.batchIds.reduce((s, bid) => s + (feeMap[bid] ?? 0), 0);
+      const dbFee = entry.bookings.reduce((s, b) => s + (b.service_fee_cents ?? 0), 0);
+      entry.serviceFee = sessionFee > 0 ? sessionFee : (dbFee > 0 ? dbFee : null);
+
+      // Paid = all batches for this guide in period are paid
+      const allBatchesPaid = entry.batchIds.every(bid =>
+        guidePaidMap[bid] || entry.bookings.find(b => b.batch_id === bid)?.guide_payment_status === "paid"
+      );
+      entry.isPaid = entry.batchIds.length > 0 && allBatchesPaid;
     }
 
-    return Object.values(map).sort((a, b) => b.balance - a.balance);
-  }, [periodBookings, guidePaidMap]);
+    return Object.values(map).sort((a, b) => a.guide_name.localeCompare(b.guide_name));
+  }, [periodBookings, feeMap, guidePaidMap]);
 
-  async function markGuidePaid(batchId: string, ref: string) {
-    setMarkingId(batchId);
-    try {
-      const res = await fetch("/api/dashboard/tour-operator/mark-guide-paid", {
+  async function saveServiceFee(batchIds: string[], feeCents: number) {
+    // Save fee to all batches for this guide in period
+    for (const batchId of batchIds) {
+      await fetch("/api/dashboard/tour-operator/set-service-fee", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batch_id: batchId, payment_ref: ref }),
+        body: JSON.stringify({ batch_id: batchId, service_fee_cents: feeCents }),
       });
-      if (res.ok) {
-        setGuidePaidMap(prev => ({ ...prev, [batchId]: { ref, at: new Date().toISOString() } }));
+      setFeeMap(prev => ({ ...prev, [batchId]: feeCents }));
+    }
+  }
+
+  async function markGuidePaid(batchIds: string[], ref: string) {
+    const firstId = batchIds[0];
+    setMarkingId(firstId);
+    try {
+      for (const batchId of batchIds) {
+        const res = await fetch("/api/dashboard/tour-operator/mark-guide-paid", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batch_id: batchId, payment_ref: ref }),
+        });
+        if (res.ok) {
+          setGuidePaidMap(prev => ({ ...prev, [batchId]: { ref, at: new Date().toISOString() } }));
+        }
       }
     } finally {
       setMarkingId(null);
     }
   }
 
-  // ── Dashboard booking filters (unchanged) ────────────────────────────
+  // ── Dashboard bookings ─────────────────────────────────────────────────
   const upcomingBookings = useMemo(() =>
     bookings.filter(b => b.schedule_date && b.schedule_date >= todayPH)
       .sort((a, b) => (a.schedule_date ?? "").localeCompare(b.schedule_date ?? "")),
@@ -258,16 +358,16 @@ export default function TourOperatorDashboardClient({
 
   const statusBookings = useMemo(() => {
     let startStr: string;
-    if (statusPeriod === "day") {
-      startStr = todayPH;
-    } else if (statusPeriod === "week") {
+    if (statusPeriod === "day") startStr = todayPH;
+    else if (statusPeriod === "week") {
       const d = new Date(); d.setDate(d.getDate() - 7);
       startStr = d.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
     } else {
       const d = new Date(); d.setDate(d.getDate() - 30);
       startStr = d.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
     }
-    return bookings.filter(b => b.schedule_date && b.schedule_date >= startStr && b.schedule_date <= todayPH)
+    return bookings
+      .filter(b => b.schedule_date && b.schedule_date >= startStr && b.schedule_date <= todayPH)
       .sort((a, b) => (b.schedule_date ?? "").localeCompare(a.schedule_date ?? ""));
   }, [bookings, statusPeriod, todayPH]);
 
@@ -300,6 +400,11 @@ export default function TourOperatorDashboardClient({
     }
     return map;
   }, [statusBookings]);
+
+  // Total guide fees owed (unpaid only)
+  const totalGuideFeesOwed = guideAudit
+    .filter(g => !g.isPaid && g.serviceFee)
+    .reduce((s, g) => s + (g.serviceFee ?? 0), 0);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
@@ -394,7 +499,6 @@ export default function TourOperatorDashboardClient({
 
           <p className="text-xs text-gray-400 mb-4 font-semibold uppercase tracking-wide">{periodLabel}</p>
 
-          {/* Revenue cards */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-4">
             <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4">
               <div className="flex items-center justify-between mb-1">
@@ -422,13 +526,20 @@ export default function TourOperatorDashboardClient({
             </div>
           </div>
 
-          {/* Summary bar */}
+          {/* FIXED: summary bar — reads live adminBalance */}
           <div className="rounded-2xl bg-emerald-700 px-5 py-3 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-emerald-200 uppercase tracking-wide">Admin Owes You</p>
               <p className="text-xs text-emerald-300 mt-0.5">Online + Admin Walk-ins · {periodLabel}</p>
             </div>
-            <p className="text-2xl font-bold text-white">₱{(adminOwesMe / 100).toLocaleString()}</p>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-white">
+                {adminBalance > 0 ? `₱${(adminBalance / 100).toLocaleString()}` : "✅ Settled"}
+              </p>
+              {adminPaidTotal > 0 && adminBalance > 0 && (
+                <p className="text-xs text-emerald-300 mt-0.5">₱{(adminPaidTotal / 100).toLocaleString()} already paid</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -439,17 +550,16 @@ export default function TourOperatorDashboardClient({
           Online bookings and admin walk-ins assigned to you. Admin marks these as paid after sending GCash.
         </p>
 
-        {/* Summary */}
-        <div className="flex gap-4 mb-4 flex-wrap">
-          <div className="flex-1 min-w-[100px] rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-center">
+        <div className="flex gap-3 mb-4 flex-wrap">
+          <div className="flex-1 min-w-[90px] rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-center">
             <p className="text-xs text-gray-400">Total Owed</p>
-            <p className="font-bold text-[#134e4a]">₱{(adminOwedBookings.reduce((s, b) => s + b.total_amount_cents, 0) / 100).toLocaleString()}</p>
+            <p className="font-bold text-[#134e4a]">₱{(adminOwesMe / 100).toLocaleString()}</p>
           </div>
-          <div className="flex-1 min-w-[100px] rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-center">
+          <div className="flex-1 min-w-[90px] rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-center">
             <p className="text-xs text-gray-400">Paid</p>
             <p className="font-bold text-emerald-700">₱{(adminPaidTotal / 100).toLocaleString()}</p>
           </div>
-          <div className={`flex-1 min-w-[100px] rounded-xl border px-4 py-3 text-center ${adminBalance > 0 ? "bg-red-50 border-red-100" : "bg-emerald-50 border-emerald-100"}`}>
+          <div className={`flex-1 min-w-[90px] rounded-xl border px-4 py-3 text-center ${adminBalance > 0 ? "bg-red-50 border-red-100" : "bg-emerald-50 border-emerald-100"}`}>
             <p className="text-xs text-gray-400">Balance</p>
             <p className={`font-bold text-lg ${adminBalance > 0 ? "text-red-600" : "text-emerald-600"}`}>
               {adminBalance > 0 ? `₱${(adminBalance / 100).toLocaleString()}` : "✅ Settled"}
@@ -501,50 +611,93 @@ export default function TourOperatorDashboardClient({
       </CollapseSection>
 
       {/* ── WHAT I OWE MY GUIDES ── */}
-      <CollapseSection title="💰 I Owe My Guides" count={guideAudit.length} defaultOpen={true} accent="amber">
-        <p className="text-xs text-gray-400 mb-4">
-          Service fees owed to guides for tours they handled this period. Mark paid after sending GCash.
+      <CollapseSection
+        title="💰 I Owe My Guides"
+        count={guideAudit.length}
+        defaultOpen={true}
+        accent="amber"
+      >
+        <p className="text-xs text-gray-400 mb-1">
+          Set the agreed service fee per guide for this period. The fee covers all their tours — it&apos;s not per booking.
         </p>
+        {totalGuideFeesOwed > 0 && (
+          <div className="mb-4 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2 flex items-center justify-between">
+            <p className="text-xs font-semibold text-amber-800">Total guide fees to pay this period</p>
+            <p className="font-bold text-amber-700">₱{(totalGuideFeesOwed / 100).toLocaleString()}</p>
+          </div>
+        )}
 
         {guideAudit.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">No guide bookings for this period.</p>
         ) : (
           <div className="space-y-5">
-            {guideAudit.map(({ guide_name, bookings: gBookings, totalOwed, totalPaid, balance }) => (
-              <div key={guide_name} className="rounded-2xl border-2 border-gray-100 overflow-hidden">
-                {/* Guide header */}
-                <div className={`px-5 py-4 flex items-center justify-between flex-wrap gap-3 ${
-                  balance > 0 ? "bg-amber-50 border-b-2 border-amber-100" : "bg-emerald-50 border-b-2 border-emerald-100"
-                }`}>
-                  <div>
-                    <p className="font-bold text-[#134e4a]">{guide_name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{gBookings.length} tour{gBookings.length > 1 ? "s" : ""}</p>
-                  </div>
-                  <div className="flex gap-4 text-right">
-                    <div>
-                      <p className="text-xs text-gray-400">Total Owed</p>
-                      <p className="font-bold text-[#134e4a]">₱{(totalOwed / 100).toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Paid</p>
-                      <p className="font-bold text-emerald-700">₱{(totalPaid / 100).toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Balance</p>
-                      <p className={`font-bold text-lg ${balance > 0 ? "text-red-600" : "text-emerald-600"}`}>
-                        {balance > 0 ? `₱${(balance / 100).toLocaleString()}` : "✅ Settled"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+            {guideAudit.map(({ guide_id, guide_name, bookings: gBookings, batchIds, serviceFee, isPaid }) => {
+              const firstPaidInfo = batchIds.map(bid => guidePaidMap[bid]).find(Boolean);
+              const firstPaidRef = firstPaidInfo?.ref ?? gBookings.find(b => b.guide_payment_ref)?.guide_payment_ref;
+              const firstPaidAt = firstPaidInfo?.at ?? gBookings.find(b => b.guide_paid_at)?.guide_paid_at;
 
-                {/* Bookings under this guide */}
-                <div className="divide-y divide-gray-50">
-                  {gBookings.map(b => {
-                    const keyId = b.batch_id ?? b.id;
-                    const isPaid = guidePaidMap[keyId] || b.guide_payment_status === "paid";
-                    const paidInfo = guidePaidMap[keyId];
-                    return (
+              return (
+                <div key={guide_id} className="rounded-2xl border-2 border-gray-100 overflow-hidden">
+                  {/* Guide header */}
+                  <div className={`px-5 py-4 ${isPaid ? "bg-emerald-50 border-b-2 border-emerald-100" : "bg-amber-50 border-b-2 border-amber-100"}`}>
+                    <div className="flex items-start justify-between flex-wrap gap-3 mb-3">
+                      <div>
+                        <p className="font-bold text-[#134e4a]">{guide_name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {gBookings.length} tour{gBookings.length > 1 ? "s" : ""} · {gBookings.reduce((s, b) => s + b.total_pax, 0)} total pax
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        {serviceFee != null ? (
+                          <p className="text-lg font-bold text-[#134e4a]">
+                            ₱{(serviceFee / 100).toLocaleString()}
+                            <span className="text-xs font-normal text-gray-400 ml-1">service fee</span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">No fee set yet</p>
+                        )}
+                        {isPaid && (
+                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">✅ Paid</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Service fee input */}
+                    {!isPaid && (
+                      <ServiceFeeInput
+                        batchIds={batchIds}
+                        guideName={guide_name}
+                        currentFeeCents={serviceFee}
+                        onSave={(feeCents) => saveServiceFee(batchIds, feeCents)}
+                      />
+                    )}
+
+                    {/* Mark paid (only when fee is set) */}
+                    {!isPaid && serviceFee && serviceFee > 0 && (
+                      <div className="mt-3 pt-3 border-t border-amber-200 flex items-center justify-between flex-wrap gap-2">
+                        <p className="text-xs text-gray-500">
+                          After sending ₱{(serviceFee / 100).toLocaleString()} GCash to {guide_name}:
+                        </p>
+                        <MarkPaidButton
+                          id={batchIds[0]}
+                          loading={markingId === batchIds[0]}
+                          onMark={(ref) => markGuidePaid(batchIds, ref)}
+                        />
+                      </div>
+                    )}
+
+                    {/* Paid info */}
+                    {isPaid && firstPaidRef && (
+                      <p className="text-xs text-emerald-600 font-semibold mt-1">
+                        GCash ref: {firstPaidRef}
+                        {firstPaidAt ? " · " + new Date(firstPaidAt).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : ""}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Booking manifest */}
+                  <div className="divide-y divide-gray-50">
+                    {gBookings.map(b => (
                       <div key={b.id} className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -558,35 +711,19 @@ export default function TourOperatorDashboardClient({
                             </span>
                           </div>
                           <p className="text-xs text-gray-500 mt-0.5">
-                            {b.customer_name} · {b.total_pax} guest{b.total_pax > 1 ? "s" : ""}
+                            {b.customer_name} · {b.total_pax} pax
                             {b.schedule_date ? " · " + formatDateMed(b.schedule_date) : ""}
                           </p>
-                          {isPaid && (b.guide_payment_ref || paidInfo?.ref) && (
-                            <p className="text-xs text-emerald-600 mt-0.5 font-semibold">
-                              GCash ref: {paidInfo?.ref ?? b.guide_payment_ref}
-                              {(paidInfo?.at ?? b.guide_paid_at) ? " · " + new Date(paidInfo?.at ?? b.guide_paid_at!).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : ""}
-                            </p>
-                          )}
                         </div>
-                        <div className="flex items-center gap-3">
-                          <p className="text-sm font-bold text-[#134e4a]">₱{(b.total_amount_cents / 100).toLocaleString()}</p>
-                          {isPaid ? (
-                            <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-bold">✅ Paid</span>
-                          ) : (
-                            <MarkPaidButton
-                              id={keyId}
-                              type="guide"
-                              loading={markingId === keyId}
-                              onMark={(ref) => markGuidePaid(keyId, ref)}
-                            />
-                          )}
-                        </div>
+                        <p className="text-xs text-gray-400">
+                          ₱{(b.total_amount_cents / 100).toLocaleString()} booking
+                        </p>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CollapseSection>
@@ -664,10 +801,7 @@ export default function TourOperatorDashboardClient({
                           </p>
                           <p className="text-xs text-blue-600 mt-0.5 font-medium">👤 {b.guide_name ?? "No guide assigned"}</p>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full capitalize">{b.booking_type}</span>
-                          {b.is_walk_in && <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">Walk-in</span>}
-                        </div>
+                        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full capitalize shrink-0">{b.booking_type}</span>
                       </div>
                       <TrackingBadges t={b.tracking} />
                     </Link>
