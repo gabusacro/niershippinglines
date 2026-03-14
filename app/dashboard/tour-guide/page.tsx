@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
 import TourGuideScanner from "./TourGuideScanner";
+import TourGuideEarningsClient from "./TourGuideEarningsClient";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Tour Guide Dashboard" };
@@ -30,15 +31,16 @@ export default async function TourGuideDashboard() {
         .maybeSingle()
     : { data: null };
 
-  // My assigned batches — via tour_batches where tour_guide_id = me
+  // My assigned batches
   const { data: myBatches } = await supabase
     .from("tour_batches")
-    .select("id, schedule_id, guide_payment_status")
-    .eq("tour_guide_id", user.id);
+    .select("id, schedule_id, guide_payment_status, guide_payment_ref, guide_paid_at, service_fee_cents, created_at")
+    .eq("tour_guide_id", user.id)
+    .order("created_at", { ascending: false });
 
   const batchIds = (myBatches ?? []).map((b) => b.id);
 
-  // Get booking IDs from my batches
+  // Get all booking IDs from my batches
   const { data: batchBookings } = batchIds.length > 0
     ? await supabase
         .from("tour_batch_bookings")
@@ -48,25 +50,17 @@ export default async function TourGuideDashboard() {
 
   const bookingIds = (batchBookings ?? []).map((bb) => bb.booking_id);
 
-  // Get today's bookings from my batches
-  const { data: todayBookings } = bookingIds.length > 0
+  // All my bookings with schedule + tour info
+  const { data: allBookings } = bookingIds.length > 0
     ? await supabase
         .from("tour_bookings")
         .select("*, tour:tour_packages(title), schedule:tour_schedules(available_date, departure_time), passengers:tour_booking_passengers(*)")
         .in("id", bookingIds)
         .eq("status", "confirmed")
-        .eq("schedule.available_date" as never, todayPH)
+        .order("created_at", { ascending: false })
     : { data: [] };
 
-  // All assigned bookings (not just today) for history count
-  const { data: allAssignedBookings } = bookingIds.length > 0
-    ? await supabase
-        .from("tour_bookings")
-        .select("id, status")
-        .in("id", bookingIds)
-    : { data: [] };
-
-  // Tracking
+  // Tracking for all bookings
   const { data: tracking } = bookingIds.length > 0
     ? await supabase
         .from("tour_passenger_tracking")
@@ -75,23 +69,57 @@ export default async function TourGuideDashboard() {
         .eq("tour_guide_id", user.id)
     : { data: [] };
 
-  const totalGuests = (todayBookings ?? []).reduce((sum, b) => sum + (b.total_pax ?? 0), 0);
+  // Today's bookings
+  const todayBookings = (allBookings ?? []).filter(b => {
+    const d = (b.schedule as { available_date?: string } | null)?.available_date;
+    return d === todayPH;
+  });
+
+  const totalGuests = todayBookings.reduce((sum, b) => sum + (b.total_pax ?? 0), 0);
   const pickedUp = (tracking ?? []).filter((t) => t.status !== "assigned").length;
   const operator = operatorProfile as { full_name: string | null; email: string | null; mobile: string | null } | null;
+
+  // Build batch map for earnings
+  const batchMap = Object.fromEntries((myBatches ?? []).map(b => [b.id, b]));
+
+  // Build earnings data: one entry per batch (= one tour day)
+  const earningsData = (myBatches ?? []).map(batch => {
+    const batchBookingIds = (batchBookings ?? [])
+      .filter(bb => bb.batch_id === batch.id)
+      .map(bb => bb.booking_id);
+
+    const batchBookingList = (allBookings ?? []).filter(b => batchBookingIds.includes(b.id));
+    const scheduleDate = batchBookingList[0]
+      ? (batchBookingList[0].schedule as { available_date?: string } | null)?.available_date ?? null
+      : null;
+    const tourTitle = batchBookingList[0]
+      ? (batchBookingList[0].tour as { title?: string } | null)?.title ?? "—"
+      : "—";
+    const totalPax = batchBookingList.reduce((s, b) => s + (b.total_pax ?? 0), 0);
+
+    return {
+      batch_id: batch.id,
+      schedule_date: scheduleDate,
+      tour_title: tourTitle,
+      total_pax: totalPax,
+      booking_count: batchBookingList.length,
+      service_fee_cents: batch.service_fee_cents ?? 0,
+      guide_payment_status: batch.guide_payment_status ?? "pending",
+      guide_payment_ref: batch.guide_payment_ref ?? null,
+      guide_paid_at: batch.guide_paid_at ?? null,
+    };
+  }).filter(e => e.schedule_date !== null);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
 
       {/* Hero */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-8 text-white shadow-lg mb-5">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-10"
+        <div className="pointer-events-none absolute inset-0 opacity-10"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='120' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 40 Q30 20 60 40 Q90 60 120 40' stroke='white' fill='none' stroke-width='2'/%3E%3Cpath d='M0 50 Q30 30 60 50 Q90 70 120 50' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E")`,
-            backgroundSize: "240px 120px",
-            backgroundRepeat: "repeat",
-          }}
-        />
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='120' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 40 Q30 20 60 40 Q90 60 120 40' stroke='white' fill='none' stroke-width='2'/%3E%3C/svg%3E")`,
+            backgroundSize: "240px 120px", backgroundRepeat: "repeat",
+          }} />
         <span className="pointer-events-none absolute -right-4 top-0 select-none text-[8rem] leading-none opacity-[0.07]">🌴</span>
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -106,7 +134,7 @@ export default async function TourGuideDashboard() {
           <div className="flex gap-3 shrink-0">
             <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center backdrop-blur-sm">
               <div className="text-2xl font-bold leading-none">{totalGuests}</div>
-              <div className="mt-1 text-xs text-white/65 tracking-wide">Today's Guests</div>
+              <div className="mt-1 text-xs text-white/65 tracking-wide">Today&apos;s Guests</div>
             </div>
             <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-center backdrop-blur-sm">
               <div className="text-2xl font-bold leading-none">{pickedUp}</div>
@@ -136,7 +164,7 @@ export default async function TourGuideDashboard() {
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         {[
-          { href: "/dashboard/account",              label: "👤 My Account" },
+          { href: "/dashboard/account",             label: "👤 My Account" },
           { href: "/dashboard/tour-guide/bookings", label: "📋 My Bookings" },
         ].map(({ href, label }) => (
           <Link key={href} href={href}
@@ -151,13 +179,16 @@ export default async function TourGuideDashboard() {
         <TourGuideScanner guideId={user.id} todayPH={todayPH} />
       </div>
 
+      {/* Earnings — client component with period filter */}
+      <TourGuideEarningsClient earnings={earningsData} todayPH={todayPH} />
+
       {/* Today's Guests */}
-      <div className="rounded-2xl border-2 border-gray-100 bg-white p-6">
+      <div className="rounded-2xl border-2 border-gray-100 bg-white p-6 mt-5">
         <h2 className="font-bold text-[#134e4a] mb-4">
           Today&apos;s Guests
           <span className="ml-2 text-sm font-normal text-gray-400">{totalGuests} total</span>
         </h2>
-        {!todayBookings || todayBookings.length === 0 ? (
+        {todayBookings.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">No bookings assigned to you today.</p>
         ) : (
           <div className="space-y-3">
