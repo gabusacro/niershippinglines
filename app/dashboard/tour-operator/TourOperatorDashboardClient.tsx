@@ -302,48 +302,52 @@ export default function TourOperatorDashboardClient({
       }
     }
 
-    // Compute service fee and paid status per guide
+    // Service fee is ONE flat amount per batch (per day) — not multiplied by bookings
+    // All bookings in the same day/guide share ONE batch now (proper grouping)
     for (const entry of Object.values(map)) {
-      // Check feeMap (session overrides DB)
-      const sessionFee = entry.batchIds.reduce((s, bid) => s + (feeMap[bid] ?? 0), 0);
-      const dbFee = entry.bookings.reduce((s, b) => s + (b.service_fee_cents ?? 0), 0);
-      entry.serviceFee = sessionFee > 0 ? sessionFee : (dbFee > 0 ? dbFee : null);
+      const primaryBatchId = entry.batchIds[0];
+      if (!primaryBatchId) continue;
 
-      // Paid = all batches for this guide in period are paid
-      const allBatchesPaid = entry.batchIds.every(bid =>
-        guidePaidMap[bid] || entry.bookings.find(b => b.batch_id === bid)?.guide_payment_status === "paid"
+      // Session override takes priority, then DB value from the primary batch
+      const sessionFee = feeMap[primaryBatchId] ?? null;
+      const dbFee = entry.bookings.find(b => b.batch_id === primaryBatchId)?.service_fee_cents ?? null;
+      entry.serviceFee = sessionFee ?? (dbFee && dbFee > 0 ? dbFee : null);
+
+      // Paid = the primary batch is marked paid
+      entry.isPaid = !!(
+        guidePaidMap[primaryBatchId] ||
+        entry.bookings.find(b => b.batch_id === primaryBatchId)?.guide_payment_status === "paid"
       );
-      entry.isPaid = entry.batchIds.length > 0 && allBatchesPaid;
     }
 
     return Object.values(map).sort((a, b) => a.guide_name.localeCompare(b.guide_name));
   }, [periodBookings, feeMap, guidePaidMap]);
 
   async function saveServiceFee(batchIds: string[], feeCents: number) {
-    // Save fee to all batches for this guide in period
-    for (const batchId of batchIds) {
-      await fetch("/api/dashboard/tour-operator/set-service-fee", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batch_id: batchId, service_fee_cents: feeCents }),
-      });
-      setFeeMap(prev => ({ ...prev, [batchId]: feeCents }));
-    }
+    // Save fee only to the PRIMARY batch (first one = the grouped batch for that day)
+    const primaryBatchId = batchIds[0];
+    if (!primaryBatchId) return;
+    await fetch("/api/dashboard/tour-operator/set-service-fee", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch_id: primaryBatchId, service_fee_cents: feeCents }),
+    });
+    setFeeMap(prev => ({ ...prev, [primaryBatchId]: feeCents }));
   }
 
   async function markGuidePaid(batchIds: string[], ref: string) {
-    const firstId = batchIds[0];
-    setMarkingId(firstId);
+    // Only mark the primary batch (the grouped batch for that day)
+    const primaryBatchId = batchIds[0];
+    if (!primaryBatchId) return;
+    setMarkingId(primaryBatchId);
     try {
-      for (const batchId of batchIds) {
-        const res = await fetch("/api/dashboard/tour-operator/mark-guide-paid", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ batch_id: batchId, payment_ref: ref }),
-        });
-        if (res.ok) {
-          setGuidePaidMap(prev => ({ ...prev, [batchId]: { ref, at: new Date().toISOString() } }));
-        }
+      const res = await fetch("/api/dashboard/tour-operator/mark-guide-paid", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch_id: primaryBatchId, payment_ref: ref }),
+      });
+      if (res.ok) {
+        setGuidePaidMap(prev => ({ ...prev, [primaryBatchId]: { ref, at: new Date().toISOString() } }));
       }
     } finally {
       setMarkingId(null);
