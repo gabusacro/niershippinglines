@@ -442,11 +442,12 @@ export default function TourOperatorDashboardClient({
       </div>
 
       {/* QUICK ACTIONS */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
         {[
-          { href: "/dashboard/tour-operator/bookings", label: "📋 My Bookings",     color: "border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50" },
-          { href: "/dashboard/tour-operator/walk-in",  label: "✏️ Walk-in Booking", color: "border-teal-200 hover:border-teal-400 hover:bg-teal-50" },
-          { href: "/dashboard/account",                label: "👤 My Account",       color: "border-gray-200 hover:border-gray-400 hover:bg-gray-50" },
+        { href: "/dashboard/tour-operator/bookings",  label: "📋 My Bookings",     color: "border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50" },
+        { href: "/dashboard/tour-operator/walk-in",   label: "✏️ Walk-in Booking", color: "border-teal-200 hover:border-teal-400 hover:bg-teal-50" },
+        { href: "/dashboard/tour-operator/packages",  label: "📦 My Packages",     color: "border-purple-200 hover:border-purple-400 hover:bg-purple-50" },
+        { href: "/dashboard/account",                 label: "👤 My Account",       color: "border-gray-200 hover:border-gray-400 hover:bg-gray-50" },
         ].map(({ href, label, color }) => (
           <Link key={href} href={href}
             className={`flex min-h-[48px] items-center justify-center rounded-xl border-2 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] text-center transition-colors ${color}`}>
