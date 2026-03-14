@@ -8,6 +8,7 @@ export interface VesselDayStats {
   boat_name: string;
   // passengers
   boarded: number;
+  checked_in: number;
   confirmed: number;
   total_passengers: number;
   // revenue breakdown
@@ -145,7 +146,7 @@ export async function getDashboardStats(
       vesselMap.set(boatId, {
         boat_id: boatId,
         boat_name: boatMap.get(boatId) ?? "Unknown",
-        boarded: 0, confirmed: 0, total_passengers: 0,
+        boarded: 0, checked_in: 0, confirmed: 0, total_passengers: 0,
         fare_cents: 0, platform_fee_cents: 0, processing_fee_cents: 0, total_revenue_cents: 0,
         online_count: 0, walkin_count: 0, pending_count: 0,
       });
@@ -170,6 +171,7 @@ export async function getDashboardStats(
     }
 
     if (b.status === "boarded") v.boarded += pax;
+    if (b.status === "checked_in") v.checked_in += pax;
     if (b.status === "confirmed") v.confirmed += pax;
     if (b.status === "pending_payment") v.pending_count++;
   }

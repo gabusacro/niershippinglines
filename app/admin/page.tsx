@@ -90,12 +90,32 @@ export default async function AdminDashboardPage() {
     }
   }
 
-  const [stats, pendingPreview, liveOps, unpaidTrips, pendingIdCount] = await Promise.all([
+  async function getFeeLabels() {
+    try {
+      const { data } = await supabase
+        .from("fee_settings")
+        .select("admin_fee_label, gcash_fee_label")
+        .eq("id", 1)
+        .maybeSingle();
+      return {
+        adminFeeLabel: data?.admin_fee_label ?? "Platform Service Fee",
+        gcashFeeLabel: data?.gcash_fee_label ?? "Payment Processing Fee",
+      };
+    } catch {
+      return {
+        adminFeeLabel: "Platform Service Fee",
+        gcashFeeLabel: "Payment Processing Fee",
+      };
+    }
+  }
+
+  const [stats, pendingPreview, liveOps, unpaidTrips, pendingIdCount, feeLabels] = await Promise.all([
     getDashboardStats("today"),
     getPendingPaymentsPreview(),
     getTodayLiveOperations(),
     getUnpaidVesselTrips(),
     getPendingIdCount(),
+    getFeeLabels(),
   ]);
 
   return (
@@ -136,7 +156,6 @@ export default async function AdminDashboardPage() {
           </Link>
         ))}
 
-        {/* ID Verifications — with pending badge */}
         <Link href="/admin/id-verifications"
           className="relative flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-100">
           🪪 ID Verifications
@@ -257,8 +276,13 @@ export default async function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── NEW SNAPSHOT ── */}
-      <AdminSnapshotClient initialStats={stats} todayLabel={today} />
+      {/* ── SNAPSHOT ── */}
+      <AdminSnapshotClient
+        initialStats={stats}
+        todayLabel={today}
+        adminFeeLabel={feeLabels.adminFeeLabel}
+        gcashFeeLabel={feeLabels.gcashFeeLabel}
+      />
 
       {/* ── LIVE OPERATIONS TABLE ── */}
       <div className="mt-10">
