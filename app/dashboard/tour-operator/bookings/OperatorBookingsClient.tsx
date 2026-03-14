@@ -430,14 +430,56 @@ export default function OperatorBookingsClient({
                               </div>
                             </div>
 
-                            {/* Guide assignment */}
-                            <div className="flex items-center gap-2">
+                            {/* Guide assignment per batch */}
+                            <div className="flex items-center gap-2 flex-wrap">
                               {batch.tour_guide_id ? (
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">
-                                  👤 {batch.guide_name}
-                                </span>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">
+                                    👤 {batch.guide_name}
+                                  </span>
+                                  {/* Warn if this guide is on another batch same day */}
+                                  {groupBatches.filter(bt => bt.id !== batch.id && bt.tour_guide_id === batch.tour_guide_id).length > 0 && (
+                                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-semibold">
+                                      ⚠️ Also on another batch today
+                                    </span>
+                                  )}
+                                  {/* Reassign guide */}
+                                  <select
+                                    defaultValue=""
+                                    onChange={e => { if (e.target.value) {
+                                      const batchBookingIds = batchedBookings[batch.id]?.map(b => b.id) ?? [];
+                                      if (batchBookingIds.length > 0) assignGuide(batchBookingIds[0], e.target.value);
+                                    }}}
+                                    className="text-xs rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 focus:outline-none focus:border-blue-400">
+                                    <option value="">Change guide...</option>
+                                    {myGuides.map(g => (
+                                      <option key={g.id} value={g.id}>{g.full_name}</option>
+                                    ))}
+                                  </select>
+                                </div>
                               ) : (
-                                <span className="text-xs text-gray-400">No guide assigned</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-semibold animate-pulse">
+                                    ⚠️ Needs guide
+                                  </span>
+                                  <select
+                                    defaultValue=""
+                                    onChange={e => { if (e.target.value) {
+                                      const batchBookingIds = batchedBookings[batch.id]?.map(b => b.id) ?? [];
+                                      if (batchBookingIds.length > 0) assignGuide(batchBookingIds[0], e.target.value);
+                                    }}}
+                                    className="text-xs rounded-lg border border-red-200 bg-red-50 px-2 py-1 focus:outline-none focus:border-red-400">
+                                    <option value="">Assign guide...</option>
+                                    {myGuides.map(g => {
+                                      const alreadyToday = groupBatches.some(bt => bt.id !== batch.id && bt.tour_guide_id === g.id);
+                                      return (
+                                        <option key={g.id} value={g.id}>
+                                          {g.full_name}{alreadyToday ? " (⚠️ already on batch today)" : ""}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -485,7 +527,34 @@ export default function OperatorBookingsClient({
                       );
                     })}
 
-                    {/* Unassigned bookings */}
+                    {/* Guide workload summary for this day */}
+                    {groupBatches.length > 0 && (() => {
+                      const guideWorkload: Record<string, { name: string; batches: number; pax: number }> = {};
+                      for (const bt of groupBatches) {
+                        if (!bt.tour_guide_id || !bt.guide_name) continue;
+                        if (!guideWorkload[bt.tour_guide_id]) {
+                          guideWorkload[bt.tour_guide_id] = { name: bt.guide_name, batches: 0, pax: 0 };
+                        }
+                        guideWorkload[bt.tour_guide_id].batches++;
+                        const pax = (batchedBookings[bt.id] ?? []).reduce((s, b) => s + b.total_pax, 0);
+                        guideWorkload[bt.tour_guide_id].pax += pax;
+                      }
+                      const overloaded = Object.values(guideWorkload).filter(g => g.batches > 1);
+                      if (overloaded.length === 0) return null;
+                      return (
+                        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                          <p className="text-xs font-bold text-amber-800 mb-1">⚠️ Guide handling multiple batches today:</p>
+                          {overloaded.map(g => (
+                            <p key={g.name} className="text-xs text-amber-700">
+                              👤 {g.name} — {g.batches} batches · {g.pax} total pax
+                              <span className="ml-1 text-amber-600">(Confirm with guide they can handle this)</span>
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                  {/* Unassigned bookings */}
                     {unbatched.length > 0 && (
                       <div className="rounded-xl border-2 border-dashed border-gray-200">
                         <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
@@ -556,10 +625,44 @@ export default function OperatorBookingsClient({
                       </div>
                     )}
 
-                    {/* All assigned, no overflow warning */}
+                    {/* All assigned summary */}
                     {unbatched.length === 0 && groupBatches.length > 0 && (
-                      <div className="text-center py-2">
+                      <div className="flex items-center justify-between py-2 flex-wrap gap-2">
                         <span className="text-xs text-emerald-600 font-semibold">✅ All bookings assigned to batches</span>
+                        {/* Show + New Batch if any batch is full */}
+                        {groupBatches.some(bt => {
+                          const pax = (batchedBookings[bt.id] ?? []).reduce((s, b) => s + b.total_pax, 0);
+                          return pax >= bt.max_pax;
+                        }) && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-amber-600 font-semibold">Some batches are full</span>
+                            <select
+                              defaultValue=""
+                              onChange={e => {
+                                if (e.target.value && group.schedule_id) {
+                                  const fullBatch = groupBatches.find(bt => {
+                                    const pax = (batchedBookings[bt.id] ?? []).reduce((s, b) => s + b.total_pax, 0);
+                                    return pax >= bt.max_pax;
+                                  });
+                                  if (fullBatch) {
+                                    const firstBooking = batchedBookings[fullBatch.id]?.[0];
+                                    if (firstBooking) createNewBatch(group.schedule_id!, e.target.value, firstBooking.id);
+                                  }
+                                }
+                              }}
+                              className="text-xs rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 focus:outline-none focus:border-amber-400">
+                              <option value="">+ New batch with guide...</option>
+                              {myGuides.map(g => {
+                                const alreadyToday = groupBatches.some(bt => bt.tour_guide_id === g.id);
+                                return (
+                                  <option key={g.id} value={g.id}>
+                                    {g.full_name}{alreadyToday ? " ⚠️ already assigned" : ""}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
