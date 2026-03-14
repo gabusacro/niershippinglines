@@ -19,7 +19,6 @@ export default async function TourDetailPage({
 
   if (!pkg) notFound();
 
-  // Fetch markup — only needed for operator packages
   const isOperator = pkg.owner_type === "operator";
   const markupCents = isOperator ? await supabase
     .from("tour_settings")
@@ -70,37 +69,54 @@ export default async function TourDetailPage({
     return joinersAvailable || privateAvailable;
   });
 
+  const galleryUrls: string[] = pkg.gallery_urls ?? [];
+
   return (
     <div className="min-h-screen bg-[#fafaf7]">
 
-      {/* Hero */}
-      <div className="bg-gradient-to-br from-[#0c7b93] to-[#0f766e] px-6 py-12 text-white">
-        <div className="mx-auto max-w-3xl">
-          <Link href="/tours" className="text-sm text-white/70 hover:text-white mb-4 inline-block">
-            ← Back to Tours
-          </Link>
-          <h1 className="text-3xl font-bold mb-3">{pkg.title}</h1>
-          {pkg.short_description && (
-            <p className="text-white/80 text-sm mb-4">{pkg.short_description}</p>
-          )}
-          <div className="flex flex-wrap gap-4 text-sm text-white/70">
-            {pkg.pickup_time_label && (
-              <span>🕐 Pickup: <strong className="text-white">{pkg.pickup_time_label}</strong></span>
-            )}
-            {pkg.end_time_label && (
-              <span>🏁 End: <strong className="text-white">{pkg.end_time_label}</strong></span>
-            )}
-            {pkg.duration_label && (
-              <span>⏱ <strong className="text-white">{pkg.duration_label}</strong></span>
-            )}
-            {pkg.meeting_point && (
-              <span>📍 <strong className="text-white">{pkg.meeting_point}</strong></span>
+      {/* Hero — show cover photo if available, else gradient */}
+      {pkg.cover_image_url ? (
+        <div className="relative h-64 sm:h-80 overflow-hidden">
+          <img src={pkg.cover_image_url} alt={pkg.title}
+            className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 px-6 py-6 text-white">
+            <div className="mx-auto max-w-3xl">
+              <Link href="/tours" className="text-sm text-white/70 hover:text-white mb-3 inline-block">
+                ← Back to Tours
+              </Link>
+              <h1 className="text-3xl font-bold mb-2">{pkg.title}</h1>
+              {pkg.short_description && (
+                <p className="text-white/80 text-sm">{pkg.short_description}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gradient-to-br from-[#0c7b93] to-[#0f766e] px-6 py-12 text-white">
+          <div className="mx-auto max-w-3xl">
+            <Link href="/tours" className="text-sm text-white/70 hover:text-white mb-4 inline-block">
+              ← Back to Tours
+            </Link>
+            <h1 className="text-3xl font-bold mb-3">{pkg.title}</h1>
+            {pkg.short_description && (
+              <p className="text-white/80 text-sm mb-4">{pkg.short_description}</p>
             )}
           </div>
         </div>
+      )}
+
+      {/* Tour info bar */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="mx-auto max-w-3xl px-6 py-3 flex flex-wrap gap-4 text-sm text-gray-600">
+          {pkg.pickup_time_label && <span>🕐 Pickup: <strong>{pkg.pickup_time_label}</strong></span>}
+          {pkg.end_time_label    && <span>🏁 End: <strong>{pkg.end_time_label}</strong></span>}
+          {pkg.duration_label    && <span>⏱ <strong>{pkg.duration_label}</strong></span>}
+          {pkg.meeting_point     && <span>📍 <strong>{pkg.meeting_point}</strong></span>}
+        </div>
       </div>
 
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
 
         {/* Price & booking type */}
         <div className="rounded-2xl border-2 border-emerald-200 bg-white p-5 mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -127,6 +143,18 @@ export default async function TourDetailPage({
             </a>
           )}
         </div>
+
+        {/* Gallery */}
+        {galleryUrls.length > 0 && (
+          <div className="mb-6">
+            <div className={`grid gap-2 ${galleryUrls.length === 1 ? "grid-cols-1" : galleryUrls.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+              {galleryUrls.map((url, i) => (
+                <img key={i} src={url} alt={`${pkg.title} ${i + 1}`}
+                  className="w-full h-40 object-cover rounded-xl border border-gray-100" />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Description */}
         {pkg.description && (
@@ -164,7 +192,6 @@ export default async function TourDetailPage({
         {/* Pick a date */}
         <div id="pick-date">
           <h2 className="text-lg font-bold text-[#134e4a] mb-4">📅 Available Dates</h2>
-
           {availableSchedules.length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center">
               <div className="text-4xl mb-3">📅</div>

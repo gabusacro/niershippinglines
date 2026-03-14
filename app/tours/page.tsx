@@ -10,7 +10,6 @@ export const metadata = {
 export default async function ToursPage() {
   const supabase = await createClient();
 
-  // Fetch markup setting
   const { data: settings } = await supabase
     .from("tour_settings")
     .select("admin_markup_per_pax_cents")
@@ -20,13 +19,11 @@ export default async function ToursPage() {
 
   const { data: packages } = await supabase
     .from("tour_packages")
-    .select("id, title, short_description, joiner_price_cents, exclusive_price_cents, per_person_price_cents, hourly_price_min_cents, hourly_price_max_cents, accepts_joiners, accepts_private, accepts_exclusive, is_hourly, is_per_person, exclusive_unit_label, is_featured, is_weather_dependent, pickup_time_label, end_time_label, duration_label, sort_order, owner_type")
+    .select("id, title, short_description, joiner_price_cents, exclusive_price_cents, per_person_price_cents, hourly_price_min_cents, hourly_price_max_cents, accepts_joiners, accepts_private, accepts_exclusive, is_hourly, is_per_person, exclusive_unit_label, is_featured, is_weather_dependent, pickup_time_label, end_time_label, duration_label, sort_order, owner_type, cover_image_url")
     .eq("is_active", true)
     .eq("approval_status", "approved")
     .order("sort_order", { ascending: true });
 
-  // For operator packages, add markup to joiner/per-person price
-  // Admin packages already have final price set (markup baked in)
   function getDisplayPrice(pkg: {
     owner_type?: string | null;
     joiner_price_cents?: number | null;
@@ -37,20 +34,15 @@ export default async function ToursPage() {
     hourly_price_max_cents?: number | null;
   }): string {
     const isOperator = pkg.owner_type === "operator";
-
     if (pkg.joiner_price_cents) {
-      const displayCents = isOperator
-        ? pkg.joiner_price_cents + markupCents
-        : pkg.joiner_price_cents;
-      return `₱${(displayCents / 100).toLocaleString()}/pax`;
+      const cents = pkg.joiner_price_cents + (isOperator ? markupCents : 0);
+      return `₱${(cents / 100).toLocaleString()}/pax`;
     }
     if (pkg.exclusive_price_cents)
       return `₱${(pkg.exclusive_price_cents / 100).toLocaleString()}/${pkg.exclusive_unit_label}`;
     if (pkg.per_person_price_cents) {
-      const displayCents = isOperator
-        ? pkg.per_person_price_cents + markupCents
-        : pkg.per_person_price_cents;
-      return `₱${(displayCents / 100).toLocaleString()}/person`;
+      const cents = pkg.per_person_price_cents + (isOperator ? markupCents : 0);
+      return `₱${(cents / 100).toLocaleString()}/person`;
     }
     if (pkg.hourly_price_min_cents) {
       const min = pkg.hourly_price_min_cents / 100;
@@ -84,27 +76,40 @@ export default async function ToursPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {featured.map(pkg => (
                 <Link key={pkg.id} href={`/tours/${pkg.id}`}
-                  className="group flex flex-col rounded-2xl border-2 border-emerald-100 bg-white p-5 hover:border-emerald-300 hover:shadow-md transition-all">
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="font-bold text-[#134e4a] group-hover:text-emerald-700 transition-colors leading-tight">
-                        {pkg.title}
-                      </h3>
-                      {pkg.is_weather_dependent && (
-                        <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600">🌤 Weather</span>
-                      )}
+                  className="group flex flex-col rounded-2xl border-2 border-emerald-100 bg-white hover:border-emerald-300 hover:shadow-md transition-all overflow-hidden">
+                  {/* Cover photo or placeholder */}
+                  {pkg.cover_image_url ? (
+                    <div className="h-44 overflow-hidden">
+                      <img src={pkg.cover_image_url} alt={pkg.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     </div>
-                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">{pkg.short_description}</p>
-                    <div className="flex flex-wrap gap-2 text-xs text-gray-400 mb-4">
-                      {pkg.pickup_time_label && <span>🕐 {pkg.pickup_time_label}</span>}
-                      {pkg.duration_label && <span>⏱ {pkg.duration_label}</span>}
+                  ) : (
+                    <div className="h-44 bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center">
+                      <span className="text-5xl opacity-40">🌴</span>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-emerald-700">{getDisplayPrice(pkg)}</span>
-                    <span className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white group-hover:bg-emerald-700 transition-colors">
-                      Book Now →
-                    </span>
+                  )}
+                  <div className="p-5 flex-1 flex flex-col">
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <h3 className="font-bold text-[#134e4a] group-hover:text-emerald-700 transition-colors leading-tight">
+                          {pkg.title}
+                        </h3>
+                        {pkg.is_weather_dependent && (
+                          <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600">🌤</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 mb-3 line-clamp-2">{pkg.short_description}</p>
+                      <div className="flex flex-wrap gap-2 text-xs text-gray-400 mb-3">
+                        {pkg.pickup_time_label && <span>🕐 {pkg.pickup_time_label}</span>}
+                        {pkg.duration_label && <span>⏱ {pkg.duration_label}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xl font-bold text-emerald-700">{getDisplayPrice(pkg)}</span>
+                      <span className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white group-hover:bg-emerald-700 transition-colors">
+                        Book Now →
+                      </span>
+                    </div>
                   </div>
                 </Link>
               ))}
@@ -119,9 +124,20 @@ export default async function ToursPage() {
             <div className="space-y-3">
               {regular.map(pkg => (
                 <Link key={pkg.id} href={`/tours/${pkg.id}`}
-                  className="group flex flex-wrap items-center gap-4 rounded-2xl border-2 border-gray-100 bg-white p-5 hover:border-emerald-200 hover:shadow-sm transition-all">
+                  className="group flex items-center gap-4 rounded-2xl border-2 border-gray-100 bg-white p-4 hover:border-emerald-200 hover:shadow-sm transition-all overflow-hidden">
+                  {/* Thumbnail */}
+                  {pkg.cover_image_url ? (
+                    <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden">
+                      <img src={pkg.cover_image_url} alt={pkg.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 shrink-0 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center">
+                      <span className="text-2xl opacity-40">🌴</span>
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <h3 className="font-bold text-[#134e4a] group-hover:text-emerald-700 transition-colors">
                         {pkg.title}
                       </h3>
@@ -147,7 +163,6 @@ export default async function ToursPage() {
           </div>
         )}
 
-        {/* Empty state */}
         {(packages ?? []).length === 0 && (
           <div className="text-center py-16 text-gray-400">
             <div className="text-5xl mb-4">🌴</div>
@@ -157,7 +172,6 @@ export default async function ToursPage() {
         )}
 
         <ToursContactForm />
-
       </div>
     </div>
   );
