@@ -945,8 +945,16 @@ function ManageCrewModal({ vessel, onClose, onSuccess }: {
     cls: role === "captain" ? "bg-[#0c7b93]/15 text-[#0c7b93]" : role === "deck_crew" ? "bg-teal-100 text-teal-800" : "bg-purple-100 text-purple-800",
   });
 
+  const roleMap: Record<string, string> = {
+    captain: "captain",
+    deck_crew: "crew",
+    ticket_booth: "ticket_booth",
+  };
+  const requiredProfileRole = roleMap[selectedRole] ?? selectedRole;
   const availableStaff = staff.filter(
-    (s) => !vessel.crew.some((c) => c.profile_id === s.id && c.assignment_role === selectedRole)
+    (s) =>
+      s.role === requiredProfileRole &&
+      !vessel.crew.some((c) => c.profile_id === s.id && c.assignment_role === selectedRole)
   );
 
   return (

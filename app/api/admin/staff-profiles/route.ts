@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 // GET /api/admin/staff-profiles
-// Returns all captain, crew, ticket_booth profiles for crew assignment dropdown
+// Returns captain, crew, ticket_booth profiles for crew assignment dropdown
+// Excludes vessel_owner — they are financial partners, not operational crew
 export async function GET(_req: NextRequest) {
   const supabase = await createClient();
 
@@ -15,10 +16,13 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // ── Only return actual operational staff roles ──────────────────────────
+  // captain, crew, ticket_booth — NOT vessel_owner (financial role, not crew)
   const { data, error } = await supabase
     .from("profiles")
     .select("id, full_name, role")
-    .in("role", ["captain", "crew", "ticket_booth", "vessel_owner"])
+    .in("role", ["captain", "crew", "ticket_booth"])
+    .order("role")
     .order("full_name");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -39,6 +39,7 @@ const ROLE_STYLES: Record<string, string> = {
   tour_operator: "bg-emerald-100 text-emerald-800",
   tour_guide:    "bg-blue-100 text-blue-800",
 };
+
 const ROLE_LABELS: Record<string, string> = {
   admin:         "Admin",
   captain:       "Captain",
@@ -51,8 +52,69 @@ const ROLE_LABELS: Record<string, string> = {
   tour_guide:    "Tour Guide",
 };
 
+// ── Roles that require vessel assignment after promotion ─────────────────────
+const VESSEL_ROLES = ["captain", "crew", "ticket_booth"];
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// ── Post-promotion action banner ─────────────────────────────────────────────
+function PromotionBanner({
+  user, newRole, onDismiss,
+}: {
+  user: { id: string; name: string | null };
+  newRole: string;
+  onDismiss: () => void;
+}) {
+  const isVesselOwner = newRole === "vessel_owner";
+  const isVesselStaff = VESSEL_ROLES.includes(newRole);
+
+  if (!isVesselOwner && !isVesselStaff) return null;
+
+  const name = user.name ?? "This user";
+
+  if (isVesselOwner) {
+    return (
+      <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-5 py-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-bold text-amber-900">🚢 {name} is now a Vessel Owner</p>
+          <p className="mt-1 text-sm text-amber-800">
+            Role saved — they need a <strong>vessel assigned</strong> before their dashboard shows data.
+            Go to <strong>Vessel Owners</strong> to assign their vessel and set patronage bonus %.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link href="/admin/vessel-owners"
+            className="inline-flex items-center rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 transition-colors">
+            Assign Vessel →
+          </Link>
+          <button type="button" onClick={onDismiss} className="text-amber-600 hover:text-amber-800 text-lg font-bold px-1">×</button>
+        </div>
+      </div>
+    );
+  }
+
+  // captain, crew, ticket_booth
+  const roleLabel = ROLE_LABELS[newRole] ?? newRole;
+  return (
+    <div className="rounded-xl border-2 border-teal-300 bg-teal-50 px-5 py-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p className="font-bold text-teal-900">✅ {name} is now {roleLabel}</p>
+        <p className="mt-1 text-sm text-teal-800">
+          Role saved — they need to be <strong>assigned to a vessel</strong> before they can see their dashboard.
+          Go to <strong>Fleet & Schedule</strong> → open their vessel → <strong>Manage Crew</strong>.
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <Link href="/admin/vessels"
+          className="inline-flex items-center rounded-xl bg-teal-600 px-4 py-2 text-sm font-bold text-white hover:bg-teal-700 transition-colors">
+          Assign to Vessel →
+        </Link>
+        <button type="button" onClick={onDismiss} className="text-teal-600 hover:text-teal-800 text-lg font-bold px-1">×</button>
+      </div>
+    </div>
+  );
 }
 
 export function UserManagementClient({ users, currentUserId }: Props) {
@@ -62,8 +124,7 @@ export function UserManagementClient({ users, currentUserId }: Props) {
   const [changingRole, setChangingRole] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [error, setError] = useState("");
-  // Track recently promoted vessel owners to show assign-vessel banner
-  const [vesselOwnerPromoted, setVesselOwnerPromoted] = useState<{ id: string; name: string | null } | null>(null);
+  const [promotionBanner, setPromotionBanner] = useState<{ id: string; name: string | null; newRole: string } | null>(null);
 
   const filtered = useMemo(() => {
     return users.filter((u) => {
@@ -82,7 +143,7 @@ export function UserManagementClient({ users, currentUserId }: Props) {
     }
     setChangingRole(userId);
     setError("");
-    setVesselOwnerPromoted(null);
+    setPromotionBanner(null);
     try {
       const res = await fetch(`/api/admin/users/${userId}/role`, {
         method: "PATCH",
@@ -92,9 +153,9 @@ export function UserManagementClient({ users, currentUserId }: Props) {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to update role."); return; }
 
-      // Show assign-vessel reminder when promoting to vessel_owner
-      if (newRole === "vessel_owner") {
-        setVesselOwnerPromoted({ id: userId, name: userName });
+      // Show assignment reminder for roles that need vessel assignment
+      if (newRole === "vessel_owner" || VESSEL_ROLES.includes(newRole)) {
+        setPromotionBanner({ id: userId, name: userName, newRole });
       }
 
       router.refresh();
@@ -132,43 +193,18 @@ export function UserManagementClient({ users, currentUserId }: Props) {
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
-      {/* Vessel Owner assignment reminder banner — appears after promoting a user */}
-      {vesselOwnerPromoted && (
-        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-5 py-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="font-semibold text-amber-900">
-              🚢 {vesselOwnerPromoted.name ?? "This user"} is now a Vessel Owner
-            </p>
-            <p className="mt-1 text-sm text-amber-800">
-              Role saved — but they need a <strong>vessel assigned</strong> before their dashboard shows any data.
-              Go to <strong>Vessel Owners</strong> to assign a vessel and set their patronage bonus %.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              href="/admin/vessel-owners"
-              className="inline-flex items-center rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 transition-colors"
-            >
-              Assign Vessel →
-            </Link>
-            <button
-              type="button"
-              onClick={() => setVesselOwnerPromoted(null)}
-              className="text-amber-600 hover:text-amber-800 text-lg font-bold px-1"
-              aria-label="Dismiss"
-            >
-              ×
-            </button>
-          </div>
-        </div>
+      {/* Post-promotion banner */}
+      {promotionBanner && (
+        <PromotionBanner
+          user={{ id: promotionBanner.id, name: promotionBanner.name }}
+          newRole={promotionBanner.newRole}
+          onDismiss={() => setPromotionBanner(null)}
+        />
       )}
 
-      {/* User count */}
-      <p className="text-xs text-[#0f766e]">
-        Showing {filtered.length} of {users.length} users
-      </p>
+      <p className="text-xs text-[#0f766e]">Showing {filtered.length} of {users.length} users</p>
 
-      {/* Table — desktop */}
+      {/* ── Desktop table ── */}
       <div className="hidden md:block rounded-2xl border border-teal-200 bg-white overflow-hidden shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-teal-50/80 border-b border-teal-100">
@@ -183,9 +219,7 @@ export function UserManagementClient({ users, currentUserId }: Props) {
           <tbody className="divide-y divide-teal-50">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-sm text-[#0f766e]/60">
-                  No users found.
-                </td>
+                <td colSpan={5} className="px-5 py-8 text-center text-sm text-[#0f766e]/60">No users found.</td>
               </tr>
             ) : (
               filtered.map((u) => (
@@ -204,10 +238,15 @@ export function UserManagementClient({ users, currentUserId }: Props) {
                     <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${ROLE_STYLES[u.role] ?? "bg-gray-100 text-gray-700"}`}>
                       {ROLE_LABELS[u.role] ?? u.role}
                     </span>
-                    {/* Persistent reminder for all vessel owners without vessel assignments */}
+                    {/* ── Vessel assignment shortcut links ── */}
                     {u.role === "vessel_owner" && (
                       <Link href="/admin/vessel-owners" className="block mt-1 text-xs text-amber-600 hover:underline font-medium">
                         🚢 Manage vessel →
+                      </Link>
+                    )}
+                    {VESSEL_ROLES.includes(u.role) && (
+                      <Link href="/admin/vessels" className="block mt-1 text-xs text-teal-600 hover:underline font-medium">
+                        ⚓ Assign to vessel →
                       </Link>
                     )}
                   </td>
@@ -215,9 +254,7 @@ export function UserManagementClient({ users, currentUserId }: Props) {
                     <span className="text-sm text-[#134e4a] font-medium">{u.booking_count}</span>
                     <span className="text-xs text-[#0f766e]/60 ml-1">booking{u.booking_count !== 1 ? "s" : ""}</span>
                   </td>
-                  <td className="px-5 py-4 text-xs text-[#0f766e]">
-                    {formatDate(u.created_at)}
-                  </td>
+                  <td className="px-5 py-4 text-xs text-[#0f766e]">{formatDate(u.created_at)}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
                       <select
@@ -233,11 +270,8 @@ export function UserManagementClient({ users, currentUserId }: Props) {
                       {changingRole === u.id && (
                         <span className="text-xs text-[#0f766e] animate-pulse">Saving…</span>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedUser(u)}
-                        className="text-xs text-[#0c7b93] hover:underline font-medium"
-                      >
+                      <button type="button" onClick={() => setSelectedUser(u)}
+                        className="text-xs text-[#0c7b93] hover:underline font-medium">
                         View
                       </button>
                     </div>
@@ -249,7 +283,7 @@ export function UserManagementClient({ users, currentUserId }: Props) {
         </table>
       </div>
 
-      {/* Cards — mobile */}
+      {/* ── Mobile cards ── */}
       <div className="md:hidden space-y-3">
         {filtered.map((u) => (
           <div key={u.id} className={`rounded-2xl border bg-white p-4 shadow-sm ${u.id === currentUserId ? "border-amber-200" : "border-teal-200"}`}>
@@ -262,7 +296,9 @@ export function UserManagementClient({ users, currentUserId }: Props) {
                   )}
                 </p>
                 <p className="text-xs text-[#0f766e]">{u.email}</p>
-                <p className="text-xs text-[#0f766e]/60 mt-1">Joined {formatDate(u.created_at)} · {u.booking_count} booking{u.booking_count !== 1 ? "s" : ""}</p>
+                <p className="text-xs text-[#0f766e]/60 mt-1">
+                  Joined {formatDate(u.created_at)} · {u.booking_count} booking{u.booking_count !== 1 ? "s" : ""}
+                </p>
               </div>
               <div className="text-right shrink-0">
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ROLE_STYLES[u.role] ?? "bg-gray-100 text-gray-700"}`}>
@@ -271,6 +307,11 @@ export function UserManagementClient({ users, currentUserId }: Props) {
                 {u.role === "vessel_owner" && (
                   <Link href="/admin/vessel-owners" className="block mt-1 text-xs text-amber-600 hover:underline font-medium">
                     🚢 Manage vessel →
+                  </Link>
+                )}
+                {VESSEL_ROLES.includes(u.role) && (
+                  <Link href="/admin/vessels" className="block mt-1 text-xs text-teal-600 hover:underline font-medium">
+                    ⚓ Assign to vessel →
                   </Link>
                 )}
               </div>
@@ -292,7 +333,6 @@ export function UserManagementClient({ users, currentUserId }: Props) {
         ))}
       </div>
 
-      {/* User detail modal */}
       {selectedUser && (
         <UserDetailModal user={selectedUser} onClose={() => setSelectedUser(null)} />
       )}
@@ -300,8 +340,7 @@ export function UserManagementClient({ users, currentUserId }: Props) {
   );
 }
 
-// ─── User Detail Modal ─────────────────────────────────────────────────────────
-
+// ── User Detail Modal ─────────────────────────────────────────────────────────
 function UserDetailModal({ user, onClose }: { user: UserRow; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
@@ -326,12 +365,12 @@ function UserDetailModal({ user, onClose }: { user: UserRow; onClose: () => void
 
           <div className="rounded-xl bg-teal-50/50 border border-teal-100 divide-y divide-teal-100">
             {[
-              { label: "Email", value: user.email },
-              { label: "Mobile", value: user.mobile },
-              { label: "Address", value: user.address },
-              { label: "Joined", value: formatDate(user.created_at) },
+              { label: "Email",    value: user.email },
+              { label: "Mobile",   value: user.mobile },
+              { label: "Address",  value: user.address },
+              { label: "Joined",   value: formatDate(user.created_at) },
               { label: "Bookings", value: `${user.booking_count} booking${user.booking_count !== 1 ? "s" : ""}` },
-              { label: "User ID", value: user.id.slice(0, 8) + "…" },
+              { label: "User ID",  value: user.id.slice(0, 8) + "…" },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between px-4 py-2.5 text-sm">
                 <span className="text-[#0f766e] font-medium">{label}</span>
@@ -340,14 +379,17 @@ function UserDetailModal({ user, onClose }: { user: UserRow; onClose: () => void
             ))}
           </div>
 
-          {/* Vessel owner: shortcut to vessel assignment page */}
+          {/* Action shortcuts based on role */}
           {user.role === "vessel_owner" && (
-            <Link
-              href="/admin/vessel-owners"
-              onClick={onClose}
-              className="flex items-center justify-center w-full min-h-[44px] rounded-xl border-2 border-amber-300 bg-amber-50 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
-            >
+            <Link href="/admin/vessel-owners" onClick={onClose}
+              className="flex items-center justify-center w-full min-h-[44px] rounded-xl border-2 border-amber-300 bg-amber-50 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition-colors">
               🚢 Manage Vessel Assignment →
+            </Link>
+          )}
+          {VESSEL_ROLES.includes(user.role) && (
+            <Link href="/admin/vessels" onClick={onClose}
+              className="flex items-center justify-center w-full min-h-[44px] rounded-xl border-2 border-teal-300 bg-teal-50 text-sm font-semibold text-teal-800 hover:bg-teal-100 transition-colors">
+              ⚓ Assign to Vessel (Fleet page) →
             </Link>
           )}
 
