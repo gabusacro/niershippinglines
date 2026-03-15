@@ -52,14 +52,12 @@ const ROLE_LABELS: Record<string, string> = {
   tour_guide:    "Tour Guide",
 };
 
-// ── Roles that require vessel assignment after promotion ─────────────────────
 const VESSEL_ROLES = ["captain", "crew", "ticket_booth"];
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 }
 
-// ── Post-promotion action banner ─────────────────────────────────────────────
 function PromotionBanner({
   user, newRole, onDismiss,
 }: {
@@ -69,20 +67,18 @@ function PromotionBanner({
 }) {
   const isVesselOwner = newRole === "vessel_owner";
   const isVesselStaff = VESSEL_ROLES.includes(newRole);
-
   if (!isVesselOwner && !isVesselStaff) return null;
-
   const name = user.name ?? "This user";
 
   if (isVesselOwner) {
     return (
       <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-5 py-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-bold text-amber-900">🚢 {name} is now a Vessel Owner</p>
-          <p className="mt-1 text-sm text-amber-800">
+          <div className="font-bold text-amber-900">🚢 {name} is now a Vessel Owner</div>
+          <div className="mt-1 text-sm text-amber-800">
             Role saved — they need a <strong>vessel assigned</strong> before their dashboard shows data.
             Go to <strong>Vessel Owners</strong> to assign their vessel and set patronage bonus %.
-          </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link href="/admin/vessel-owners"
@@ -95,16 +91,15 @@ function PromotionBanner({
     );
   }
 
-  // captain, crew, ticket_booth
   const roleLabel = ROLE_LABELS[newRole] ?? newRole;
   return (
     <div className="rounded-xl border-2 border-teal-300 bg-teal-50 px-5 py-4 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="font-bold text-teal-900">✅ {name} is now {roleLabel}</p>
-        <p className="mt-1 text-sm text-teal-800">
+        <div className="font-bold text-teal-900">✅ {name} is now {roleLabel}</div>
+        <div className="mt-1 text-sm text-teal-800">
           Role saved — they need to be <strong>assigned to a vessel</strong> before they can see their dashboard.
-          Go to <strong>Fleet & Schedule</strong> → open their vessel → <strong>Manage Crew</strong>.
-        </p>
+          Go to <strong>Fleet &amp; Schedule</strong> → open their vessel → <strong>Manage Crew</strong>.
+        </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <Link href="/admin/vessels"
@@ -152,12 +147,9 @@ export function UserManagementClient({ users, currentUserId }: Props) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to update role."); return; }
-
-      // Show assignment reminder for roles that need vessel assignment
       if (newRole === "vessel_owner" || VESSEL_ROLES.includes(newRole)) {
         setPromotionBanner({ id: userId, name: userName, newRole });
       }
-
       router.refresh();
     } catch {
       setError("Network error.");
@@ -168,6 +160,7 @@ export function UserManagementClient({ users, currentUserId }: Props) {
 
   return (
     <div className="space-y-4">
+
       {/* Search + Filter */}
       <div className="flex flex-wrap gap-3">
         <input
@@ -193,7 +186,6 @@ export function UserManagementClient({ users, currentUserId }: Props) {
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
-      {/* Post-promotion banner */}
       {promotionBanner && (
         <PromotionBanner
           user={{ id: promotionBanner.id, name: promotionBanner.name }}
@@ -202,7 +194,7 @@ export function UserManagementClient({ users, currentUserId }: Props) {
         />
       )}
 
-      <p className="text-xs text-[#0f766e]">Showing {filtered.length} of {users.length} users</p>
+      <div className="text-xs text-[#0f766e]">Showing {filtered.length} of {users.length} users</div>
 
       {/* ── Desktop table ── */}
       <div className="hidden md:block rounded-2xl border border-teal-200 bg-white overflow-hidden shadow-sm">
@@ -224,21 +216,24 @@ export function UserManagementClient({ users, currentUserId }: Props) {
             ) : (
               filtered.map((u) => (
                 <tr key={u.id} className={`hover:bg-teal-50/30 transition-colors ${u.id === currentUserId ? "bg-amber-50/30" : ""}`}>
+
+                  {/* User cell */}
                   <td className="px-5 py-4">
-                    <p className="font-semibold text-[#134e4a]">
-                      {u.full_name ?? <span className="italic text-gray-400">No name</span>}
+                    <div className="font-semibold text-[#134e4a]">
+                      {u.full_name ?? <span className="italic text-gray-400 text-xs">No name</span>}
                       {u.id === currentUserId && (
                         <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">You</span>
                       )}
-                    </p>
-                    <p className="text-xs text-[#0f766e] mt-0.5">{u.email ?? "—"}</p>
-                    {u.mobile && <p className="text-xs text-[#0f766e]/60">{u.mobile}</p>}
+                    </div>
+                    <div className="text-xs text-[#0f766e] mt-0.5">{u.email ?? "—"}</div>
+                    {u.mobile && <div className="text-xs text-[#0f766e]/60">{u.mobile}</div>}
                   </td>
+
+                  {/* Role cell */}
                   <td className="px-5 py-4">
                     <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${ROLE_STYLES[u.role] ?? "bg-gray-100 text-gray-700"}`}>
                       {ROLE_LABELS[u.role] ?? u.role}
                     </span>
-                    {/* ── Vessel assignment shortcut links ── */}
                     {u.role === "vessel_owner" && (
                       <Link href="/admin/vessel-owners" className="block mt-1 text-xs text-amber-600 hover:underline font-medium">
                         🚢 Manage vessel →
@@ -250,11 +245,17 @@ export function UserManagementClient({ users, currentUserId }: Props) {
                       </Link>
                     )}
                   </td>
+
+                  {/* Bookings cell */}
                   <td className="px-5 py-4">
                     <span className="text-sm text-[#134e4a] font-medium">{u.booking_count}</span>
                     <span className="text-xs text-[#0f766e]/60 ml-1">booking{u.booking_count !== 1 ? "s" : ""}</span>
                   </td>
+
+                  {/* Joined cell */}
                   <td className="px-5 py-4 text-xs text-[#0f766e]">{formatDate(u.created_at)}</td>
+
+                  {/* Actions cell */}
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
                       <select
@@ -270,12 +271,16 @@ export function UserManagementClient({ users, currentUserId }: Props) {
                       {changingRole === u.id && (
                         <span className="text-xs text-[#0f766e] animate-pulse">Saving…</span>
                       )}
-                      <button type="button" onClick={() => setSelectedUser(u)}
-                        className="text-xs text-[#0c7b93] hover:underline font-medium">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedUser(u)}
+                        className="text-xs text-[#0c7b93] hover:underline font-medium"
+                      >
                         View
                       </button>
                     </div>
                   </td>
+
                 </tr>
               ))
             )}
@@ -289,16 +294,16 @@ export function UserManagementClient({ users, currentUserId }: Props) {
           <div key={u.id} className={`rounded-2xl border bg-white p-4 shadow-sm ${u.id === currentUserId ? "border-amber-200" : "border-teal-200"}`}>
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-semibold text-[#134e4a]">
-                  {u.full_name ?? <span className="italic text-gray-400">No name</span>}
+                <div className="font-semibold text-[#134e4a]">
+                  {u.full_name ?? <span className="italic text-gray-400 text-xs">No name</span>}
                   {u.id === currentUserId && (
                     <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">You</span>
                   )}
-                </p>
-                <p className="text-xs text-[#0f766e]">{u.email}</p>
-                <p className="text-xs text-[#0f766e]/60 mt-1">
+                </div>
+                <div className="text-xs text-[#0f766e]">{u.email}</div>
+                <div className="text-xs text-[#0f766e]/60 mt-1">
                   Joined {formatDate(u.created_at)} · {u.booking_count} booking{u.booking_count !== 1 ? "s" : ""}
-                </p>
+                </div>
               </div>
               <div className="text-right shrink-0">
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${ROLE_STYLES[u.role] ?? "bg-gray-100 text-gray-700"}`}>
@@ -336,6 +341,7 @@ export function UserManagementClient({ users, currentUserId }: Props) {
       {selectedUser && (
         <UserDetailModal user={selectedUser} onClose={() => setSelectedUser(null)} />
       )}
+
     </div>
   );
 }
@@ -343,11 +349,13 @@ export function UserManagementClient({ users, currentUserId }: Props) {
 // ── User Detail Modal ─────────────────────────────────────────────────────────
 function UserDetailModal({ user, onClose }: { user: UserRow; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-teal-100">
         <div className="border-b border-teal-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-base font-bold text-[#134e4a]">User Profile</h2>
+          <div className="text-base font-bold text-[#134e4a]">User Profile</div>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold p-1">×</button>
         </div>
         <div className="p-6 space-y-3">
@@ -356,7 +364,7 @@ function UserDetailModal({ user, onClose }: { user: UserRow; onClose: () => void
               {user.full_name?.charAt(0)?.toUpperCase() ?? "?"}
             </div>
             <div>
-              <p className="font-bold text-[#134e4a]">{user.full_name ?? "No name"}</p>
+              <div className="font-bold text-[#134e4a]">{user.full_name ?? "No name"}</div>
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ROLE_STYLES[user.role] ?? "bg-gray-100 text-gray-700"}`}>
                 {ROLE_LABELS[user.role] ?? user.role}
               </span>
@@ -379,22 +387,30 @@ function UserDetailModal({ user, onClose }: { user: UserRow; onClose: () => void
             ))}
           </div>
 
-          {/* Action shortcuts based on role */}
           {user.role === "vessel_owner" && (
-            <Link href="/admin/vessel-owners" onClick={onClose}
-              className="flex items-center justify-center w-full min-h-[44px] rounded-xl border-2 border-amber-300 bg-amber-50 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition-colors">
+            <Link
+              href="/admin/vessel-owners"
+              onClick={onClose}
+              className="flex items-center justify-center w-full min-h-[44px] rounded-xl border-2 border-amber-300 bg-amber-50 text-sm font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
+            >
               🚢 Manage Vessel Assignment →
             </Link>
           )}
           {VESSEL_ROLES.includes(user.role) && (
-            <Link href="/admin/vessels" onClick={onClose}
-              className="flex items-center justify-center w-full min-h-[44px] rounded-xl border-2 border-teal-300 bg-teal-50 text-sm font-semibold text-teal-800 hover:bg-teal-100 transition-colors">
+            <Link
+              href="/admin/vessels"
+              onClick={onClose}
+              className="flex items-center justify-center w-full min-h-[44px] rounded-xl border-2 border-teal-300 bg-teal-50 text-sm font-semibold text-teal-800 hover:bg-teal-100 transition-colors"
+            >
               ⚓ Assign to Vessel (Fleet page) →
             </Link>
           )}
 
-          <button type="button" onClick={onClose}
-            className="w-full min-h-[44px] rounded-xl border-2 border-teal-200 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full min-h-[44px] rounded-xl border-2 border-teal-200 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors"
+          >
             Close
           </button>
         </div>
