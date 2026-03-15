@@ -9,6 +9,8 @@ export type TodayTripForCrew = {
   route: { display_name?: string; origin?: string; destination?: string } | null;
   /** True if this trip has already departed (Manila time). */
   departed: boolean;
+  online_quota: number;
+  online_booked: number;
 };
 
 /**
@@ -23,7 +25,7 @@ export async function getTodaysTripsForBoats(boatIds: string[]): Promise<TodayTr
 
   const { data, error } = await supabase
     .from("trips")
-    .select("id, departure_date, departure_time, boat:boats(id, name), route:routes(display_name, origin, destination)")
+    .select("id, departure_date, departure_time, online_quota, online_booked, boat:boats(id, name), route:routes(display_name, origin, destination)")
     .eq("departure_date", today)
     .eq("status", "scheduled")
     .in("boat_id", boatIds)
@@ -38,6 +40,8 @@ export async function getTodaysTripsForBoats(boatIds: string[]): Promise<TodayTr
     boat: t.boat as TodayTripForCrew["boat"],
     route: t.route as TodayTripForCrew["route"],
     departed: isTripDeparted(t.departure_date, t.departure_time ?? ""),
+    online_quota: (t as unknown as { online_quota?: number }).online_quota ?? 0,
+    online_booked: (t as unknown as { online_booked?: number }).online_booked ?? 0,
   }));
 }
 
