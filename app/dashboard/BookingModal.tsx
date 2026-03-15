@@ -723,31 +723,42 @@ export function BookingModal({
       if (t==="infant")  return infantExtras[i]  ?? e;
       return e;
     };
-    const name  = getName(fromType, fromIndex);
-    const extra = getExtra(fromType, fromIndex);
+    const getAddress = (t: string, i: number): string => {
+      if (t==="adult")   return adultAddresses[i]   ?? "";
+      if (t==="senior")  return seniorAddresses[i]  ?? "";
+      if (t==="pwd")     return pwdAddresses[i]     ?? "";
+      if (t==="student") return studentAddresses[i] ?? "";
+      if (t==="child")   return childAddresses[i]   ?? "";
+      if (t==="infant")  return infantAddresses[i]  ?? "";
+      return "";
+    };
+    const name    = getName(fromType, fromIndex);
+    const extra   = getExtra(fromType, fromIndex);
+    const address = getAddress(fromType, fromIndex);
 
-    const rm = (names: string[], setN: (v:string[])=>void, setC: (v:number)=>void, extras: PassengerExtra[], setE: (v:PassengerExtra[])=>void) => {
+    const rm = (names: string[], setN: (v:string[])=>void, setC: (v:number)=>void, extras: PassengerExtra[], setE: (v:PassengerExtra[])=>void, addresses: string[], setA: (v:string[])=>void) => {
       const nn = names.filter((_,i)=>i!==fromIndex);
       const ne = extras.filter((_,i)=>i!==fromIndex);
-      setN(nn); setE(ne); setC(nn.length);
+      const na = addresses.filter((_,i)=>i!==fromIndex);
+      setN(nn); setE(ne); setA(na); setC(nn.length);
     };
-    if (fromType==="adult")   rm(adultNames,   setAdultNames,   setCountAdult,   adultExtras,   setAdultExtras);
-    if (fromType==="senior")  rm(seniorNames,  setSeniorNames,  setCountSenior,  seniorExtras,  setSeniorExtras);
-    if (fromType==="pwd")     rm(pwdNames,     setPwdNames,     setCountPwd,     pwdExtras,     setPwdExtras);
-    if (fromType==="student") rm(studentNames, setStudentNames, setCountStudent, studentExtras, setStudentExtras);
-    if (fromType==="child")   rm(childNames,   setChildNames,   setCountChild,   childExtras,   setChildExtras);
-    if (fromType==="infant")  rm(infantNames,  setInfantNames,  setCountInfant,  infantExtras,  setInfantExtras);
+    if (fromType==="adult")   rm(adultNames,   setAdultNames,   setCountAdult,   adultExtras,   setAdultExtras,   adultAddresses,   setAdultAddresses);
+    if (fromType==="senior")  rm(seniorNames,  setSeniorNames,  setCountSenior,  seniorExtras,  setSeniorExtras,  seniorAddresses,  setSeniorAddresses);
+    if (fromType==="pwd")     rm(pwdNames,     setPwdNames,     setCountPwd,     pwdExtras,     setPwdExtras,     pwdAddresses,     setPwdAddresses);
+    if (fromType==="student") rm(studentNames, setStudentNames, setCountStudent, studentExtras, setStudentExtras, studentAddresses, setStudentAddresses);
+    if (fromType==="child")   rm(childNames,   setChildNames,   setCountChild,   childExtras,   setChildExtras,   childAddresses,   setChildAddresses);
+    if (fromType==="infant")  rm(infantNames,  setInfantNames,  setCountInfant,  infantExtras,  setInfantExtras,  infantAddresses,  setInfantAddresses);
 
-    const add = (names: string[], setN: (v:string[])=>void, setC: (v:number)=>void, extras: PassengerExtra[], setE: (v:PassengerExtra[])=>void) => {
-      setN([...names, name]); setE([...extras, extra]); setC(names.length+1);
+    const add = (names: string[], setN: (v:string[])=>void, setC: (v:number)=>void, extras: PassengerExtra[], setE: (v:PassengerExtra[])=>void, addresses: string[], setA: (v:string[])=>void) => {
+      setN([...names, name]); setE([...extras, extra]); setA([...addresses, address]); setC(names.length+1);
     };
-    if (toType==="adult")   add(adultNames,   setAdultNames,   setCountAdult,   adultExtras,   setAdultExtras);
-    if (toType==="senior")  add(seniorNames,  setSeniorNames,  setCountSenior,  seniorExtras,  setSeniorExtras);
-    if (toType==="pwd")     add(pwdNames,     setPwdNames,     setCountPwd,     pwdExtras,     setPwdExtras);
-    if (toType==="student") add(studentNames, setStudentNames, setCountStudent, studentExtras, setStudentExtras);
-    if (toType==="child")   add(childNames,   setChildNames,   setCountChild,   childExtras,   setChildExtras);
-    if (toType==="infant")  add(infantNames,  setInfantNames,  setCountInfant,  infantExtras,  setInfantExtras);
-  }, [adultNames,seniorNames,pwdNames,studentNames,childNames,infantNames,adultExtras,seniorExtras,pwdExtras,studentExtras,childExtras,infantExtras]);
+    if (toType==="adult")   add(adultNames,   setAdultNames,   setCountAdult,   adultExtras,   setAdultExtras,   adultAddresses,   setAdultAddresses);
+    if (toType==="senior")  add(seniorNames,  setSeniorNames,  setCountSenior,  seniorExtras,  setSeniorExtras,  seniorAddresses,  setSeniorAddresses);
+    if (toType==="pwd")     add(pwdNames,     setPwdNames,     setCountPwd,     pwdExtras,     setPwdExtras,     pwdAddresses,     setPwdAddresses);
+    if (toType==="student") add(studentNames, setStudentNames, setCountStudent, studentExtras, setStudentExtras, studentAddresses, setStudentAddresses);
+    if (toType==="child")   add(childNames,   setChildNames,   setCountChild,   childExtras,   setChildExtras,   childAddresses,   setChildAddresses);
+    if (toType==="infant")  add(infantNames,  setInfantNames,  setCountInfant,  infantExtras,  setInfantExtras,  infantAddresses,  setInfantAddresses);
+  }, [adultNames,seniorNames,pwdNames,studentNames,childNames,infantNames,adultExtras,seniorExtras,pwdExtras,studentExtras,childExtras,infantExtras,adultAddresses,seniorAddresses,pwdAddresses,studentAddresses,childAddresses,infantAddresses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
