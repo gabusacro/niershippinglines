@@ -104,7 +104,9 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
     setMonthYear({ year: now.getFullYear(), month: now.getMonth() + 1 });
   }, []);
   const [data,    setData]    = useState<SummaryTotals | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // ── Compute date range from current mode + offset ─────────────────────────
   const getDateRange = useCallback((): { start: string; end: string; label: string } => {
@@ -135,8 +137,10 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const { label } = getDateRange();
-  const today = getTodayManila();
+  const [today, setToday] = useState("");
+  useEffect(() => { setToday(getTodayManila()); }, []);
+  const [label, setLabel] = useState("Today");
+  useEffect(() => { setLabel(getDateRange().label); }, [getDateRange]);
   const isToday = mode === "day" && dayOffset === 0;
   const isThisWeek = mode === "week" && weekOffset === 0;
   const [nowMonth, setNowMonth] = useState({ year: 2026, month: 1 });
@@ -223,7 +227,7 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
         </button>
       </div>
 
-      {loading ? (
+      {!mounted || loading ? (
         <div className="py-10 text-center text-sm text-[#0f766e] animate-pulse">Loading…</div>
       ) : !data ? (
         <div className="py-10 text-center text-sm text-[#0f766e]/60">No data available.</div>
