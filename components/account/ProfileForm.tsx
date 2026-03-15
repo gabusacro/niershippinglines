@@ -73,19 +73,30 @@ export function ProfileForm({ initialData, authEmail }: Props) {
 
   const age = calculateAge(birthdate);
 
-  const inputClass = "mt-1 block w-full rounded-lg border border-teal-200 px-3 py-2 text-[#134e4a] focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/30";
-  const labelClass = "block text-sm font-medium text-[#134e4a]";
+  const inputClass = "mt-1 block w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2.5 text-[#134e4a] focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/20 transition-colors";
+  const labelClass = "block text-sm font-semibold text-[#134e4a]";
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (newEmail && newEmail === authEmail) {
+
+    if (newEmail && newEmail.trim() === authEmail) {
       toast.showError("New email must be different from your current email.");
       return;
     }
-    if (recoveryEmail && recoveryEmail === (newEmail || authEmail)) {
-      toast.showError("Recovery email must differ from your main email.");
+
+    // ── Recovery email fix ────────────────────────────────────────────────
+    // Only block if user is ACTIVELY CHANGING recovery email to match main email.
+    // If recovery email is the same as the saved value (pre-filled), allow it.
+    // The point of recovery email is to have a backup — it CAN be different
+    // but we should NOT block saving if they haven't touched this field.
+    const recoveryTrimmed = recoveryEmail.trim();
+    const effectiveMainEmail = newEmail.trim() || authEmail;
+    const recoveryChanged = recoveryTrimmed !== (initialData.recovery_email ?? "").trim();
+    if (recoveryChanged && recoveryTrimmed && recoveryTrimmed === effectiveMainEmail) {
+      toast.showError("Recovery email should be different from your main email so you can use it as a backup.");
       return;
     }
+
     setSaving(true);
     try {
       const body: Record<string, string | null> = {
@@ -95,7 +106,7 @@ export function ProfileForm({ initialData, authEmail }: Props) {
         gender: gender || null,
         birthdate: birthdate || null,
         nationality: nationality || "Filipino",
-        recovery_email: recoveryEmail.trim() || null,
+        recovery_email: recoveryTrimmed || null,
         mobile: mobile.trim() || null,
         emergency_contact_name: emergencyContactName.trim() || null,
         emergency_contact_number: emergencyContactNumber.trim() || null,
@@ -111,7 +122,7 @@ export function ProfileForm({ initialData, authEmail }: Props) {
       if (!res.ok) throw new Error(data.error ?? "Failed to save");
 
       if (newEmail.trim()) {
-        toast.showSuccess("Profile saved! Check your new email inbox to confirm the email change.");
+        toast.showSuccess("Profile saved! Check your new email inbox to confirm the change.");
       } else {
         toast.showSuccess("Profile saved successfully!");
       }
@@ -125,14 +136,16 @@ export function ProfileForm({ initialData, authEmail }: Props) {
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-5">
+    <form onSubmit={handleSave} className="space-y-6">
 
-      {/* Personal Info */}
-      <div className="rounded-xl border-2 border-teal-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[#134e4a]">Personal information</h2>
-        <p className="mt-1 text-sm text-[#0f766e]">Used on tickets and Coast Guard manifest.</p>
-
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* ── Personal Information ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="h-px flex-1 bg-teal-100"/>
+          <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">Personal</span>
+          <div className="h-px flex-1 bg-teal-100"/>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Salutation</label>
             <select value={salutation} onChange={(e) => setSalutation(e.target.value)} className={inputClass}>
@@ -142,12 +155,10 @@ export function ProfileForm({ initialData, authEmail }: Props) {
               <option value="Ms">Ms.</option>
             </select>
           </div>
-
           <div>
             <label className={labelClass}>Full name</label>
-            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
+            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} placeholder="Your full name" />
           </div>
-
           <div>
             <label className={labelClass}>Gender</label>
             <select value={gender} onChange={(e) => setGender(e.target.value)} className={inputClass}>
@@ -158,89 +169,88 @@ export function ProfileForm({ initialData, authEmail }: Props) {
               <option value="Prefer not to say">Prefer not to say</option>
             </select>
           </div>
-
           <div>
             <label className={labelClass}>Date of birth</label>
             <input type="date" value={birthdate} onChange={(e) => setBirthdate(e.target.value)}
               max={new Date().toISOString().split("T")[0]} className={inputClass} />
-            {age !== null && (
-              <p className="mt-1 text-xs text-[#0f766e]">Age: {age} years old</p>
-            )}
+            {age !== null && <p className="mt-1 text-xs text-[#0c7b93] font-medium">Age: {age} years old</p>}
           </div>
-
           <div>
             <label className={labelClass}>Nationality</label>
             <select value={nationality} onChange={(e) => setNationality(e.target.value)} className={inputClass}>
-              {COUNTRIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-
           <div>
             <label className={labelClass}>Address</label>
             <input type="text" value={address} onChange={(e) => setAddress(e.target.value)}
               className={inputClass} placeholder="For tickets and manifest" />
           </div>
-
-          <div>
+          <div className="sm:col-span-2">
             <label className={labelClass}>Mobile number</label>
             <input type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)}
               className={inputClass} placeholder="09XX XXX XXXX" />
-            <p className="mt-1 text-xs text-[#0f766e]/80">Used to pre-fill tour booking forms.</p>
+            <p className="mt-1 text-xs text-[#0f766e]/70">Used to pre-fill booking forms.</p>
           </div>
         </div>
       </div>
 
-      {/* Emergency Contact */}
-      <div className="rounded-xl border-2 border-teal-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[#134e4a]">Emergency contact</h2>
-        <p className="mt-1 text-sm text-[#0f766e]">Pre-filled in tour booking forms for your safety.</p>
-
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* ── Emergency Contact ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="h-px flex-1 bg-teal-100"/>
+          <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">Emergency contact</span>
+          <div className="h-px flex-1 bg-teal-100"/>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>Emergency contact name</label>
-            <input type="text" value={emergencyContactName}
-              onChange={(e) => setEmergencyContactName(e.target.value)}
+            <label className={labelClass}>Contact name</label>
+            <input type="text" value={emergencyContactName} onChange={(e) => setEmergencyContactName(e.target.value)}
               className={inputClass} placeholder="Juan Dela Cruz" />
           </div>
-
           <div>
-            <label className={labelClass}>Emergency contact number</label>
-            <input type="tel" value={emergencyContactNumber}
-              onChange={(e) => setEmergencyContactNumber(e.target.value)}
+            <label className={labelClass}>Contact number</label>
+            <input type="tel" value={emergencyContactNumber} onChange={(e) => setEmergencyContactNumber(e.target.value)}
               className={inputClass} placeholder="09XX XXX XXXX" />
           </div>
         </div>
       </div>
 
-      {/* Email Settings */}
-      <div className="rounded-xl border-2 border-teal-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[#134e4a]">Email settings</h2>
-        <p className="mt-1 text-sm text-[#0f766e]">Your current email: <span className="font-semibold">{authEmail}</span></p>
-
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* ── Email Settings ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="h-px flex-1 bg-teal-100"/>
+          <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">Email settings</span>
+          <div className="h-px flex-1 bg-teal-100"/>
+        </div>
+        <div className="mb-3 rounded-xl bg-teal-50 border border-teal-200 px-4 py-3">
+          <p className="text-xs text-[#0f766e]">
+            Current email: <span className="font-bold text-[#134e4a]">{authEmail}</span>
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>
-              Change email <span className="text-xs text-[#0f766e] font-normal">(optional)</span>
+              Change email <span className="text-xs font-normal text-[#0f766e]">(optional)</span>
             </label>
             <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
               className={inputClass} placeholder="Enter new email address" />
-            <p className="mt-1 text-xs text-[#0f766e]/80">You will receive a confirmation link at the new email.</p>
+            <p className="mt-1 text-xs text-[#0f766e]/70">A confirmation link will be sent to the new email.</p>
           </div>
-
           <div>
             <label className={labelClass}>
-              Recovery email <span className="text-xs text-[#0f766e] font-normal">(optional)</span>
+              Recovery email <span className="text-xs font-normal text-[#0f766e]">(optional)</span>
             </label>
             <input type="email" value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)}
               className={inputClass} placeholder="Backup email if you lose access" />
+            <p className="mt-1 text-xs text-[#0f766e]/70">Used to recover your account if you lose access.</p>
           </div>
         </div>
       </div>
 
+      {/* ── Save button ── */}
       <button type="submit" disabled={saving}
-        className="w-full rounded-xl bg-[#0c7b93] px-5 py-3 text-sm font-semibold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors">
+        className="w-full rounded-xl bg-[#0c7b93] px-5 py-3 text-sm font-bold text-white hover:bg-[#085f72] disabled:opacity-50 transition-colors shadow-sm">
         {saving ? "Saving..." : "Save profile"}
       </button>
     </form>
