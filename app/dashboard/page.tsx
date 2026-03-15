@@ -13,7 +13,6 @@ import { ClaimBookingFromRef } from "@/components/dashboard/ClaimBookingFromRef"
 import { ClaimGuestBookingsByEmail } from "@/components/dashboard/ClaimGuestBookingsByEmail";
 import { SetDisplayNameForm } from "@/app/dashboard/SetDisplayNameForm";
 import { SetAddressForm } from "@/app/dashboard/SetAddressForm";
-import { DashboardAutoRefresh } from "@/components/dashboard/DashboardAutoRefresh";
 import { ROUTES, GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
 import { getSiteBranding } from "@/lib/site-branding";
 import { getCrewCaptainAssignedBoatIds } from "@/lib/dashboard/get-crew-captain-assigned-boats";
@@ -21,6 +20,7 @@ import {
   getTodaysTripsForBoats,
   getCurrentTripFromTodays,
 } from "@/lib/dashboard/get-todays-trips-for-boats";
+import { getUpcomingTripsForBoats } from "@/lib/dashboard/get-upcoming-trips-for-boats";
 import { getTripManifestData } from "@/lib/admin/trip-manifest";
 import { getPassengerRestrictions, isBlockedNow } from "@/lib/dashboard/get-passenger-restrictions";
 import { CrewCaptainManifestSection } from "@/app/dashboard/CrewCaptainManifestSection";
@@ -129,12 +129,13 @@ export default async function DashboardPage({
     crewCaptainData = { boatIds, todayTrips, currentTrip, selectedTripId, manifest };
   }
 
-  // ── Ticket Booth data — ONLY assigned vessel, not all vessels ──────────────
+  // ── Ticket Booth data — ONLY assigned vessel ───────────────────────────────
   let ticketBoothData: {
     vesselName: string | null;
     boatId: string | null;
     boatIds: string[];
     todayTrips: Awaited<ReturnType<typeof getTodaysTripsForBoats>>;
+    upcomingTrips: Awaited<ReturnType<typeof getUpcomingTripsForBoats>>;
     currentTrip: ReturnType<typeof getCurrentTripFromTodays>;
     selectedTripId: string | null;
     manifest: Awaited<ReturnType<typeof getTripManifestData>>;
@@ -145,7 +146,6 @@ export default async function DashboardPage({
   if (user.role === "ticket_booth") {
     const sb = await (await import("@/lib/supabase/server")).createClient();
 
-    // Only fetch this operator's assigned vessels
     const { data: assignments } = await sb
       .from("boat_assignments")
       .select("boat_id, boats(id, name)")
@@ -166,15 +166,15 @@ export default async function DashboardPage({
     const vesselName = boatRecord?.name ?? null;
     const boatIds = boatId ? [boatId] : [];
 
-    const todayTrips  = boatIds.length > 0 ? await getTodaysTripsForBoats(boatIds) : [];
-    const currentTrip = getCurrentTripFromTodays(todayTrips);
+    const todayTrips    = boatIds.length > 0 ? await getTodaysTripsForBoats(boatIds) : [];
+    const upcomingTrips = boatIds.length > 0 ? await getUpcomingTripsForBoats(boatIds) : [];
+    const currentTrip   = getCurrentTripFromTodays(todayTrips);
     const selectedTripId =
       params.tripId && todayTrips.some(t => t.id === params.tripId)
         ? params.tripId
         : currentTrip?.id ?? null;
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
 
-    // Pending payments for this vessel's trips today only
     const todayManila = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
     const tripIds = todayTrips.map(t => t.id);
 
@@ -189,7 +189,6 @@ export default async function DashboardPage({
           .limit(10)
       : { data: [] };
 
-    // Tickets issued today by this specific operator
     const { data: issuedRaw } = await sb
       .from("bookings")
       .select("reference, customer_full_name, total_amount_cents, passenger_count, created_at")
@@ -203,6 +202,7 @@ export default async function DashboardPage({
       boatId,
       boatIds,
       todayTrips,
+      upcomingTrips,
       currentTrip,
       selectedTripId,
       manifest,
@@ -232,7 +232,7 @@ export default async function DashboardPage({
         // ══════════════════════════════════════════════════════════
         <div className="space-y-6">
 
-          {/* ① HERO WELCOME BANNER */}
+          {/* HERO WELCOME BANNER */}
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-8 text-white shadow-lg">
             <div className="pointer-events-none absolute inset-0 opacity-10"
               style={{
@@ -282,7 +282,7 @@ export default async function DashboardPage({
           {params.ref ? <ClaimBookingFromRef refParam={params.ref} /> : null}
           <ClaimGuestBookingsByEmail />
 
-          {/* ② RESTRICTION NOTICES */}
+          {/* RESTRICTION NOTICES */}
           {passengerRestriction && passengerRestriction.booking_warnings >= 1 && !isBlockedNow(passengerRestriction) && (
             <div className="rounded-2xl border-2 border-amber-500 bg-amber-50 p-6 shadow-sm">
               <h2 className="text-lg font-bold text-amber-900">⚠️ Notice about your account</h2>
@@ -304,7 +304,7 @@ export default async function DashboardPage({
             </div>
           )}
 
-          {/* ③ BOOKING STATUS CARDS */}
+          {/* BOOKING STATUS CARDS */}
           {(awaitingPayment.length > 0 || awaitingConfirmation.length > 0 || recentlyConfirmed.length > 0 || refundedBookings.length > 0) && (
             <div>
               <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">My Active Bookings</p>
@@ -384,9 +384,7 @@ export default async function DashboardPage({
                       <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(5,150,105,0.2)]" />
                       <span className="text-xs font-bold uppercase tracking-widest text-emerald-800">✅ Confirmed — Tickets Ready</span>
                     </div>
-                    <p className="mb-2 text-xs text-emerald-700">
-                      Your tickets are confirmed. Show QR code when boarding.
-                    </p>
+                    <p className="mb-2 text-xs text-emerald-700">Your tickets are confirmed. Show QR code when boarding.</p>
                     <ul className="space-y-2">
                       {recentlyConfirmed.map(b => {
                         const refundBadge =
@@ -458,7 +456,6 @@ export default async function DashboardPage({
                     </ul>
                   </div>
                 )}
-
               </div>
             </div>
           )}
@@ -470,7 +467,7 @@ export default async function DashboardPage({
             />
           )}
 
-          {/* ④ QUICK ACTIONS */}
+          {/* QUICK ACTIONS */}
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Quick Actions</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -501,7 +498,7 @@ export default async function DashboardPage({
             </div>
           </div>
 
-          {/* ⑤ TRIP CALENDAR */}
+          {/* TRIP CALENDAR */}
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Scheduled Trips</p>
             <TripCalendarWrapper
@@ -542,13 +539,14 @@ export default async function DashboardPage({
 
       ) : user.role === "ticket_booth" ? (
         // ══════════════════════════════════════════════════════════
-        // TICKET BOOTH — new elegant vessel-restricted dashboard
+        // TICKET BOOTH
         // ══════════════════════════════════════════════════════════
         <TicketBoothDashboard
           ownerName={welcomeName ?? user.email ?? "Ticket Booth"}
           vesselName={ticketBoothData?.vesselName ?? null}
           boatId={ticketBoothData?.boatId ?? null}
           todayTrips={ticketBoothData?.todayTrips ?? []}
+          upcomingTrips={ticketBoothData?.upcomingTrips ?? []}
           selectedTripId={ticketBoothData?.selectedTripId ?? null}
           manifest={ticketBoothData?.manifest ?? null}
           pendingPayments={ticketBoothData?.pendingPayments ?? []}
@@ -581,9 +579,9 @@ export default async function DashboardPage({
               currentTrip={crewCaptainData.currentTrip}
               selectedTripId={crewCaptainData.selectedTripId}
               manifest={crewCaptainData.manifest}
+              ownerName={welcomeName ?? user.email ?? undefined}
             />
           )}
-          
         </>
 
       ) : user.role === "vessel_owner" ? (
@@ -607,19 +605,13 @@ export default async function DashboardPage({
           </div>
         </>
 
-            ) : (
+      ) : (
         // ══════════════════════════════════════════════════════════
-        // FALLBACK — unknown or transitional role
+        // FALLBACK
         // ══════════════════════════════════════════════════════════
         <div className="min-h-[60vh] flex items-center justify-center px-4">
           <div className="w-full max-w-md text-center space-y-6">
-
-            {/* Icon */}
-            <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-teal-100 text-4xl shadow-sm mx-auto">
-              🚢
-            </div>
-
-            {/* Welcome */}
+            <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-teal-100 text-4xl shadow-sm mx-auto">🚢</div>
             <div>
               <h1 className="text-2xl font-black text-[#134e4a]">
                 Welcome, {welcomeName || user.email?.split("@")[0] || "Traveler"}!
@@ -631,8 +623,6 @@ export default async function DashboardPage({
                 </span>
               </p>
             </div>
-
-            {/* Info card */}
             <div className="rounded-2xl border-2 border-teal-200 bg-white p-6 shadow-sm text-left space-y-3">
               <p className="text-sm font-semibold text-[#134e4a]">Your account is set up</p>
               <p className="text-sm text-[#0f766e]">
@@ -648,31 +638,20 @@ export default async function DashboardPage({
                 </div>
               </div>
             </div>
-
-            {/* Action buttons */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link
-                href={ROUTES.account}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0c7b93] px-6 py-3 text-sm font-bold text-white hover:bg-[#085f72] transition-colors shadow-sm"
-              >
+              <Link href={ROUTES.account}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0c7b93] px-6 py-3 text-sm font-bold text-white hover:bg-[#085f72] transition-colors shadow-sm">
                 👤 My Account
               </Link>
-              <a
-                href="mailto:support@travelasiargao.com"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-teal-200 bg-white px-6 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors"
-              >
+              <a href="mailto:support@travelasiargao.com"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-teal-200 bg-white px-6 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors">
                 ✉️ Contact Admin
               </a>
             </div>
-
-            <p className="text-xs text-[#0f766e]/40">
-              Travela Siargao · support@travelasiargao.com
-            </p>
-
+            <p className="text-xs text-[#0f766e]/40">Travela Siargao · support@travelasiargao.com</p>
           </div>
         </div>
       )}
-
     </div>
   );
 }
