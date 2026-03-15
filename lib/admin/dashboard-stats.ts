@@ -57,9 +57,16 @@ export async function getDashboardStats(
     startDate = today;
     endDate = today;
   } else if (period === "week") {
+    // Current calendar week — Monday to Sunday (Manila time)
     const d = new Date(today + "T00:00:00");
-    d.setDate(d.getDate() - 6);
+    const day = d.getDay(); // 0 = Sunday, 1 = Monday ...
+    const daysFromMonday = day === 0 ? 6 : day - 1; // Sunday wraps to 6
+    d.setDate(d.getDate() - daysFromMonday);
     startDate = d.toISOString().slice(0, 10);
+    // End = this Sunday
+    const end = new Date(d);
+    end.setDate(end.getDate() + 6);
+    endDate = end.toISOString().slice(0, 10);
   } else if (period === "month") {
     startDate = today.slice(0, 7) + "-01";
     const [y, m] = today.split("-").map(Number);
