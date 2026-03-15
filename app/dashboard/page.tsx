@@ -583,12 +583,7 @@ export default async function DashboardPage({
               manifest={crewCaptainData.manifest}
             />
           )}
-          <div className="mt-6">
-            <Link href={ROUTES.account}
-              className="inline-flex rounded-xl border-2 border-teal-200 bg-white px-5 py-4 text-left transition-colors hover:border-[#0c7b93] hover:bg-[#0c7b93]/5">
-              <p className="font-semibold text-[#134e4a]">Account</p>
-            </Link>
-          </div>
+          
         </>
 
       ) : user.role === "vessel_owner" ? (
@@ -612,21 +607,72 @@ export default async function DashboardPage({
           </div>
         </>
 
-      ) : (
+            ) : (
         // ══════════════════════════════════════════════════════════
-        // FALLBACK
+        // FALLBACK — unknown or transitional role
         // ══════════════════════════════════════════════════════════
-        <>
-          <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
-          <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email}. Your role: <strong>{yourRoleLabel}</strong>.</p>
-          <div className="mt-6">
-            <Link href={ROUTES.account}
-              className="inline-flex rounded-xl border-2 border-teal-200 bg-white px-5 py-4 text-left transition-colors hover:border-[#0c7b93] hover:bg-[#0c7b93]/5">
-              <p className="font-semibold text-[#134e4a]">Account</p>
-            </Link>
+        <div className="min-h-[60vh] flex items-center justify-center px-4">
+          <div className="w-full max-w-md text-center space-y-6">
+
+            {/* Icon */}
+            <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-teal-100 text-4xl shadow-sm mx-auto">
+              🚢
+            </div>
+
+            {/* Welcome */}
+            <div>
+              <h1 className="text-2xl font-black text-[#134e4a]">
+                Welcome, {welcomeName || user.email?.split("@")[0] || "Traveler"}!
+              </h1>
+              <p className="mt-2 text-sm text-[#0f766e]">
+                You&apos;re signed in as{" "}
+                <span className="font-semibold inline-flex items-center gap-1 rounded-full bg-teal-100 text-teal-800 px-2.5 py-0.5 text-xs">
+                  {yourRoleLabel}
+                </span>
+              </p>
+            </div>
+
+            {/* Info card */}
+            <div className="rounded-2xl border-2 border-teal-200 bg-white p-6 shadow-sm text-left space-y-3">
+              <p className="text-sm font-semibold text-[#134e4a]">Your account is set up</p>
+              <p className="text-sm text-[#0f766e]">
+                Your role doesn&apos;t have a dedicated dashboard yet, or you may be in the process of being assigned to a vessel or tour.
+                Contact the admin if you think something is wrong.
+              </p>
+              <div className="pt-2 border-t border-teal-100 space-y-2">
+                <div className="flex items-center gap-2 text-xs text-[#0f766e]">
+                  <span className="text-teal-500">✓</span> Account email: <strong>{user.email}</strong>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-[#0f766e]">
+                  <span className="text-teal-500">✓</span> Role: <strong>{yourRoleLabel}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                href={ROUTES.account}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0c7b93] px-6 py-3 text-sm font-bold text-white hover:bg-[#085f72] transition-colors shadow-sm"
+              >
+                👤 My Account
+              </Link>
+              <a
+                href="mailto:support@travelasiargao.com"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-teal-200 bg-white px-6 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors"
+              >
+                ✉️ Contact Admin
+              </a>
+            </div>
+
+            <p className="text-xs text-[#0f766e]/40">
+              Travela Siargao · support@travelasiargao.com
+            </p>
+
           </div>
-        </>
+        </div>
       )}
+
     </div>
   );
 }
