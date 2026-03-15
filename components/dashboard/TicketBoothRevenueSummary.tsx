@@ -97,10 +97,12 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
   const [mode, setMode]           = useState<ViewMode>("day");
   const [dayOffset, setDayOffset] = useState(0);     // 0 = today, -1 = yesterday
   const [weekOffset, setWeekOffset] = useState(0);   // 0 = this week
-  const [monthYear, setMonthYear] = useState(() => {
+  const [monthYear, setMonthYear] = useState({ year: 2026, month: 1 });
+  // Initialize to actual current month on client only (avoids hydration mismatch)
+  useEffect(() => {
     const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
-  });
+    setMonthYear({ year: now.getFullYear(), month: now.getMonth() + 1 });
+  }, []);
   const [data,    setData]    = useState<SummaryTotals | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -137,10 +139,13 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
   const today = getTodayManila();
   const isToday = mode === "day" && dayOffset === 0;
   const isThisWeek = mode === "week" && weekOffset === 0;
-  const isThisMonth = mode === "month" && (() => {
+  const [nowMonth, setNowMonth] = useState({ year: 2026, month: 1 });
+  useEffect(() => {
     const now = new Date();
-    return monthYear.year === now.getFullYear() && monthYear.month === now.getMonth() + 1;
-  })();
+    setNowMonth({ year: now.getFullYear(), month: now.getMonth() + 1 });
+  }, []);
+  const isThisMonth = mode === "month" &&
+    monthYear.year === nowMonth.year && monthYear.month === nowMonth.month;
   const canGoForward = mode === "day" ? dayOffset < 0
     : mode === "week" ? weekOffset < 0
     : !isThisMonth;
