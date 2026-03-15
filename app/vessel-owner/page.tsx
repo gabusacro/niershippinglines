@@ -4,6 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 import { ROUTES } from "@/lib/constants";
 import { VesselOwnerClient } from "./VesselOwnerClient";
 
+type PassengerDetail = {
+  fare_type: string;
+  full_name: string;
+  gender?: string | null;
+  address?: string | null;
+  birthdate?: string | null;
+  nationality?: string | null;
+  ticket_number?: string | null;
+};
+
 export const metadata = {
   title: "Vessel Owner Dashboard",
   description: "Your vessel earnings — Travela Siargao",
@@ -36,6 +46,8 @@ export default async function VesselOwnerDashboard({
   const daysInCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
   const isViewingCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
   const isLast5Days = isViewingCurrentMonth && todayDay >= daysInCurrentMonth - 4;
+
+  
 
   // Owner's vessel assignments
   const { data: assignments } = await supabase
@@ -91,6 +103,7 @@ export default async function VesselOwnerDashboard({
           id, trip_id, reference, booking_source, is_walk_in,
           payment_method, passenger_count, total_amount_cents,
           admin_fee_cents, gcash_fee_cents, customer_full_name,
+          fare_type, passenger_details,
           status, created_at, created_by,
           creator:profiles!created_by(full_name, role)
         `)
@@ -105,6 +118,9 @@ export default async function VesselOwnerDashboard({
     totalAmountCents: number; netFareCents: number;
     platformFeeCents: number; processingFeeCents: number;
     customerName: string; createdByName: string; createdByRole: string;
+    bookingSource: string | null;
+    fareType: string;
+    passengerDetails: PassengerDetail[] | null;
     createdAt: string; status: string;
   };
 
@@ -124,6 +140,9 @@ export default async function VesselOwnerDashboard({
       customerName: b.customer_full_name ?? "—",
       createdByName: creator?.full_name ?? "Passenger (online)",
       createdByRole: creator?.role ?? "passenger",
+      bookingSource: b.booking_source ?? null,
+      fareType: (b as { fare_type?: string }).fare_type ?? "adult",
+      passengerDetails: (b as { passenger_details?: unknown }).passenger_details as PassengerDetail[] | null ?? null,
       createdAt: b.created_at, status: b.status,
     };
   });

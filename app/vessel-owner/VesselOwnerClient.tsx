@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronDown, ChevronUp, Ship, User, Ticket } from "lucide-react";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE_SIZE = 10;
@@ -26,6 +27,25 @@ function formatDateTime(iso: string) {
     return new Date(iso).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
   } catch { return iso; }
 }
+function calcAge(birthdate: string): number {
+  const bday = new Date(birthdate);
+  const now = new Date();
+  let age = now.getFullYear() - bday.getFullYear();
+  const m = now.getMonth() - bday.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < bday.getDate())) age--;
+  return age;
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+type PassengerDetail = {
+  fare_type: string;
+  full_name: string;
+  gender?: string | null;
+  address?: string | null;
+  birthdate?: string | null;
+  nationality?: string | null;
+  ticket_number?: string | null;
+};
 
 type BookingLine = {
   id: string; tripId: string; reference: string; isOnline: boolean;
@@ -33,7 +53,10 @@ type BookingLine = {
   totalAmountCents: number; netFareCents: number;
   platformFeeCents: number; processingFeeCents: number;
   customerName: string; createdByName: string; createdByRole: string;
+  bookingSource: string | null;
   createdAt: string; status: string;
+  passengerDetails: PassengerDetail[] | null;
+  fareType: string;
 };
 
 type TripRow = {
@@ -72,30 +95,266 @@ interface Props {
   owedTrips: OwedTrip[]; totalOwedCents: number; totalPaidCents: number;
 }
 
+// ── Badges ────────────────────────────────────────────────────────────────────
+const ROLE_MAP: Record<string, { label: string; cls: string }> = {
+  passenger:    { label: "Passenger",    cls: "bg-blue-100 text-blue-800"   },
+  admin:        { label: "Admin",        cls: "bg-purple-100 text-purple-800" },
+  vessel_owner: { label: "Owner",        cls: "bg-teal-100 text-teal-800"   },
+  crew:         { label: "Crew",         cls: "bg-orange-100 text-orange-800" },
+  ticket_booth: { label: "Ticket Booth", cls: "bg-pink-100 text-pink-800"   },
+  captain:      { label: "Captain",      cls: "bg-sky-100 text-sky-800"     },
+};
+
+const FARE_TYPE_LABELS: Record<string, { label: string; cls: string }> = {
+  adult:   { label: "Adult",   cls: "bg-teal-100 text-teal-800"     },
+  senior:  { label: "Senior",  cls: "bg-amber-100 text-amber-800"   },
+  pwd:     { label: "PWD",     cls: "bg-blue-100 text-blue-800"     },
+  student: { label: "Student", cls: "bg-indigo-100 text-indigo-800" },
+  child:   { label: "Child",   cls: "bg-green-100 text-green-800"   },
+  infant:  { label: "Infant",  cls: "bg-rose-100 text-rose-800"     },
+};
+
+const SOURCE_MAP: Record<string, { label: string; cls: string }> = {
+  online:                  { label: "Online (GCash)",    cls: "bg-teal-100 text-teal-800"   },
+  ticket_booth_walk_in:    { label: "Ticket Booth",      cls: "bg-pink-100 text-pink-800"   },
+  admin_walk_in:           { label: "Admin Walk-in",     cls: "bg-purple-100 text-purple-800" },
+  captain_walk_in:         { label: "Captain Walk-in",   cls: "bg-sky-100 text-sky-800"     },
+  deck_crew_walk_in:       { label: "Crew Walk-in",      cls: "bg-orange-100 text-orange-800" },
+  walk_in:                 { label: "Walk-in",           cls: "bg-amber-100 text-amber-800" },
+};
+
 function RoleBadge({ role }: { role: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    passenger:    { label: "Passenger", cls: "bg-blue-100 text-blue-800" },
-    admin:        { label: "Admin",     cls: "bg-purple-100 text-purple-800" },
-    vessel_owner: { label: "Owner",     cls: "bg-teal-100 text-teal-800" },
-    crew:         { label: "Crew",      cls: "bg-orange-100 text-orange-800" },
-    ticket_booth: { label: "Booth",     cls: "bg-pink-100 text-pink-800" },
-  };
-  const { label, cls } = map[role] ?? { label: role, cls: "bg-gray-100 text-gray-700" };
+  const { label, cls } = ROLE_MAP[role] ?? { label: role, cls: "bg-gray-100 text-gray-700" };
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
 }
-
-function SourceBadge({ isOnline }: { isOnline: boolean }) {
-  return isOnline
-    ? <span className="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800">Online</span>
-    : <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Walk-in</span>;
+function SourceBadge({ source, isOnline }: { source: string | null; isOnline: boolean }) {
+  const key = source ?? (isOnline ? "online" : "walk_in");
+  const { label, cls } = SOURCE_MAP[key] ?? { label: key, cls: "bg-gray-100 text-gray-700" };
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
 }
-
+function FareTypeBadge({ fareType }: { fareType: string }) {
+  const { label, cls } = FARE_TYPE_LABELS[fareType] ?? { label: fareType, cls: "bg-gray-100 text-gray-700" };
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
+}
 function PaymentBadge({ status }: { status: "pending" | "paid" | "failed" }) {
   if (status === "paid")   return <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">Paid</span>;
   if (status === "failed") return <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">Failed</span>;
   return <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Pending</span>;
 }
 
+// ── Passenger Breakdown Row ───────────────────────────────────────────────────
+function PassengerBreakdown({ booking }: { booking: BookingLine }) {
+  const [open, setOpen] = useState(false);
+  const details = booking.passengerDetails;
+
+  if (!details || details.length === 0) {
+    // Single-type booking — show simple row
+    return (
+      <div className="mt-1.5 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600">
+        <div className="flex items-center gap-2">
+          <FareTypeBadge fareType={booking.fareType} />
+          <span>{booking.passengerCount} passenger{booking.passengerCount !== 1 ? "s" : ""}</span>
+          <span className="ml-auto font-semibold text-[#134e4a]">{peso(booking.netFareCents)}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1.5 rounded-lg border border-teal-100 overflow-hidden">
+      <button type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-teal-50/60 hover:bg-teal-50 transition-colors text-xs font-semibold text-[#134e4a]">
+        <div className="flex items-center gap-2">
+          <Ticket size={12} className="text-[#0c7b93]" />
+          <span>{details.length} passengers — click to see breakdown</span>
+          {/* Fare type pills summary */}
+          <div className="flex gap-1 flex-wrap">
+            {[...new Set(details.map(d => d.fare_type))].map(ft => (
+              <FareTypeBadge key={ft} fareType={ft} />
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-[#0c7b93]">{peso(booking.netFareCents)}</span>
+          {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </div>
+      </button>
+
+      {open && (
+        <table className="min-w-full text-xs bg-white">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100">
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">#</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Name</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Fare Type</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Gender</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Age</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Nationality</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Ticket #</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {details.map((p, i) => (
+              <tr key={i} className={p.fare_type !== "adult" ? "bg-amber-50/40" : ""}>
+                <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+                <td className="px-3 py-2 font-medium text-[#134e4a]">
+                  <div className="flex items-center gap-1.5">
+                    <User size={11} className="text-gray-400 shrink-0" />
+                    {p.full_name}
+                  </div>
+                </td>
+                <td className="px-3 py-2"><FareTypeBadge fareType={p.fare_type} /></td>
+                <td className="px-3 py-2 text-gray-500 capitalize">{p.gender ?? "—"}</td>
+                <td className="px-3 py-2 text-gray-500">
+                  {p.birthdate ? `${calcAge(p.birthdate)} yrs` : "—"}
+                </td>
+                <td className="px-3 py-2 text-gray-500">{p.nationality ?? "—"}</td>
+                <td className="px-3 py-2 font-mono text-[#0c7b93] text-xs">{p.ticket_number ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ── Audit table ───────────────────────────────────────────────────────────────
+function TripAuditTable({ bookings, trip }: { bookings: BookingLine[]; trip: TripRow }) {
+  return (
+    <div className="rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-wide text-slate-600">
+          Booking Audit — {bookings.length} transaction{bookings.length !== 1 ? "s" : ""}
+        </span>
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          <span className="font-semibold text-[#0c7b93]">Online: {peso(trip.onlineNetFareCents)}</span>
+          <span className="font-semibold text-amber-700">Walk-in: {peso(trip.walkInFareCents)}</span>
+        </div>
+      </div>
+
+      <div className="divide-y divide-slate-100">
+        {bookings.map((bl) => (
+          <div key={bl.id} className={`px-4 py-3 ${bl.isOnline ? "bg-white" : "bg-amber-50/30"}`}>
+            {/* Booking header row */}
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-sm font-bold text-[#0c7b93]">{bl.reference}</span>
+                <SourceBadge source={bl.bookingSource} isOnline={bl.isOnline} />
+                {/* Handler info for walk-ins */}
+                {!bl.isOnline && (
+                  <div className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-2 py-0.5 border border-amber-200">
+                    <RoleBadge role={bl.createdByRole} />
+                    <span className="text-xs font-semibold text-amber-800">{bl.createdByName}</span>
+                  </div>
+                )}
+                {bl.isOnline && (
+                  <span className="text-xs text-gray-400">by {bl.customerName}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-gray-400">{formatDateTime(bl.createdAt)}</span>
+                <span className={`font-bold ${bl.isOnline ? "text-[#0c7b93]" : "text-amber-700"}`}>
+                  {peso(bl.netFareCents)}
+                </span>
+              </div>
+            </div>
+
+            {/* Passenger breakdown */}
+            <PassengerBreakdown booking={bl} />
+          </div>
+        ))}
+      </div>
+
+      {/* Trip footer totals */}
+      <div className="bg-slate-100 border-t-2 border-slate-200 px-4 py-2.5 flex flex-wrap gap-4 text-xs font-semibold">
+        <span className="text-slate-600">
+          Total: {bookings.reduce((s, b) => s + b.passengerCount, 0)} pax
+        </span>
+        {trip.onlineNetFareCents > 0 && (
+          <span className="text-[#0c7b93]">Online fare: {peso(trip.onlineNetFareCents)}</span>
+        )}
+        {trip.walkInFareCents > 0 && (
+          <span className="text-amber-700">Walk-in cash: {peso(trip.walkInFareCents)}</span>
+        )}
+        <span className="ml-auto text-slate-700">Grand total: {peso(trip.onlineNetFareCents + trip.walkInFareCents)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Trip Table ────────────────────────────────────────────────────────────────
+function TripTable({ trips, auditTripId, setAuditTripId, highlight = false }: {
+  trips: TripRow[]; auditTripId: string | null;
+  setAuditTripId: (id: string | null) => void; highlight?: boolean;
+}) {
+  return (
+    <table className="min-w-full divide-y divide-teal-100 text-sm">
+      <thead>
+        <tr className="bg-teal-50">
+          <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Date</th>
+          <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Time</th>
+          <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Route</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">Online Pax</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">Online Fare</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">Walk-in</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">Cash</th>
+          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Remit</th>
+          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Audit</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-teal-50">
+        {trips.map((t) => {
+          const isAudit = auditTripId === t.id;
+          return (
+            <React.Fragment key={t.id}>
+              <tr className={`transition-colors ${highlight || t.isToday ? "bg-teal-50/60" : "hover:bg-gray-50"}`}>
+                <td className="px-3 py-2.5 text-[#134e4a] whitespace-nowrap">
+                  {formatDate(t.departureDate, true)}
+                  {t.isToday && <span className="ml-1 rounded-full bg-teal-100 px-1.5 py-0.5 text-xs text-teal-700 font-semibold">today</span>}
+                </td>
+                <td className="px-3 py-2.5 text-[#134e4a] whitespace-nowrap">{formatTime(t.departureTime)}</td>
+                <td className="px-3 py-2.5 text-[#134e4a] max-w-[120px] truncate">{t.routeName}</td>
+                <td className="px-3 py-2.5 text-right">
+                  {t.onlinePax > 0 ? <span className="font-semibold text-[#0c7b93]">{t.onlinePax}</span> : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                  {t.onlineNetFareCents > 0 ? <span className="font-medium text-[#0c7b93]">{peso(t.onlineNetFareCents)}</span> : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-right">
+                  {t.walkInPax > 0 ? <span className="text-amber-700">{t.walkInPax}</span> : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                  {t.walkInFareCents > 0 ? <span className="text-amber-700">{peso(t.walkInFareCents)}</span> : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-center"><PaymentBadge status={t.paymentStatus} /></td>
+                <td className="px-3 py-2.5 text-center">
+                  {t.bookings.length > 0 && (
+                    <button onClick={() => setAuditTripId(isAudit ? null : t.id)}
+                      className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${isAudit ? "bg-[#0c7b93] text-white" : "bg-teal-50 text-[#0c7b93] border border-teal-200 hover:bg-teal-100"}`}>
+                      {isAudit ? "Hide" : `Log (${t.bookings.length})`}
+                    </button>
+                  )}
+                </td>
+              </tr>
+
+              {isAudit && t.bookings.length > 0 && (
+                <tr className="bg-slate-50">
+                  <td colSpan={9} className="px-4 py-4">
+                    <TripAuditTable bookings={t.bookings} trip={t} />
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// ── Main VesselOwnerClient ────────────────────────────────────────────────────
 export function VesselOwnerClient({
   ownerName, vessels, tripRows, todayTripIds,
   completedTripCount, todayTripCount, upcomingTripCount, totalTripCount,
@@ -134,60 +393,36 @@ export function VesselOwnerClient({
   const totalRemittable = monthTotals.onlineNetFareCents;
   const totalWalkIn     = monthTotals.walkInFareCents;
   const totalCombined   = totalRemittable + totalWalkIn;
-
-  // Progress bar percentage for trips
   const tripProgressPct = totalTripCount > 0 ? Math.round((completedTripCount / totalTripCount) * 100) : 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8 space-y-5">
 
-      {/* ── Header — iOS Safari safe: solid bg, no gradient/opacity text ── */}
+      {/* ── Header ── */}
       <div className="rounded-2xl px-5 py-6 shadow-lg" style={{ backgroundColor: "#0c7b93" }}>
         <p style={{ color: "#b2e4ef", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
           Vessel Owner Dashboard
         </p>
-        <h1 style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, marginTop: 2, lineHeight: 1.2 }}>
-          {ownerName}
-        </h1>
-        <p style={{ color: "#d0f0f7", fontSize: 13, marginTop: 3 }}>
-          {vessels.map((v) => v.boatName).join(" · ")}
-        </p>
-
+        <h1 style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, marginTop: 2, lineHeight: 1.2 }}>{ownerName}</h1>
+        <p style={{ color: "#d0f0f7", fontSize: 13, marginTop: 3 }}>{vessels.map((v) => v.boatName).join(" · ")}</p>
         <div style={{ height: 1, backgroundColor: "rgba(255,255,255,0.2)", margin: "14px 0" }} />
 
-        {/* Month nav */}
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={prevMonth}
-            style={{ backgroundColor: "rgba(255,255,255,0.18)", color: "#ffffff", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, border: "none" }}>
-            ← Prev
-          </button>
-          <span style={{ color: "#ffffff", fontSize: 16, fontWeight: 700 }}>
-            {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
-          </span>
-          {isViewingNextMonth && (
-            <span style={{ backgroundColor: "rgba(255,255,255,0.22)", color: "#ffffff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>
-              Next Month
-            </span>
-          )}
-          <button onClick={nextMonth} disabled={isAtMax}
-            style={{ backgroundColor: "rgba(255,255,255,0.18)", color: isAtMax ? "rgba(255,255,255,0.35)" : "#ffffff", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: isAtMax ? "not-allowed" : "pointer" }}>
-            Next →
-          </button>
+          <button onClick={prevMonth} style={{ backgroundColor: "rgba(255,255,255,0.18)", color: "#ffffff", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, border: "none" }}>← Prev</button>
+          <span style={{ color: "#ffffff", fontSize: 16, fontWeight: 700 }}>{MONTH_NAMES[selectedMonth - 1]} {selectedYear}</span>
+          {isViewingNextMonth && <span style={{ backgroundColor: "rgba(255,255,255,0.22)", color: "#ffffff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>Next Month</span>}
+          <button onClick={nextMonth} disabled={isAtMax} style={{ backgroundColor: "rgba(255,255,255,0.18)", color: isAtMax ? "rgba(255,255,255,0.35)" : "#ffffff", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: isAtMax ? "not-allowed" : "pointer" }}>Next →</button>
           {(isViewingNextMonth || (selectedYear === currentYear && selectedMonth !== currentMonth)) && (
-            <button onClick={() => goToMonth(currentYear, currentMonth)}
-              style={{ marginLeft: "auto", backgroundColor: "rgba(255,255,255,0.22)", color: "#ffffff", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 600, border: "none" }}>
-              This month
-            </button>
+            <button onClick={() => goToMonth(currentYear, currentMonth)} style={{ marginLeft: "auto", backgroundColor: "rgba(255,255,255,0.22)", color: "#ffffff", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 600, border: "none" }}>This month</button>
           )}
         </div>
 
-        {/* Quick stats inside header */}
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            { label: "Total Trips", value: String(totalTripCount) },
-            { label: "Online Pax", value: String(monthTotals.onlinePax) },
-            { label: "Walk-in Pax", value: String(monthTotals.walkInPax), yellow: true },
-            { label: "Total Fare", value: peso(totalCombined) },
+            { label: "Total Trips",  value: String(totalTripCount) },
+            { label: "Online Pax",   value: String(monthTotals.onlinePax) },
+            { label: "Walk-in Pax",  value: String(monthTotals.walkInPax), yellow: true },
+            { label: "Total Fare",   value: peso(totalCombined) },
           ].map((s) => (
             <div key={s.label} style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 10, padding: "10px 12px" }}>
               <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</p>
@@ -197,57 +432,39 @@ export function VesselOwnerClient({
         </div>
       </div>
 
-      {/* ── Trip Progress Card ── */}
+      {/* ── Trip Progress ── */}
       {!isViewingNextMonth && (
         <div className="rounded-xl border-2 border-teal-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div>
-              <p className="text-sm font-bold text-[#134e4a]">
-                Trip Progress — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
-              </p>
-              <p className="text-xs text-[#0f766e] mt-0.5">
-                {completedTripCount} completed · {todayTripCount} today · {upcomingTripCount} upcoming
-              </p>
+              <p className="text-sm font-bold text-[#134e4a]">Trip Progress — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}</p>
+              <p className="text-xs text-[#0f766e] mt-0.5">{completedTripCount} completed · {todayTripCount} today · {upcomingTripCount} upcoming</p>
             </div>
-            <span className="text-2xl font-black text-[#0c7b93]">
-              {completedTripCount} <span className="text-base font-normal text-[#0f766e]">/ {totalTripCount} trips</span>
-            </span>
+            <span className="text-2xl font-black text-[#0c7b93]">{completedTripCount} <span className="text-base font-normal text-[#0f766e]">/ {totalTripCount} trips</span></span>
           </div>
-
-          {/* Progress bar */}
           <div className="w-full h-3 rounded-full bg-teal-100 overflow-hidden">
-            <div
-              className="h-3 rounded-full transition-all"
-              style={{ width: `${tripProgressPct}%`, backgroundColor: "#0c7b93" }}
-            />
+            <div className="h-3 rounded-full transition-all" style={{ width: `${tripProgressPct}%`, backgroundColor: "#0c7b93" }} />
           </div>
           <p className="mt-1.5 text-xs text-[#0f766e]">{tripProgressPct}% of this month&apos;s trips completed</p>
-
-          {/* 3 stat pills */}
           <div className="mt-4 grid grid-cols-3 gap-2">
-            <div className="rounded-xl bg-teal-50 border border-teal-200 p-3 text-center">
-              <p className="text-xs text-[#0f766e] font-semibold">Completed</p>
-              <p className="text-xl font-black text-[#0c7b93] mt-0.5">{completedTripCount}</p>
-              <p className="text-xs text-[#0f766e]/60">past trips</p>
-            </div>
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-center">
-              <p className="text-xs text-amber-700 font-semibold">Today</p>
-              <p className="text-xl font-black text-amber-800 mt-0.5">{todayTripCount}</p>
-              <p className="text-xs text-amber-600/60">happening now</p>
-            </div>
-            <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-center">
-              <p className="text-xs text-blue-700 font-semibold">Upcoming</p>
-              <p className="text-xl font-black text-blue-800 mt-0.5">{upcomingTripCount}</p>
-              <p className="text-xs text-blue-600/60">remaining</p>
-            </div>
+            {[
+              { label: "Completed", value: completedTripCount, sub: "past trips",     bg: "bg-teal-50",  border: "border-teal-200",  val: "text-[#0c7b93]",  lbl: "text-[#0f766e]"  },
+              { label: "Today",     value: todayTripCount,     sub: "happening now",  bg: "bg-amber-50", border: "border-amber-200", val: "text-amber-800", lbl: "text-amber-700" },
+              { label: "Upcoming",  value: upcomingTripCount,  sub: "remaining",      bg: "bg-blue-50",  border: "border-blue-200",  val: "text-blue-800",  lbl: "text-blue-700"  },
+            ].map(s => (
+              <div key={s.label} className={`rounded-xl ${s.bg} border ${s.border} p-3 text-center`}>
+                <p className={`text-xs ${s.lbl} font-semibold`}>{s.label}</p>
+                <p className={`text-xl font-black ${s.val} mt-0.5`}>{s.value}</p>
+                <p className={`text-xs ${s.lbl} opacity-60`}>{s.sub}</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* ── Admin Owes Me Card ── */}
+      {/* ── Admin Owes Me ── */}
       {!isViewingNextMonth && (
         <div className={`rounded-xl border-2 p-5 shadow-sm ${totalOwedCents > 0 ? "border-rose-300 bg-rose-50" : "border-green-300 bg-green-50"}`}>
-          {/* Header */}
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
               <p className={`text-sm font-bold ${totalOwedCents > 0 ? "text-rose-900" : "text-green-900"}`}>
@@ -258,55 +475,34 @@ export function VesselOwnerClient({
               </p>
             </div>
             <div className="text-right">
-              {totalOwedCents > 0 ? (
-                <p className="text-2xl font-black text-rose-700">{peso(totalOwedCents)}</p>
-              ) : (
-                <p className="text-lg font-bold text-green-700">All paid!</p>
-              )}
-              {totalPaidCents > 0 && (
-                <p className="text-xs text-green-700 font-semibold mt-0.5">{peso(totalPaidCents)} already remitted</p>
-              )}
+              {totalOwedCents > 0
+                ? <p className="text-2xl font-black text-rose-700">{peso(totalOwedCents)}</p>
+                : <p className="text-lg font-bold text-green-700">All paid!</p>}
+              {totalPaidCents > 0 && <p className="text-xs text-green-700 font-semibold mt-0.5">{peso(totalPaidCents)} already remitted</p>}
             </div>
           </div>
 
-          {/* Summary row */}
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <div className="rounded-xl bg-white border border-rose-200 p-3 text-center">
-              <p className="text-xs text-rose-700 font-semibold">Pending Remittance</p>
-              <p className="text-xl font-black text-rose-700 mt-0.5">{peso(totalOwedCents)}</p>
-              <p className="text-xs text-rose-500 mt-0.5">
-                {owedTrips.filter(t => t.paymentStatus === "pending").length} trips
-              </p>
-            </div>
-            <div className="rounded-xl bg-white border border-green-200 p-3 text-center">
-              <p className="text-xs text-green-700 font-semibold">Already Remitted</p>
-              <p className="text-xl font-black text-green-700 mt-0.5">{peso(totalPaidCents)}</p>
-              <p className="text-xs text-green-500 mt-0.5">
-                {owedTrips.filter(t => t.paymentStatus === "paid").length} trips
-              </p>
-            </div>
-            <div className="rounded-xl bg-white border border-teal-200 p-3 text-center col-span-2 sm:col-span-1">
-              <p className="text-xs text-[#0f766e] font-semibold">Total Online Fare</p>
-              <p className="text-xl font-black text-[#0c7b93] mt-0.5">{peso(totalOwedCents + totalPaidCents)}</p>
-              <p className="text-xs text-[#0f766e]/60 mt-0.5">{owedTrips.length} trips with online bookings</p>
-            </div>
+            {[
+              { label: "Pending Remittance", value: peso(totalOwedCents),               sub: `${owedTrips.filter(t=>t.paymentStatus==="pending").length} trips`, border: "border-rose-200",  val: "text-rose-700"  },
+              { label: "Already Remitted",   value: peso(totalPaidCents),               sub: `${owedTrips.filter(t=>t.paymentStatus==="paid").length} trips`,    border: "border-green-200", val: "text-green-700" },
+              { label: "Total Online Fare",  value: peso(totalOwedCents+totalPaidCents), sub: `${owedTrips.length} trips`,                                        border: "border-teal-200",  val: "text-[#0c7b93]" },
+            ].map(s => (
+              <div key={s.label} className={`rounded-xl bg-white border ${s.border} p-3 text-center col-span-${s.label==="Total Online Fare"?"2 sm:col-span-1":"1"}`}>
+                <p className="text-xs font-semibold text-gray-600">{s.label}</p>
+                <p className={`text-xl font-black ${s.val} mt-0.5`}>{s.value}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+              </div>
+            ))}
           </div>
 
-          {/* Expandable per-trip breakdown */}
           {owedTrips.length > 0 && (
             <div className="mt-4">
-              <button
-                onClick={() => setShowOwedBreakdown(!showOwedBreakdown)}
-                className={`w-full flex items-center justify-between rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  totalOwedCents > 0
-                    ? "bg-rose-100 text-rose-800 hover:bg-rose-200"
-                    : "bg-green-100 text-green-800 hover:bg-green-200"
-                }`}
-              >
+              <button onClick={() => setShowOwedBreakdown(!showOwedBreakdown)}
+                className={`w-full flex items-center justify-between rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${totalOwedCents > 0 ? "bg-rose-100 text-rose-800 hover:bg-rose-200" : "bg-green-100 text-green-800 hover:bg-green-200"}`}>
                 <span>Per-trip breakdown ({owedTrips.length} trips)</span>
                 <span>{showOwedBreakdown ? "▲ Hide" : "▼ Show"}</span>
               </button>
-
               {showOwedBreakdown && (
                 <div className="mt-2 rounded-xl border border-rose-100 bg-white overflow-hidden">
                   <table className="min-w-full text-sm">
@@ -330,16 +526,10 @@ export function VesselOwnerClient({
                           <td className="px-3 py-2.5 text-[#134e4a] max-w-[140px] truncate text-xs">{t.routeName}</td>
                           <td className="px-3 py-2.5 text-right font-semibold text-[#0c7b93]">{t.onlinePax}</td>
                           <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">
-                            <span className={t.paymentStatus === "paid" ? "text-green-700" : "text-rose-700"}>
-                              {peso(t.netFareCents)}
-                            </span>
+                            <span className={t.paymentStatus === "paid" ? "text-green-700" : "text-rose-700"}>{peso(t.netFareCents)}</span>
                           </td>
-                          <td className="px-3 py-2.5 text-center">
-                            <PaymentBadge status={t.paymentStatus} />
-                          </td>
-                          <td className="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">
-                            {t.paidAt ? formatDateTime(t.paidAt) : "—"}
-                          </td>
+                          <td className="px-3 py-2.5 text-center"><PaymentBadge status={t.paymentStatus} /></td>
+                          <td className="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">{t.paidAt ? formatDateTime(t.paidAt) : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -359,17 +549,12 @@ export function VesselOwnerClient({
             </div>
           )}
 
-          {owedTrips.length === 0 && (
-            <p className="mt-4 text-sm text-[#0f766e]">No trips with online bookings this month yet.</p>
-          )}
-
-          <p className="mt-3 text-xs text-gray-400">
-            Only online bookings are included — walk-in cash is collected directly by the vessel and does not go through admin.
-          </p>
+          {owedTrips.length === 0 && <p className="mt-4 text-sm text-[#0f766e]">No trips with online bookings this month yet.</p>}
+          <p className="mt-3 text-xs text-gray-400">Only online bookings are included — walk-in cash is collected directly by the vessel.</p>
         </div>
       )}
 
-      {/* ── Next Month Early Booking Alert ── */}
+      {/* ── Next Month Preview ── */}
       {nextMonthPreview && !isViewingNextMonth && (
         <div className="rounded-xl border-2 border-blue-300 bg-blue-50 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -382,15 +567,13 @@ export function VesselOwnerClient({
               View {nextMonthPreview.monthName} →
             </button>
           </div>
-          {nextMonthPreview.tripCount === 0 ? (
-            <p className="mt-3 text-sm text-blue-600">No trips scheduled yet for {nextMonthPreview.monthName}.</p>
-          ) : (
+          {nextMonthPreview.tripCount > 0 && (
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { label: "Trips", value: nextMonthPreview.tripCount, cls: "text-blue-900" },
-                { label: "Online Pax", value: nextMonthPreview.onlinePax, cls: "text-teal-800" },
-                { label: "Walk-in Pax", value: nextMonthPreview.walkInPax, cls: "text-amber-800" },
-                { label: "Est. Online Fare", value: peso(nextMonthPreview.onlineNetFareCents), cls: "text-blue-900" },
+                { label: "Trips",           value: nextMonthPreview.tripCount,           cls: "text-blue-900"  },
+                { label: "Online Pax",      value: nextMonthPreview.onlinePax,           cls: "text-teal-800"  },
+                { label: "Walk-in Pax",     value: nextMonthPreview.walkInPax,           cls: "text-amber-800" },
+                { label: "Est. Online Fare",value: peso(nextMonthPreview.onlineNetFareCents), cls: "text-blue-900" },
               ].map((s) => (
                 <div key={s.label} className="rounded-lg bg-white p-3 text-center">
                   <p className="text-xs text-blue-600 font-medium">{s.label}</p>
@@ -420,28 +603,21 @@ export function VesselOwnerClient({
 
       {/* ── Summary cards ── */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Trips This Month</p>
-          <p className="mt-2 text-2xl font-bold text-[#134e4a]">{allTrips.length}</p>
-        </div>
-        <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">Online Fare</p>
-          <p className="mt-2 text-2xl font-bold text-[#0c7b93]">{peso(totalRemittable)}</p>
-          <p className="mt-0.5 text-xs text-[#0c7b93]">{monthTotals.onlinePax} pax · after fees</p>
-        </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Walk-in Cash</p>
-          <p className="mt-2 text-2xl font-bold text-amber-800">{peso(totalWalkIn)}</p>
-          <p className="mt-0.5 text-xs text-amber-700">{monthTotals.walkInPax} pax · direct</p>
-        </div>
-        <div className="rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Total Revenue</p>
-          <p className="mt-2 text-2xl font-bold text-[#134e4a]">{peso(totalCombined)}</p>
-          <p className="mt-0.5 text-xs text-[#0f766e]">{monthTotals.onlinePax + monthTotals.walkInPax} total pax</p>
-        </div>
+        {[
+          { label: "Trips This Month", value: peso(0),              num: allTrips.length,                bg: "border-teal-100 bg-white",     val: "text-[#134e4a]", lbl: "text-[#0f766e]",  isNum: true  },
+          { label: "Online Fare",      value: peso(totalRemittable), num: monthTotals.onlinePax,          bg: "border-teal-200 bg-teal-50",   val: "text-[#0c7b93]", lbl: "text-[#0c7b93]",  isNum: false },
+          { label: "Walk-in Cash",     value: peso(totalWalkIn),     num: monthTotals.walkInPax,          bg: "border-amber-200 bg-amber-50", val: "text-amber-800", lbl: "text-amber-700", isNum: false },
+          { label: "Total Revenue",    value: peso(totalCombined),   num: monthTotals.onlinePax + monthTotals.walkInPax, bg: "border-teal-200 bg-white", val: "text-[#134e4a]", lbl: "text-[#0f766e]", isNum: false },
+        ].map(s => (
+          <div key={s.label} className={`rounded-xl border p-4 shadow-sm ${s.bg}`}>
+            <p className={`text-xs font-semibold uppercase tracking-wide ${s.lbl}`}>{s.label}</p>
+            <p className={`mt-2 text-2xl font-bold ${s.val}`}>{s.isNum ? s.num : s.value}</p>
+            {!s.isNum && <p className={`mt-0.5 text-xs ${s.lbl}`}>{s.num} pax</p>}
+          </div>
+        ))}
       </div>
 
-      {/* ── Revenue explanation ── */}
+      {/* ── How it works ── */}
       <div className="rounded-xl border border-teal-100 bg-white p-4 space-y-2">
         <p className="text-xs font-bold text-[#134e4a] uppercase tracking-wide">How it works</p>
         <p className="text-xs text-[#0f766e]">
@@ -452,7 +628,7 @@ export function VesselOwnerClient({
         </p>
       </div>
 
-      {/* ── Operator Loyalty Bonus ── */}
+      {/* ── Patronage Bonus ── */}
       {!isViewingNextMonth && (
         <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-4 sm:p-5">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -519,124 +695,5 @@ export function VesselOwnerClient({
         )}
       </div>
     </div>
-  );
-}
-
-function TripTable({ trips, auditTripId, setAuditTripId, highlight = false }: {
-  trips: TripRow[]; auditTripId: string | null;
-  setAuditTripId: (id: string | null) => void; highlight?: boolean;
-}) {
-  return (
-    <table className="min-w-full divide-y divide-teal-100 text-sm">
-      <thead>
-        <tr className="bg-teal-50">
-          <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Date</th>
-          <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Time</th>
-          <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Route</th>
-          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">Online Pax</th>
-          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">Online Fare</th>
-          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">Walk-in</th>
-          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">Cash</th>
-          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Remit</th>
-          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Audit</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-teal-50">
-        {trips.map((t) => {
-          const isAudit = auditTripId === t.id;
-          return (
-            <React.Fragment key={t.id}>
-              <tr className={`transition-colors ${highlight || t.isToday ? "bg-teal-50/60" : "hover:bg-gray-50"}`}>
-                <td className="px-3 py-2.5 text-[#134e4a] whitespace-nowrap">
-                  {formatDate(t.departureDate, true)}
-                  {t.isToday && <span className="ml-1 rounded-full bg-teal-100 px-1.5 py-0.5 text-xs text-teal-700 font-semibold">today</span>}
-                </td>
-                <td className="px-3 py-2.5 text-[#134e4a] whitespace-nowrap">{formatTime(t.departureTime)}</td>
-                <td className="px-3 py-2.5 text-[#134e4a] max-w-[120px] truncate">{t.routeName}</td>
-                <td className="px-3 py-2.5 text-right">
-                  {t.onlinePax > 0 ? <span className="font-semibold text-[#0c7b93]">{t.onlinePax}</span> : <span className="text-gray-300">—</span>}
-                </td>
-                <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                  {t.onlineNetFareCents > 0 ? <span className="font-medium text-[#0c7b93]">{peso(t.onlineNetFareCents)}</span> : <span className="text-gray-300">—</span>}
-                </td>
-                <td className="px-3 py-2.5 text-right">
-                  {t.walkInPax > 0 ? <span className="text-amber-700">{t.walkInPax}</span> : <span className="text-gray-300">—</span>}
-                </td>
-                <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                  {t.walkInFareCents > 0 ? <span className="text-amber-700">{peso(t.walkInFareCents)}</span> : <span className="text-gray-300">—</span>}
-                </td>
-                <td className="px-3 py-2.5 text-center"><PaymentBadge status={t.paymentStatus} /></td>
-                <td className="px-3 py-2.5 text-center">
-                  {t.bookings.length > 0 && (
-                    <button onClick={() => setAuditTripId(isAudit ? null : t.id)}
-                      className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${isAudit ? "bg-[#0c7b93] text-white" : "bg-teal-50 text-[#0c7b93] border border-teal-200 hover:bg-teal-100"}`}>
-                      {isAudit ? "Hide" : `Log (${t.bookings.length})`}
-                    </button>
-                  )}
-                </td>
-              </tr>
-
-              {isAudit && t.bookings.length > 0 && (
-                <tr className="bg-slate-50">
-                  <td colSpan={9} className="px-4 py-4">
-                    <p className="mb-3 text-xs font-bold uppercase tracking-wide text-[#0f766e]">
-                      Booking Audit Log — {t.bookings.length} transaction{t.bookings.length !== 1 ? "s" : ""}
-                    </p>
-                    <div className="overflow-x-auto rounded-lg border border-slate-200">
-                      <table className="min-w-full text-xs">
-                        <thead>
-                          <tr className="bg-slate-100">
-                            <th className="px-3 py-2 text-left font-semibold text-slate-600">Reference</th>
-                            <th className="px-3 py-2 text-left font-semibold text-slate-600">Customer</th>
-                            <th className="px-3 py-2 text-center font-semibold text-slate-600">Source</th>
-                            <th className="px-3 py-2 text-left font-semibold text-slate-600">Created By</th>
-                            <th className="px-3 py-2 text-right font-semibold text-slate-600">Pax</th>
-                            <th className="px-3 py-2 text-right font-semibold text-[#0c7b93]">Online Fare</th>
-                            <th className="px-3 py-2 text-right font-semibold text-amber-700">Walk-in</th>
-                            <th className="px-3 py-2 text-left font-semibold text-slate-600">Booked At</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {t.bookings.map((bl) => (
-                            <tr key={bl.id} className={bl.isOnline ? "bg-white" : "bg-amber-50"}>
-                              <td className="px-3 py-2 font-mono font-semibold text-[#0c7b93]">{bl.reference}</td>
-                              <td className="px-3 py-2 text-slate-700">{bl.customerName}</td>
-                              <td className="px-3 py-2 text-center"><SourceBadge isOnline={bl.isOnline} /></td>
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <RoleBadge role={bl.createdByRole} />
-                                  <span className="text-slate-500">{bl.createdByName}</span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2 text-right font-semibold text-slate-700">{bl.passengerCount}</td>
-                              <td className="px-3 py-2 text-right">
-                                {bl.isOnline ? <span className="font-semibold text-[#0c7b93]">{peso(bl.netFareCents)}</span> : <span className="text-gray-300">—</span>}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {!bl.isOnline ? <span className="font-semibold text-amber-700">{peso(bl.netFareCents)}</span> : <span className="text-gray-300">—</span>}
-                              </td>
-                              <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{formatDateTime(bl.createdAt)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-slate-100 font-semibold">
-                            <td colSpan={4} className="px-3 py-2 text-slate-600">Trip Total</td>
-                            <td className="px-3 py-2 text-right text-slate-700">{t.bookings.reduce((s, b) => s + b.passengerCount, 0)}</td>
-                            <td className="px-3 py-2 text-right text-[#0c7b93]">{t.onlineNetFareCents > 0 ? peso(t.onlineNetFareCents) : "—"}</td>
-                            <td className="px-3 py-2 text-right text-amber-700">{t.walkInFareCents > 0 ? peso(t.walkInFareCents) : "—"}</td>
-                            <td className="px-3 py-2" />
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </React.Fragment>
-          );
-        })}
-      </tbody>
-    </table>
   );
 }
