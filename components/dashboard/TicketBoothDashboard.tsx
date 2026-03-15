@@ -82,7 +82,8 @@ export function TicketBoothDashboard({
 }: Props) {
   const [activeTripId, setActiveTripId] = useState<string | null>(selectedTripId);
   const [bookingTrip, setBookingTrip] = useState<UpcomingTripForBooth | null>(null);
-  const [nowString, setNowString] = useState(getNowManila());
+  const [nowString, setNowString] = useState("");
+useEffect(() => { setNowString(getNowManila()); }, []);
 
   useEffect(() => {
     const t = setInterval(() => setNowString(getNowManila()), 60000);
@@ -228,7 +229,7 @@ export function TicketBoothDashboard({
                             className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${isActive ? "bg-[#0c7b93] text-white" : "border border-teal-200 bg-teal-50 text-[#0c7b93] hover:bg-teal-100"}`}>
                             {isActive ? "Hide manifest" : "View manifest"}
                           </button>
-                          {isUpcoming && seatsLeft > 0 && upcomingVersion && (
+                          {seatsLeft > 0 && upcomingVersion && (
                             <button onClick={() => setBookingTrip(upcomingVersion)}
                               className="rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-bold text-white hover:bg-[#085f72] transition-colors shadow-sm">
                               Issue Ticket
