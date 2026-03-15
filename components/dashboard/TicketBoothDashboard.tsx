@@ -8,6 +8,7 @@ import type { UpcomingTripForBooth } from "@/lib/dashboard/get-upcoming-trips-fo
 import type { TripManifestData } from "@/lib/admin/trip-manifest";
 import { ManifestStatusButton } from "@/components/admin/ManifestStatusButton";
 import { Ship, Clock, Ticket, QrCode, BarChart3, BookOpen, User } from "lucide-react";
+import { TicketBoothRevenueSummary } from "@/components/dashboard/TicketBoothRevenueSummary";
 
 type PendingItem = { reference: string; customer_full_name: string; total_amount_cents: number };
 type IssuedBooking = {
@@ -387,6 +388,12 @@ export function TicketBoothDashboard({
             </div>
           </div>
         )}
+
+{/* Revenue Summary */}
+{boatId && (
+  <TicketBoothRevenueSummary boatId={boatId} vesselName={vesselName ?? ""} />
+)}
+
 
         {/* ── Quick links ── */}
         <div>
