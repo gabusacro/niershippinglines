@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { FeeBreakdownCards } from "@/components/admin/FeeBreakdownCards";
 import {
   TrendingUp, Users, Clock, Smartphone, Ticket,
   RotateCcw, Ship, ChevronDown, LayoutDashboard,
@@ -402,6 +403,13 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
             vessels={[]}
             href="/admin/refunds"
             accent={s.total_refund_requests > 0 ? "red" : "teal"}
+          />
+
+          <FeeBreakdownCards
+            platformFeeCents={s.total_platform_fee_cents}
+            processingFeeCents={s.total_processing_fee_cents}
+            adminFeeLabel={adminFeeLabel}
+            gcashFeeLabel={gcashFeeLabel}
           />
 
         </div>
