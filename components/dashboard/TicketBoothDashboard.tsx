@@ -298,7 +298,7 @@ export function TicketBoothDashboard({
               {Object.entries(tripsByDate)
                .filter(([date]) => date > today)
                .sort(([a], [b]) => a.localeCompare(b))
-               .map(([date, trips], idx) => (
+               .map(([date, trips]) => (
                   <div key={date} className="rounded-xl border border-teal-200 bg-white shadow-sm overflow-hidden">
                     <div className="bg-teal-50 px-4 py-2 border-b border-teal-100">
                       <span className="text-xs font-bold text-[#0c7b93]">{formatDate(date)}</span>
