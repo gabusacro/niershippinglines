@@ -34,14 +34,9 @@ function formatDate(d: string | null | undefined) {
   if (!d) return "—";
   try {
     return new Date(d + "Z").toLocaleDateString("en-PH", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
     });
-  } catch {
-    return String(d);
-  }
+  } catch { return String(d); }
 }
 
 const statusLabel: Record<string, string> = {
@@ -118,20 +113,15 @@ export default async function BookingDetailPage({
         .eq("reference", refNormalized)
         .eq("created_by", user.id)
         .maybeSingle();
-      if (minimalRes.error || !minimalRes.data) {
-        console.error("[BookingDetail] Supabase error:", fullRes.error.message, { reference });
-        notFound();
-      }
+      if (minimalRes.error || !minimalRes.data) notFound();
       booking = minimalRes.data as BookingRow;
     } else {
-      console.error("[BookingDetail] Supabase error:", fullRes.error.message, fullRes.error.code, { reference });
       notFound();
     }
   } else {
     booking = fullRes.data as BookingRow;
   }
 
-  // Not in account: maybe a guest booking with same email — allow claim
   if (!booking) {
     const guestRes = await supabase
       .from("bookings")
@@ -190,7 +180,6 @@ export default async function BookingDetailPage({
   };
   const routeName = b.trip_snapshot_route_name ?? "—";
 
-  // Fetch refund details (GCash reference + admin notes) for refunded or in-progress refund bookings
   let gcashRef: string | null = null;
   let refundAdminNotes: string | null = null;
   const hasRefund = booking.status === "refunded" || !!(booking.refund_status && booking.refund_status !== "none");
@@ -215,22 +204,10 @@ export default async function BookingDetailPage({
     booking.status === "boarded" ||
     booking.status === "completed";
 
-
-
-// inside JSX, after the print tickets button:
-{canPrintTickets && (
-  <BookingShareSection
-    routeName={routeName}
-    origin={b.trip_snapshot_route_name ?? ""}
-    destination=""
-  />
-)}
-
   const canReschedule =
     ["confirmed", "checked_in", "boarded", "pending_payment"].includes(booking.status) &&
     isDepartureAtLeast24HoursFromNow(b.trip_snapshot_departure_date ?? "", b.trip_snapshot_departure_time ?? "");
 
-  // Map bookings.refund_status to the refunds table status values for the banner
   const refundStatusMap: Record<string, "pending" | "under_review" | "approved" | "rejected" | "processed"> = {
     pending: "pending",
     under_review: "under_review",
@@ -243,10 +220,7 @@ export default async function BookingDetailPage({
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
-        <Link
-          href={ROUTES.myBookings}
-          className="text-sm font-semibold text-[#0c7b93] hover:underline"
-        >
+        <Link href={ROUTES.myBookings} className="text-sm font-semibold text-[#0c7b93] hover:underline">
           ← My bookings
         </Link>
       </div>
@@ -254,40 +228,30 @@ export default async function BookingDetailPage({
       <div className="rounded-2xl border-2 border-teal-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="font-mono text-xl font-bold text-[#0c7b93]">{booking.reference}</h1>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              booking.status === "refunded"
-                ? "bg-amber-100 text-amber-800"
-                : booking.status === "pending_payment"
-                ? "bg-amber-100 text-amber-800"
-                : canPrintTickets
-                ? "bg-teal-100 text-teal-800"
-                : booking.status === "completed"
-                ? "bg-[#0c7b93]/10 text-[#0f766e]"
-                : "bg-gray-100 text-gray-700"
-            }`}
-          >
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+            booking.status === "refunded" ? "bg-amber-100 text-amber-800"
+            : booking.status === "pending_payment" ? "bg-amber-100 text-amber-800"
+            : canPrintTickets ? "bg-teal-100 text-teal-800"
+            : booking.status === "completed" ? "bg-[#0c7b93]/10 text-[#0f766e]"
+            : "bg-gray-100 text-gray-700"
+          }`}>
             {statusLabel[booking.status] ?? booking.status}
           </span>
         </div>
 
-        <p className="mt-2 text-[#134e4a]">{routeName}{b.trip_snapshot_vessel_name ? ` · ${b.trip_snapshot_vessel_name}` : ""}</p>
+        <p className="mt-2 text-[#134e4a]">
+          {routeName}{b.trip_snapshot_vessel_name ? ` · ${b.trip_snapshot_vessel_name}` : ""}
+        </p>
         <p className="mt-0.5 text-sm text-[#0f766e]">
           {formatDate(b.trip_snapshot_departure_date)} · {formatTime(b.trip_snapshot_departure_time)}
         </p>
 
         <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50/50 p-4">
           <h3 className="text-sm font-semibold text-[#134e4a]">Passenger details</h3>
-          <p className="mt-1 text-sm text-[#0f766e]">
-            <strong>Name:</strong> {booking.customer_full_name ?? "—"}
-          </p>
-          <p className="mt-0.5 text-sm text-[#0f766e]">
-            <strong>Email:</strong> {booking.customer_email ?? "—"}
-          </p>
+          <p className="mt-1 text-sm text-[#0f766e]"><strong>Name:</strong> {booking.customer_full_name ?? "—"}</p>
+          <p className="mt-0.5 text-sm text-[#0f766e]"><strong>Email:</strong> {booking.customer_email ?? "—"}</p>
           {booking.customer_mobile && (
-            <p className="mt-0.5 text-sm text-[#0f766e]">
-              <strong>Mobile:</strong> {booking.customer_mobile}
-            </p>
+            <p className="mt-0.5 text-sm text-[#0f766e]"><strong>Mobile:</strong> {booking.customer_mobile}</p>
           )}
           {Array.isArray(booking.passenger_names) && booking.passenger_names.length > 0 && (
             <p className="mt-0.5 text-sm text-[#0f766e]">
@@ -349,6 +313,15 @@ export default async function BookingDetailPage({
           </div>
         )}
 
+        {/* ── BookingShareSection — moved inside return, was floating outside causing #418 ── */}
+        {canPrintTickets && (
+          <BookingShareSection
+            routeName={routeName}
+            origin={b.trip_snapshot_route_name ?? ""}
+            destination=""
+          />
+        )}
+
         {["confirmed", "checked_in", "boarded", "pending_payment"].includes(booking.status) && (
           <RequestRescheduleButton
             reference={booking.reference}
@@ -369,12 +342,11 @@ export default async function BookingDetailPage({
 
         {booking.status === "refunded" && (
           <div className="mt-6 rounded-xl border-2 border-amber-300 bg-amber-50 p-5">
-            <h2 className="text-base font-bold text-amber-900">
-              Your ticket has been refunded
-            </h2>
+            <h2 className="text-base font-bold text-amber-900">Your ticket has been refunded</h2>
             <p className="mt-2 text-sm text-amber-800">
               {branding.site_name} has processed a refund for your booking. The amount of{" "}
-              <strong>₱{(booking.total_amount_cents / 100).toLocaleString()}</strong> for {routeName} on {formatDate(b.trip_snapshot_departure_date)} at {formatTime(b.trip_snapshot_departure_time)} has been refunded.
+              <strong>₱{(booking.total_amount_cents / 100).toLocaleString()}</strong> for {routeName} on{" "}
+              {formatDate(b.trip_snapshot_departure_date)} at {formatTime(b.trip_snapshot_departure_time)} has been refunded.
             </p>
             {gcashRef && (
               <p className="mt-2 text-sm text-amber-800">
@@ -385,9 +357,7 @@ export default async function BookingDetailPage({
             <p className="mt-2 text-sm text-amber-800">
               We apologize for any inconvenience. If you have questions about this refund, please contact us at the ticket booth or via our contact channels.
             </p>
-            <p className="mt-3 text-xs text-amber-700">
-              Refund processed on your account. You may book a new trip anytime.
-            </p>
+            <p className="mt-3 text-xs text-amber-700">Refund processed on your account. You may book a new trip anytime.</p>
             <AcknowledgeRefundButton reference={booking.reference} acknowledged={!!b.refund_acknowledged_at} />
           </div>
         )}
