@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
     total_amount_cents: totalCents,
     gcash_fee_cents: gcashFeeCents,
     admin_fee_cents: adminFeeCents,
-    status: "pending_payment",
+    status: isWalkIn ? "confirmed" : "pending_payment",
     is_walk_in: isWalkIn,
     booking_source: bookingSource,
     payment_method: isWalkIn ? "cash" : "gcash",

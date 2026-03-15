@@ -3,15 +3,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface ManifestStatusButtonProps {
-  ticketNumber: string;  // ✅ per-ticket, not booking reference
+  ticketNumber: string;
   initialStatus: string;
 }
 
 const statusLabel: Record<string, string> = {
-  confirmed: "Confirmed",
-  checked_in: "Checked in",
-  boarded: "Boarded",
-  completed: "Completed",
+  confirmed:       "Confirmed",
+  checked_in:      "Checked in",
+  boarded:         "Boarded",
+  completed:       "Completed",
+  pending_payment: "Cash — Awaiting Confirm",
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -19,10 +20,13 @@ function StatusBadge({ status }: { status: string }) {
     status === "boarded"
       ? "bg-teal-600 text-white"
       : status === "checked_in"
-        ? "bg-amber-500 text-white"
-        : status === "completed"
-          ? "bg-gray-400 text-white"
-          : "bg-gray-100 text-gray-700 border border-gray-300";
+      ? "bg-amber-500 text-white"
+      : status === "completed"
+      ? "bg-gray-400 text-white"
+      : status === "pending_payment"
+      ? "bg-amber-100 text-amber-800 border border-amber-200"
+      : "bg-gray-100 text-gray-700 border border-gray-300";
+
   return (
     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>
       {statusLabel[status] ?? status}
@@ -43,13 +47,10 @@ export function ManifestStatusButton({ ticketNumber, initialStatus }: ManifestSt
       const res = await fetch("/api/crew/check-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket_number: ticketNumber, action }),  // ✅ per-ticket
+        body: JSON.stringify({ ticket_number: ticketNumber, action }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed");
-        return;
-      }
+      if (!res.ok) { setError(data.error ?? "Failed"); return; }
       setStatus(data.status);
       router.refresh();
     } catch {
