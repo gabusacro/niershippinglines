@@ -17,20 +17,46 @@ function peso(cents: number) {
   return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
 }
 
+// ── Week navigation helpers ───────────────────────────────────────────────────
+function getWeekRange(offsetWeeks: number): { start: string; end: string; label: string } {
+  const now = new Date();
+  const day = now.getDay();
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - daysFromMonday + offsetWeeks * 7);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const labelFmt = (d: Date) =>
+    d.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+
+  const label = offsetWeeks === 0
+    ? "This Week"
+    : offsetWeeks === -1
+    ? "Last Week"
+    : `${labelFmt(monday)} – ${labelFmt(sunday)}`;
+
+  return { start: fmt(monday), end: fmt(sunday), label };
+}
+
 function PeriodToggle({ active, onChange }: { active: Period; onChange: (p: Period) => void }) {
   const periods: { key: Period; label: string }[] = [
-    { key: "today", label: "Today" },
-    { key: "week", label: "This Week" },
-    { key: "month", label: "This Month" },
-    { key: "year", label: "This Year" },
-    { key: "custom", label: "Custom" },
+    { key: "today",  label: "Today"      },
+    { key: "week",   label: "This Week"  },
+    { key: "month",  label: "This Month" },
+    { key: "year",   label: "This Year"  },
+    { key: "custom", label: "Custom"     },
   ];
   return (
     <div className="flex flex-wrap gap-2">
       {periods.map(({ key, label }) => (
         <button key={key} onClick={() => onChange(key)}
           className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-colors ${
-            active === key ? "border-[#0c7b93] bg-[#0c7b93] text-white" : "border-teal-200 bg-white text-[#134e4a] hover:border-[#0c7b93]"
+            active === key
+              ? "border-[#0c7b93] bg-[#0c7b93] text-white"
+              : "border-teal-200 bg-white text-[#134e4a] hover:border-[#0c7b93]"
           }`}>
           {label}
         </button>
@@ -56,7 +82,6 @@ function BoardedCard({ vessels, totalBoarded, totalCheckedIn, totalConfirmed, hr
 }) {
   const [open, setOpen] = useState(false);
   const grandTotal = totalBoarded + totalCheckedIn + totalConfirmed;
-
   return (
     <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between gap-2" type="button">
@@ -72,13 +97,11 @@ function BoardedCard({ vessels, totalBoarded, totalCheckedIn, totalConfirmed, hr
           <span className={`text-gray-400 text-xs font-bold transition-transform ${open ? "rotate-180" : ""}`}>▼</span>
         </div>
       </button>
-
       <div className="flex flex-wrap gap-1.5 mt-2 pl-7">
-        <StatusPill label="Boarded" count={totalBoarded} color="bg-emerald-100 text-emerald-800" />
-        <StatusPill label="Checked in" count={totalCheckedIn} color="bg-blue-100 text-blue-800" />
-        <StatusPill label="Confirmed" count={totalConfirmed} color="bg-amber-100 text-amber-800" />
+        <StatusPill label="Boarded"    count={totalBoarded}    color="bg-emerald-100 text-emerald-800" />
+        <StatusPill label="Checked in" count={totalCheckedIn}  color="bg-blue-100 text-blue-800"      />
+        <StatusPill label="Confirmed"  count={totalConfirmed}  color="bg-amber-100 text-amber-800"    />
       </div>
-
       {open && vessels.length > 0 && (
         <div className="mt-3 pt-3 border-t border-emerald-200">
           {vessels.map((v, i) => (
@@ -88,9 +111,9 @@ function BoardedCard({ vessels, totalBoarded, totalCheckedIn, totalConfirmed, hr
                 <span className="font-bold text-sm text-emerald-700">{v.boarded + v.checked_in + v.confirmed} total</span>
               </div>
               <div className="flex flex-wrap gap-1.5 pl-1">
-                <StatusPill label="Boarded" count={v.boarded} color="bg-emerald-100 text-emerald-800" />
-                <StatusPill label="Checked in" count={v.checked_in} color="bg-blue-100 text-blue-800" />
-                <StatusPill label="Confirmed" count={v.confirmed} color="bg-amber-100 text-amber-800" />
+                <StatusPill label="Boarded"    count={v.boarded}     color="bg-emerald-100 text-emerald-800" />
+                <StatusPill label="Checked in" count={v.checked_in}  color="bg-blue-100 text-blue-800"      />
+                <StatusPill label="Confirmed"  count={v.confirmed}   color="bg-amber-100 text-amber-800"    />
               </div>
             </div>
           ))}
@@ -158,6 +181,7 @@ function SnapshotCard({ title, icon, total, totalLabel, vessels, href, accent }:
 
 export default function AdminSnapshotClient({ initialStats, todayLabel, adminFeeLabel, gcashFeeLabel }: Props) {
   const [period, setPeriod] = useState<Period>("today");
+  const [weekOffset, setWeekOffset] = useState(0);
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [stats, setStats] = useState<PeriodDashboardStats>(initialStats);
@@ -165,35 +189,90 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
 
   async function fetchStats(p: Period, cs?: string, ce?: string) {
     const params = new URLSearchParams({ period: p });
-    if (p === "custom" && cs && ce) { params.set("start", cs); params.set("end", ce); }
+    if (p === "custom" && cs && ce) {
+      params.set("start", cs);
+      params.set("end", ce);
+    }
+    const res = await fetch(`/api/admin/dashboard-stats?${params}`);
+    if (res.ok) setStats(await res.json());
+  }
+
+  async function fetchWeek(offset: number) {
+    const { start, end } = getWeekRange(offset);
+    const params = new URLSearchParams({ period: "custom", start, end });
     const res = await fetch(`/api/admin/dashboard-stats?${params}`);
     if (res.ok) setStats(await res.json());
   }
 
   function handlePeriodChange(p: Period) {
     setPeriod(p);
-    if (p !== "custom") startTransition(() => { fetchStats(p); });
+    if (p === "week") {
+      setWeekOffset(0);
+      startTransition(() => fetchWeek(0));
+    } else if (p !== "custom") {
+      startTransition(() => fetchStats(p));
+    }
   }
+
+  function handleWeekNav(dir: -1 | 1) {
+    const next = weekOffset + dir;
+    setWeekOffset(next);
+    startTransition(() => fetchWeek(next));
+  }
+
+  const weekInfo = getWeekRange(weekOffset);
 
   const s = stats;
   const totalCheckedIn = s.vessels.reduce((acc, v) => acc + v.checked_in, 0);
 
-  const periodLabel = period === "today" ? todayLabel
-    : period === "week" ? "This week"
-    : period === "month" ? "This month"
-    : period === "year" ? "This year"
-    : customStart && customEnd ? `${customStart} to ${customEnd}` : "Custom range";
+  const periodLabel =
+    period === "today"  ? todayLabel :
+    period === "week"   ? weekInfo.label :
+    period === "month"  ? "This month" :
+    period === "year"   ? "This year" :
+    customStart && customEnd ? `${customStart} to ${customEnd}` : "Custom range";
 
   return (
     <div className="mt-8">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <h2 className="text-lg font-semibold text-[#134e4a]">📊 Snapshot</h2>
-          <p className="text-xs text-[#0f766e]/70">{periodLabel} · {s.vessels_active} vessels active · {s.trips_today} trips today</p>
+          <p className="text-xs text-[#0f766e]/70">
+            {periodLabel} · {s.vessels_active} vessels active · {s.trips_today} trips today
+          </p>
         </div>
         <PeriodToggle active={period} onChange={handlePeriodChange} />
       </div>
 
+      {/* ── Week Prev/Next navigation ── */}
+      {period === "week" && (
+        <div className="flex items-center justify-between mb-4 rounded-xl border border-teal-200 bg-white px-4 py-2.5 shadow-sm">
+          <button
+            type="button"
+            onClick={() => handleWeekNav(-1)}
+            disabled={isPending}
+            className="flex items-center gap-1.5 rounded-lg border border-teal-200 px-3 py-1.5 text-xs font-bold text-[#0c7b93] hover:bg-teal-50 disabled:opacity-40 transition-colors"
+          >
+            ← Prev Week
+          </button>
+          <div className="text-center">
+            <div className="text-xs font-bold text-[#134e4a]">{weekInfo.label}</div>
+            <div className="text-xs text-[#0f766e]/60">
+              {weekInfo.start} — {weekInfo.end}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleWeekNav(1)}
+            disabled={isPending || weekOffset >= 0}
+            className="flex items-center gap-1.5 rounded-lg border border-teal-200 px-3 py-1.5 text-xs font-bold text-[#0c7b93] hover:bg-teal-50 disabled:opacity-40 transition-colors"
+          >
+            Next Week →
+          </button>
+        </div>
+      )}
+
+      {/* ── Custom date range ── */}
       {period === "custom" && (
         <div className="flex flex-wrap gap-3 mb-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
           <div>
@@ -217,12 +296,13 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
         </div>
       )}
 
-      {isPending && <div className="text-center py-6 text-sm text-[#0f766e]">Loading...</div>}
+      {isPending && (
+        <div className="text-center py-6 text-sm text-[#0f766e] animate-pulse">Loading…</div>
+      )}
 
       {!isPending && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 
-          {/* Total Revenue */}
           <SnapshotCard
             title="Total Revenue" icon="💰"
             total={peso(s.total_revenue_cents)}
@@ -235,7 +315,6 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
             accent="teal"
           />
 
-          {/* Passengers */}
           <BoardedCard
             vessels={s.vessels}
             totalBoarded={s.total_boarded}
@@ -244,7 +323,6 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
             href="/admin/bookings"
           />
 
-          {/* Pending Payments */}
           <SnapshotCard
             title="Pending Payments" icon="⏳"
             total={s.total_pending}
@@ -254,7 +332,6 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
             accent={s.total_pending > 0 ? "amber" : "teal"}
           />
 
-          {/* Online Bookings */}
           <SnapshotCard
             title="Online Bookings" icon="📱"
             total={s.total_online}
@@ -268,7 +345,6 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
             accent="blue"
           />
 
-          {/* Walk-in Bookings */}
           <SnapshotCard
             title="Walk-in Bookings" icon="🎫"
             total={s.total_walkin}
@@ -282,7 +358,6 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
             accent="teal"
           />
 
-          {/* Refund Requests */}
           <SnapshotCard
             title="Refund Requests" icon="💸"
             total={s.total_refund_requests}
