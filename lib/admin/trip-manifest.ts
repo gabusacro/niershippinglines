@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-const MANIFEST_STATUSES = ["confirmed", "checked_in", "boarded", "completed"] as const;
+const MANIFEST_STATUSES = ["confirmed", "checked_in", "boarded", "completed", "pending_payment"] as const;
 
 /** One row per passenger (all names listed individually). */
 export interface ManifestPassengerRow {

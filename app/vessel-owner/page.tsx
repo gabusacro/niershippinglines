@@ -21,7 +21,7 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-const PAID_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
+const PAID_STATUSES = ["confirmed", "checked_in", "boarded", "completed", "pending_payment"];
 
 export default async function VesselOwnerDashboard({
   searchParams,
