@@ -2,9 +2,9 @@ import { getDashboardStats } from "@/lib/admin/dashboard-stats";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { NextRequest, NextResponse } from "next/server";
 
-type Period = "today" | "week" | "month" | "year";
+type Period = "today" | "week" | "month" | "year" | "custom";
 
-const VALID_PERIODS: Period[] = ["today", "week", "month", "year"];
+const VALID_PERIODS: Period[] = ["today", "week", "month", "year", "custom"];
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser();
@@ -15,10 +15,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const rawPeriod = searchParams.get("period") ?? "today";
   const start = searchParams.get("start") ?? undefined;
-  const end = searchParams.get("end") ?? undefined;
+  const end   = searchParams.get("end")   ?? undefined;
 
-  // If custom dates provided, use month as period with custom dates
-  // Otherwise validate period is one of the known values
   const period: Period = VALID_PERIODS.includes(rawPeriod as Period)
     ? (rawPeriod as Period)
     : "today";

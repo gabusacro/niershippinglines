@@ -42,7 +42,7 @@ export interface PeriodDashboardStats {
 }
 
 export async function getDashboardStats(
-  period: "today" | "week" | "month" | "year" = "today",
+  period: "today" | "week" | "month" | "year" | "custom" = "today",
   customStart?: string,
   customEnd?: string
 ): Promise<PeriodDashboardStats> {
