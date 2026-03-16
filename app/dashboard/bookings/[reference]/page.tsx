@@ -39,6 +39,11 @@ function formatDate(d: string | null | undefined) {
   } catch { return String(d); }
 }
 
+// Safe peso formatter — pinned to en-PH so server and browser always match
+function peso(cents: number) {
+  return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
 const statusLabel: Record<string, string> = {
   pending_payment: "Pending payment",
   confirmed: "Confirmed",
@@ -262,7 +267,7 @@ export default async function BookingDetailPage({
 
         <p className="mt-3 text-sm text-[#134e4a]">
           {booking.passenger_count} passenger{booking.passenger_count !== 1 ? "s" : ""} · {passengerTypeLabel(booking.fare_type)} ·{" "}
-          <strong>₱{(booking.total_amount_cents / 100).toLocaleString()}</strong>
+          <strong>{peso(booking.total_amount_cents)}</strong>
         </p>
 
         <div className="mt-4 rounded-lg border-2 border-amber-200 bg-amber-50/50 p-4">
@@ -280,7 +285,7 @@ export default async function BookingDetailPage({
             )}
             <h2 className="text-sm font-semibold text-amber-900">Where to send payment</h2>
             <p className="mt-1 text-sm text-amber-800">
-              Send <strong>₱{(booking.total_amount_cents / 100).toLocaleString()}</strong> via GCash to confirm this booking.
+              Send <strong>{peso(booking.total_amount_cents)}</strong> via GCash to confirm this booking.
             </p>
             {GCASH_NUMBER && (
               <p className="mt-2 text-sm font-medium text-amber-900">
@@ -313,7 +318,6 @@ export default async function BookingDetailPage({
           </div>
         )}
 
-        {/* ── BookingShareSection — moved inside return, was floating outside causing #418 ── */}
         {canPrintTickets && (
           <BookingShareSection
             routeName={routeName}
@@ -345,7 +349,7 @@ export default async function BookingDetailPage({
             <h2 className="text-base font-bold text-amber-900">Your ticket has been refunded</h2>
             <p className="mt-2 text-sm text-amber-800">
               {branding.site_name} has processed a refund for your booking. The amount of{" "}
-              <strong>₱{(booking.total_amount_cents / 100).toLocaleString()}</strong> for {routeName} on{" "}
+              <strong>{peso(booking.total_amount_cents)}</strong> for {routeName} on{" "}
               {formatDate(b.trip_snapshot_departure_date)} at {formatTime(b.trip_snapshot_departure_time)} has been refunded.
             </p>
             {gcashRef && (
