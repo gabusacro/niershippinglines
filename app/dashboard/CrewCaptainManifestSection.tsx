@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ROUTES } from "@/lib/constants";
 import { formatTime } from "@/lib/dashboard/format";
@@ -40,7 +40,14 @@ export function CrewCaptainManifestSection({
   roleLabel, todayTrips, currentTrip, selectedTripId, manifest,
   avatarUrl, ownerName, vesselNames = [],
 }: Props) {
-  const nowManila = getNowManilaString();
+  // ── FIX: never render time string on server — causes hydration error #418 ──
+  const [nowManila, setNowManila] = useState("");
+  useEffect(() => {
+    setNowManila(getNowManilaString());
+    const t = setInterval(() => setNowManila(getNowManilaString()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
   const [activeTripId, setActiveTripId] = useState<string | null>(selectedTripId);
 
   const selectedTrip = todayTrips.find((t) => t.id === activeTripId) ?? currentTrip;
@@ -60,12 +67,6 @@ export function CrewCaptainManifestSection({
   const initials = ownerName
     ? ownerName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)
     : roleLabel[0]?.toUpperCase() ?? "C";
-
-  const roleColor = roleLabel === "Captain"
-    ? "#0c7b93"
-    : roleLabel === "Deck crew" || roleLabel === "Crew"
-    ? "#0f766e"
-    : "#7c3aed";
 
   return (
     <div className="space-y-5">
@@ -118,11 +119,14 @@ export function CrewCaptainManifestSection({
               {vesselName}
               {vesselNames.length > 1 && ` · ${vesselNames.length} vessels`}
             </div>
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border border-white/20"
-              style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span style={{ color: "#ffffff", fontSize: 12, fontWeight: 600 }}>{nowManila}</span>
-            </div>
+            {/* Only render time after client mounts — empty string on server = no mismatch */}
+            {nowManila && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border border-white/20"
+                style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span style={{ color: "#ffffff", fontSize: 12, fontWeight: 600 }}>{nowManila}</span>
+              </div>
+            )}
           </div>
 
           {/* Today's trips count pill */}
