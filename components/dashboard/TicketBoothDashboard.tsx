@@ -48,6 +48,8 @@ function formatDate(d: string) {
   } catch { return d; }
 }
 
+// ── FIX: formatTimestamp is only called after mounted = true ──
+// so it never runs on the server, preventing hydration error #418
 function formatTimestamp(ts: string | null): string {
   if (!ts) return "";
   try {
@@ -67,9 +69,12 @@ export function TicketBoothDashboard({
   pendingPayments, issuedToday,
   loggedInEmail, loggedInAddress,
 }: Props) {
-  // ── Fix hydration #418: never call date functions during initial render ──
+  // ── mounted guard — nothing time-related renders on server ────────────
+  const [mounted, setMounted] = useState(false);
+
   const [nowString, setNowString] = useState("");
   useEffect(() => {
+    setMounted(true);
     setNowString(new Date().toLocaleString("en-PH", {
       timeZone: "Asia/Manila", weekday: "long", month: "long",
       day: "numeric", year: "numeric",
@@ -81,7 +86,6 @@ export function TicketBoothDashboard({
     return () => clearInterval(t);
   }, []);
 
-  // ── Client-side manifest fetch — fixes wrong manifest showing ──────────
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [manifest, setManifest] = useState<TripManifestData | null>(null);
   const [manifestLoading, setManifestLoading] = useState(false);
@@ -121,7 +125,6 @@ export function TicketBoothDashboard({
     return acc;
   }, {});
 
-  // ── No vessel assigned ─────────────────────────────────────────────────
   if (!boatId || !vesselName) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-teal-50 to-cyan-50 flex items-center justify-center p-4">
@@ -257,7 +260,6 @@ export function TicketBoothDashboard({
                             }`}>
                             {isActive ? "Hide manifest" : "View manifest"}
                           </button>
-                          {/* Allow issuing ticket even for departed trips — vessel may be delayed */}
                           {seatsLeft > 0 && upcomingVersion && (
                             <button onClick={() => setBookingTrip(upcomingVersion)}
                               className="rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-bold text-white hover:bg-[#085f72] transition-colors shadow-sm">
@@ -267,7 +269,6 @@ export function TicketBoothDashboard({
                         </div>
                       </div>
 
-                      {/* ── Manifest — client-side fetched, correct per trip ── */}
                       {isActive && (
                         <div className="mt-4 border-t border-teal-100 pt-4">
                           {manifestLoading ? (
@@ -303,7 +304,8 @@ export function TicketBoothDashboard({
                                           <td className="px-3 py-2 text-xs text-[#0f766e]">{p.source}</td>
                                           <td className="px-3 py-2">
                                             <ManifestStatusButton ticketNumber={p.ticketNumber} initialStatus={p.status} />
-                                            {p.boardedAt && (
+                                            {/* ── FIX: only render timestamp after client mounts ── */}
+                                            {mounted && p.boardedAt && (
                                               <div className="text-xs text-gray-400 mt-0.5">{formatTimestamp(p.boardedAt)}</div>
                                             )}
                                           </td>
@@ -412,7 +414,10 @@ export function TicketBoothDashboard({
                       <td className="px-4 py-2.5 text-[#134e4a]">{b.customer_full_name}</td>
                       <td className="px-4 py-2.5 text-right font-semibold text-[#134e4a]">{b.passenger_count}</td>
                       <td className="px-4 py-2.5 text-right font-bold text-[#0c7b93]">{peso(b.total_amount_cents)}</td>
-                      <td className="px-4 py-2.5 text-xs text-[#0f766e]">{formatTimestamp(b.created_at)}</td>
+                      {/* ── FIX: only render timestamp after client mounts ── */}
+                      <td className="px-4 py-2.5 text-xs text-[#0f766e]">
+                        {mounted ? formatTimestamp(b.created_at) : ""}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
