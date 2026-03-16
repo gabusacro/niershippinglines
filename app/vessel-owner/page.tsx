@@ -4,16 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { ROUTES } from "@/lib/constants";
 import { VesselOwnerClient } from "./VesselOwnerClient";
 
-type PassengerDetail = {
-  fare_type: string;
-  full_name: string;
-  gender?: string | null;
-  address?: string | null;
-  birthdate?: string | null;
-  nationality?: string | null;
-  ticket_number?: string | null;
-};
-
 export const metadata = {
   title: "Vessel Owner Dashboard",
   description: "Your vessel earnings — Travela Siargao",
@@ -21,7 +11,7 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-const PAID_STATUSES = ["confirmed", "checked_in", "boarded", "completed", "pending_payment"];
+const PAID_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
 
 export default async function VesselOwnerDashboard({
   searchParams,
@@ -34,10 +24,14 @@ export default async function VesselOwnerDashboard({
 
   const params = await searchParams;
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear  = parseInt(now.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }).slice(0, 4), 10);
-  const currentMonth = parseInt(now.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }).slice(5, 7), 10);
-  const todayManila  = now.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+
+  // ── FIX: compute date string ONCE, then parse from that string ──
+  // Previously called new Date().toLocaleDateString() three separate times
+  // which could produce slightly different results between server and client,
+  // causing React hydration error #418.
+  const todayManila  = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+  const currentYear  = parseInt(todayManila.slice(0, 4), 10);
+  const currentMonth = parseInt(todayManila.slice(5, 7), 10);
   const todayDay     = parseInt(todayManila.slice(8, 10), 10);
 
   const selectedYear  = parseInt(params.year  ?? String(currentYear),  10);
@@ -46,8 +40,6 @@ export default async function VesselOwnerDashboard({
   const daysInCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
   const isViewingCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
   const isLast5Days = isViewingCurrentMonth && todayDay >= daysInCurrentMonth - 4;
-
-  
 
   // Owner's vessel assignments
   const { data: assignments } = await supabase
@@ -112,6 +104,16 @@ export default async function VesselOwnerDashboard({
         .order("created_at", { ascending: false })
     : { data: [] };
 
+  type PassengerDetail = {
+    fare_type: string;
+    full_name: string;
+    gender?: string | null;
+    address?: string | null;
+    birthdate?: string | null;
+    nationality?: string | null;
+    ticket_number?: string | null;
+  };
+
   type BookingLine = {
     id: string; tripId: string; reference: string; isOnline: boolean;
     paymentMethod: string | null; passengerCount: number;
@@ -119,13 +121,14 @@ export default async function VesselOwnerDashboard({
     platformFeeCents: number; processingFeeCents: number;
     customerName: string; createdByName: string; createdByRole: string;
     bookingSource: string | null;
-    fareType: string;
-    passengerDetails: PassengerDetail[] | null;
     createdAt: string; status: string;
+    passengerDetails: PassengerDetail[] | null;
+    fareType: string;
   };
 
   const bookingLines: BookingLine[] = (bookings ?? []).map((b) => {
     const creator = (b as { creator?: { full_name?: string; role?: string } | null }).creator;
+    const bx = b as { booking_source?: string | null; fare_type?: string | null; passenger_details?: PassengerDetail[] | null };
     const isOnline = b.booking_source === "online" && !b.is_walk_in;
     const adminFee = b.admin_fee_cents ?? 0;
     const gcashFee = b.gcash_fee_cents ?? 0;
@@ -140,10 +143,10 @@ export default async function VesselOwnerDashboard({
       customerName: b.customer_full_name ?? "—",
       createdByName: creator?.full_name ?? "Passenger (online)",
       createdByRole: creator?.role ?? "passenger",
-      bookingSource: b.booking_source ?? null,
-      fareType: (b as { fare_type?: string }).fare_type ?? "adult",
-      passengerDetails: (b as { passenger_details?: unknown }).passenger_details as PassengerDetail[] | null ?? null,
+      bookingSource: bx.booking_source ?? null,
       createdAt: b.created_at, status: b.status,
+      passengerDetails: Array.isArray(bx.passenger_details) ? bx.passenger_details : null,
+      fareType: bx.fare_type ?? "adult",
     };
   });
 
@@ -202,11 +205,6 @@ export default async function VesselOwnerDashboard({
   }
 
   // ── Admin Owes Me calculation ─────────────────────────────────────────────
-  // For each PAST trip with online bookings:
-  //   - If trip_fare_payments.status = 'paid' → already remitted
-  //   - If trip_fare_payments.status = 'pending' or no record → admin still owes
-  // Only online bookings count — walk-in cash goes directly to vessel
-
   type OwedTrip = {
     tripId: string; boatName: string; routeName: string;
     departureDate: string; departureTime: string;
@@ -220,11 +218,10 @@ export default async function VesselOwnerDashboard({
   let totalPaidCents = 0;
 
   for (const t of trips ?? []) {
-    // Only count past + today trips (departure already happened or happening today)
     if (t.departure_date > todayManila) continue;
 
     const agg = byTrip.get(t.id);
-    if (!agg || agg.onlineNetFareCents === 0) continue; // no online fare = nothing to owe
+    if (!agg || agg.onlineNetFareCents === 0) continue;
 
     const pay = paymentByTrip.get(t.id);
     const status = (pay?.status ?? "pending") as "pending" | "paid" | "failed";
