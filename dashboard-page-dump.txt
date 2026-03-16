@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { getUpcomingTrips } from "@/lib/dashboard/get-upcoming-trips";
@@ -31,15 +31,10 @@ import { TicketBoothDashboard } from "@/components/dashboard/TicketBoothDashboar
 
 export async function generateMetadata() {
   const branding = await getSiteBranding();
-  return { title: "Dashboard", description: `Dashboard — ${branding.site_name}` };
+  return { title: "Dashboard", description: `Dashboard â€“ ${branding.site_name}` };
 }
 
 export const dynamic = "force-dynamic";
-
-// ── FIX: pinned locale helper so server and browser always format the same way ──
-function peso(cents: number) {
-  return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
 
 async function TripCalendarWrapper({
   loggedInEmail, passengerName, loggedInAddress,
@@ -113,7 +108,7 @@ export default async function DashboardPage({
   const awaitingPayment      = allPending.filter(b => !b.payment_proof_path);
   const awaitingConfirmation = allPending.filter(b => !!b.payment_proof_path);
 
-  // ── Crew / Captain data ──────────────────────────────────────────────────
+  // â”€â”€ Crew / Captain data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let crewCaptainData: {
     boatIds: string[];
     todayTrips: Awaited<ReturnType<typeof getTodaysTripsForBoats>>;
@@ -134,7 +129,7 @@ export default async function DashboardPage({
     crewCaptainData = { boatIds, todayTrips, currentTrip, selectedTripId, manifest };
   }
 
-  // ── Ticket Booth data — ONLY assigned vessel ─────────────────────────────
+  // â”€â”€ Ticket Booth data â€” ONLY assigned vessel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let ticketBoothData: {
     vesselName: string | null;
     boatId: string | null;
@@ -180,7 +175,6 @@ export default async function DashboardPage({
         : currentTrip?.id ?? null;
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
 
-    // ── FIX: compute date string once ──
     const todayManila = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
     const tripIds = todayTrips.map(t => t.id);
 
@@ -233,6 +227,9 @@ export default async function DashboardPage({
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
 
       {isPassenger ? (
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // PASSENGER DASHBOARD
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         <div className="space-y-6">
 
           {/* HERO WELCOME BANNER */}
@@ -244,17 +241,17 @@ export default async function DashboardPage({
                 backgroundRepeat: "repeat",
               }}
             />
-            <span className="pointer-events-none absolute -right-4 top-0 select-none text-[8rem] leading-none opacity-[0.07]">🌴</span>
+            <span className="pointer-events-none absolute -right-4 top-0 select-none text-[8rem] leading-none opacity-[0.07]">ðŸŒ´</span>
 
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-white/60">Passenger Dashboard</p>
                 <h1 className="mt-1 font-bold text-3xl leading-tight">
-                  {showWelcomeName ? <>Welcome back, {showWelcomeName}! 👋</> : <>Welcome aboard! 👋</>}
+                  {showWelcomeName ? <>Welcome back, {showWelcomeName}! ðŸ‘‹</> : <>Welcome aboard! ðŸ‘‹</>}
                 </h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white/75">
                   {loggedInAddress && (
-                    <span className="rounded-full bg-white/15 px-3 py-0.5 text-xs font-medium">📍 {loggedInAddress}</span>
+                    <span className="rounded-full bg-white/15 px-3 py-0.5 text-xs font-medium">ðŸ“ {loggedInAddress}</span>
                   )}
                   {!displayName && (
                     <span className="text-white/60 text-xs">Set your name so we can greet you properly</span>
@@ -271,7 +268,7 @@ export default async function DashboardPage({
 
             {displayName && (
               <div className="relative mt-4 border-t border-white/15 pt-4">
-                <p className="text-xs font-semibold text-white/70 mb-1">📋 Address for tickets & Coast Guard manifest</p>
+                <p className="text-xs font-semibold text-white/70 mb-1">ðŸ“‹ Address for tickets & Coast Guard manifest</p>
                 <SetAddressForm initialAddress={user.address ?? ""} />
               </div>
             )}
@@ -288,7 +285,7 @@ export default async function DashboardPage({
           {/* RESTRICTION NOTICES */}
           {passengerRestriction && passengerRestriction.booking_warnings >= 1 && !isBlockedNow(passengerRestriction) && (
             <div className="rounded-2xl border-2 border-amber-500 bg-amber-50 p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-amber-900">⚠️ Notice about your account</h2>
+              <h2 className="text-lg font-bold text-amber-900">âš ï¸ Notice about your account</h2>
               <p className="mt-2 text-sm text-amber-800">
                 We&apos;ve noticed some issues with your recent booking activity. Please ensure you only
                 book when you intend to complete payment. Repeated abuse may result in temporary or
@@ -298,7 +295,7 @@ export default async function DashboardPage({
           )}
           {passengerRestriction && isBlockedNow(passengerRestriction) && (
             <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-red-900">🚫 Account temporarily restricted</h2>
+              <h2 className="text-lg font-bold text-red-900">ðŸš« Account temporarily restricted</h2>
               <p className="mt-2 text-sm text-red-800">
                 We noticed unusual activity and have temporarily restricted your account from making new
                 bookings. If you believe this is an error, please contact us at{" "}
@@ -317,12 +314,12 @@ export default async function DashboardPage({
                   <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
                       <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.2)]" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-amber-800">⏳ Awaiting Payment</span>
+                      <span className="text-xs font-bold uppercase tracking-widest text-amber-800">â³ Awaiting Payment</span>
                     </div>
                     <ul className="space-y-2">
                       {awaitingPayment.map(b => {
                         const routeName = b.trip?.route?.display_name
-                          ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
+                          ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" â†’ ") ?? "â€”";
                         return (
                           <li key={b.id}>
                             <Link href={`/dashboard/bookings/${b.reference}`}
@@ -331,8 +328,7 @@ export default async function DashboardPage({
                                 <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
                                 <div className="text-xs text-[#6B8886] mt-0.5">{routeName}</div>
                               </div>
-                              {/* ── FIX: pinned locale via peso() helper ── */}
-                              <div className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</div>
+                              <div className="font-bold text-[#134e4a]">â‚±{(b.total_amount_cents / 100).toLocaleString()}</div>
                             </Link>
                           </li>
                         );
@@ -345,7 +341,7 @@ export default async function DashboardPage({
                     )}
                     <Link href={ROUTES.myBookings}
                       className="mt-3 inline-flex items-center gap-1 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-600">
-                      View all bookings →
+                      View all bookings â†’
                     </Link>
                   </div>
                 )}
@@ -354,13 +350,13 @@ export default async function DashboardPage({
                   <div className="rounded-2xl border-2 border-teal-200 bg-teal-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
                       <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-teal-500 shadow-[0_0_0_3px_rgba(20,184,166,0.2)]" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-teal-800">🕐 Awaiting Confirmation</span>
+                      <span className="text-xs font-bold uppercase tracking-widest text-teal-800">ðŸ• Awaiting Confirmation</span>
                     </div>
-                    <p className="mb-2 text-xs text-teal-700">Payment proof submitted — waiting for admin to confirm.</p>
+                    <p className="mb-2 text-xs text-teal-700">Payment proof submitted â€” waiting for admin to confirm.</p>
                     <ul className="space-y-2">
                       {awaitingConfirmation.map(b => {
                         const routeName = b.trip?.route?.display_name
-                          ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
+                          ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" â†’ ") ?? "â€”";
                         return (
                           <li key={b.id}>
                             <Link href={`/dashboard/bookings/${b.reference}`}
@@ -369,8 +365,7 @@ export default async function DashboardPage({
                                 <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
                                 <div className="text-xs text-[#6B8886] mt-0.5">{routeName}</div>
                               </div>
-                              {/* ── FIX: pinned locale via peso() helper ── */}
-                              <div className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</div>
+                              <div className="font-bold text-[#134e4a]">â‚±{(b.total_amount_cents / 100).toLocaleString()}</div>
                             </Link>
                           </li>
                         );
@@ -378,7 +373,7 @@ export default async function DashboardPage({
                     </ul>
                     <Link href={ROUTES.myBookings}
                       className="mt-3 inline-flex items-center gap-1 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700">
-                      View all bookings →
+                      View all bookings â†’
                     </Link>
                   </div>
                 )}
@@ -387,17 +382,17 @@ export default async function DashboardPage({
                   <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
                       <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(5,150,105,0.2)]" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-800">✅ Confirmed — Tickets Ready</span>
+                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-800">âœ… Confirmed â€” Tickets Ready</span>
                     </div>
                     <p className="mb-2 text-xs text-emerald-700">Your tickets are confirmed. Show QR code when boarding.</p>
                     <ul className="space-y-2">
                       {recentlyConfirmed.map(b => {
                         const refundBadge =
-                          b.refund_status === "pending"      ? { emoji: "⏳", label: "Refund pending",      color: "bg-amber-100 text-amber-800"    } :
-                          b.refund_status === "under_review" ? { emoji: "🔍", label: "Refund under review", color: "bg-blue-100 text-blue-800"      } :
-                          b.refund_status === "approved"     ? { emoji: "✅", label: "Refund approved",     color: "bg-emerald-100 text-emerald-800" } :
-                          b.refund_status === "processed"    ? { emoji: "💸", label: "Refunded",            color: "bg-teal-100 text-teal-800"       } :
-                          b.refund_status === "rejected"     ? { emoji: "❌", label: "Refund rejected",     color: "bg-red-100 text-red-800"         } :
+                          b.refund_status === "pending"      ? { emoji: "â³", label: "Refund pending",      color: "bg-amber-100 text-amber-800"    } :
+                          b.refund_status === "under_review" ? { emoji: "ðŸ”", label: "Refund under review", color: "bg-blue-100 text-blue-800"      } :
+                          b.refund_status === "approved"     ? { emoji: "âœ…", label: "Refund approved",     color: "bg-emerald-100 text-emerald-800" } :
+                          b.refund_status === "processed"    ? { emoji: "ðŸ’¸", label: "Refunded",            color: "bg-teal-100 text-teal-800"       } :
+                          b.refund_status === "rejected"     ? { emoji: "âŒ", label: "Refund rejected",     color: "bg-red-100 text-red-800"         } :
                           null;
                         const isRescheduleRequested = !!b.reschedule_requested_at;
                         return (
@@ -408,7 +403,7 @@ export default async function DashboardPage({
                                 {b.trip_snapshot_departure_date && (
                                   <div className="text-xs text-[#6B8886] mt-0.5">
                                     {b.trip_snapshot_departure_date}
-                                    {b.trip_snapshot_departure_time ? ` · ${b.trip_snapshot_departure_time}` : ""}
+                                    {b.trip_snapshot_departure_time ? ` Â· ${b.trip_snapshot_departure_time}` : ""}
                                   </div>
                                 )}
                               </div>
@@ -420,7 +415,7 @@ export default async function DashboardPage({
                                 )}
                                 {isRescheduleRequested && (
                                   <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800">
-                                    🔄 Reschedule requested
+                                    ðŸ”„ Reschedule requested
                                   </span>
                                 )}
                               </div>
@@ -438,7 +433,7 @@ export default async function DashboardPage({
                     </ul>
                     <Link href={ROUTES.myBookings}
                       className="mt-3 inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-700">
-                      View all bookings →
+                      View all bookings â†’
                     </Link>
                   </div>
                 )}
@@ -446,7 +441,7 @@ export default async function DashboardPage({
                 {refundedBookings.length > 0 && (
                   <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
-                      <span className="text-xs font-bold uppercase tracking-widest text-slate-600">💸 Recent Refunds</span>
+                      <span className="text-xs font-bold uppercase tracking-widest text-slate-600">ðŸ’¸ Recent Refunds</span>
                     </div>
                     <ul className="space-y-2">
                       {refundedBookings.map(b => (
@@ -478,25 +473,25 @@ export default async function DashboardPage({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Link href={ROUTES.book}
                 className="group flex flex-col rounded-2xl border-2 border-[#0c7b93] bg-[#0c7b93] p-5 text-white shadow-lg shadow-[#0c7b93]/20 transition-all hover:bg-[#0f766e] hover:shadow-xl hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-xl">🚢</span>
+                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-xl">ðŸš¢</span>
                 <span className="text-lg font-bold">Book a Trip</span>
-                <span className="mt-1 text-xs text-white/75">Siargao ↔ Surigao · Dinagat ↔ Surigao</span>
+                <span className="mt-1 text-xs text-white/75">Siargao â†” Surigao Â· Dinagat â†” Surigao</span>
               </Link>
               <Link href={ROUTES.myBookings}
                 className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">🎫</span>
+                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">ðŸŽ«</span>
                 <span className="text-lg font-bold">My Bookings</span>
                 <span className="mt-1 text-xs text-[#6B8886]">Your reservations and references</span>
               </Link>
               <Link href={ROUTES.schedule}
                 className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">🗓️</span>
+                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">ðŸ—“ï¸</span>
                 <span className="text-lg font-bold">View Schedule</span>
                 <span className="mt-1 text-xs text-[#6B8886]">Departure times and routes</span>
               </Link>
               <Link href={ROUTES.account}
                 className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">👤</span>
+                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">ðŸ‘¤</span>
                 <span className="text-lg font-bold">My Account</span>
                 <span className="mt-1 text-xs text-[#6B8886]">Profile and password</span>
               </Link>
@@ -520,7 +515,7 @@ export default async function DashboardPage({
 
           <div className="rounded-2xl border-2 border-teal-100 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center gap-4">
-              <span className="text-2xl">🔍</span>
+              <span className="text-2xl">ðŸ”</span>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-[#134e4a] text-sm">Find a Booking by Reference</p>
                 <p className="text-xs text-[#6B8886] mt-0.5">Enter your reference code to retrieve any booking</p>
@@ -534,12 +529,18 @@ export default async function DashboardPage({
         </div>
 
       ) : isAdmin ? (
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // ADMIN (redirected above)
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         <>
           <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
           <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email}. Your role: <strong>Admin</strong>.</p>
         </>
 
       ) : user.role === "ticket_booth" ? (
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // TICKET BOOTH
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         <TicketBoothDashboard
           ownerName={welcomeName ?? user.email ?? "Ticket Booth"}
           vesselName={ticketBoothData?.vesselName ?? null}
@@ -555,6 +556,9 @@ export default async function DashboardPage({
         />
 
       ) : (user.role === "crew" || user.role === "captain") && crewCaptainData ? (
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // CREW / CAPTAIN
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         <>
           <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
           <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email}. Your role: <strong>{yourRoleLabel}</strong>.</p>
@@ -581,13 +585,16 @@ export default async function DashboardPage({
         </>
 
       ) : user.role === "vessel_owner" ? (
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // VESSEL OWNER
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         <>
           <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
           <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email}. Your role: <strong>Vessel Owner</strong>.</p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Link href="/vessel-owner"
               className="rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93]/5 p-5 text-left transition-colors hover:bg-[#0c7b93]/10">
-              <h2 className="font-semibold text-[#134e4a]">🚢 Vessel Dashboard</h2>
+              <h2 className="font-semibold text-[#134e4a]">ðŸš¢ Vessel Dashboard</h2>
               <p className="mt-1 text-sm text-[#0f766e]">Your vessel trips, passengers, fare revenue, and patronage bonus.</p>
             </Link>
             <Link href={ROUTES.account}
@@ -599,9 +606,12 @@ export default async function DashboardPage({
         </>
 
       ) : (
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        // FALLBACK
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         <div className="min-h-[60vh] flex items-center justify-center px-4">
           <div className="w-full max-w-md text-center space-y-6">
-            <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-teal-100 text-4xl shadow-sm mx-auto">🚢</div>
+            <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-teal-100 text-4xl shadow-sm mx-auto">ðŸš¢</div>
             <div>
               <h1 className="text-2xl font-black text-[#134e4a]">
                 Welcome, {welcomeName || user.email?.split("@")[0] || "Traveler"}!
@@ -621,24 +631,24 @@ export default async function DashboardPage({
               </p>
               <div className="pt-2 border-t border-teal-100 space-y-2">
                 <div className="flex items-center gap-2 text-xs text-[#0f766e]">
-                  <span className="text-teal-500">✓</span> Account email: <strong>{user.email}</strong>
+                  <span className="text-teal-500">âœ“</span> Account email: <strong>{user.email}</strong>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-[#0f766e]">
-                  <span className="text-teal-500">✓</span> Role: <strong>{yourRoleLabel}</strong>
+                  <span className="text-teal-500">âœ“</span> Role: <strong>{yourRoleLabel}</strong>
                 </div>
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link href={ROUTES.account}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0c7b93] px-6 py-3 text-sm font-bold text-white hover:bg-[#085f72] transition-colors shadow-sm">
-                👤 My Account
+                ðŸ‘¤ My Account
               </Link>
               <a href="mailto:support@travelasiargao.com"
                 className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-teal-200 bg-white px-6 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors">
-                ✉️ Contact Admin
+                âœ‰ï¸ Contact Admin
               </a>
             </div>
-            <p className="text-xs text-[#0f766e]/40">Travela Siargao · support@travelasiargao.com</p>
+            <p className="text-xs text-[#0f766e]/40">Travela Siargao Â· support@travelasiargao.com</p>
           </div>
         </div>
       )}
