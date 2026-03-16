@@ -234,7 +234,7 @@ export default async function AdminBookingDetailPage({
         </div>
 
         <p className="mt-4 text-sm text-[#134e4a]">
-          <strong>Total:</strong> ₱{(booking.total_amount_cents / 100).toLocaleString()}
+          <strong>Total:</strong> ₱{(booking.total_amount_cents / 100).toLocaleString("en-PH")}
         </p>
         <p className="mt-0.5 text-xs text-[#0f766e]">
           Created {booking.created_at ? new Date(booking.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "—"}

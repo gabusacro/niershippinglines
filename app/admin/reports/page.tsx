@@ -79,9 +79,9 @@ export default async function AdminReportsPage({
       : "daily";
 
   const supabase = await createClient();
-  const now = new Date();
-  const currentYear = parseInt(now.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }).slice(0, 4), 10);
-  const currentMonth = parseInt(now.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }).slice(5, 7), 10);
+  const todayPH = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+const currentYear = parseInt(todayPH.slice(0, 4), 10);
+const currentMonth = parseInt(todayPH.slice(5, 7), 10);
   const yearMax = currentYear + YEAR_MAX_OFFSET;
   const yearParam = params?.year != null ? parseInt(params.year, 10) : NaN;
   const selectedYear =
