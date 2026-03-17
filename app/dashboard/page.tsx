@@ -144,6 +144,7 @@ export default async function DashboardPage({
     currentTrip: ReturnType<typeof getCurrentTripFromTodays>;
     selectedTripId: string | null;
     manifest: Awaited<ReturnType<typeof getTripManifestData>>;
+    avatarUrl: string | null;  // ← ADD THIS LINE
     pendingPayments: { reference: string; customer_full_name: string; total_amount_cents: number }[];
     issuedToday: { reference: string; customer_full_name: string; total_amount_cents: number; passenger_count: number; created_at: string }[];
   } | null = null;
@@ -203,7 +204,20 @@ export default async function DashboardPage({
       .gte("created_at", `${todayManila}T00:00:00+08:00`)
       .order("created_at", { ascending: false });
 
+
+
+
+      const { data: boothProfile } = await sb
+  .from("profiles")
+  .select("avatar_url")
+  .eq("id", user.id)
+  .maybeSingle();
+
+
+
+
     ticketBoothData = {
+      avatarUrl: boothProfile?.avatar_url ?? null,
       vesselName,
       boatId,
       boatIds,
@@ -541,6 +555,7 @@ export default async function DashboardPage({
 
       ) : user.role === "ticket_booth" ? (
         <TicketBoothDashboard
+          avatarUrl={ticketBoothData?.avatarUrl ?? null}
           ownerName={welcomeName ?? user.email ?? "Ticket Booth"}
           vesselName={ticketBoothData?.vesselName ?? null}
           boatId={ticketBoothData?.boatId ?? null}
