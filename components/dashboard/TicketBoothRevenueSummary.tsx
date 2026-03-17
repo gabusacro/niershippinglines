@@ -196,7 +196,7 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4">
             {[
               { icon: Wallet,      label: "Cash (Walk-in)",  value: peso(data.cashTotal),                        sub: `${data.cashPax} pax`,                    color: "text-amber-700",  bg: "bg-amber-50 border-amber-200",        iconColor: "text-amber-600"  },
-              { icon: Smartphone,  label: "Online (GCash)",  value: peso(data.onlineTotal),                      sub: `${data.onlinePax} pax`,                  color: "text-teal-700",   bg: "bg-teal-50 border-teal-200",          iconColor: "text-teal-600"   },
+              { icon: Smartphone,  label: "Online (Payment)",  value: peso(data.onlineTotal),                      sub: `${data.onlinePax} pax`,                  color: "text-teal-700",   bg: "bg-teal-50 border-teal-200",          iconColor: "text-teal-600"   },
               { icon: TrendingUp,  label: "Total Revenue",   value: peso(data.cashTotal + data.onlineTotal),     sub: `${data.cashPax + data.onlinePax} pax`,   color: "text-[#0c7b93]",  bg: "bg-[#0c7b93]/5 border-[#0c7b93]/20", iconColor: "text-[#0c7b93]"  },
               { icon: Users,       label: "Total Bookings",  value: String(data.totalBookings),                  sub: `${data.cashPax + data.onlinePax} pax`,   color: "text-[#134e4a]",  bg: "bg-gray-50 border-gray-200",          iconColor: "text-gray-500"   },
             ].map(s => (
