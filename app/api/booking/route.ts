@@ -185,11 +185,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: tripError?.message ?? "Trip not found or not available" }, { status: 400 });
   }
 
-  const todayManila = getTodayInManila();
-  const depDate = (trip as { departure_date?: string }).departure_date;
-  const depTime = (trip as { departure_time?: string }).departure_time ?? "";
-  if (depDate === todayManila && !isTripDepartureAtLeast30MinFromNow(depDate, depTime)) {
-    return NextResponse.json({ error: "This trip departs too soon. Book a later trip (at least 30 minutes from now) so you have time to pay and board." }, { status: 400 });
+  // ── Departure time check — ONLINE bookings only ───────────────────────────
+  // Walk-in staff at the ticket booth can issue tickets right up to departure.
+  // The 30-minute cutoff only applies to online passengers who need time to
+  // pay via GCash and travel to the port before the boat leaves.
+  if (!isWalkIn) {
+    const todayManila = getTodayInManila();
+    const depDate = (trip as { departure_date?: string }).departure_date;
+    const depTime = (trip as { departure_time?: string }).departure_time ?? "";
+    if (depDate === todayManila && !isTripDepartureAtLeast30MinFromNow(depDate, depTime)) {
+      return NextResponse.json({
+        error: "This trip departs too soon. Book a later trip (at least 30 minutes from now) so you have time to pay and board.",
+      }, { status: 400 });
+    }
   }
 
   const available = (trip.online_quota ?? 0) - (trip.online_booked ?? 0);
@@ -234,9 +242,9 @@ export async function POST(request: NextRequest) {
     ? notifyAlsoEmailRaw.trim() : null;
 
   // ── Determine booking_source ──────────────────────────────────────────────
-  // online        = passenger booking via website
+  // online             = passenger booking via website
   // ticket_booth_walk_in = ticket booth staff booking on behalf of walk-in passenger
-  // admin_walk_in = admin manually creating a booking
+  // admin_walk_in      = admin manually creating a booking
   let bookingSource = "online";
   if (isWalkIn && authUser?.id) {
     const { data: bookerProfile } = await supabase

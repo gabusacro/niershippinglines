@@ -12,8 +12,12 @@ import { TicketBoothRevenueSummary } from "@/components/dashboard/TicketBoothRev
 
 type PendingItem = { reference: string; customer_full_name: string; total_amount_cents: number };
 type IssuedBooking = {
-  reference: string; customer_full_name: string;
-  total_amount_cents: number; passenger_count: number; created_at: string;
+  reference: string;
+  customer_full_name: string;
+  total_amount_cents: number;
+  passenger_count: number;
+  created_at: string;
+  trip_id?: string | null;
 };
 
 type Props = {
@@ -48,8 +52,7 @@ function formatDate(d: string) {
   } catch { return d; }
 }
 
-// ── FIX: formatTimestamp is only called after mounted = true ──
-// so it never runs on the server, preventing hydration error #418
+// Safe client-only timestamp formatter — never called on server
 function formatTimestamp(ts: string | null): string {
   if (!ts) return "";
   try {
@@ -66,58 +69,116 @@ function getTodayManila() {
 export function TicketBoothDashboard({
   ownerName, vesselName, boatId,
   todayTrips, upcomingTrips,
-  pendingPayments, issuedToday,
+  pendingPayments, issuedToday: issuedTodayProp,
   loggedInEmail, loggedInAddress,
 }: Props) {
-  // ── mounted guard — nothing time-related renders on server ────────────
+  // ── mounted guard — nothing time-related renders on server ────────────────
   const [mounted, setMounted] = useState(false);
-
   const [nowString, setNowString] = useState("");
+
   useEffect(() => {
     setMounted(true);
-    setNowString(new Date().toLocaleString("en-PH", {
+    const format = () => new Date().toLocaleString("en-PH", {
       timeZone: "Asia/Manila", weekday: "long", month: "long",
       day: "numeric", year: "numeric",
-    }));
-    const t = setInterval(() => setNowString(new Date().toLocaleString("en-PH", {
-      timeZone: "Asia/Manila", weekday: "long", month: "long",
-      day: "numeric", year: "numeric",
-    })), 60000);
+    });
+    setNowString(format());
+    const t = setInterval(() => setNowString(format()), 60000);
     return () => clearInterval(t);
   }, []);
 
-  const [activeTripId, setActiveTripId] = useState<string | null>(null);
-  const [manifest, setManifest] = useState<TripManifestData | null>(null);
+  // ── Live issuedToday — refreshed after each ticket issue ──────────────────
+  const [issuedToday, setIssuedToday] = useState<IssuedBooking[]>(issuedTodayProp);
+
+  const refreshIssuedToday = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard/issued-today", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setIssuedToday(data);
+      }
+    } catch {
+      // Silently fall back to existing list — no console error spam
+    }
+  }, []);
+
+  // ── Manifest state — keyed per trip to avoid stale data ───────────────────
+  const [activeTripId, setActiveTripId]     = useState<string | null>(null);
+  const [manifestData, setManifestData]     = useState<TripManifestData | null>(null);
   const [manifestLoading, setManifestLoading] = useState(false);
+  const [manifestError, setManifestError]   = useState<string | null>(null);
 
   const fetchManifest = useCallback(async (tripId: string) => {
     setManifestLoading(true);
+    setManifestError(null);
     try {
-      const res = await fetch(`/api/admin/trip-manifest?trip_id=${tripId}`);
-      if (res.ok) setManifest(await res.json());
-      else setManifest(null);
-    } catch { setManifest(null); }
-    finally { setManifestLoading(false); }
+      const res = await fetch(`/api/admin/trip-manifest?trip_id=${tripId}`, { cache: "no-store" });
+      if (res.ok) {
+        setManifestData(await res.json());
+      } else {
+        setManifestData(null);
+        setManifestError("Could not load manifest.");
+      }
+    } catch {
+      setManifestData(null);
+      setManifestError("Network error loading manifest.");
+    } finally {
+      setManifestLoading(false);
+    }
   }, []);
 
   const toggleManifest = useCallback((tripId: string) => {
     if (activeTripId === tripId) {
       setActiveTripId(null);
-      setManifest(null);
+      setManifestData(null);
+      setManifestError(null);
     } else {
       setActiveTripId(tripId);
       fetchManifest(tripId);
     }
   }, [activeTripId, fetchManifest]);
 
+  // ── Issue ticket modal ────────────────────────────────────────────────────
   const [bookingTrip, setBookingTrip] = useState<UpcomingTripForBooth | null>(null);
+
+  // After issuing a ticket: refresh manifest (if that trip is open) + issuedToday list
+  const handleTicketIssued = useCallback(async (tripId: string) => {
+    setBookingTrip(null);
+    // Refresh the live issued-today list without a full page reload
+    await refreshIssuedToday();
+    // If this trip's manifest is currently open, refresh it too
+    if (activeTripId === tripId) {
+      await fetchManifest(tripId);
+    } else {
+      // Auto-open the manifest for the trip we just issued a ticket for
+      setActiveTripId(tripId);
+      await fetchManifest(tripId);
+    }
+  }, [activeTripId, fetchManifest, refreshIssuedToday]);
 
   const today = getTodayManila();
 
+  // ── Manifest counts — scoped to the currently open manifest ──────────────
+  const manifest = manifestData;
   const totalPax     = manifest?.totalPassengers ?? 0;
   const boardedCount = manifest?.passengers.filter(p => p.status === "boarded" || p.status === "completed").length ?? 0;
   const checkedIn    = manifest?.passengers.filter(p => p.status === "checked_in").length ?? 0;
   const confirmed    = manifest?.passengers.filter(p => p.status === "confirmed" || p.status === "pending_payment").length ?? 0;
+
+  // ── Build a lookup: tripId → route label (for issuedToday trip column) ───
+  const tripLabelMap = new Map<string, string>();
+  for (const t of todayTrips) {
+    const label = t.route?.display_name
+      ?? [t.route?.origin, t.route?.destination].filter(Boolean).join(" → ")
+      ?? "—";
+    tripLabelMap.set(t.id, `${label} ${fmt12(t.departure_time)}`);
+  }
+  for (const t of upcomingTrips) {
+    const label = t.route?.display_name
+      ?? [t.route?.origin, t.route?.destination].filter(Boolean).join(" → ")
+      ?? "—";
+    tripLabelMap.set(t.id, `${label} ${fmt12(t.departure_time)} (${formatDate(t.departure_date)})`);
+  }
 
   const tripsByDate = upcomingTrips.reduce<Record<string, UpcomingTripForBooth[]>>((acc, t) => {
     if (!acc[t.departure_date]) acc[t.departure_date] = [];
@@ -154,7 +215,8 @@ export function TicketBoothDashboard({
               <div style={{ color: "#b2e4ef", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Ticket Booth</div>
               <div style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, marginTop: 2 }}>{ownerName}</div>
               <div style={{ color: "#d0f0f7", fontSize: 13, marginTop: 3 }}>
-                {vesselName}{nowString ? ` · ${nowString}` : ""}
+                {/* Only render date string after mount to avoid hydration mismatch */}
+                {vesselName}{mounted && nowString ? ` · ${nowString}` : ""}
               </div>
             </div>
             <div style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12, padding: "10px 16px", textAlign: "center" }}>
@@ -226,7 +288,11 @@ export function TicketBoothDashboard({
                   ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" → ") ?? "—";
                 const seatsLeft = (trip.online_quota ?? 0) - (trip.online_booked ?? 0);
                 const upcomingVersion = upcomingTrips.find(u => u.id === trip.id);
-                const isDeparted = trip.departed;
+                // Only derive departed on client to avoid hydration mismatch
+                const isDeparted = mounted ? trip.departed : false;
+
+                // Count how many of today's issued tickets belong to this trip
+                const issuedForThisTrip = issuedToday.filter(b => b.trip_id === trip.id).length;
 
                 return (
                   <div key={trip.id}
@@ -244,6 +310,11 @@ export function TicketBoothDashboard({
                           <div>
                             <div className="font-bold text-[#134e4a] text-sm">{routeName}</div>
                             <div className="text-xs text-[#0f766e] mt-0.5">{trip.boat?.name ?? vesselName}</div>
+                            {issuedForThisTrip > 0 && (
+                              <div className="text-xs text-emerald-700 font-semibold mt-0.5">
+                                {issuedForThisTrip} ticket{issuedForThisTrip !== 1 ? "s" : ""} issued today
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -260,8 +331,10 @@ export function TicketBoothDashboard({
                             }`}>
                             {isActive ? "Hide manifest" : "View manifest"}
                           </button>
-                          {seatsLeft > 0 && upcomingVersion && (
-                            <button onClick={() => setBookingTrip(upcomingVersion)}
+                          {/* Allow issuing tickets for today's trips regardless of departed status */}
+                          {seatsLeft > 0 && (upcomingVersion || trip) && (
+                            <button
+                              onClick={() => setBookingTrip(upcomingVersion ?? (trip as unknown as UpcomingTripForBooth))}
                               className="rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-bold text-white hover:bg-[#085f72] transition-colors shadow-sm">
                               Issue Ticket
                             </button>
@@ -269,10 +342,16 @@ export function TicketBoothDashboard({
                         </div>
                       </div>
 
+                      {/* ── Manifest panel ── */}
                       {isActive && (
                         <div className="mt-4 border-t border-teal-100 pt-4">
                           {manifestLoading ? (
-                            <div className="text-center py-4 text-sm text-[#0f766e] animate-pulse">Loading manifest…</div>
+                            <div className="text-center py-6 text-sm text-[#0f766e] animate-pulse">Loading manifest…</div>
+                          ) : manifestError ? (
+                            <div className="text-center py-4 text-sm text-red-500">
+                              {manifestError}
+                              <button onClick={() => fetchManifest(trip.id)} className="ml-2 underline text-[#0c7b93]">Retry</button>
+                            </div>
                           ) : manifest ? (
                             <>
                               <div className="flex flex-wrap gap-2 mb-3">
@@ -280,9 +359,16 @@ export function TicketBoothDashboard({
                                 <span className="rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-xs font-semibold">Checked in: {checkedIn}</span>
                                 <span className="rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold">Boarded: {boardedCount}</span>
                                 <span className="rounded-full bg-[#0c7b93] text-white px-3 py-1 text-xs font-semibold">Total: {totalPax}</span>
+                                {/* Refresh button — lets booth staff manually refresh without reloading page */}
+                                <button
+                                  onClick={() => fetchManifest(trip.id)}
+                                  className="rounded-full border border-teal-200 bg-white text-[#0c7b93] px-3 py-1 text-xs font-semibold hover:bg-teal-50 transition-colors"
+                                >
+                                  ↻ Refresh
+                                </button>
                               </div>
                               {manifest.passengers.length === 0 ? (
-                                <div className="text-sm text-[#0f766e]/60 text-center py-4">No passengers booked yet.</div>
+                                <div className="text-sm text-[#0f766e]/60 text-center py-4">No passengers booked for this trip yet.</div>
                               ) : (
                                 <div className="overflow-x-auto rounded-xl border border-teal-100">
                                   <table className="min-w-full text-sm divide-y divide-teal-50">
@@ -304,7 +390,7 @@ export function TicketBoothDashboard({
                                           <td className="px-3 py-2 text-xs text-[#0f766e]">{p.source}</td>
                                           <td className="px-3 py-2">
                                             <ManifestStatusButton ticketNumber={p.ticketNumber} initialStatus={p.status} />
-                                            {/* ── FIX: only render timestamp after client mounts ── */}
+                                            {/* Safe: only rendered after mount */}
                                             {mounted && p.boardedAt && (
                                               <div className="text-xs text-gray-400 mt-0.5">{formatTimestamp(p.boardedAt)}</div>
                                             )}
@@ -317,7 +403,7 @@ export function TicketBoothDashboard({
                               )}
                             </>
                           ) : (
-                            <div className="text-sm text-[#0f766e]/60 text-center py-4">No passengers booked yet.</div>
+                            <div className="text-sm text-[#0f766e]/60 text-center py-4">No passengers booked for this trip yet.</div>
                           )}
                         </div>
                       )}
@@ -354,6 +440,7 @@ export function TicketBoothDashboard({
                         const routeName = trip.route?.display_name
                           ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" → ") ?? "—";
                         const seatsLeft = (trip.online_quota ?? 0) - (trip.online_booked ?? 0);
+                        const issuedForTrip = issuedToday.filter(b => b.trip_id === trip.id).length;
                         return (
                           <div key={trip.id} className="flex items-center justify-between px-4 py-3 gap-3 flex-wrap">
                             <div className="flex items-center gap-3">
@@ -363,6 +450,11 @@ export function TicketBoothDashboard({
                               <div>
                                 <div className="font-semibold text-[#134e4a] text-sm">{routeName}</div>
                                 <div className="text-xs text-[#0f766e]">{seatsLeft} seats available</div>
+                                {issuedForTrip > 0 && (
+                                  <div className="text-xs text-emerald-700 font-semibold">
+                                    {issuedForTrip} ticket{issuedForTrip !== 1 ? "s" : ""} issued today
+                                  </div>
+                                )}
                               </div>
                             </div>
                             {seatsLeft > 0 ? (
@@ -397,6 +489,7 @@ export function TicketBoothDashboard({
                   <tr className="bg-teal-50">
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Reference</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Passenger</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e] hidden sm:table-cell">Trip</th>
                     <th className="px-4 py-2.5 text-right text-xs font-semibold text-[#0f766e]">Pax</th>
                     <th className="px-4 py-2.5 text-right text-xs font-semibold text-[#0f766e]">Amount</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Time</th>
@@ -412,9 +505,12 @@ export function TicketBoothDashboard({
                         </Link>
                       </td>
                       <td className="px-4 py-2.5 text-[#134e4a]">{b.customer_full_name}</td>
+                      <td className="px-4 py-2.5 text-xs text-[#0f766e] hidden sm:table-cell">
+                        {b.trip_id ? (tripLabelMap.get(b.trip_id) ?? "—") : "—"}
+                      </td>
                       <td className="px-4 py-2.5 text-right font-semibold text-[#134e4a]">{b.passenger_count}</td>
                       <td className="px-4 py-2.5 text-right font-bold text-[#0c7b93]">{peso(b.total_amount_cents)}</td>
-                      {/* ── FIX: only render timestamp after client mounts ── */}
+                      {/* Safe: only rendered after mount */}
                       <td className="px-4 py-2.5 text-xs text-[#0f766e]">
                         {mounted ? formatTimestamp(b.created_at) : ""}
                       </td>
@@ -423,7 +519,7 @@ export function TicketBoothDashboard({
                 </tbody>
                 <tfoot>
                   <tr className="bg-teal-50/60 border-t-2 border-teal-200">
-                    <td colSpan={2} className="px-4 py-2.5 text-xs font-bold text-[#134e4a]">Total issued today</td>
+                    <td colSpan={3} className="px-4 py-2.5 text-xs font-bold text-[#134e4a]">Total issued today</td>
                     <td className="px-4 py-2.5 text-right font-bold text-[#134e4a]">
                       {issuedToday.reduce((s, b) => s + b.passenger_count, 0)} pax
                     </td>
@@ -482,7 +578,7 @@ export function TicketBoothDashboard({
           loggedInEmail={loggedInEmail}
           loggedInAddress={loggedInAddress}
           onClose={() => setBookingTrip(null)}
-          onSuccess={() => { setBookingTrip(null); window.location.reload(); }}
+          onSuccess={(tripId) => handleTicketIssued(tripId)}
         />
       )}
     </div>
@@ -495,7 +591,7 @@ function IssueTicketModal({ trip, loggedInEmail, loggedInAddress, onClose, onSuc
   loggedInEmail: string;
   loggedInAddress: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (tripId: string) => void;
 }) {
   const routeName = trip.route?.display_name
     ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" → ") ?? "—";
@@ -533,10 +629,17 @@ function IssueTicketModal({ trip, loggedInEmail, loggedInAddress, onClose, onSuc
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Booking failed."); return; }
-      onSuccess();
-    } catch { setError("Network error. Please try again."); }
-    finally { setSubmitting(false); }
+      if (!res.ok) {
+        setError(data.error ?? "Booking failed.");
+        return;
+      }
+      // Pass tripId back so the dashboard can refresh the right manifest
+      onSuccess(trip.id);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const inputCls = "mt-1 w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2.5 text-[#134e4a] focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/20 text-sm";
