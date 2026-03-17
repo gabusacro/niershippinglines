@@ -198,10 +198,16 @@ export async function GET(request: NextRequest) {
   );
 
   // ── 6. Merge and return ───────────────────────────────────────────────────
-  const result = dailySummary.map(day => ({
-    ...day,
-    handover: handoverByDate.get(day.date) ?? null,
-  }));
+  // Only return days that either:
+  //   a) have at least one walk-in booking, OR
+  //   b) have a handover record already marked (past history preservation)
+  // Days with trips but ZERO bookings are hidden — no activity = not shown
+  const result = dailySummary
+    .filter(day => day.hasAnyBookings || handoverByDate.has(day.date))
+    .map(day => ({
+      ...day,
+      handover: handoverByDate.get(day.date) ?? null,
+    }));
 
   return NextResponse.json(result);
 }
