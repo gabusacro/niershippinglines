@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { CashHandoverSummary } from "@/components/dashboard/CashHandoverSummary";
 import { ChevronDown, ChevronUp, Ship, User, Ticket } from "lucide-react";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -553,6 +554,47 @@ export function VesselOwnerClient({
           <p className="mt-3 text-xs text-gray-400">Only online bookings are included — walk-in cash is collected directly by the vessel.</p>
         </div>
       )}
+
+
+
+
+{/* ── Walk-in Cash Accountability ── */}
+      {!isViewingNextMonth && activeVessel && (
+        <div className={`rounded-xl border-2 p-5 shadow-sm ${
+          // Highlight if there are unconfirmed days
+          "border-amber-300 bg-amber-50"
+        }`}>
+          <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
+            <div>
+              <p className="text-sm font-bold text-amber-900">
+                Walk-in Cash — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Cash collected by your ticket booth on behalf of{" "}
+                {vessels.find(v => v.boatId === activeVessel)?.boatName ?? "your vessel"}.
+                Mark each day as received once the booth hands it over.
+              </p>
+            </div>
+          </div>
+          <CashHandoverSummary
+            boatId={activeVessel}
+            vesselName={vessels.find(v => v.boatId === activeVessel)?.boatName ?? ""}
+            mode="owner"
+            todayOnly={false}
+            year={selectedYear}
+            month={selectedMonth}
+          />
+          <p className="mt-3 text-xs text-gray-400">
+            This is separate from online (GCash) fare — walk-in cash is collected directly
+            by your ticket booth and must be handed over to you.
+          </p>
+        </div>
+      )}
+
+
+
+
+
 
       {/* ── Next Month Preview ── */}
       {nextMonthPreview && !isViewingNextMonth && (

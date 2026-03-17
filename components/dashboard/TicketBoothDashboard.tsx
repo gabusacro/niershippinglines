@@ -8,6 +8,7 @@ import type { UpcomingTripForBooth } from "@/lib/dashboard/get-upcoming-trips-fo
 import type { TripManifestData } from "@/lib/admin/trip-manifest";
 import { ManifestStatusButton } from "@/components/admin/ManifestStatusButton";
 import { Clock, QrCode, BarChart3, BookOpen, User } from "lucide-react";
+import { CashHandoverSummary } from "@/components/dashboard/CashHandoverSummary";
 import { TicketBoothRevenueSummary } from "@/components/dashboard/TicketBoothRevenueSummary";
 
 type PendingItem = { reference: string; customer_full_name: string; total_amount_cents: number };
@@ -530,6 +531,30 @@ export function TicketBoothDashboard({
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Cash to Hand Over Today ── */}
+        {boatId && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-px flex-1 bg-teal-200" />
+              <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">
+                Cash to Hand Over — {vesselName}
+              </span>
+              <div className="h-px flex-1 bg-teal-200" />
+            </div>
+            <div className="rounded-xl border-2 border-amber-200 bg-amber-50/40 p-4">
+              <p className="text-xs text-amber-700 mb-3">
+                Walk-in cash collected today that must be handed over to the vessel owner.
+              </p>
+              <CashHandoverSummary
+                boatId={boatId}
+                vesselName={vesselName ?? ""}
+                mode="booth"
+                todayOnly={true}
+              />
             </div>
           </div>
         )}
