@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronDown, ChevronUp, CheckCircle, Clock, Banknote } from "lucide-react";
+import { ChevronDown, ChevronUp, CheckCircle, Clock, Banknote, AlertCircle } from "lucide-react";
 
 function peso(cents: number) {
   return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
 }
-
 function formatDate(d: string) {
   try {
     return new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
@@ -14,13 +13,11 @@ function formatDate(d: string) {
     });
   } catch { return d; }
 }
-
 function fmt12(t: string) {
   if (!t) return "—";
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
-
 function formatTimestamp(iso: string) {
   try {
     return new Date(iso).toLocaleString("en-PH", {
@@ -56,45 +53,45 @@ type DayEntry = {
   date: string;
   totalCents: number;
   totalPax: number;
+  tripCount: number;
   trips: TripEntry[];
+  hasAnyBookings: boolean;
   handover: Handover | null;
 };
 
 type Props = {
   boatId: string;
   vesselName: string;
-  /** "owner" shows Mark as Received button; "booth" shows read-only status */
   mode: "owner" | "booth";
-  /** For booth mode — only show today. For owner mode — show full month via year/month */
   todayOnly?: boolean;
   year?: number;
   month?: number;
 };
 
 const METHOD_LABELS: Record<string, string> = {
-  cash_in_person:  "Cash in person",
-  gcash:           "GCash transfer",
-  bank_transfer:   "Bank transfer",
-  other:           "Other",
+  cash_in_person: "Cash in person",
+  gcash:          "GCash transfer",
+  bank_transfer:  "Bank transfer",
+  other:          "Other",
 };
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = false, year, month }: Props) {
-  const [days, setDays]           = useState<DayEntry[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
+export function CashHandoverSummary({
+  boatId, vesselName, mode, todayOnly = false, year, month,
+}: Props) {
+  const [days, setDays]               = useState<DayEntry[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
-  // For the "Mark as Received" modal
-  const [markingDate, setMarkingDate]     = useState<string | null>(null);
+  // Mark as received modal state
+  const [markingDate,   setMarkingDate]   = useState<string | null>(null);
   const [markingAmount, setMarkingAmount] = useState(0);
-  const [method, setMethod]               = useState("cash_in_person");
-  const [refNote, setRefNote]             = useState("");
-  const [saving, setSaving]               = useState(false);
-  const [saveError, setSaveError]         = useState("");
-
-  // For un-marking
-  const [unmarking, setUnmarking] = useState<string | null>(null);
+  const [method,        setMethod]        = useState("cash_in_person");
+  const [refNote,       setRefNote]       = useState("");
+  const [saving,        setSaving]        = useState(false);
+  const [saveError,     setSaveError]     = useState("");
+  const [unmarking,     setUnmarking]     = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -111,7 +108,6 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
       const data: DayEntry[] = await res.json();
 
       if (todayOnly) {
-        // For booth mode: only show today (Manila date)
         const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
         setDays(data.filter(d => d.date === today));
       } else {
@@ -126,7 +122,6 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ── Mark as Received ──────────────────────────────────────────────────────
   const openMarkModal = (day: DayEntry) => {
     setMarkingDate(day.date);
     setMarkingAmount(day.totalCents);
@@ -162,7 +157,6 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
     }
   };
 
-  // ── Un-mark ───────────────────────────────────────────────────────────────
   const handleUnmark = async (date: string) => {
     setUnmarking(date);
     try {
@@ -175,13 +169,15 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
     }
   };
 
-  // ── Totals ────────────────────────────────────────────────────────────────
+  // ── Summary totals ────────────────────────────────────────────────────────
+  const daysWithCash    = days.filter(d => d.totalCents > 0);
   const totalCollected  = days.reduce((s, d) => s + d.totalCents, 0);
   const totalReceived   = days.filter(d => d.handover).reduce((s, d) => s + d.totalCents, 0);
   const totalPending    = totalCollected - totalReceived;
   const totalPax        = days.reduce((s, d) => s + d.totalPax, 0);
+  // Days that had trips but ZERO cash — potential accountability red flag
+  const suspiciousDays  = days.filter(d => d.tripCount > 0 && !d.hasAnyBookings);
 
-  // ── Loading / Error states ────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="rounded-xl border border-teal-100 bg-white p-6 text-center text-sm text-[#0f766e] animate-pulse">
@@ -189,7 +185,6 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
       </div>
     );
   }
-
   if (error) {
     return (
       <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
@@ -197,13 +192,10 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
       </div>
     );
   }
-
   if (days.length === 0) {
     return (
       <div className="rounded-xl border border-teal-100 bg-white p-6 text-center text-sm text-[#0f766e]/60">
-        {todayOnly
-          ? "No walk-in cash collected today yet."
-          : "No walk-in cash recorded this month yet."}
+        {todayOnly ? "No trips scheduled today." : "No trips scheduled this month yet."}
       </div>
     );
   }
@@ -211,18 +203,39 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
   return (
     <div className="space-y-3">
 
-      {/* ── Summary totals bar ── */}
+      {/* ── Monthly totals bar ── */}
       {!todayOnly && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            { label: "Total collected",  value: peso(totalCollected), sub: `${totalPax} pax`,       cls: "text-[#134e4a]"  },
-            { label: "Confirmed received", value: peso(totalReceived),  sub: `${days.filter(d=>d.handover).length} days`, cls: "text-emerald-700" },
-            { label: "Pending handover", value: peso(totalPending),   sub: `${days.filter(d=>!d.handover).length} days`, cls: totalPending > 0 ? "text-amber-700" : "text-gray-400" },
+            {
+              label: "Total collected",
+              value: peso(totalCollected),
+              sub: `${totalPax} pax · ${daysWithCash.length} days`,
+              cls: "text-[#134e4a]",
+            },
+            {
+              label: "Owner confirmed",
+              value: peso(totalReceived),
+              sub: `${days.filter(d => d.handover).length} days confirmed`,
+              cls: "text-emerald-700",
+            },
+            {
+              label: "Pending handover",
+              value: peso(totalPending),
+              sub: `${daysWithCash.filter(d => !d.handover).length} days unconfirmed`,
+              cls: totalPending > 0 ? "text-amber-700" : "text-gray-400",
+            },
+            {
+              label: "Zero cash days",
+              value: String(suspiciousDays.length),
+              sub: suspiciousDays.length > 0 ? "trips with no walk-in" : "all days accounted for",
+              cls: suspiciousDays.length > 0 ? "text-rose-600" : "text-gray-400",
+            },
           ].map(s => (
             <div key={s.label} className="rounded-xl border border-teal-100 bg-white p-3 text-center">
               <p className="text-xs text-[#0f766e] font-semibold">{s.label}</p>
               <p className={`text-lg font-black mt-0.5 ${s.cls}`}>{s.value}</p>
-              <p className="text-xs text-gray-400">{s.sub}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
             </div>
           ))}
         </div>
@@ -233,34 +246,49 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
         {days.map((day) => {
           const isExpanded  = expandedDay === day.date;
           const isConfirmed = !!day.handover;
+          const isZeroCash  = day.tripCount > 0 && !day.hasAnyBookings;
+
+          // Determine card style based on state
+          const cardStyle = isConfirmed
+            ? "border-emerald-200 bg-emerald-50/40"
+            : isZeroCash
+              ? "border-gray-200 bg-gray-50/60"
+              : day.totalCents > 0
+                ? "border-amber-200 bg-amber-50/30"
+                : "border-teal-100 bg-white";
 
           return (
-            <div key={day.date}
-              className={`rounded-xl border-2 overflow-hidden transition-all ${
-                isConfirmed
-                  ? "border-emerald-200 bg-emerald-50/40"
-                  : "border-amber-200 bg-amber-50/30"
-              }`}>
+            <div key={day.date} className={`rounded-xl border-2 overflow-hidden transition-all ${cardStyle}`}>
 
-              {/* Day header row */}
+              {/* ── Day header ── */}
               <div className="flex items-center justify-between px-4 py-3 gap-3 flex-wrap">
                 <div className="flex items-center gap-3">
                   {isConfirmed
                     ? <CheckCircle size={18} className="text-emerald-600 shrink-0" />
-                    : <Clock size={18} className="text-amber-600 shrink-0" />
+                    : isZeroCash
+                      ? <AlertCircle size={18} className="text-gray-400 shrink-0" />
+                      : <Clock size={18} className="text-amber-600 shrink-0" />
                   }
                   <div>
                     <div className="font-bold text-[#134e4a] text-sm">{formatDate(day.date)}</div>
                     <div className="text-xs text-[#0f766e] mt-0.5">
-                      {day.trips.length} trip{day.trips.length !== 1 ? "s" : ""} · {day.totalPax} pax
+                      {day.tripCount} trip{day.tripCount !== 1 ? "s" : ""} scheduled
+                      {day.totalPax > 0 && ` · ${day.totalPax} walk-in pax`}
+                      {isZeroCash && (
+                        <span className="ml-1 text-gray-400 italic">— no walk-in bookings</span>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="text-right">
-                    <div className={`text-lg font-black ${isConfirmed ? "text-emerald-700" : "text-amber-700"}`}>
-                      {peso(day.totalCents)}
+                    <div className={`text-lg font-black ${
+                      isConfirmed ? "text-emerald-700"
+                      : isZeroCash ? "text-gray-400"
+                      : "text-amber-700"
+                    }`}>
+                      {isZeroCash ? "₱0" : peso(day.totalCents)}
                     </div>
                     {isConfirmed && day.handover && (
                       <div className="text-xs text-emerald-600 font-semibold">
@@ -275,8 +303,8 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
                     )}
                   </div>
 
-                  {/* Action buttons */}
-                  {mode === "owner" && !isConfirmed && (
+                  {/* Action buttons — owner mode */}
+                  {mode === "owner" && !isConfirmed && day.totalCents > 0 && (
                     <button
                       onClick={() => openMarkModal(day)}
                       className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors whitespace-nowrap">
@@ -291,7 +319,9 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
                       {unmarking === day.date ? "…" : "Undo"}
                     </button>
                   )}
-                  {mode === "booth" && (
+
+                  {/* Status badge — booth mode */}
+                  {mode === "booth" && !isZeroCash && (
                     <span className={`rounded-full px-3 py-1 text-xs font-bold ${
                       isConfirmed
                         ? "bg-emerald-100 text-emerald-800"
@@ -301,7 +331,7 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
                     </span>
                   )}
 
-                  {/* Expand toggle */}
+                  {/* Expand toggle — only if there's something to show */}
                   <button
                     onClick={() => setExpandedDay(isExpanded ? null : day.date)}
                     className="rounded-xl border border-teal-200 bg-white px-2 py-2 text-[#0c7b93] hover:bg-teal-50 transition-colors">
@@ -310,7 +340,7 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
                 </div>
               </div>
 
-              {/* Expanded per-trip breakdown */}
+              {/* ── Expanded per-trip breakdown ── */}
               {isExpanded && (
                 <div className="border-t border-teal-100 bg-white">
                   {day.trips.map((trip) => (
@@ -321,28 +351,42 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
                           <span className="rounded-lg bg-[#0c7b93] text-white px-2 py-1 text-xs font-bold">
                             {fmt12(trip.departure_time)}
                           </span>
-                          <span className="text-sm font-semibold text-[#134e4a]">{trip.routeName}</span>
-                          <span className="text-xs text-[#0f766e]">{trip.pax} pax</span>
+                          <span className="text-sm font-semibold text-[#134e4a]">
+                            {trip.routeName}
+                          </span>
+                          {trip.pax > 0
+                            ? <span className="text-xs text-[#0f766e]">{trip.pax} pax</span>
+                            : <span className="text-xs text-gray-400 italic">no walk-in bookings</span>
+                          }
                         </div>
-                        <span className="font-bold text-amber-700">{peso(trip.amountCents)}</span>
+                        <span className={`font-bold ${trip.amountCents > 0 ? "text-amber-700" : "text-gray-400"}`}>
+                          {trip.amountCents > 0 ? peso(trip.amountCents) : "₱0"}
+                        </span>
                       </div>
 
-                      {/* Per-booking list within the trip */}
-                      <div className="mt-2 space-y-1">
-                        {trip.bookingRefs.map((br, i) => (
-                          <div key={i} className="flex items-center justify-between text-xs text-gray-500 pl-2 border-l-2 border-teal-100">
-                            <span>{br.name} ({br.pax} pax)</span>
-                            <span className="font-semibold">{peso(br.cents)}</span>
-                          </div>
-                        ))}
-                      </div>
+                      {/* Per-booking list */}
+                      {trip.bookingRefs.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {trip.bookingRefs.map((br, i) => (
+                            <div key={i}
+                              className="flex items-center justify-between text-xs text-gray-500 pl-2 border-l-2 border-teal-100">
+                              <span>{br.name} ({br.pax} pax)</span>
+                              <span className="font-semibold">{peso(br.cents)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
 
                   {/* Day total footer */}
                   <div className="px-4 py-2.5 bg-teal-50 flex justify-between text-sm font-bold border-t border-teal-100">
-                    <span className="text-[#134e4a]">Day total — {day.totalPax} pax</span>
-                    <span className="text-amber-700">{peso(day.totalCents)}</span>
+                    <span className="text-[#134e4a]">
+                      Day total{day.totalPax > 0 ? ` — ${day.totalPax} pax` : ""}
+                    </span>
+                    <span className={day.totalCents > 0 ? "text-amber-700" : "text-gray-400"}>
+                      {day.totalCents > 0 ? peso(day.totalCents) : "₱0 collected"}
+                    </span>
                   </div>
                 </div>
               )}
@@ -363,7 +407,9 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
               </div>
               <div>
                 <div className="font-bold text-[#134e4a]">Confirm Cash Received</div>
-                <div className="text-xs text-[#0f766e] mt-0.5">{formatDate(markingDate)} · {vesselName}</div>
+                <div className="text-xs text-[#0f766e] mt-0.5">
+                  {formatDate(markingDate)} · {vesselName}
+                </div>
               </div>
             </div>
 
@@ -395,7 +441,9 @@ export function CashHandoverSummary({ boatId, vesselName, mode, todayOnly = fals
                   type="text"
                   value={refNote}
                   onChange={e => setRefNote(e.target.value)}
-                  placeholder={method === "gcash" ? "GCash ref # e.g. 09123456789" : "Any notes"}
+                  placeholder={
+                    method === "gcash" ? "GCash ref # e.g. 09123456789" : "Any notes"
+                  }
                   className="mt-1 w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2.5 text-sm text-[#134e4a] focus:border-[#0c7b93] focus:outline-none"
                 />
               </div>

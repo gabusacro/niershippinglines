@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { CashHandoverSummary } from "@/components/dashboard/CashHandoverSummary";
 import { ChevronDown, ChevronUp, Ship, User, Ticket } from "lucide-react";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -137,6 +136,48 @@ function FareTypeBadge({ fareType }: { fareType: string }) {
   const { label, cls } = FARE_TYPE_LABELS[fareType] ?? { label: fareType, cls: "bg-gray-100 text-gray-700" };
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
 }
+
+/**
+ * RemitBadge — only shows a remittance status when there are online bookings
+ * that require the admin to collect and remit GCash payments to the vessel owner.
+ *
+ * Walk-in / cash bookings go directly to the vessel owner — no admin remittance
+ * needed, so we show "Cash Direct" instead of "Pending" to avoid confusion.
+ */
+function RemitBadge({ status, hasOnlineBookings }: {
+  status: "pending" | "paid" | "failed";
+  hasOnlineBookings: boolean;
+}) {
+  // No online bookings = all cash, goes directly to vessel owner
+  if (!hasOnlineBookings) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-400">
+        Cash Direct
+      </span>
+    );
+  }
+  if (status === "paid") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+        Admin Paid ✓
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+        Failed
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+      Admin Owes You
+    </span>
+  );
+}
+
+// Keep PaymentBadge for the owed-trips breakdown table (which only shows online trips)
 function PaymentBadge({ status }: { status: "pending" | "paid" | "failed" }) {
   if (status === "paid")   return <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">Paid</span>;
   if (status === "failed") return <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">Failed</span>;
@@ -149,7 +190,6 @@ function PassengerBreakdown({ booking }: { booking: BookingLine }) {
   const details = booking.passengerDetails;
 
   if (!details || details.length === 0) {
-    // Single-type booking — show simple row
     return (
       <div className="mt-1.5 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600">
         <div className="flex items-center gap-2">
@@ -169,7 +209,6 @@ function PassengerBreakdown({ booking }: { booking: BookingLine }) {
         <div className="flex items-center gap-2">
           <Ticket size={12} className="text-[#0c7b93]" />
           <span>{details.length} passengers — click to see breakdown</span>
-          {/* Fare type pills summary */}
           <div className="flex gap-1 flex-wrap">
             {[...new Set(details.map(d => d.fare_type))].map(ft => (
               <FareTypeBadge key={ft} fareType={ft} />
@@ -230,20 +269,22 @@ function TripAuditTable({ bookings, trip }: { bookings: BookingLine[]; trip: Tri
           Booking Audit — {bookings.length} transaction{bookings.length !== 1 ? "s" : ""}
         </span>
         <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span className="font-semibold text-[#0c7b93]">Online: {peso(trip.onlineNetFareCents)}</span>
-          <span className="font-semibold text-amber-700">Walk-in: {peso(trip.walkInFareCents)}</span>
+          {trip.onlineNetFareCents > 0 && (
+            <span className="font-semibold text-[#0c7b93]">Online: {peso(trip.onlineNetFareCents)}</span>
+          )}
+          {trip.walkInFareCents > 0 && (
+            <span className="font-semibold text-amber-700">Walk-in cash: {peso(trip.walkInFareCents)}</span>
+          )}
         </div>
       </div>
 
       <div className="divide-y divide-slate-100">
         {bookings.map((bl) => (
           <div key={bl.id} className={`px-4 py-3 ${bl.isOnline ? "bg-white" : "bg-amber-50/30"}`}>
-            {/* Booking header row */}
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-sm font-bold text-[#0c7b93]">{bl.reference}</span>
                 <SourceBadge source={bl.bookingSource} isOnline={bl.isOnline} />
-                {/* Handler info for walk-ins */}
                 {!bl.isOnline && (
                   <div className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-2 py-0.5 border border-amber-200">
                     <RoleBadge role={bl.createdByRole} />
@@ -261,8 +302,6 @@ function TripAuditTable({ bookings, trip }: { bookings: BookingLine[]; trip: Tri
                 </span>
               </div>
             </div>
-
-            {/* Passenger breakdown */}
             <PassengerBreakdown booking={bl} />
           </div>
         ))}
@@ -274,12 +313,14 @@ function TripAuditTable({ bookings, trip }: { bookings: BookingLine[]; trip: Tri
           Total: {bookings.reduce((s, b) => s + b.passengerCount, 0)} pax
         </span>
         {trip.onlineNetFareCents > 0 && (
-          <span className="text-[#0c7b93]">Online fare: {peso(trip.onlineNetFareCents)}</span>
+          <span className="text-[#0c7b93]">Online fare (admin owes owner): {peso(trip.onlineNetFareCents)}</span>
         )}
         {trip.walkInFareCents > 0 && (
-          <span className="text-amber-700">Walk-in cash: {peso(trip.walkInFareCents)}</span>
+          <span className="text-amber-700">Walk-in cash (direct to vessel): {peso(trip.walkInFareCents)}</span>
         )}
-        <span className="ml-auto text-slate-700">Grand total: {peso(trip.onlineNetFareCents + trip.walkInFareCents)}</span>
+        <span className="ml-auto text-slate-700">
+          Grand total: {peso(trip.onlineNetFareCents + trip.walkInFareCents)}
+        </span>
       </div>
     </div>
   );
@@ -301,39 +342,63 @@ function TripTable({ trips, auditTripId, setAuditTripId, highlight = false }: {
           <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">Online Fare</th>
           <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">Walk-in</th>
           <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">Cash</th>
-          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Remit</th>
+          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Admin Owes</th>
           <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Audit</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-teal-50">
         {trips.map((t) => {
           const isAudit = auditTripId === t.id;
+          // Only show remittance status if there are online bookings that
+          // require admin to collect GCash and remit to the vessel owner.
+          // Pure cash/walk-in trips go directly to the vessel — no remit needed.
+          const hasOnlineBookings = t.onlinePax > 0 || t.onlineNetFareCents > 0;
+
           return (
             <React.Fragment key={t.id}>
               <tr className={`transition-colors ${highlight || t.isToday ? "bg-teal-50/60" : "hover:bg-gray-50"}`}>
                 <td className="px-3 py-2.5 text-[#134e4a] whitespace-nowrap">
                   {formatDate(t.departureDate, true)}
-                  {t.isToday && <span className="ml-1 rounded-full bg-teal-100 px-1.5 py-0.5 text-xs text-teal-700 font-semibold">today</span>}
+                  {t.isToday && (
+                    <span className="ml-1 rounded-full bg-teal-100 px-1.5 py-0.5 text-xs text-teal-700 font-semibold">
+                      today
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-2.5 text-[#134e4a] whitespace-nowrap">{formatTime(t.departureTime)}</td>
                 <td className="px-3 py-2.5 text-[#134e4a] max-w-[120px] truncate">{t.routeName}</td>
                 <td className="px-3 py-2.5 text-right">
-                  {t.onlinePax > 0 ? <span className="font-semibold text-[#0c7b93]">{t.onlinePax}</span> : <span className="text-gray-300">—</span>}
+                  {t.onlinePax > 0
+                    ? <span className="font-semibold text-[#0c7b93]">{t.onlinePax}</span>
+                    : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                  {t.onlineNetFareCents > 0 ? <span className="font-medium text-[#0c7b93]">{peso(t.onlineNetFareCents)}</span> : <span className="text-gray-300">—</span>}
+                  {t.onlineNetFareCents > 0
+                    ? <span className="font-medium text-[#0c7b93]">{peso(t.onlineNetFareCents)}</span>
+                    : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="px-3 py-2.5 text-right">
-                  {t.walkInPax > 0 ? <span className="text-amber-700">{t.walkInPax}</span> : <span className="text-gray-300">—</span>}
+                  {t.walkInPax > 0
+                    ? <span className="text-amber-700">{t.walkInPax}</span>
+                    : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                  {t.walkInFareCents > 0 ? <span className="text-amber-700">{peso(t.walkInFareCents)}</span> : <span className="text-gray-300">—</span>}
+                  {t.walkInFareCents > 0
+                    ? <span className="text-amber-700">{peso(t.walkInFareCents)}</span>
+                    : <span className="text-gray-300">—</span>}
                 </td>
-                <td className="px-3 py-2.5 text-center"><PaymentBadge status={t.paymentStatus} /></td>
+                <td className="px-3 py-2.5 text-center">
+                  <RemitBadge status={t.paymentStatus} hasOnlineBookings={hasOnlineBookings} />
+                </td>
                 <td className="px-3 py-2.5 text-center">
                   {t.bookings.length > 0 && (
-                    <button onClick={() => setAuditTripId(isAudit ? null : t.id)}
-                      className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${isAudit ? "bg-[#0c7b93] text-white" : "bg-teal-50 text-[#0c7b93] border border-teal-200 hover:bg-teal-100"}`}>
+                    <button
+                      onClick={() => setAuditTripId(isAudit ? null : t.id)}
+                      className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${
+                        isAudit
+                          ? "bg-[#0c7b93] text-white"
+                          : "bg-teal-50 text-[#0c7b93] border border-teal-200 hover:bg-teal-100"
+                      }`}>
                       {isAudit ? "Hide" : `Log (${t.bookings.length})`}
                     </button>
                   )}
@@ -449,9 +514,9 @@ export function VesselOwnerClient({
           <p className="mt-1.5 text-xs text-[#0f766e]">{tripProgressPct}% of this month&apos;s trips completed</p>
           <div className="mt-4 grid grid-cols-3 gap-2">
             {[
-              { label: "Completed", value: completedTripCount, sub: "past trips",     bg: "bg-teal-50",  border: "border-teal-200",  val: "text-[#0c7b93]",  lbl: "text-[#0f766e]"  },
-              { label: "Today",     value: todayTripCount,     sub: "happening now",  bg: "bg-amber-50", border: "border-amber-200", val: "text-amber-800", lbl: "text-amber-700" },
-              { label: "Upcoming",  value: upcomingTripCount,  sub: "remaining",      bg: "bg-blue-50",  border: "border-blue-200",  val: "text-blue-800",  lbl: "text-blue-700"  },
+              { label: "Completed", value: completedTripCount, sub: "past trips",    bg: "bg-teal-50",  border: "border-teal-200",  val: "text-[#0c7b93]",  lbl: "text-[#0f766e]"  },
+              { label: "Today",     value: todayTripCount,     sub: "happening now", bg: "bg-amber-50", border: "border-amber-200", val: "text-amber-800", lbl: "text-amber-700" },
+              { label: "Upcoming",  value: upcomingTripCount,  sub: "remaining",     bg: "bg-blue-50",  border: "border-blue-200",  val: "text-blue-800",  lbl: "text-blue-700"  },
             ].map(s => (
               <div key={s.label} className={`rounded-xl ${s.bg} border ${s.border} p-3 text-center`}>
                 <p className={`text-xs ${s.lbl} font-semibold`}>{s.label}</p>
@@ -472,7 +537,8 @@ export function VesselOwnerClient({
                 Admin Owes Me — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
               </p>
               <p className={`text-xs mt-0.5 ${totalOwedCents > 0 ? "text-rose-700" : "text-green-700"}`}>
-                Online fare collected by admin that hasn&apos;t been remitted yet
+                Online (GCash) fare collected by admin that hasn&apos;t been remitted yet.
+                Walk-in cash goes directly to the vessel — not included here.
               </p>
             </div>
             <div className="text-right">
@@ -485,11 +551,11 @@ export function VesselOwnerClient({
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {[
-              { label: "Pending Remittance", value: peso(totalOwedCents),               sub: `${owedTrips.filter(t=>t.paymentStatus==="pending").length} trips`, border: "border-rose-200",  val: "text-rose-700"  },
-              { label: "Already Remitted",   value: peso(totalPaidCents),               sub: `${owedTrips.filter(t=>t.paymentStatus==="paid").length} trips`,    border: "border-green-200", val: "text-green-700" },
+              { label: "Pending Remittance", value: peso(totalOwedCents),                sub: `${owedTrips.filter(t=>t.paymentStatus==="pending").length} trips`, border: "border-rose-200",  val: "text-rose-700"  },
+              { label: "Already Remitted",   value: peso(totalPaidCents),                sub: `${owedTrips.filter(t=>t.paymentStatus==="paid").length} trips`,    border: "border-green-200", val: "text-green-700" },
               { label: "Total Online Fare",  value: peso(totalOwedCents+totalPaidCents), sub: `${owedTrips.length} trips`,                                        border: "border-teal-200",  val: "text-[#0c7b93]" },
             ].map(s => (
-              <div key={s.label} className={`rounded-xl bg-white border ${s.border} p-3 text-center col-span-${s.label==="Total Online Fare"?"2 sm:col-span-1":"1"}`}>
+              <div key={s.label} className={`rounded-xl bg-white border ${s.border} p-3 text-center`}>
                 <p className="text-xs font-semibold text-gray-600">{s.label}</p>
                 <p className={`text-xl font-black ${s.val} mt-0.5`}>{s.value}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
@@ -550,51 +616,14 @@ export function VesselOwnerClient({
             </div>
           )}
 
-          {owedTrips.length === 0 && <p className="mt-4 text-sm text-[#0f766e]">No trips with online bookings this month yet.</p>}
-          <p className="mt-3 text-xs text-gray-400">Only online bookings are included — walk-in cash is collected directly by the vessel.</p>
-        </div>
-      )}
-
-
-
-
-{/* ── Walk-in Cash Accountability ── */}
-      {!isViewingNextMonth && activeVessel && (
-        <div className={`rounded-xl border-2 p-5 shadow-sm ${
-          // Highlight if there are unconfirmed days
-          "border-amber-300 bg-amber-50"
-        }`}>
-          <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
-            <div>
-              <p className="text-sm font-bold text-amber-900">
-                Walk-in Cash — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
-              </p>
-              <p className="text-xs text-amber-700 mt-0.5">
-                Cash collected by your ticket booth on behalf of{" "}
-                {vessels.find(v => v.boatId === activeVessel)?.boatName ?? "your vessel"}.
-                Mark each day as received once the booth hands it over.
-              </p>
-            </div>
-          </div>
-          <CashHandoverSummary
-            boatId={activeVessel}
-            vesselName={vessels.find(v => v.boatId === activeVessel)?.boatName ?? ""}
-            mode="owner"
-            todayOnly={false}
-            year={selectedYear}
-            month={selectedMonth}
-          />
+          {owedTrips.length === 0 && (
+            <p className="mt-4 text-sm text-[#0f766e]">No trips with online bookings this month yet.</p>
+          )}
           <p className="mt-3 text-xs text-gray-400">
-            This is separate from online (GCash) fare — walk-in cash is collected directly
-            by your ticket booth and must be handed over to you.
+            Only online (GCash) bookings require admin remittance. Walk-in cash is collected directly by the vessel.
           </p>
         </div>
       )}
-
-
-
-
-
 
       {/* ── Next Month Preview ── */}
       {nextMonthPreview && !isViewingNextMonth && (
@@ -612,10 +641,10 @@ export function VesselOwnerClient({
           {nextMonthPreview.tripCount > 0 && (
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { label: "Trips",           value: nextMonthPreview.tripCount,           cls: "text-blue-900"  },
-                { label: "Online Pax",      value: nextMonthPreview.onlinePax,           cls: "text-teal-800"  },
-                { label: "Walk-in Pax",     value: nextMonthPreview.walkInPax,           cls: "text-amber-800" },
-                { label: "Est. Online Fare",value: peso(nextMonthPreview.onlineNetFareCents), cls: "text-blue-900" },
+                { label: "Trips",            value: nextMonthPreview.tripCount,            cls: "text-blue-900"  },
+                { label: "Online Pax",       value: nextMonthPreview.onlinePax,            cls: "text-teal-800"  },
+                { label: "Walk-in Pax",      value: nextMonthPreview.walkInPax,            cls: "text-amber-800" },
+                { label: "Est. Online Fare", value: peso(nextMonthPreview.onlineNetFareCents), cls: "text-blue-900" },
               ].map((s) => (
                 <div key={s.label} className="rounded-lg bg-white p-3 text-center">
                   <p className="text-xs text-blue-600 font-medium">{s.label}</p>
@@ -646,10 +675,10 @@ export function VesselOwnerClient({
       {/* ── Summary cards ── */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Trips This Month", value: peso(0),              num: allTrips.length,                bg: "border-teal-100 bg-white",     val: "text-[#134e4a]", lbl: "text-[#0f766e]",  isNum: true  },
-          { label: "Online Fare",      value: peso(totalRemittable), num: monthTotals.onlinePax,          bg: "border-teal-200 bg-teal-50",   val: "text-[#0c7b93]", lbl: "text-[#0c7b93]",  isNum: false },
-          { label: "Walk-in Cash",     value: peso(totalWalkIn),     num: monthTotals.walkInPax,          bg: "border-amber-200 bg-amber-50", val: "text-amber-800", lbl: "text-amber-700", isNum: false },
-          { label: "Total Revenue",    value: peso(totalCombined),   num: monthTotals.onlinePax + monthTotals.walkInPax, bg: "border-teal-200 bg-white", val: "text-[#134e4a]", lbl: "text-[#0f766e]", isNum: false },
+          { label: "Trips This Month", value: peso(0),               num: allTrips.length,                           bg: "border-teal-100 bg-white",     val: "text-[#134e4a]", lbl: "text-[#0f766e]", isNum: true  },
+          { label: "Online Fare",      value: peso(totalRemittable),  num: monthTotals.onlinePax,                     bg: "border-teal-200 bg-teal-50",   val: "text-[#0c7b93]", lbl: "text-[#0c7b93]", isNum: false },
+          { label: "Walk-in Cash",     value: peso(totalWalkIn),      num: monthTotals.walkInPax,                     bg: "border-amber-200 bg-amber-50", val: "text-amber-800", lbl: "text-amber-700", isNum: false },
+          { label: "Total Revenue",    value: peso(totalCombined),    num: monthTotals.onlinePax + monthTotals.walkInPax, bg: "border-teal-200 bg-white", val: "text-[#134e4a]", lbl: "text-[#0f766e]", isNum: false },
         ].map(s => (
           <div key={s.label} className={`rounded-xl border p-4 shadow-sm ${s.bg}`}>
             <p className={`text-xs font-semibold uppercase tracking-wide ${s.lbl}`}>{s.label}</p>
@@ -663,10 +692,10 @@ export function VesselOwnerClient({
       <div className="rounded-xl border border-teal-100 bg-white p-4 space-y-2">
         <p className="text-xs font-bold text-[#134e4a] uppercase tracking-wide">How it works</p>
         <p className="text-xs text-[#0f766e]">
-          <span className="font-semibold text-[#0c7b93]">Online fare</span> — paid via GCash through Travela Siargao. Platform and processing fees are deducted. Remaining fare is remitted to you.
+          <span className="font-semibold text-[#0c7b93]">Online fare</span> — paid via GCash through Travela Siargao. Platform and processing fees are deducted. Remaining fare is remitted to you by the admin.
         </p>
         <p className="text-xs text-[#0f766e]">
-          <span className="font-semibold text-amber-700">Walk-in cash</span> — collected at counter or manually. Full amount goes directly to the vessel.
+          <span className="font-semibold text-amber-700">Walk-in cash</span> — collected directly at the ticket booth or vessel counter. Full amount goes directly to the vessel — no admin remittance needed.
         </p>
       </div>
 
