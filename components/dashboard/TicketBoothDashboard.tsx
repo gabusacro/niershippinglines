@@ -33,6 +33,7 @@ type Props = {
   issuedToday: IssuedBooking[];
   loggedInEmail: string;
   loggedInAddress: string;
+  avatarUrl?: string | null;
 };
 
 function peso(cents: number) {
@@ -72,6 +73,7 @@ export function TicketBoothDashboard({
   todayTrips, upcomingTrips,
   pendingPayments, issuedToday: issuedTodayProp,
   loggedInEmail, loggedInAddress,
+  avatarUrl,
 }: Props) {
   // ── mounted guard — nothing time-related renders on server ────────────────
   const [mounted, setMounted] = useState(false);
@@ -212,14 +214,27 @@ export function TicketBoothDashboard({
         {/* ── Hero header ── */}
         <div className="rounded-2xl px-5 py-6 shadow-lg" style={{ backgroundColor: "#0c7b93" }}>
           <div className="flex items-start justify-between flex-wrap gap-3">
-            <div>
-              <div style={{ color: "#b2e4ef", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Ticket Booth</div>
-              <div style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, marginTop: 2 }}>{ownerName}</div>
-              <div style={{ color: "#d0f0f7", fontSize: 13, marginTop: 3 }}>
-                {/* Only render date string after mount to avoid hydration mismatch */}
-                {vesselName}{mounted && nowString ? ` · ${nowString}` : ""}
+            {/* Avatar + name */}
+            <div className="flex items-center gap-4">
+              <div className="shrink-0 w-14 h-14 rounded-2xl border-2 border-white/30 overflow-hidden bg-white/20 flex items-center justify-center shadow-md">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={ownerName} className="w-full h-full object-cover" />
+                ) : (
+                  <span style={{ color: "#ffffff", fontSize: 20, fontWeight: 800 }}>
+                    {ownerName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+                  </span>
+                )}
+              </div>
+              <div>
+                <div style={{ color: "#b2e4ef", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Ticket Booth</div>
+                <div style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, marginTop: 2 }}>{ownerName}</div>
+                <div style={{ color: "#d0f0f7", fontSize: 13, marginTop: 3 }}>
+                  {/* Only render date string after mount to avoid hydration mismatch */}
+                  {vesselName}{mounted && nowString ? ` · ${nowString}` : ""}
+                </div>
               </div>
             </div>
+            {/* Issued today counter */}
             <div style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12, padding: "10px 16px", textAlign: "center" }}>
               <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Issued today</div>
               <div style={{ color: "#ffffff", fontSize: 28, fontWeight: 800, marginTop: 2 }}>{issuedToday.length}</div>
