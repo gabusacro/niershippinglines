@@ -10,6 +10,8 @@ export type UpcomingTripForBooth = {
   departed: boolean;
   online_quota: number;
   online_booked: number;
+  walk_in_quota: number;
+  walk_in_booked: number;
 };
 
 /**
@@ -28,7 +30,7 @@ export async function getUpcomingTripsForBoats(boatIds: string[]): Promise<Upcom
 
   const { data, error } = await supabase
     .from("trips")
-    .select("id, departure_date, departure_time, online_quota, online_booked, boat:boats(id, name), route:routes(display_name, origin, destination)")
+    .select("id, departure_date, departure_time, online_quota, online_booked, walk_in_quota, walk_in_booked, boat:boats(id, name), route:routes(display_name, origin, destination)")
     .gte("departure_date", today)
     .lte("departure_date", endDate)
     .eq("status", "scheduled")
@@ -44,7 +46,9 @@ export async function getUpcomingTripsForBoats(boatIds: string[]): Promise<Upcom
     boat: t.boat as UpcomingTripForBooth["boat"],
     route: t.route as UpcomingTripForBooth["route"],
     departed: isTripDeparted(t.departure_date, t.departure_time ?? ""),
-    online_quota: t.online_quota ?? 0,
-    online_booked: t.online_booked ?? 0,
+    online_quota:   t.online_quota   ?? 0,
+    online_booked:  t.online_booked  ?? 0,
+    walk_in_quota:  t.walk_in_quota  ?? 0,
+    walk_in_booked: t.walk_in_booked ?? 0,
   }));
 }

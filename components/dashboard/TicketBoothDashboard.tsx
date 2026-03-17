@@ -287,7 +287,8 @@ export function TicketBoothDashboard({
                 const isActive  = activeTripId === trip.id;
                 const routeName = trip.route?.display_name
                   ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" → ") ?? "—";
-                const seatsLeft = (trip.online_quota ?? 0) - (trip.online_booked ?? 0);
+                const onlineSeatsLeft  = (trip.online_quota  ?? 0) - (trip.online_booked  ?? 0);
+                const walkInSeatsLeft  = (trip.walk_in_quota ?? 0) - (trip.walk_in_booked ?? 0);
                 const upcomingVersion = upcomingTrips.find(u => u.id === trip.id);
                 // Only derive departed on client to avoid hydration mismatch
                 const isDeparted = mounted ? trip.departed : false;
@@ -324,7 +325,10 @@ export function TicketBoothDashboard({
                             : <span className="rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-xs font-bold">Upcoming</span>
                           }
                           <span className="rounded-full bg-teal-50 text-[#0c7b93] border border-teal-200 px-2.5 py-0.5 text-xs font-semibold">
-                            {seatsLeft} seats left
+                            {onlineSeatsLeft} online left
+                          </span>
+                          <span className="rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold">
+                            {walkInSeatsLeft} walk-in left
                           </span>
                           <button onClick={() => toggleManifest(trip.id)}
                             className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
@@ -333,7 +337,7 @@ export function TicketBoothDashboard({
                             {isActive ? "Hide manifest" : "View manifest"}
                           </button>
                           {/* Allow issuing tickets for today's trips regardless of departed status */}
-                          {seatsLeft > 0 && (upcomingVersion || trip) && (
+                          {walkInSeatsLeft > 0 && (upcomingVersion || trip) && (
                             <button
                               onClick={() => setBookingTrip(upcomingVersion ?? (trip as unknown as UpcomingTripForBooth))}
                               className="rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-bold text-white hover:bg-[#085f72] transition-colors shadow-sm">
@@ -440,7 +444,8 @@ export function TicketBoothDashboard({
                       {trips.map(trip => {
                         const routeName = trip.route?.display_name
                           ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" → ") ?? "—";
-                        const seatsLeft = (trip.online_quota ?? 0) - (trip.online_booked ?? 0);
+                        const onlineSeatsLeft  = (trip.online_quota  ?? 0) - (trip.online_booked  ?? 0);
+                        const walkInSeatsLeft  = (trip.walk_in_quota ?? 0) - (trip.walk_in_booked ?? 0);
                         const issuedForTrip = issuedToday.filter(b => b.trip_id === trip.id).length;
                         return (
                           <div key={trip.id} className="flex items-center justify-between px-4 py-3 gap-3 flex-wrap">
@@ -450,7 +455,10 @@ export function TicketBoothDashboard({
                               </div>
                               <div>
                                 <div className="font-semibold text-[#134e4a] text-sm">{routeName}</div>
-                                <div className="text-xs text-[#0f766e]">{seatsLeft} seats available</div>
+                                <div className="flex gap-2 mt-0.5">
+                                  <span className="text-xs text-[#0c7b93]">{onlineSeatsLeft} online left</span>
+                                  <span className="text-xs text-amber-700">{walkInSeatsLeft} walk-in left</span>
+                                </div>
                                 {issuedForTrip > 0 && (
                                   <div className="text-xs text-emerald-700 font-semibold">
                                     {issuedForTrip} ticket{issuedForTrip !== 1 ? "s" : ""} issued today
@@ -458,13 +466,13 @@ export function TicketBoothDashboard({
                                 )}
                               </div>
                             </div>
-                            {seatsLeft > 0 ? (
+                            {walkInSeatsLeft > 0 ? (
                               <button onClick={() => setBookingTrip(trip)}
                                 className="rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-bold text-white hover:bg-[#085f72] transition-colors">
                                 Issue Ticket
                               </button>
                             ) : (
-                              <span className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-500">Full</span>
+                              <span className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-500">Walk-in Full</span>
                             )}
                           </div>
                         );
