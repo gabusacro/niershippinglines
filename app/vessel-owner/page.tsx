@@ -26,9 +26,6 @@ export default async function VesselOwnerDashboard({
   const supabase = await createClient();
 
   // ── FIX: compute date string ONCE, then parse from that string ──
-  // Previously called new Date().toLocaleDateString() three separate times
-  // which could produce slightly different results between server and client,
-  // causing React hydration error #418.
   const todayManila  = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
   const currentYear  = parseInt(todayManila.slice(0, 4), 10);
   const currentMonth = parseInt(todayManila.slice(5, 7), 10);
@@ -40,6 +37,15 @@ export default async function VesselOwnerDashboard({
   const daysInCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
   const isViewingCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
   const isLast5Days = isViewingCurrentMonth && todayDay >= daysInCurrentMonth - 4;
+
+  // ── Fetch avatar from profiles ─────────────────────────────────────────────
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const avatarUrl = profile?.avatar_url ?? null;
 
   // Owner's vessel assignments
   const { data: assignments } = await supabase
@@ -342,6 +348,7 @@ export default async function VesselOwnerDashboard({
   return (
     <VesselOwnerClient
       ownerName={user.fullName ?? "Vessel Owner"}
+      avatarUrl={avatarUrl}
       vessels={vesselList}
       tripRows={tripRows}
       todayTripIds={todayTripIds}

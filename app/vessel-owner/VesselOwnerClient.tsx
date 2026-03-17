@@ -94,6 +94,7 @@ interface Props {
   currentYear: number; currentMonth: number; monthTotals: MonthTotals;
   totalPatronageBonusCents: number; nextMonthPreview: NextMonthPreview;
   owedTrips: OwedTrip[]; totalOwedCents: number; totalPaidCents: number;
+  avatarUrl?: string | null;
 }
 
 // ── Badges ────────────────────────────────────────────────────────────────────
@@ -428,6 +429,7 @@ export function VesselOwnerClient({
   selectedYear, selectedMonth, currentYear, currentMonth,
   monthTotals, totalPatronageBonusCents, nextMonthPreview,
   owedTrips, totalOwedCents, totalPaidCents,
+  avatarUrl,
 }: Props) {
   const router = useRouter();
   const [activeVessel, setActiveVessel] = useState<string | null>(vessels[0]?.boatId ?? null);
@@ -467,11 +469,43 @@ export function VesselOwnerClient({
 
       {/* ── Header ── */}
       <div className="rounded-2xl px-5 py-6 shadow-lg" style={{ backgroundColor: "#0c7b93" }}>
-        <p style={{ color: "#b2e4ef", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-          Vessel Owner Dashboard
-        </p>
-        <h1 style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, marginTop: 2, lineHeight: 1.2 }}>{ownerName}</h1>
-        <p style={{ color: "#d0f0f7", fontSize: 13, marginTop: 3 }}>{vessels.map((v) => v.boatName).join(" · ")}</p>
+        {/* Top row: avatar + name + account button */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            {/* Big profile photo */}
+            <div className="shrink-0 w-16 h-16 rounded-2xl border-2 border-white/30 overflow-hidden bg-white/20 flex items-center justify-center shadow-md">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={ownerName} className="w-full h-full object-cover" />
+              ) : (
+                <span style={{ color: "#ffffff", fontSize: 22, fontWeight: 800 }}>
+                  {ownerName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+                </span>
+              )}
+            </div>
+            {/* Name + vessel */}
+            <div>
+              <p style={{ color: "#b2e4ef", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                Vessel Owner Dashboard
+              </p>
+              <h1 style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, marginTop: 2, lineHeight: 1.2 }}>{ownerName}</h1>
+              <p style={{ color: "#d0f0f7", fontSize: 13, marginTop: 3 }}>{vessels.map((v) => v.boatName).join(" · ")}</p>
+            </div>
+          </div>
+          {/* Account button */}
+          <a
+            href="/account"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              backgroundColor: "rgba(255,255,255,0.18)",
+              color: "#ffffff", borderRadius: 12, padding: "10px 16px",
+              fontSize: 13, fontWeight: 700, textDecoration: "none",
+              border: "1.5px solid rgba(255,255,255,0.3)",
+              whiteSpace: "nowrap",
+            }}>
+            👤 My Account
+          </a>
+        </div>
+
         <div style={{ height: 1, backgroundColor: "rgba(255,255,255,0.2)", margin: "14px 0" }} />
 
         <div className="flex items-center gap-3 flex-wrap">
