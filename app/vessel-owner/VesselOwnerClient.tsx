@@ -1,759 +1,801 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { ROUTES } from "@/lib/constants";
-import type { TodayTripForCrew } from "@/lib/dashboard/get-todays-trips-for-boats";
-import type { UpcomingTripForBooth } from "@/lib/dashboard/get-upcoming-trips-for-boats";
-import type { TripManifestData } from "@/lib/admin/trip-manifest";
-import { ManifestStatusButton } from "@/components/admin/ManifestStatusButton";
-import { Clock, QrCode, BarChart3, BookOpen, User } from "lucide-react";
-import { TicketBoothRevenueSummary } from "@/components/dashboard/TicketBoothRevenueSummary";
+import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, ChevronUp, Ship, User, Ticket } from "lucide-react";
 import { CashHandoverSummary } from "@/components/dashboard/CashHandoverSummary";
 
-type PendingItem = { reference: string; customer_full_name: string; total_amount_cents: number };
-type IssuedBooking = {
-  reference: string;
-  customer_full_name: string;
-  total_amount_cents: number;
-  passenger_count: number;
-  created_at: string;
-  trip_id?: string | null;
-};
-
-type Props = {
-  ownerName: string;
-  vesselName: string | null;
-  boatId: string | null;
-  todayTrips: TodayTripForCrew[];
-  upcomingTrips: UpcomingTripForBooth[];
-  selectedTripId: string | null;
-  manifest: TripManifestData | null;
-  pendingPayments: PendingItem[];
-  issuedToday: IssuedBooking[];
-  loggedInEmail: string;
-  loggedInAddress: string;
-};
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const PAGE_SIZE = 10;
 
 function peso(cents: number) {
-  return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
+  const abs = Math.abs(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return cents < 0 ? `-₱${abs}` : `₱${abs}`;
 }
-
-function fmt12(t: string) {
+function formatTime(t: string) {
   if (!t) return "—";
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
-
-function formatDate(d: string) {
+function formatDate(d: string, short = false) {
   try {
-    return new Date(d + "T00:00:00").toLocaleDateString("en-PH", {
-      weekday: "short", month: "short", day: "numeric",
-    });
+    return new Date(d + "T00:00:00").toLocaleDateString("en-PH",
+      short ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
   } catch { return d; }
 }
-
-// Safe client-only timestamp formatter — never called on server
-function formatTimestamp(ts: string | null): string {
-  if (!ts) return "";
+function formatDateTime(iso: string) {
   try {
-    return new Date(ts).toLocaleTimeString("en-PH", {
-      hour: "2-digit", minute: "2-digit", hour12: true,
-    });
-  } catch { return ""; }
+    return new Date(iso).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  } catch { return iso; }
+}
+function calcAge(birthdate: string): number {
+  const bday = new Date(birthdate);
+  const now = new Date();
+  let age = now.getFullYear() - bday.getFullYear();
+  const m = now.getMonth() - bday.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < bday.getDate())) age--;
+  return age;
 }
 
-function getTodayManila() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+// ── Types ─────────────────────────────────────────────────────────────────────
+type PassengerDetail = {
+  fare_type: string;
+  full_name: string;
+  gender?: string | null;
+  address?: string | null;
+  birthdate?: string | null;
+  nationality?: string | null;
+  ticket_number?: string | null;
+};
+
+type BookingLine = {
+  id: string; tripId: string; reference: string; isOnline: boolean;
+  paymentMethod: string | null; passengerCount: number;
+  totalAmountCents: number; netFareCents: number;
+  platformFeeCents: number; processingFeeCents: number;
+  customerName: string; createdByName: string; createdByRole: string;
+  bookingSource: string | null;
+  createdAt: string; status: string;
+  passengerDetails: PassengerDetail[] | null;
+  fareType: string;
+};
+
+type TripRow = {
+  id: string; boat_id: string; boatName: string; routeName: string;
+  departureDate: string; departureTime: string; isToday: boolean;
+  onlinePax: number; walkInPax: number;
+  onlineNetFareCents: number; walkInFareCents: number; totalGrossCents: number;
+  paymentStatus: "pending" | "paid" | "failed";
+  paymentMethod: string | null; paymentReference: string | null; paidAt: string | null;
+  bookings: BookingLine[];
+};
+
+type OwedTrip = {
+  tripId: string; boatName: string; routeName: string;
+  departureDate: string; departureTime: string;
+  onlinePax: number; netFareCents: number;
+  paymentStatus: "pending" | "paid" | "failed";
+  paidAt: string | null;
+};
+
+type Vessel = { boatId: string; boatName: string; patronagePct: number; bonusCents: number };
+type MonthTotals = { onlinePax: number; walkInPax: number; onlineNetFareCents: number; walkInFareCents: number };
+type NextMonthPreview = {
+  month: number; year: number; monthName: string;
+  onlinePax: number; walkInPax: number; tripCount: number; onlineNetFareCents: number;
+} | null;
+
+interface Props {
+  ownerName: string; vessels: Vessel[]; tripRows: TripRow[];
+  todayTripIds: string[];
+  completedTripCount: number; todayTripCount: number;
+  upcomingTripCount: number; totalTripCount: number;
+  selectedYear: number; selectedMonth: number;
+  currentYear: number; currentMonth: number; monthTotals: MonthTotals;
+  totalPatronageBonusCents: number; nextMonthPreview: NextMonthPreview;
+  owedTrips: OwedTrip[]; totalOwedCents: number; totalPaidCents: number;
 }
 
-export function TicketBoothDashboard({
-  ownerName, vesselName, boatId,
-  todayTrips, upcomingTrips,
-  pendingPayments, issuedToday: issuedTodayProp,
-  loggedInEmail, loggedInAddress,
-}: Props) {
-  // ── mounted guard — nothing time-related renders on server ────────────────
-  const [mounted, setMounted] = useState(false);
-  const [nowString, setNowString] = useState("");
+// ── Badges ────────────────────────────────────────────────────────────────────
+const ROLE_MAP: Record<string, { label: string; cls: string }> = {
+  passenger:    { label: "Passenger",    cls: "bg-blue-100 text-blue-800"   },
+  admin:        { label: "Admin",        cls: "bg-purple-100 text-purple-800" },
+  vessel_owner: { label: "Owner",        cls: "bg-teal-100 text-teal-800"   },
+  crew:         { label: "Crew",         cls: "bg-orange-100 text-orange-800" },
+  ticket_booth: { label: "Ticket Booth", cls: "bg-pink-100 text-pink-800"   },
+  captain:      { label: "Captain",      cls: "bg-sky-100 text-sky-800"     },
+};
 
-  useEffect(() => {
-    setMounted(true);
-    const format = () => new Date().toLocaleString("en-PH", {
-      timeZone: "Asia/Manila", weekday: "long", month: "long",
-      day: "numeric", year: "numeric",
-    });
-    setNowString(format());
-    const t = setInterval(() => setNowString(format()), 60000);
-    return () => clearInterval(t);
-  }, []);
+const FARE_TYPE_LABELS: Record<string, { label: string; cls: string }> = {
+  adult:   { label: "Adult",   cls: "bg-teal-100 text-teal-800"     },
+  senior:  { label: "Senior",  cls: "bg-amber-100 text-amber-800"   },
+  pwd:     { label: "PWD",     cls: "bg-blue-100 text-blue-800"     },
+  student: { label: "Student", cls: "bg-indigo-100 text-indigo-800" },
+  child:   { label: "Child",   cls: "bg-green-100 text-green-800"   },
+  infant:  { label: "Infant",  cls: "bg-rose-100 text-rose-800"     },
+};
 
-  // ── Live issuedToday — refreshed after each ticket issue ──────────────────
-  const [issuedToday, setIssuedToday] = useState<IssuedBooking[]>(issuedTodayProp);
+const SOURCE_MAP: Record<string, { label: string; cls: string }> = {
+  online:                  { label: "Online (GCash)",    cls: "bg-teal-100 text-teal-800"   },
+  ticket_booth_walk_in:    { label: "Ticket Booth",      cls: "bg-pink-100 text-pink-800"   },
+  admin_walk_in:           { label: "Admin Walk-in",     cls: "bg-purple-100 text-purple-800" },
+  captain_walk_in:         { label: "Captain Walk-in",   cls: "bg-sky-100 text-sky-800"     },
+  deck_crew_walk_in:       { label: "Crew Walk-in",      cls: "bg-orange-100 text-orange-800" },
+  walk_in:                 { label: "Walk-in",           cls: "bg-amber-100 text-amber-800" },
+};
 
-  const refreshIssuedToday = useCallback(async () => {
-    try {
-      const res = await fetch("/api/dashboard/issued-today", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) setIssuedToday(data);
-      }
-    } catch {
-      // Silently fall back to existing list — no console error spam
-    }
-  }, []);
+function RoleBadge({ role }: { role: string }) {
+  const { label, cls } = ROLE_MAP[role] ?? { label: role, cls: "bg-gray-100 text-gray-700" };
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
+}
+function SourceBadge({ source, isOnline }: { source: string | null; isOnline: boolean }) {
+  const key = source ?? (isOnline ? "online" : "walk_in");
+  const { label, cls } = SOURCE_MAP[key] ?? { label: key, cls: "bg-gray-100 text-gray-700" };
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
+}
+function FareTypeBadge({ fareType }: { fareType: string }) {
+  const { label, cls } = FARE_TYPE_LABELS[fareType] ?? { label: fareType, cls: "bg-gray-100 text-gray-700" };
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>;
+}
 
-  // ── Manifest state — keyed per trip to avoid stale data ───────────────────
-  const [activeTripId, setActiveTripId]     = useState<string | null>(null);
-  const [manifestData, setManifestData]     = useState<TripManifestData | null>(null);
-  const [manifestLoading, setManifestLoading] = useState(false);
-  const [manifestError, setManifestError]   = useState<string | null>(null);
-
-  const fetchManifest = useCallback(async (tripId: string) => {
-    setManifestLoading(true);
-    setManifestError(null);
-    try {
-      const res = await fetch(`/api/admin/trip-manifest?trip_id=${tripId}`, { cache: "no-store" });
-      if (res.ok) {
-        setManifestData(await res.json());
-      } else {
-        setManifestData(null);
-        setManifestError("Could not load manifest.");
-      }
-    } catch {
-      setManifestData(null);
-      setManifestError("Network error loading manifest.");
-    } finally {
-      setManifestLoading(false);
-    }
-  }, []);
-
-  const toggleManifest = useCallback((tripId: string) => {
-    if (activeTripId === tripId) {
-      setActiveTripId(null);
-      setManifestData(null);
-      setManifestError(null);
-    } else {
-      setActiveTripId(tripId);
-      fetchManifest(tripId);
-    }
-  }, [activeTripId, fetchManifest]);
-
-  // ── Issue ticket modal ────────────────────────────────────────────────────
-  const [bookingTrip, setBookingTrip] = useState<UpcomingTripForBooth | null>(null);
-
-  // After issuing a ticket: refresh manifest (if that trip is open) + issuedToday list
-  const handleTicketIssued = useCallback(async (tripId: string) => {
-    setBookingTrip(null);
-    // Refresh the live issued-today list without a full page reload
-    await refreshIssuedToday();
-    // If this trip's manifest is currently open, refresh it too
-    if (activeTripId === tripId) {
-      await fetchManifest(tripId);
-    } else {
-      // Auto-open the manifest for the trip we just issued a ticket for
-      setActiveTripId(tripId);
-      await fetchManifest(tripId);
-    }
-  }, [activeTripId, fetchManifest, refreshIssuedToday]);
-
-  const today = getTodayManila();
-
-  // ── Manifest counts — scoped to the currently open manifest ──────────────
-  const manifest = manifestData;
-  const totalPax     = manifest?.totalPassengers ?? 0;
-  const boardedCount = manifest?.passengers.filter(p => p.status === "boarded" || p.status === "completed").length ?? 0;
-  const checkedIn    = manifest?.passengers.filter(p => p.status === "checked_in").length ?? 0;
-  const confirmed    = manifest?.passengers.filter(p => p.status === "confirmed" || p.status === "pending_payment").length ?? 0;
-
-  // ── Build a lookup: tripId → route label (for issuedToday trip column) ───
-  const tripLabelMap = new Map<string, string>();
-  for (const t of todayTrips) {
-    const label = t.route?.display_name
-      ?? [t.route?.origin, t.route?.destination].filter(Boolean).join(" → ")
-      ?? "—";
-    tripLabelMap.set(t.id, `${label} ${fmt12(t.departure_time)}`);
-  }
-  for (const t of upcomingTrips) {
-    const label = t.route?.display_name
-      ?? [t.route?.origin, t.route?.destination].filter(Boolean).join(" → ")
-      ?? "—";
-    tripLabelMap.set(t.id, `${label} ${fmt12(t.departure_time)} (${formatDate(t.departure_date)})`);
-  }
-
-  const tripsByDate = upcomingTrips.reduce<Record<string, UpcomingTripForBooth[]>>((acc, t) => {
-    if (!acc[t.departure_date]) acc[t.departure_date] = [];
-    acc[t.departure_date].push(t);
-    return acc;
-  }, {});
-
-  if (!boatId || !vesselName) {
+/**
+ * RemitBadge — only shows a remittance status when there are online bookings
+ * that require the admin to collect and remit GCash payments to the vessel owner.
+ *
+ * Walk-in / cash bookings go directly to the vessel owner — no admin remittance
+ * needed, so we show "Cash Direct" instead of "Pending" to avoid confusion.
+ */
+function RemitBadge({ status, hasOnlineBookings }: {
+  status: "pending" | "paid" | "failed";
+  hasOnlineBookings: boolean;
+}) {
+  // No online bookings = all cash, goes directly to vessel owner
+  if (!hasOnlineBookings) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 to-cyan-50 flex items-center justify-center p-4">
-        <div className="rounded-2xl border-2 border-amber-200 bg-white p-10 shadow-lg text-center max-w-sm">
-          <div className="text-5xl mb-4">🎫</div>
-          <div className="text-xl font-bold text-[#134e4a]">Not assigned to a vessel yet</div>
-          <div className="mt-3 text-sm text-[#0f766e]">Contact admin to get assigned.</div>
-          <Link href={ROUTES.account}
-            className="mt-6 inline-flex rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-            My Account
-          </Link>
+      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-400">
+        Cash Direct
+      </span>
+    );
+  }
+  if (status === "paid") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+        Admin Paid ✓
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+        Failed
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+      Admin Owes You
+    </span>
+  );
+}
+
+// Keep PaymentBadge for the owed-trips breakdown table (which only shows online trips)
+function PaymentBadge({ status }: { status: "pending" | "paid" | "failed" }) {
+  if (status === "paid")   return <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">Paid</span>;
+  if (status === "failed") return <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">Failed</span>;
+  return <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Pending</span>;
+}
+
+// ── Passenger Breakdown Row ───────────────────────────────────────────────────
+function PassengerBreakdown({ booking }: { booking: BookingLine }) {
+  const [open, setOpen] = useState(false);
+  const details = booking.passengerDetails;
+
+  if (!details || details.length === 0) {
+    return (
+      <div className="mt-1.5 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600">
+        <div className="flex items-center gap-2">
+          <FareTypeBadge fareType={booking.fareType} />
+          <span>{booking.passengerCount} passenger{booking.passengerCount !== 1 ? "s" : ""}</span>
+          <span className="ml-auto font-semibold text-[#134e4a]">{peso(booking.netFareCents)}</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "linear-gradient(160deg, #C9EEE4 0%, #E1F5EE 40%, #f0fdfa 100%)" }}>
-      <div className="h-1" style={{ background: "linear-gradient(90deg, #085C52, #0c7b93, #1AB5A3)" }} />
-
-      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8 space-y-5">
-
-        {/* ── Hero header ── */}
-        <div className="rounded-2xl px-5 py-6 shadow-lg" style={{ backgroundColor: "#0c7b93" }}>
-          <div className="flex items-start justify-between flex-wrap gap-3">
-            <div>
-              <div style={{ color: "#b2e4ef", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Ticket Booth</div>
-              <div style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, marginTop: 2 }}>{ownerName}</div>
-              <div style={{ color: "#d0f0f7", fontSize: 13, marginTop: 3 }}>
-                {/* Only render date string after mount to avoid hydration mismatch */}
-                {vesselName}{mounted && nowString ? ` · ${nowString}` : ""}
-              </div>
-            </div>
-            <div style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12, padding: "10px 16px", textAlign: "center" }}>
-              <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Issued today</div>
-              <div style={{ color: "#ffffff", fontSize: 28, fontWeight: 800, marginTop: 2 }}>{issuedToday.length}</div>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {[
-              { label: "Today's trips",   value: String(todayTrips.length) },
-              { label: "Pending confirm", value: String(pendingPayments.length), yellow: pendingPayments.length > 0 },
-              { label: "Boarded",         value: String(boardedCount) },
-            ].map((s) => (
-              <div key={s.label} style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 10, padding: "10px 12px" }}>
-                <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</div>
-                <div style={{ color: s.yellow ? "#fde68a" : "#d0f0f7", fontSize: 18, fontWeight: 800, marginTop: 2 }}>{s.value}</div>
-              </div>
+    <div className="mt-1.5 rounded-lg border border-teal-100 overflow-hidden">
+      <button type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-teal-50/60 hover:bg-teal-50 transition-colors text-xs font-semibold text-[#134e4a]">
+        <div className="flex items-center gap-2">
+          <Ticket size={12} className="text-[#0c7b93]" />
+          <span>{details.length} passengers — click to see breakdown</span>
+          <div className="flex gap-1 flex-wrap">
+            {[...new Set(details.map(d => d.fare_type))].map(ft => (
+              <FareTypeBadge key={ft} fareType={ft} />
             ))}
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-[#0c7b93]">{peso(booking.netFareCents)}</span>
+          {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </div>
+      </button>
 
-        {/* ── Pending payments ── */}
-        {pendingPayments.length > 0 && (
-          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
-            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-              <div>
-                <div className="text-sm font-bold text-amber-900">Pending Payments — {pendingPayments.length}</div>
-                <div className="text-xs text-amber-700 mt-0.5">Passengers waiting for confirmation</div>
-              </div>
-              <Link href={ROUTES.adminPendingPayments}
-                className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 transition-colors">
-                Confirm →
-              </Link>
-            </div>
-            <div className="space-y-2">
-              {pendingPayments.slice(0, 3).map(b => (
-                <div key={b.reference} className="flex items-center justify-between rounded-xl bg-white border border-amber-200 px-4 py-2.5">
-                  <span className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</span>
-                  <span className="text-sm text-[#134e4a]">{b.customer_full_name}</span>
-                  <span className="font-bold text-amber-800">{peso(b.total_amount_cents)}</span>
-                </div>
-              ))}
-              {pendingPayments.length > 3 && (
-                <div className="text-xs text-amber-600 text-center">+{pendingPayments.length - 3} more</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Today's trips ── */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="h-px flex-1 bg-teal-200" />
-            <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">
-              Today&apos;s Trips — {vesselName}
-            </span>
-            <div className="h-px flex-1 bg-teal-200" />
-          </div>
-
-          {todayTrips.length === 0 ? (
-            <div className="rounded-xl border border-teal-100 bg-white p-8 text-center text-sm text-[#0f766e]/60">
-              No trips scheduled for {vesselName} today.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {todayTrips.map((trip) => {
-                const isActive  = activeTripId === trip.id;
-                const routeName = trip.route?.display_name
-                  ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" → ") ?? "—";
-                const seatsLeft = (trip.online_quota ?? 0) - (trip.online_booked ?? 0);
-                const upcomingVersion = upcomingTrips.find(u => u.id === trip.id);
-                // Only derive departed on client to avoid hydration mismatch
-                const isDeparted = mounted ? trip.departed : false;
-
-                // Count how many of today's issued tickets belong to this trip
-                const issuedForThisTrip = issuedToday.filter(b => b.trip_id === trip.id).length;
-
-                return (
-                  <div key={trip.id}
-                    className={`rounded-2xl border-2 transition-all ${
-                      isActive ? "border-[#0c7b93] shadow-md bg-white"
-                      : isDeparted ? "border-gray-100 bg-gray-50/50"
-                      : "border-teal-200 bg-white shadow-sm"
-                    }`}>
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-3 flex-wrap">
-                        <div className="flex items-center gap-3">
-                          <div className={`rounded-xl px-3 py-2 text-center min-w-[72px] ${isDeparted ? "bg-gray-100 text-gray-500" : "bg-[#0c7b93] text-white"}`}>
-                            <div className="text-xs font-bold">{fmt12(trip.departure_time)}</div>
-                          </div>
-                          <div>
-                            <div className="font-bold text-[#134e4a] text-sm">{routeName}</div>
-                            <div className="text-xs text-[#0f766e] mt-0.5">{trip.boat?.name ?? vesselName}</div>
-                            {issuedForThisTrip > 0 && (
-                              <div className="text-xs text-emerald-700 font-semibold mt-0.5">
-                                {issuedForThisTrip} ticket{issuedForThisTrip !== 1 ? "s" : ""} issued today
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {isDeparted
-                            ? <span className="rounded-full bg-gray-100 text-gray-600 px-2.5 py-0.5 text-xs font-semibold">Departed</span>
-                            : <span className="rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-xs font-bold">Upcoming</span>
-                          }
-                          <span className="rounded-full bg-teal-50 text-[#0c7b93] border border-teal-200 px-2.5 py-0.5 text-xs font-semibold">
-                            {seatsLeft} seats left
-                          </span>
-                          <button onClick={() => toggleManifest(trip.id)}
-                            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
-                              isActive ? "bg-[#0c7b93] text-white" : "border border-teal-200 bg-teal-50 text-[#0c7b93] hover:bg-teal-100"
-                            }`}>
-                            {isActive ? "Hide manifest" : "View manifest"}
-                          </button>
-                          {/* Allow issuing tickets for today's trips regardless of departed status */}
-                          {seatsLeft > 0 && (upcomingVersion || trip) && (
-                            <button
-                              onClick={() => setBookingTrip(upcomingVersion ?? (trip as unknown as UpcomingTripForBooth))}
-                              className="rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-bold text-white hover:bg-[#085f72] transition-colors shadow-sm">
-                              Issue Ticket
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* ── Manifest panel ── */}
-                      {isActive && (
-                        <div className="mt-4 border-t border-teal-100 pt-4">
-                          {manifestLoading ? (
-                            <div className="text-center py-6 text-sm text-[#0f766e] animate-pulse">Loading manifest…</div>
-                          ) : manifestError ? (
-                            <div className="text-center py-4 text-sm text-red-500">
-                              {manifestError}
-                              <button onClick={() => fetchManifest(trip.id)} className="ml-2 underline text-[#0c7b93]">Retry</button>
-                            </div>
-                          ) : manifest ? (
-                            <>
-                              <div className="flex flex-wrap gap-2 mb-3">
-                                <span className="rounded-full bg-gray-100 text-gray-700 px-3 py-1 text-xs font-semibold">Confirmed: {confirmed}</span>
-                                <span className="rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-xs font-semibold">Checked in: {checkedIn}</span>
-                                <span className="rounded-full bg-teal-600 text-white px-3 py-1 text-xs font-semibold">Boarded: {boardedCount}</span>
-                                <span className="rounded-full bg-[#0c7b93] text-white px-3 py-1 text-xs font-semibold">Total: {totalPax}</span>
-                                {/* Refresh button — lets booth staff manually refresh without reloading page */}
-                                <button
-                                  onClick={() => fetchManifest(trip.id)}
-                                  className="rounded-full border border-teal-200 bg-white text-[#0c7b93] px-3 py-1 text-xs font-semibold hover:bg-teal-50 transition-colors"
-                                >
-                                  ↻ Refresh
-                                </button>
-                              </div>
-                              {manifest.passengers.length === 0 ? (
-                                <div className="text-sm text-[#0f766e]/60 text-center py-4">No passengers booked for this trip yet.</div>
-                              ) : (
-                                <div className="overflow-x-auto rounded-xl border border-teal-100">
-                                  <table className="min-w-full text-sm divide-y divide-teal-50">
-                                    <thead>
-                                      <tr className="bg-teal-50">
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-[#0f766e]">#</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-[#0f766e]">Ticket</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-[#0f766e]">Name</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-[#0f766e]">Source</th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-[#0f766e]">Status</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-teal-50 bg-white">
-                                      {manifest.passengers.map((p) => (
-                                        <tr key={`${p.ticketNumber}-${p.seq}`}>
-                                          <td className="px-3 py-2 text-[#134e4a]">{p.seq}</td>
-                                          <td className="px-3 py-2 font-mono text-xs font-semibold text-[#0c7b93]">{p.ticketNumber}</td>
-                                          <td className="px-3 py-2 font-medium text-[#134e4a]">{p.passengerName}</td>
-                                          <td className="px-3 py-2 text-xs text-[#0f766e]">{p.source}</td>
-                                          <td className="px-3 py-2">
-                                            <ManifestStatusButton ticketNumber={p.ticketNumber} initialStatus={p.status} />
-                                            {/* Safe: only rendered after mount */}
-                                            {mounted && p.boardedAt && (
-                                              <div className="text-xs text-gray-400 mt-0.5">{formatTimestamp(p.boardedAt)}</div>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="text-sm text-[#0f766e]/60 text-center py-4">No passengers booked for this trip yet.</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+      {open && (
+        <table className="min-w-full text-xs bg-white">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100">
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">#</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Name</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Fare Type</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Gender</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Age</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Nationality</th>
+              <th className="px-3 py-2 text-left font-semibold text-gray-500">Ticket #</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {details.map((p, i) => (
+              <tr key={i} className={p.fare_type !== "adult" ? "bg-amber-50/40" : ""}>
+                <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+                <td className="px-3 py-2 font-medium text-[#134e4a]">
+                  <div className="flex items-center gap-1.5">
+                    <User size={11} className="text-gray-400 shrink-0" />
+                    {p.full_name}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* ── Upcoming trips — collapsible by date ── */}
-        {Object.keys(tripsByDate).filter(d => d > today).length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-px flex-1 bg-teal-200" />
-              <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">Upcoming Trips — Issue Ticket</span>
-              <div className="h-px flex-1 bg-teal-200" />
-            </div>
-            <div className="space-y-2">
-              {Object.entries(tripsByDate)
-                .filter(([date]) => date > today)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([date, trips], idx) => (
-                  <details key={date} open={idx < 2}>
-                    <summary className="cursor-pointer rounded-xl border border-teal-200 bg-white shadow-sm overflow-hidden list-none">
-                      <div className="flex items-center justify-between bg-teal-50 px-4 py-2.5 border-b border-teal-100">
-                        <span className="text-xs font-bold text-[#0c7b93]">{formatDate(date)}</span>
-                        <span className="text-xs text-[#0f766e]/60">{trips.length} trip{trips.length !== 1 ? "s" : ""} · tap to expand</span>
-                      </div>
-                    </summary>
-                    <div className="rounded-b-xl border border-t-0 border-teal-200 bg-white divide-y divide-teal-50">
-                      {trips.map(trip => {
-                        const routeName = trip.route?.display_name
-                          ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" → ") ?? "—";
-                        const seatsLeft = (trip.online_quota ?? 0) - (trip.online_booked ?? 0);
-                        const issuedForTrip = issuedToday.filter(b => b.trip_id === trip.id).length;
-                        return (
-                          <div key={trip.id} className="flex items-center justify-between px-4 py-3 gap-3 flex-wrap">
-                            <div className="flex items-center gap-3">
-                              <div className="rounded-xl bg-[#0c7b93] text-white px-3 py-1.5 text-xs font-bold min-w-[64px] text-center">
-                                {fmt12(trip.departure_time)}
-                              </div>
-                              <div>
-                                <div className="font-semibold text-[#134e4a] text-sm">{routeName}</div>
-                                <div className="text-xs text-[#0f766e]">{seatsLeft} seats available</div>
-                                {issuedForTrip > 0 && (
-                                  <div className="text-xs text-emerald-700 font-semibold">
-                                    {issuedForTrip} ticket{issuedForTrip !== 1 ? "s" : ""} issued today
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            {seatsLeft > 0 ? (
-                              <button onClick={() => setBookingTrip(trip)}
-                                className="rounded-xl bg-[#0c7b93] px-4 py-2 text-sm font-bold text-white hover:bg-[#085f72] transition-colors">
-                                Issue Ticket
-                              </button>
-                            ) : (
-                              <span className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-500">Full</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </details>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Tickets issued today ── */}
-        {issuedToday.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-px flex-1 bg-teal-200" />
-              <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">Tickets Issued Today</span>
-              <div className="h-px flex-1 bg-teal-200" />
-            </div>
-            <div className="rounded-xl border border-teal-200 bg-white shadow-sm overflow-hidden">
-              <table className="min-w-full text-sm divide-y divide-teal-50">
-                <thead>
-                  <tr className="bg-teal-50">
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Reference</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Passenger</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e] hidden sm:table-cell">Trip</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-[#0f766e]">Pax</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-[#0f766e]">Amount</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Time</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-teal-50 bg-white">
-                  {issuedToday.map((b) => (
-                    <tr key={b.reference} className="hover:bg-teal-50/30 transition-colors">
-                      <td className="px-4 py-2.5">
-                        <Link href={`/dashboard/bookings/${b.reference}`}
-                          className="font-mono text-xs font-semibold text-[#0c7b93] hover:underline">
-                          {b.reference}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-2.5 text-[#134e4a]">{b.customer_full_name}</td>
-                      <td className="px-4 py-2.5 text-xs text-[#0f766e] hidden sm:table-cell">
-                        {b.trip_id ? (tripLabelMap.get(b.trip_id) ?? "—") : "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-[#134e4a]">{b.passenger_count}</td>
-                      <td className="px-4 py-2.5 text-right font-bold text-[#0c7b93]">{peso(b.total_amount_cents)}</td>
-                      {/* Safe: only rendered after mount */}
-                      <td className="px-4 py-2.5 text-xs text-[#0f766e]">
-                        {mounted ? formatTimestamp(b.created_at) : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-teal-50/60 border-t-2 border-teal-200">
-                    <td colSpan={3} className="px-4 py-2.5 text-xs font-bold text-[#134e4a]">Total issued today</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-[#134e4a]">
-                      {issuedToday.reduce((s, b) => s + b.passenger_count, 0)} pax
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-bold text-[#0c7b93]">
-                      {peso(issuedToday.reduce((s, b) => s + b.total_amount_cents, 0))}
-                    </td>
-                    <td />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── Cash to Hand Over ── */}
-        {boatId && (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-px flex-1 bg-teal-200" />
-              <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">
-                Cash to Hand Over — {vesselName}
-              </span>
-              <div className="h-px flex-1 bg-teal-200" />
-            </div>
-            <div className="rounded-xl border-2 border-amber-200 bg-amber-50/40 p-4">
-              <p className="text-xs text-amber-700 mb-3">
-                Walk-in cash collected today that must be handed over to the vessel owner.
-                Once you hand it over, the owner will confirm receipt on their dashboard.
-              </p>
-              <CashHandoverSummary
-                boatId={boatId}
-                vesselName={vesselName ?? ""}
-                mode="booth"
-                todayOnly={true}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ── Revenue Summary ── */}
-        {boatId && (
-          <TicketBoothRevenueSummary boatId={boatId} vesselName={vesselName ?? ""} />
-        )}
-
-        {/* ── Quick links ── */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="h-px flex-1 bg-teal-200" />
-            <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">Quick Links</span>
-            <div className="h-px flex-1 bg-teal-200" />
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[
-              { href: ROUTES.adminPendingPayments, icon: Clock,     label: "Pending Payments", sub: "Confirm walk-ins"    },
-              { href: ROUTES.adminBookings,        icon: BookOpen,  label: "Booking History",  sub: "All bookings"        },
-              { href: ROUTES.crewScan,             icon: QrCode,    label: "Scan QR Ticket",   sub: "Verify passenger"    },
-              { href: ROUTES.adminReports,         icon: BarChart3, label: "Reports",          sub: "Manifests & reports" },
-              { href: ROUTES.account,              icon: User,      label: "My Account",       sub: "Profile & password"  },
-            ].map((item) => (
-              <Link key={item.href} href={item.href}
-                className="flex items-center gap-3 rounded-xl border-2 border-teal-100 bg-white/80 px-4 py-3 shadow-sm hover:border-[#0c7b93] hover:bg-white transition-all">
-                <item.icon size={18} className="text-[#0c7b93] shrink-0" />
-                <div>
-                  <div className="text-sm font-bold text-[#134e4a]">{item.label}</div>
-                  <div className="text-xs text-[#0f766e]">{item.sub}</div>
-                </div>
-              </Link>
+                </td>
+                <td className="px-3 py-2"><FareTypeBadge fareType={p.fare_type} /></td>
+                <td className="px-3 py-2 text-gray-500 capitalize">{p.gender ?? "—"}</td>
+                <td className="px-3 py-2 text-gray-500">
+                  {p.birthdate ? `${calcAge(p.birthdate)} yrs` : "—"}
+                </td>
+                <td className="px-3 py-2 text-gray-500">{p.nationality ?? "—"}</td>
+                <td className="px-3 py-2 font-mono text-[#0c7b93] text-xs">{p.ticket_number ?? "—"}</td>
+              </tr>
             ))}
-          </div>
-        </div>
-
-        <div className="text-center text-xs text-[#0f766e]/40 pb-4">
-          You can only issue tickets for {vesselName}. Contact admin to change vessel assignment.
-        </div>
-      </div>
-
-      {/* ── Issue Ticket Modal ── */}
-      {bookingTrip && (
-        <IssueTicketModal
-          trip={bookingTrip}
-          loggedInEmail={loggedInEmail}
-          loggedInAddress={loggedInAddress}
-          onClose={() => setBookingTrip(null)}
-          onSuccess={(tripId) => handleTicketIssued(tripId)}
-        />
+          </tbody>
+        </table>
       )}
     </div>
   );
 }
 
-// ── Issue Ticket Modal ────────────────────────────────────────────────────────
-function IssueTicketModal({ trip, loggedInEmail, loggedInAddress, onClose, onSuccess }: {
-  trip: UpcomingTripForBooth;
-  loggedInEmail: string;
-  loggedInAddress: string;
-  onClose: () => void;
-  onSuccess: (tripId: string) => void;
-}) {
-  const routeName = trip.route?.display_name
-    ?? [trip.route?.origin, trip.route?.destination].filter(Boolean).join(" → ") ?? "—";
-
-  const [fullName,       setFullName]       = useState("");
-  const [email,          setEmail]          = useState("");
-  const [mobile,         setMobile]         = useState("");
-  const [address,        setAddress]        = useState(loggedInAddress);
-  const [fareType,       setFareType]       = useState("adult");
-  const [passengerCount, setPassengerCount] = useState(1);
-  const [submitting,     setSubmitting]     = useState(false);
-  const [error,          setError]          = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (!fullName.trim()) { setError("Passenger name is required."); return; }
-    if (!mobile.trim())   { setError("Mobile number is required.");   return; }
-    if (!address.trim())  { setError("Address is required.");         return; }
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/booking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trip_id: trip.id,
-          customer_full_name: fullName.trim(),
-          customer_email: email.trim() || loggedInEmail,
-          customer_mobile: mobile.trim(),
-          customer_address: address.trim(),
-          passenger_count: passengerCount,
-          fare_type: fareType,
-          is_walk_in: true,
-          booking_source: "ticket_booth_walk_in",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Booking failed.");
-        return;
-      }
-      // Pass tripId back so the dashboard can refresh the right manifest
-      onSuccess(trip.id);
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const inputCls = "mt-1 w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2.5 text-[#134e4a] focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/20 text-sm";
-
+// ── Audit table ───────────────────────────────────────────────────────────────
+function TripAuditTable({ bookings, trip }: { bookings: BookingLine[]; trip: TripRow }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-teal-100 max-h-[90vh] overflow-y-auto">
+    <div className="rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-wide text-slate-600">
+          Booking Audit — {bookings.length} transaction{bookings.length !== 1 ? "s" : ""}
+        </span>
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          {trip.onlineNetFareCents > 0 && (
+            <span className="font-semibold text-[#0c7b93]">Online: {peso(trip.onlineNetFareCents)}</span>
+          )}
+          {trip.walkInFareCents > 0 && (
+            <span className="font-semibold text-amber-700">Walk-in cash: {peso(trip.walkInFareCents)}</span>
+          )}
+        </div>
+      </div>
 
-        <div className="sticky top-0 bg-white border-b border-teal-100 px-5 py-4 rounded-t-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">Issue Walk-in Ticket</div>
-              <div className="text-base font-bold text-[#134e4a] mt-0.5">{routeName}</div>
-              <div className="text-xs text-[#0f766e] mt-1 flex items-center gap-2">
-                <span className="rounded-full bg-teal-100 px-2 py-0.5 font-semibold text-teal-800">
-                  {formatDate(trip.departure_date)}
+      <div className="divide-y divide-slate-100">
+        {bookings.map((bl) => (
+          <div key={bl.id} className={`px-4 py-3 ${bl.isOnline ? "bg-white" : "bg-amber-50/30"}`}>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-sm font-bold text-[#0c7b93]">{bl.reference}</span>
+                <SourceBadge source={bl.bookingSource} isOnline={bl.isOnline} />
+                {!bl.isOnline && (
+                  <div className="flex items-center gap-1.5 rounded-lg bg-amber-100 px-2 py-0.5 border border-amber-200">
+                    <RoleBadge role={bl.createdByRole} />
+                    <span className="text-xs font-semibold text-amber-800">{bl.createdByName}</span>
+                  </div>
+                )}
+                {bl.isOnline && (
+                  <span className="text-xs text-gray-400">by {bl.customerName}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-gray-400">{formatDateTime(bl.createdAt)}</span>
+                <span className={`font-bold ${bl.isOnline ? "text-[#0c7b93]" : "text-amber-700"}`}>
+                  {peso(bl.netFareCents)}
                 </span>
-                <span className="font-semibold">{fmt12(trip.departure_time)}</span>
-                <span className="text-[#0f766e]/60">· {trip.boat?.name}</span>
               </div>
             </div>
-            <button type="button" onClick={onClose}
-              className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
+            <PassengerBreakdown booking={bl} />
           </div>
+        ))}
+      </div>
+
+      {/* Trip footer totals */}
+      <div className="bg-slate-100 border-t-2 border-slate-200 px-4 py-2.5 flex flex-wrap gap-4 text-xs font-semibold">
+        <span className="text-slate-600">
+          Total: {bookings.reduce((s, b) => s + b.passengerCount, 0)} pax
+        </span>
+        {trip.onlineNetFareCents > 0 && (
+          <span className="text-[#0c7b93]">Online fare (admin owes owner): {peso(trip.onlineNetFareCents)}</span>
+        )}
+        {trip.walkInFareCents > 0 && (
+          <span className="text-amber-700">Walk-in cash (direct to vessel): {peso(trip.walkInFareCents)}</span>
+        )}
+        <span className="ml-auto text-slate-700">
+          Grand total: {peso(trip.onlineNetFareCents + trip.walkInFareCents)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Trip Table ────────────────────────────────────────────────────────────────
+function TripTable({ trips, auditTripId, setAuditTripId, highlight = false }: {
+  trips: TripRow[]; auditTripId: string | null;
+  setAuditTripId: (id: string | null) => void; highlight?: boolean;
+}) {
+  return (
+    <table className="min-w-full divide-y divide-teal-100 text-sm">
+      <thead>
+        <tr className="bg-teal-50">
+          <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Date</th>
+          <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Time</th>
+          <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Route</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">Online Pax</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[#0c7b93]">Online Fare</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">Walk-in</th>
+          <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-amber-700">Cash</th>
+          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Admin Owes</th>
+          <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-[#0f766e]">Audit</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-teal-50">
+        {trips.map((t) => {
+          const isAudit = auditTripId === t.id;
+          // Only show remittance status if there are online bookings that
+          // require admin to collect GCash and remit to the vessel owner.
+          // Pure cash/walk-in trips go directly to the vessel — no remit needed.
+          const hasOnlineBookings = t.onlinePax > 0 || t.onlineNetFareCents > 0;
+
+          return (
+            <React.Fragment key={t.id}>
+              <tr className={`transition-colors ${highlight || t.isToday ? "bg-teal-50/60" : "hover:bg-gray-50"}`}>
+                <td className="px-3 py-2.5 text-[#134e4a] whitespace-nowrap">
+                  {formatDate(t.departureDate, true)}
+                  {t.isToday && (
+                    <span className="ml-1 rounded-full bg-teal-100 px-1.5 py-0.5 text-xs text-teal-700 font-semibold">
+                      today
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 text-[#134e4a] whitespace-nowrap">{formatTime(t.departureTime)}</td>
+                <td className="px-3 py-2.5 text-[#134e4a] max-w-[120px] truncate">{t.routeName}</td>
+                <td className="px-3 py-2.5 text-right">
+                  {t.onlinePax > 0
+                    ? <span className="font-semibold text-[#0c7b93]">{t.onlinePax}</span>
+                    : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                  {t.onlineNetFareCents > 0
+                    ? <span className="font-medium text-[#0c7b93]">{peso(t.onlineNetFareCents)}</span>
+                    : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-right">
+                  {t.walkInPax > 0
+                    ? <span className="text-amber-700">{t.walkInPax}</span>
+                    : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                  {t.walkInFareCents > 0
+                    ? <span className="text-amber-700">{peso(t.walkInFareCents)}</span>
+                    : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-center">
+                  <RemitBadge status={t.paymentStatus} hasOnlineBookings={hasOnlineBookings} />
+                </td>
+                <td className="px-3 py-2.5 text-center">
+                  {t.bookings.length > 0 && (
+                    <button
+                      onClick={() => setAuditTripId(isAudit ? null : t.id)}
+                      className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors ${
+                        isAudit
+                          ? "bg-[#0c7b93] text-white"
+                          : "bg-teal-50 text-[#0c7b93] border border-teal-200 hover:bg-teal-100"
+                      }`}>
+                      {isAudit ? "Hide" : `Log (${t.bookings.length})`}
+                    </button>
+                  )}
+                </td>
+              </tr>
+
+              {isAudit && t.bookings.length > 0 && (
+                <tr className="bg-slate-50">
+                  <td colSpan={9} className="px-4 py-4">
+                    <TripAuditTable bookings={t.bookings} trip={t} />
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// ── Main VesselOwnerClient ────────────────────────────────────────────────────
+export function VesselOwnerClient({
+  ownerName, vessels, tripRows, todayTripIds,
+  completedTripCount, todayTripCount, upcomingTripCount, totalTripCount,
+  selectedYear, selectedMonth, currentYear, currentMonth,
+  monthTotals, totalPatronageBonusCents, nextMonthPreview,
+  owedTrips, totalOwedCents, totalPaidCents,
+}: Props) {
+  const router = useRouter();
+  const [activeVessel, setActiveVessel] = useState<string | null>(vessels[0]?.boatId ?? null);
+  const [page, setPage] = useState(1);
+  const [auditTripId, setAuditTripId] = useState<string | null>(null);
+  const [showOwedBreakdown, setShowOwedBreakdown] = useState(false);
+
+  const filteredTrips = useMemo(() =>
+    activeVessel ? tripRows.filter((t) => t.boat_id === activeVessel) : tripRows,
+    [tripRows, activeVessel]
+  );
+
+  const todayTrips = filteredTrips.filter((t) => todayTripIds.includes(t.id));
+  const allTrips   = filteredTrips;
+  const totalPages = Math.ceil(allTrips.length / PAGE_SIZE);
+  const pagedTrips = allTrips.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const goToMonth = (year: number, month: number) => { setPage(1); router.push(`/vessel-owner?year=${year}&month=${month}`); };
+  const prevMonth = () => selectedMonth === 1 ? goToMonth(selectedYear - 1, 12) : goToMonth(selectedYear, selectedMonth - 1);
+
+  const maxAllowedYear  = currentMonth === 12 ? currentYear + 1 : currentYear;
+  const maxAllowedMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+  const isAtMax = selectedYear > maxAllowedYear || (selectedYear === maxAllowedYear && selectedMonth >= maxAllowedMonth);
+  const nextMonth = () => {
+    if (isAtMax) return;
+    selectedMonth === 12 ? goToMonth(selectedYear + 1, 1) : goToMonth(selectedYear, selectedMonth + 1);
+  };
+  const isViewingNextMonth = selectedYear === maxAllowedYear && selectedMonth === maxAllowedMonth;
+
+  const totalRemittable = monthTotals.onlineNetFareCents;
+  const totalWalkIn     = monthTotals.walkInFareCents;
+  const totalCombined   = totalRemittable + totalWalkIn;
+  const tripProgressPct = totalTripCount > 0 ? Math.round((completedTripCount / totalTripCount) * 100) : 0;
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8 space-y-5">
+
+      {/* ── Header ── */}
+      <div className="rounded-2xl px-5 py-6 shadow-lg" style={{ backgroundColor: "#0c7b93" }}>
+        <p style={{ color: "#b2e4ef", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+          Vessel Owner Dashboard
+        </p>
+        <h1 style={{ color: "#ffffff", fontSize: 22, fontWeight: 800, marginTop: 2, lineHeight: 1.2 }}>{ownerName}</h1>
+        <p style={{ color: "#d0f0f7", fontSize: 13, marginTop: 3 }}>{vessels.map((v) => v.boatName).join(" · ")}</p>
+        <div style={{ height: 1, backgroundColor: "rgba(255,255,255,0.2)", margin: "14px 0" }} />
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={prevMonth} style={{ backgroundColor: "rgba(255,255,255,0.18)", color: "#ffffff", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, border: "none" }}>← Prev</button>
+          <span style={{ color: "#ffffff", fontSize: 16, fontWeight: 700 }}>{MONTH_NAMES[selectedMonth - 1]} {selectedYear}</span>
+          {isViewingNextMonth && <span style={{ backgroundColor: "rgba(255,255,255,0.22)", color: "#ffffff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>Next Month</span>}
+          <button onClick={nextMonth} disabled={isAtMax} style={{ backgroundColor: "rgba(255,255,255,0.18)", color: isAtMax ? "rgba(255,255,255,0.35)" : "#ffffff", borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: isAtMax ? "not-allowed" : "pointer" }}>Next →</button>
+          {(isViewingNextMonth || (selectedYear === currentYear && selectedMonth !== currentMonth)) && (
+            <button onClick={() => goToMonth(currentYear, currentMonth)} style={{ marginLeft: "auto", backgroundColor: "rgba(255,255,255,0.22)", color: "#ffffff", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 600, border: "none" }}>This month</button>
+          )}
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-[#134e4a]">Fare Type</label>
-              <select value={fareType} onChange={e => setFareType(e.target.value)} className={inputCls}>
-                <option value="adult">Adult</option>
-                <option value="senior">Senior (20% off)</option>
-                <option value="pwd">PWD (20% off)</option>
-                <option value="student">Student (20% off)</option>
-                <option value="child">Child (50% off)</option>
-                <option value="infant">Infant (FREE)</option>
-              </select>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            { label: "Total Trips",  value: String(totalTripCount) },
+            { label: "Online Pax",   value: String(monthTotals.onlinePax) },
+            { label: "Walk-in Pax",  value: String(monthTotals.walkInPax), yellow: true },
+            { label: "Total Fare",   value: peso(totalCombined) },
+          ].map((s) => (
+            <div key={s.label} style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 10, padding: "10px 12px" }}>
+              <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</p>
+              <p style={{ color: s.yellow ? "#fde68a" : "#d0f0f7", fontSize: 18, fontWeight: 800, marginTop: 2 }}>{s.value}</p>
             </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Trip Progress ── */}
+      {!isViewingNextMonth && (
+        <div className="rounded-xl border-2 border-teal-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div>
-              <label className="text-xs font-bold text-[#134e4a]">Passengers</label>
-              <input type="number" min={1} max={20} value={passengerCount}
-                onChange={e => setPassengerCount(Math.max(1, parseInt(e.target.value) || 1))}
-                className={inputCls} />
+              <p className="text-sm font-bold text-[#134e4a]">Trip Progress — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}</p>
+              <p className="text-xs text-[#0f766e] mt-0.5">{completedTripCount} completed · {todayTripCount} today · {upcomingTripCount} upcoming</p>
             </div>
+            <span className="text-2xl font-black text-[#0c7b93]">{completedTripCount} <span className="text-base font-normal text-[#0f766e]">/ {totalTripCount} trips</span></span>
           </div>
-          <div>
-            <label className="text-xs font-bold text-[#134e4a]">Passenger Full Name <span className="text-red-500">*</span></label>
-            <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
-              placeholder="Juan Dela Cruz" required className={inputCls} />
+          <div className="w-full h-3 rounded-full bg-teal-100 overflow-hidden">
+            <div className="h-3 rounded-full transition-all" style={{ width: `${tripProgressPct}%`, backgroundColor: "#0c7b93" }} />
           </div>
-          <div>
-            <label className="text-xs font-bold text-[#134e4a]">Mobile Number <span className="text-red-500">*</span></label>
-            <input type="tel" value={mobile} onChange={e => setMobile(e.target.value)}
-              placeholder="09XX XXX XXXX" required className={inputCls} />
+          <p className="mt-1.5 text-xs text-[#0f766e]">{tripProgressPct}% of this month&apos;s trips completed</p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              { label: "Completed", value: completedTripCount, sub: "past trips",    bg: "bg-teal-50",  border: "border-teal-200",  val: "text-[#0c7b93]",  lbl: "text-[#0f766e]"  },
+              { label: "Today",     value: todayTripCount,     sub: "happening now", bg: "bg-amber-50", border: "border-amber-200", val: "text-amber-800", lbl: "text-amber-700" },
+              { label: "Upcoming",  value: upcomingTripCount,  sub: "remaining",     bg: "bg-blue-50",  border: "border-blue-200",  val: "text-blue-800",  lbl: "text-blue-700"  },
+            ].map(s => (
+              <div key={s.label} className={`rounded-xl ${s.bg} border ${s.border} p-3 text-center`}>
+                <p className={`text-xs ${s.lbl} font-semibold`}>{s.label}</p>
+                <p className={`text-xl font-black ${s.val} mt-0.5`}>{s.value}</p>
+                <p className={`text-xs ${s.lbl} opacity-60`}>{s.sub}</p>
+              </div>
+            ))}
           </div>
-          <div>
-            <label className="text-xs font-bold text-[#134e4a]">Email (optional)</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="For ticket receipt" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-[#134e4a]">Address <span className="text-red-500">*</span></label>
-            <input type="text" value={address} onChange={e => setAddress(e.target.value)}
-              placeholder="For manifest" required className={inputCls} />
+        </div>
+      )}
+
+      {/* ── Admin Owes Me ── */}
+      {!isViewingNextMonth && (
+        <div className={`rounded-xl border-2 p-5 shadow-sm ${totalOwedCents > 0 ? "border-rose-300 bg-rose-50" : "border-green-300 bg-green-50"}`}>
+          <div className="flex items-start justify-between flex-wrap gap-3">
+            <div>
+              <p className={`text-sm font-bold ${totalOwedCents > 0 ? "text-rose-900" : "text-green-900"}`}>
+                Admin Owes Me — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+              </p>
+              <p className={`text-xs mt-0.5 ${totalOwedCents > 0 ? "text-rose-700" : "text-green-700"}`}>
+                Online (GCash) fare collected by admin that hasn&apos;t been remitted yet.
+                Walk-in cash goes directly to the vessel — not included here.
+              </p>
+            </div>
+            <div className="text-right">
+              {totalOwedCents > 0
+                ? <p className="text-2xl font-black text-rose-700">{peso(totalOwedCents)}</p>
+                : <p className="text-lg font-bold text-green-700">All paid!</p>}
+              {totalPaidCents > 0 && <p className="text-xs text-green-700 font-semibold mt-0.5">{peso(totalPaidCents)} already remitted</p>}
+            </div>
           </div>
 
-          {error && (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {[
+              { label: "Pending Remittance", value: peso(totalOwedCents),                sub: `${owedTrips.filter(t=>t.paymentStatus==="pending").length} trips`, border: "border-rose-200",  val: "text-rose-700"  },
+              { label: "Already Remitted",   value: peso(totalPaidCents),                sub: `${owedTrips.filter(t=>t.paymentStatus==="paid").length} trips`,    border: "border-green-200", val: "text-green-700" },
+              { label: "Total Online Fare",  value: peso(totalOwedCents+totalPaidCents), sub: `${owedTrips.length} trips`,                                        border: "border-teal-200",  val: "text-[#0c7b93]" },
+            ].map(s => (
+              <div key={s.label} className={`rounded-xl bg-white border ${s.border} p-3 text-center`}>
+                <p className="text-xs font-semibold text-gray-600">{s.label}</p>
+                <p className={`text-xl font-black ${s.val} mt-0.5`}>{s.value}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          {owedTrips.length > 0 && (
+            <div className="mt-4">
+              <button onClick={() => setShowOwedBreakdown(!showOwedBreakdown)}
+                className={`w-full flex items-center justify-between rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${totalOwedCents > 0 ? "bg-rose-100 text-rose-800 hover:bg-rose-200" : "bg-green-100 text-green-800 hover:bg-green-200"}`}>
+                <span>Per-trip breakdown ({owedTrips.length} trips)</span>
+                <span>{showOwedBreakdown ? "▲ Hide" : "▼ Show"}</span>
+              </button>
+              {showOwedBreakdown && (
+                <div className="mt-2 rounded-xl border border-rose-100 bg-white overflow-hidden">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600">Date</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600">Route</th>
+                        <th className="px-3 py-2.5 text-right text-xs font-semibold text-[#0c7b93]">Online Pax</th>
+                        <th className="px-3 py-2.5 text-right text-xs font-semibold text-[#0c7b93]">Fare Owed</th>
+                        <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-600">Status</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">Paid At</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {owedTrips.map((t) => (
+                        <tr key={t.tripId} className={t.paymentStatus === "paid" ? "bg-green-50/40" : "bg-white"}>
+                          <td className="px-3 py-2.5 text-[#134e4a] whitespace-nowrap">
+                            {formatDate(t.departureDate, true)}
+                            <span className="ml-1 text-xs text-gray-400">{formatTime(t.departureTime)}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-[#134e4a] max-w-[140px] truncate text-xs">{t.routeName}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold text-[#0c7b93]">{t.onlinePax}</td>
+                          <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">
+                            <span className={t.paymentStatus === "paid" ? "text-green-700" : "text-rose-700"}>{peso(t.netFareCents)}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-center"><PaymentBadge status={t.paymentStatus} /></td>
+                          <td className="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">{t.paidAt ? formatDateTime(t.paidAt) : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 border-t-2 border-gray-200 font-semibold">
+                        <td colSpan={3} className="px-3 py-2.5 text-gray-600 text-sm">Total</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <span className="text-rose-700 text-sm">{peso(totalOwedCents)} pending</span>
+                          {totalPaidCents > 0 && <span className="ml-2 text-green-700 text-xs">+ {peso(totalPaidCents)} paid</span>}
+                        </td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
 
-          <div className="flex gap-3 pt-1">
-            <button type="submit" disabled={submitting}
-              className="flex-1 min-h-[48px] rounded-xl bg-[#0c7b93] font-bold text-white text-sm hover:bg-[#085f72] disabled:opacity-50 transition-colors">
-              {submitting ? "Creating booking..." : "Issue Ticket"}
-            </button>
-            <button type="button" onClick={onClose}
-              className="min-h-[48px] rounded-xl border-2 border-teal-200 px-4 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
-              Cancel
+          {owedTrips.length === 0 && (
+            <p className="mt-4 text-sm text-[#0f766e]">No trips with online bookings this month yet.</p>
+          )}
+          <p className="mt-3 text-xs text-gray-400">
+            Only online (GCash) bookings require admin remittance. Walk-in cash is collected directly by the vessel.
+          </p>
+        </div>
+      )}
+
+      {/* ── Walk-in Cash Accountability ── */}
+      {!isViewingNextMonth && activeVessel && (
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 shadow-sm">
+          <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
+            <div>
+              <p className="text-sm font-bold text-amber-900">
+                Walk-in Cash — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Cash collected by your ticket booth for{" "}
+                {vessels.find(v => v.boatId === activeVessel)?.boatName ?? "your vessel"}.
+                Mark each day as received once the booth hands it over to you — via cash or GCash.
+                Past records are saved permanently for your reference.
+              </p>
+            </div>
+          </div>
+          <CashHandoverSummary
+            boatId={activeVessel}
+            vesselName={vessels.find(v => v.boatId === activeVessel)?.boatName ?? ""}
+            mode="owner"
+            todayOnly={false}
+            year={selectedYear}
+            month={selectedMonth}
+          />
+          <p className="mt-3 text-xs text-gray-400">
+            Only days with walk-in bookings are shown. Mark as received once your ticket booth
+            hands over the cash — by hand or via GCash transfer.
+          </p>
+        </div>
+      )}
+
+      {/* ── Next Month Preview ── */}
+      {nextMonthPreview && !isViewingNextMonth && (
+        <div className="rounded-xl border-2 border-blue-300 bg-blue-50 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-sm font-bold text-blue-900">Early Bookings — {nextMonthPreview.monthName} {nextMonthPreview.year}</p>
+              <p className="mt-1 text-xs text-blue-700">Passengers have already booked for next month.</p>
+            </div>
+            <button onClick={() => goToMonth(nextMonthPreview.year, nextMonthPreview.month)}
+              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors whitespace-nowrap">
+              View {nextMonthPreview.monthName} →
             </button>
           </div>
-          <div className="text-xs text-[#0f766e]/60 text-center">Walk-in cash booking — no GCash processing fee</div>
-        </form>
+          {nextMonthPreview.tripCount > 0 && (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { label: "Trips",            value: nextMonthPreview.tripCount,            cls: "text-blue-900"  },
+                { label: "Online Pax",       value: nextMonthPreview.onlinePax,            cls: "text-teal-800"  },
+                { label: "Walk-in Pax",      value: nextMonthPreview.walkInPax,            cls: "text-amber-800" },
+                { label: "Est. Online Fare", value: peso(nextMonthPreview.onlineNetFareCents), cls: "text-blue-900" },
+              ].map((s) => (
+                <div key={s.label} className="rounded-lg bg-white p-3 text-center">
+                  <p className="text-xs text-blue-600 font-medium">{s.label}</p>
+                  <p className={`mt-0.5 text-lg font-bold ${s.cls}`}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Vessel tabs ── */}
+      {vessels.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {vessels.map((v) => (
+            <button key={v.boatId} onClick={() => { setActiveVessel(v.boatId); setPage(1); }}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors border-2 ${activeVessel === v.boatId ? "border-[#0c7b93] bg-[#0c7b93] text-white" : "border-teal-200 bg-white text-[#134e4a] hover:bg-teal-50"}`}>
+              {v.boatName}
+            </button>
+          ))}
+          <button onClick={() => { setActiveVessel(null); setPage(1); }}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors border-2 ${activeVessel === null ? "border-[#0c7b93] bg-[#0c7b93] text-white" : "border-teal-200 bg-white text-[#134e4a] hover:bg-teal-50"}`}>
+            All vessels
+          </button>
+        </div>
+      )}
+
+      {/* ── Summary cards ── */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: "Trips This Month", value: peso(0),               num: allTrips.length,                           bg: "border-teal-100 bg-white",     val: "text-[#134e4a]", lbl: "text-[#0f766e]", isNum: true  },
+          { label: "Online Fare",      value: peso(totalRemittable),  num: monthTotals.onlinePax,                     bg: "border-teal-200 bg-teal-50",   val: "text-[#0c7b93]", lbl: "text-[#0c7b93]", isNum: false },
+          { label: "Walk-in Cash",     value: peso(totalWalkIn),      num: monthTotals.walkInPax,                     bg: "border-amber-200 bg-amber-50", val: "text-amber-800", lbl: "text-amber-700", isNum: false },
+          { label: "Total Revenue",    value: peso(totalCombined),    num: monthTotals.onlinePax + monthTotals.walkInPax, bg: "border-teal-200 bg-white", val: "text-[#134e4a]", lbl: "text-[#0f766e]", isNum: false },
+        ].map(s => (
+          <div key={s.label} className={`rounded-xl border p-4 shadow-sm ${s.bg}`}>
+            <p className={`text-xs font-semibold uppercase tracking-wide ${s.lbl}`}>{s.label}</p>
+            <p className={`mt-2 text-2xl font-bold ${s.val}`}>{s.isNum ? s.num : s.value}</p>
+            {!s.isNum && <p className={`mt-0.5 text-xs ${s.lbl}`}>{s.num} pax</p>}
+          </div>
+        ))}
+      </div>
+
+      {/* ── How it works ── */}
+      <div className="rounded-xl border border-teal-100 bg-white p-4 space-y-2">
+        <p className="text-xs font-bold text-[#134e4a] uppercase tracking-wide">How it works</p>
+        <p className="text-xs text-[#0f766e]">
+          <span className="font-semibold text-[#0c7b93]">Online fare</span> — paid via GCash through Travela Siargao. Platform and processing fees are deducted. Remaining fare is remitted to you by the admin.
+        </p>
+        <p className="text-xs text-[#0f766e]">
+          <span className="font-semibold text-amber-700">Walk-in cash</span> — collected directly at the ticket booth or vessel counter. Full amount goes directly to the vessel — no admin remittance needed.
+        </p>
+      </div>
+
+      {/* ── Patronage Bonus ── */}
+      {!isViewingNextMonth && (
+        <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-4 sm:p-5">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-sm font-bold text-amber-900">Operator Loyalty Bonus — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}</p>
+              <p className="mt-0.5 text-xs text-amber-700">Our monthly thank-you for trusting Travela Siargao.</p>
+            </div>
+            <span className="text-2xl font-bold text-amber-900">{peso(totalPatronageBonusCents)}</span>
+          </div>
+          <div className="mt-3 divide-y divide-amber-100">
+            {vessels.filter((v) => !activeVessel || v.boatId === activeVessel).map((v) => (
+              <div key={v.boatId} className="flex items-center justify-between py-2.5 text-sm">
+                <span className="text-amber-800">{v.boatName} ({v.patronagePct}%)</span>
+                <span className="font-bold text-amber-900">{peso(v.bonusCents)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Today's Trips ── */}
+      {todayTrips.length > 0 && (
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-[#0f766e] mb-2">Today&apos;s Trips</h2>
+          <div className="rounded-xl border border-teal-200 bg-white overflow-x-auto shadow-sm">
+            <TripTable trips={todayTrips} auditTripId={auditTripId} setAuditTripId={setAuditTripId} highlight />
+          </div>
+        </div>
+      )}
+
+      {/* ── All Trips ── */}
+      <div>
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-[#0f766e]">
+            {isViewingNextMonth ? "Upcoming" : "All Trips"} — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+            <span className="ml-2 text-xs font-normal normal-case text-[#0f766e]/60">({allTrips.length})</span>
+          </h2>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                className="rounded-lg border border-teal-200 px-3 py-1 text-sm text-[#134e4a] hover:bg-teal-50 disabled:opacity-40">←</button>
+              <span className="text-xs text-[#0f766e]">Page {page} of {totalPages}</span>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="rounded-lg border border-teal-200 px-3 py-1 text-sm text-[#134e4a] hover:bg-teal-50 disabled:opacity-40">→</button>
+            </div>
+          )}
+        </div>
+
+        {allTrips.length === 0 ? (
+          <div className="rounded-xl border border-teal-100 bg-white p-8 text-center text-sm text-[#0f766e]/60">
+            No trips {isViewingNextMonth ? "scheduled" : "recorded"} for {MONTH_NAMES[selectedMonth - 1]} yet.
+          </div>
+        ) : (
+          <div className="rounded-xl border border-teal-200 bg-white overflow-x-auto shadow-sm">
+            <TripTable trips={pagedTrips} auditTripId={auditTripId} setAuditTripId={setAuditTripId} />
+            <div className="border-t-2 border-teal-200 bg-teal-50 px-4 py-3 grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
+              <div><p className="text-xs text-[#0f766e]">Total Trips</p><p className="font-bold text-[#134e4a]">{allTrips.length}</p></div>
+              <div><p className="text-xs text-[#0c7b93]">Online Pax</p><p className="font-bold text-[#0c7b93]">{monthTotals.onlinePax}</p></div>
+              <div><p className="text-xs text-amber-700">Walk-in Pax</p><p className="font-bold text-amber-700">{monthTotals.walkInPax}</p></div>
+              <div><p className="text-xs text-[#0c7b93]">Online Fare</p><p className="font-bold text-[#0c7b93]">{peso(totalRemittable)}</p></div>
+              <div><p className="text-xs text-amber-700">Walk-in Cash</p><p className="font-bold text-amber-700">{peso(totalWalkIn)}</p></div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
