@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { getUpcomingTrips } from "@/lib/dashboard/get-upcoming-trips";
 import { getPendingPaymentBookings } from "@/lib/dashboard/get-pending-payment-bookings";
@@ -291,11 +290,10 @@ export default async function DashboardPage({
                 <div className="shrink-0">
                   {passengerAvatarUrl ? (
                     <div className="relative">
-                      <Image
+                      {/* Plain img — same as CrewCaptainManifestSection, avoids next/image domain config */}
+                      <img
                         src={passengerAvatarUrl}
                         alt={displayName ?? "Profile"}
-                        width={72}
-                        height={72}
                         className="rounded-2xl object-cover border-2 border-white/30 shadow-lg"
                         style={{ width: 72, height: 72 }}
                       />
@@ -409,10 +407,10 @@ export default async function DashboardPage({
                   reference: b.reference,
                   trip_snapshot_departure_date: b.trip_snapshot_departure_date ?? null,
                   trip_snapshot_departure_time: b.trip_snapshot_departure_time ?? null,
-                  trip_snapshot_route_name: (b as { trip_snapshot_route_name?: string | null }).trip_snapshot_route_name ?? null,
+                  trip_snapshot_route_name: b.trip_snapshot_route_name ?? null,
                   refund_status: b.refund_status ?? null,
                   reschedule_requested_at: b.reschedule_requested_at ?? null,
-                  passenger_count: (b as { passenger_count?: number }).passenger_count ?? 1,
+                  passenger_count: b.passenger_count ?? 1,
                 }))}
               />
             </div>

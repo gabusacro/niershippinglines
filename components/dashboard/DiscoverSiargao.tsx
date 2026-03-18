@@ -270,7 +270,7 @@ export function DiscoverSiargao({ items }: { items: DiscoverItem[] }) {
 
         <p className="relative mt-4 text-center text-xs text-white/30">
           Want to feature your Siargao business here?{" "}
-          <a href="mailto:gabu.sacro@gmail.com" className="text-white/50 underline transition-colors hover:text-white/80">Contact us</a>
+          <a href="mailto:support@travelasiargao.com" className="text-white/50 underline transition-colors hover:text-white/80">Contact us</a>
         </p>
       </div>
     </>

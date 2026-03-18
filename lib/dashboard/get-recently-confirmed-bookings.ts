@@ -7,6 +7,8 @@ export type RecentlyConfirmedRow = {
   updated_at: string;
   trip_snapshot_departure_date?: string | null;
   trip_snapshot_departure_time?: string | null;
+  trip_snapshot_route_name?: string | null;   // ← added
+  passenger_count?: number | null;            // ← added
   refund_status?: string | null;
   refund_requested_at?: string | null;
   reschedule_requested_at?: string | null;
@@ -32,36 +34,41 @@ export async function getRecentlyConfirmedBookings(
 
   const email = profile?.email ?? null;
 
+  const SELECT =
+    "id, reference, updated_at, " +
+    "trip_snapshot_departure_date, trip_snapshot_departure_time, trip_snapshot_route_name, " +
+    "passenger_count, refund_status, refund_requested_at, reschedule_requested_at";
+
   // Query 1: matched by created_by (bookings made while logged in)
-  const { data: byOwner } = await supabase
+  const { data: byOwnerRaw } = await supabase
     .from("bookings")
-    .select("id, reference, updated_at, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_status, refund_requested_at, reschedule_requested_at")
+    .select(SELECT)
     .eq("created_by", profileId)
     .eq("status", "confirmed")
     .order("updated_at", { ascending: false })
     .limit(20);
+  const byOwner = (byOwnerRaw ?? []) as unknown as RecentlyConfirmedRow[];
 
   // Query 2: matched by customer_email (guest bookings or claimed bookings)
-  let byEmail: typeof byOwner = [];
+  let byEmail: RecentlyConfirmedRow[] = [];
   if (email) {
     const { data } = await supabase
       .from("bookings")
-      .select("id, reference, updated_at, trip_snapshot_departure_date, trip_snapshot_departure_time, refund_status, refund_requested_at, reschedule_requested_at")
+      .select(SELECT)
       .eq("customer_email", email)
       .eq("status", "confirmed")
       .order("updated_at", { ascending: false })
       .limit(20);
-    byEmail = data ?? [];
+    byEmail = (data ?? []) as unknown as RecentlyConfirmedRow[];
   }
 
   // Merge and deduplicate by id
   const seen = new Set<string>();
   const merged: RecentlyConfirmedRow[] = [];
-  for (const row of [...(byOwner ?? []), ...(byEmail ?? [])]) {
-    const r = row as RecentlyConfirmedRow;
-    if (!seen.has(r.id)) {
-      seen.add(r.id);
-      merged.push(r);
+  for (const row of [...byOwner, ...byEmail]) {
+    if (!seen.has(row.id)) {
+      seen.add(row.id);
+      merged.push(row);
     }
   }
 
@@ -70,11 +77,12 @@ export async function getRecentlyConfirmedBookings(
     new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
   );
 
-  // Filter out tickets that are 6+ hours past departure
+  // Filter out tickets that are 6+ hours past departure (server-side pre-filter)
+  // The client component also re-checks this in real time
   return merged.filter(b => {
     const depDate = b.trip_snapshot_departure_date ?? "";
     const depTime = b.trip_snapshot_departure_time ?? "";
-    if (!depDate || !depTime) return true;
+    if (!depDate || !depTime) return true; // No snapshot → always show (safe fallback)
     return !isDeparturePlusHoursInPast(depDate, depTime, HOURS_AFTER_DEPARTURE);
   }).slice(0, 10);
 }
