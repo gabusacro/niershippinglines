@@ -1,7 +1,26 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, TrendingUp, Wallet, Smartphone, Users, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, TrendingUp, Wallet, Smartphone, Users } from "lucide-react";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface PassengerItem {
+  name:       string;
+  fare_type:  string;
+  ticket_num: string;
+  amount:     number;
+  address:    string | null;
+}
+
+interface StaffRow {
+  key:          string;
+  issuer_name:  string;
+  issuer_role:  string;
+  payment_type: "cash" | "online";
+  pax:          number;
+  total:        number;
+  passengers:   PassengerItem[];
+}
 
 interface RevenueSummaryRow {
   reference:          string;
@@ -18,17 +37,6 @@ interface RevenueSummaryRow {
   issuer_role:        string;
 }
 
-interface StaffSummary {
-  issuer_id:    string;
-  issuer_name:  string;
-  issuer_role:  string;
-  cashTotal:    number;
-  onlineTotal:  number;
-  cashPax:      number;
-  onlinePax:    number;
-  bookingCount: number;
-}
-
 interface SummaryTotals {
   cashTotal:     number;
   onlineTotal:   number;
@@ -36,19 +44,13 @@ interface SummaryTotals {
   onlinePax:     number;
   totalBookings: number;
   rows:          RevenueSummaryRow[];
-  staffSummary:  StaffSummary[];
+  staffRows:     StaffRow[];
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function peso(cents: number) {
   return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
 }
-
-const ROLE_LABELS: Record<string, string> = {
-  ticket_booth: "Ticket Booth",
-  captain:      "Captain",
-  deck_crew:    "Crew",
-  admin:        "Admin",
-};
 
 const ROLE_BADGE: Record<string, string> = {
   ticket_booth: "bg-pink-100 text-pink-800",
@@ -56,34 +58,34 @@ const ROLE_BADGE: Record<string, string> = {
   deck_crew:    "bg-orange-100 text-orange-800",
   admin:        "bg-purple-100 text-purple-800",
 };
+const ROLE_LABEL: Record<string, string> = {
+  ticket_booth: "Ticket Booth",
+  captain:      "Captain",
+  deck_crew:    "Crew",
+  admin:        "Admin",
+};
 
 type ViewMode = "day" | "week" | "month";
 
-interface Props {
-  boatId:     string;
-  vesselName: string;
-}
+interface Props { boatId: string; vesselName: string; }
 
 function getDateRange(mode: ViewMode, dayOffset: number, weekOffset: number, monthOffset: number) {
   const now = new Date();
-
   if (mode === "day") {
     const d = new Date(now);
     d.setDate(d.getDate() + dayOffset);
-    const str = d.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+    const str   = d.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
     const label = dayOffset === 0 ? "Today"
       : dayOffset === -1 ? "Yesterday"
       : d.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric" });
     return { start: str, end: str, label };
   }
-
   if (mode === "week") {
     const todayStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
     const today    = new Date(todayStr + "T00:00:00");
     const day      = today.getDay();
-    const daysFromMonday = day === 0 ? 6 : day - 1;
     const monday   = new Date(today);
-    monday.setDate(today.getDate() - daysFromMonday + weekOffset * 7);
+    monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1) + weekOffset * 7);
     const sunday   = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     const fmt      = (d: Date) => d.toISOString().slice(0, 10);
@@ -93,17 +95,129 @@ function getDateRange(mode: ViewMode, dayOffset: number, weekOffset: number, mon
       : `${labelFmt(monday)} – ${labelFmt(sunday)}`;
     return { start: fmt(monday), end: fmt(sunday), label };
   }
-
   const base    = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const year    = base.getFullYear();
   const month   = base.getMonth() + 1;
   const start   = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();
   const end     = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  const label   = base.toLocaleDateString("en-PH", { month: "long", year: "numeric" });
-  return { start, end, label };
+  return { start, end, label: base.toLocaleDateString("en-PH", { month: "long", year: "numeric" }) };
 }
 
+// ── Expandable Staff Row ──────────────────────────────────────────────────────
+function StaffAccountabilityRow({ row }: { row: StaffRow }) {
+  const [open, setOpen] = useState(false);
+
+  const isCash   = row.payment_type === "cash";
+  const rowBg    = isCash ? "bg-amber-50/40" : "bg-teal-50/40";
+  const typeBadge = isCash
+    ? <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-bold">💵 Cash</span>
+    : <span className="rounded-full bg-teal-100 text-teal-800 px-2 py-0.5 text-xs font-bold">📱 Online</span>;
+
+  const noteText = isCash
+    ? "Collected in person — staff owes this to vessel owner"
+    : "Paid via GCash to admin — admin remits to vessel owner";
+
+  return (
+    <div className={`border-b border-teal-100 last:border-b-0 ${rowBg}`}>
+      {/* Row header — clickable */}
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 gap-3 flex-wrap hover:brightness-95 transition-all text-left">
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Avatar initials */}
+          <div className="w-8 h-8 rounded-full bg-white border border-teal-200 flex items-center justify-center text-xs font-black text-[#0c7b93] shrink-0 shadow-sm">
+            {row.issuer_name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+          </div>
+          <div>
+            <span className="text-sm font-bold text-[#134e4a]">{row.issuer_name}</span>
+            <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE_BADGE[row.issuer_role] ?? "bg-gray-100 text-gray-600"}`}>
+              {ROLE_LABEL[row.issuer_role] ?? row.issuer_role}
+            </span>
+          </div>
+          {typeBadge}
+          <span className="text-xs text-gray-400">{row.pax} pax</span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className={`text-base font-black ${isCash ? "text-amber-700" : "text-teal-700"}`}>
+              {peso(row.total)}
+            </div>
+            <div className="text-xs text-gray-400">{noteText}</div>
+          </div>
+          <div className={`rounded-full p-1 ${open ? "bg-teal-100" : "bg-white border border-teal-200"}`}>
+            {open ? <ChevronUp size={14} className="text-[#0c7b93]" /> : <ChevronDown size={14} className="text-[#0c7b93]" />}
+          </div>
+        </div>
+      </button>
+
+      {/* Expanded passenger list */}
+      {open && (
+        <div className="border-t border-teal-100 bg-white">
+          <table className="min-w-full text-xs">
+            <thead>
+              <tr className="bg-teal-50/60">
+                <th className="px-4 py-2 text-left font-semibold text-[#0f766e]">#</th>
+                <th className="px-4 py-2 text-left font-semibold text-[#0f766e]">Passenger Name</th>
+                <th className="px-4 py-2 text-left font-semibold text-[#0f766e]">Fare Type</th>
+                <th className="px-4 py-2 text-left font-semibold text-[#0f766e]">Ticket #</th>
+                <th className="px-4 py-2 text-left font-semibold text-[#0f766e] hidden sm:table-cell">Address</th>
+                <th className="px-4 py-2 text-right font-semibold text-[#0f766e]">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-teal-50">
+              {row.passengers.map((p, i) => (
+                <tr key={`${p.ticket_num}-${i}`} className="hover:bg-teal-50/20 transition-colors">
+                  <td className="px-4 py-2.5 text-gray-400">{i + 1}</td>
+                  <td className="px-4 py-2.5 font-semibold text-[#134e4a]">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center text-xs font-bold text-[#0c7b93] shrink-0">
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      {p.name}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="rounded-full bg-teal-50 border border-teal-200 text-[#0c7b93] px-2 py-0.5 text-xs font-semibold">
+                      {p.fare_type}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-xs font-semibold text-[#0c7b93]">
+                    {p.ticket_num}
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-400 hidden sm:table-cell max-w-[160px] truncate">
+                    {p.address ?? "—"}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-bold">
+                    <span className={isCash ? "text-amber-700" : "text-teal-700"}>
+                      {peso(p.amount)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className={`border-t-2 ${isCash ? "bg-amber-50/60 border-amber-200" : "bg-teal-50/60 border-teal-200"}`}>
+                <td colSpan={4} className="px-4 py-2 text-xs font-bold text-[#134e4a]">
+                  {row.issuer_name} · {ROLE_LABEL[row.issuer_role] ?? row.issuer_role} · {row.pax} pax
+                </td>
+                <td className="hidden sm:table-cell" />
+                <td className={`px-4 py-2 text-right font-black text-sm ${isCash ? "text-amber-700" : "text-teal-700"}`}>
+                  {peso(row.total)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -139,11 +253,9 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
   }
 
   const { label } = getDateRange(mode, dayOffset, weekOffset, monthOffset);
-  const canGoForward = mode === "day" ? dayOffset < 0
-    : mode === "week" ? weekOffset < 0
-    : monthOffset < 0;
+  const canGoForward = mode === "day" ? dayOffset < 0 : mode === "week" ? weekOffset < 0 : monthOffset < 0;
 
-  function goBack() {
+  function goBack()    {
     if (mode === "day")   setDayOffset(d => d - 1);
     if (mode === "week")  setWeekOffset(w => w - 1);
     if (mode === "month") setMonthOffset(m => m - 1);
@@ -154,13 +266,9 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
     if (mode === "week")  setWeekOffset(w => w + 1);
     if (mode === "month") setMonthOffset(m => m + 1);
   }
-  function resetToNow() {
-    setDayOffset(0); setWeekOffset(0); setMonthOffset(0);
-  }
+  function resetToNow() { setDayOffset(0); setWeekOffset(0); setMonthOffset(0); }
 
-  const isAtCurrent = mode === "day" ? dayOffset === 0
-    : mode === "week" ? weekOffset === 0
-    : monthOffset === 0;
+  const isAtCurrent = mode === "day" ? dayOffset === 0 : mode === "week" ? weekOffset === 0 : monthOffset === 0;
 
   return (
     <div className="rounded-2xl border border-teal-200 bg-white shadow-sm overflow-hidden">
@@ -193,8 +301,7 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
         <div className="text-center">
           <div className="text-sm font-bold text-[#134e4a]">{label}</div>
           {!isAtCurrent && (
-            <button type="button" onClick={resetToNow}
-              className="text-xs text-[#0c7b93] hover:underline mt-0.5">
+            <button type="button" onClick={resetToNow} className="text-xs text-[#0c7b93] hover:underline mt-0.5">
               Back to current
             </button>
           )}
@@ -214,10 +321,10 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
           {/* ── Overall stat cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4">
             {[
-              { icon: Wallet,     label: "Cash (Walk-in)",   value: peso(data.cashTotal),                    sub: `${data.cashPax} pax`,                  color: "text-amber-700",  bg: "bg-amber-50 border-amber-200",        iconColor: "text-amber-600"  },
-              { icon: Smartphone, label: "Online (Payment)", value: peso(data.onlineTotal),                  sub: `${data.onlinePax} pax`,                color: "text-teal-700",   bg: "bg-teal-50 border-teal-200",          iconColor: "text-teal-600"   },
-              { icon: TrendingUp, label: "Total Revenue",    value: peso(data.cashTotal + data.onlineTotal), sub: `${data.cashPax + data.onlinePax} pax`, color: "text-[#0c7b93]",  bg: "bg-[#0c7b93]/5 border-[#0c7b93]/20", iconColor: "text-[#0c7b93]"  },
-              { icon: Users,      label: "Total Bookings",   value: String(data.totalBookings),              sub: `${data.cashPax + data.onlinePax} pax`, color: "text-[#134e4a]",  bg: "bg-gray-50 border-gray-200",          iconColor: "text-gray-500"   },
+              { icon: Wallet,     label: "Cash (Walk-in)",   value: peso(data.cashTotal),                    sub: `${data.cashPax} pax`,                  color: "text-amber-700",  bg: "bg-amber-50 border-amber-200",        iconColor: "text-amber-600" },
+              { icon: Smartphone, label: "Online (Payment)", value: peso(data.onlineTotal),                  sub: `${data.onlinePax} pax`,                color: "text-teal-700",   bg: "bg-teal-50 border-teal-200",          iconColor: "text-teal-600"  },
+              { icon: TrendingUp, label: "Total Revenue",    value: peso(data.cashTotal + data.onlineTotal), sub: `${data.cashPax + data.onlinePax} pax`, color: "text-[#0c7b93]",  bg: "bg-[#0c7b93]/5 border-[#0c7b93]/20", iconColor: "text-[#0c7b93]" },
+              { icon: Users,      label: "Total Bookings",   value: String(data.totalBookings),              sub: `${data.cashPax + data.onlinePax} pax`, color: "text-[#134e4a]",  bg: "bg-gray-50 border-gray-200",          iconColor: "text-gray-500"  },
             ].map(s => (
               <div key={s.label} className={`rounded-xl border p-3 ${s.bg}`}>
                 <div className="flex items-center gap-1.5 mb-1">
@@ -230,59 +337,39 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
             ))}
           </div>
 
-          {/* ── Per-staff accountability breakdown ── */}
-          {data.staffSummary.length > 0 && (
+          {/* ── Staff Accountability — expandable rows ── */}
+          {data.staffRows && data.staffRows.length > 0 && (
             <div className="mx-4 mb-4 rounded-xl border-2 border-teal-100 overflow-hidden">
-              <div className="bg-teal-50 px-4 py-2.5 border-b border-teal-100 flex items-center gap-2">
-                <User size={14} className="text-[#0c7b93]" />
+              <div className="bg-teal-50 px-4 py-2.5 border-b border-teal-100 flex items-center justify-between">
                 <span className="text-xs font-bold text-[#134e4a] uppercase tracking-wide">
                   Staff Accountability — {label}
                 </span>
+                <span className="text-xs text-gray-400">Click a row to see passenger details</span>
               </div>
-              <div className="divide-y divide-teal-50">
-                {data.staffSummary.map((staff) => (
-                  <div key={staff.issuer_id} className="px-4 py-3 flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-xs font-black text-[#0c7b93] shrink-0">
-                        {staff.issuer_name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-[#134e4a]">{staff.issuer_name}</div>
-                        <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${ROLE_BADGE[staff.issuer_role] ?? "bg-gray-100 text-gray-600"}`}>
-                          {ROLE_LABELS[staff.issuer_role] ?? staff.issuer_role}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-right">
-                      {staff.cashTotal > 0 && (
-                        <div>
-                          <div className="text-xs text-amber-700 font-semibold">Cash</div>
-                          <div className="text-base font-black text-amber-700">{peso(staff.cashTotal)}</div>
-                          <div className="text-xs text-gray-400">{staff.cashPax} pax</div>
-                        </div>
-                      )}
-                      {staff.onlineTotal > 0 && (
-                        <div>
-                          <div className="text-xs text-teal-700 font-semibold">Online</div>
-                          <div className="text-base font-black text-teal-700">{peso(staff.onlineTotal)}</div>
-                          <div className="text-xs text-gray-400">{staff.onlinePax} pax</div>
-                        </div>
-                      )}
-                      <div className="border-l border-teal-100 pl-4">
-                        <div className="text-xs text-[#0f766e] font-semibold">Total</div>
-                        <div className="text-base font-black text-[#0c7b93]">
-                          {peso(staff.cashTotal + staff.onlineTotal)}
-                        </div>
-                        <div className="text-xs text-gray-400">{staff.bookingCount} booking{staff.bookingCount !== 1 ? "s" : ""}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+
+              {/* Legend */}
+              <div className="px-4 py-2 bg-white border-b border-teal-50 flex flex-wrap gap-3 text-xs text-gray-500">
+                <span><span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1" />💵 Cash = staff collected, must hand to owner</span>
+                <span><span className="inline-block w-2 h-2 rounded-full bg-teal-400 mr-1" />📱 Online = admin collected via GCash, admin remits to owner</span>
               </div>
-              {/* Staff total footer */}
-              <div className="bg-teal-50/60 border-t-2 border-teal-200 px-4 py-2.5 flex justify-between text-xs font-bold text-[#134e4a]">
-                <span>{data.staffSummary.length} staff member{data.staffSummary.length !== 1 ? "s" : ""}</span>
-                <span className="text-[#0c7b93]">{peso(data.cashTotal + data.onlineTotal)} total</span>
+
+              {data.staffRows.map(row => (
+                <StaffAccountabilityRow key={row.key} row={row} />
+              ))}
+
+              {/* Footer totals */}
+              <div className="bg-teal-50/60 border-t-2 border-teal-200 px-4 py-2.5 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-bold">
+                <div>
+                  <span className="text-amber-700">Cash to hand over: {peso(data.cashTotal)}</span>
+                  <span className="text-gray-400 font-normal ml-1">({data.cashPax} pax)</span>
+                </div>
+                <div>
+                  <span className="text-teal-700">Online via admin: {peso(data.onlineTotal)}</span>
+                  <span className="text-gray-400 font-normal ml-1">({data.onlinePax} pax)</span>
+                </div>
+                <div className="text-[#0c7b93] sm:text-right">
+                  Total: {peso(data.cashTotal + data.onlineTotal)}
+                </div>
               </div>
             </div>
           )}
@@ -323,7 +410,7 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-semibold text-[#134e4a]">{r.issuer_name}</span>
                           <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${ROLE_BADGE[r.issuer_role] ?? "bg-gray-100 text-gray-600"}`}>
-                            {ROLE_LABELS[r.issuer_role] ?? r.issuer_role}
+                            {ROLE_LABEL[r.issuer_role] ?? r.issuer_role}
                           </span>
                         </div>
                       </td>
