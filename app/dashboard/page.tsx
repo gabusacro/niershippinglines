@@ -409,7 +409,6 @@ export default async function DashboardPage({
                   trip_snapshot_departure_time: b.trip_snapshot_departure_time ?? null,
                   trip_snapshot_route_name: b.trip_snapshot_route_name ?? null,
                   refund_status: b.refund_status ?? null,
-                  reschedule_requested_at: b.reschedule_requested_at ?? null,
                   passenger_count: b.passenger_count ?? 1,
                 }))}
               />
