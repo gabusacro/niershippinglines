@@ -11,7 +11,6 @@ type ActiveTicket = {
   trip_snapshot_departure_time: string | null;
   trip_snapshot_route_name?: string | null;
   refund_status?: string | null;
-  reschedule_requested_at?: string | null;
   passenger_count?: number;
 };
 
@@ -168,11 +167,7 @@ export function PassengerActiveTickets({ tickets }: Props) {
                         {refundBadge.emoji} {refundBadge.label}
                       </span>
                     )}
-                    {b.reschedule_requested_at && (
-                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800">
-                        🔄 Reschedule requested
-                      </span>
-                    )}
+  
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 pt-1">

@@ -10,7 +10,6 @@ export type RecentlyConfirmedRow = {
   passenger_count?: number | null;
   refund_status?: string | null;
   refund_requested_at?: string | null;
-  reschedule_requested_at?: string | null;
 };
 
 /**
@@ -37,7 +36,7 @@ export async function getRecentlyConfirmedBookings(
   const FIELDS =
     "id, reference, updated_at, " +
     "trip_snapshot_departure_date, trip_snapshot_departure_time, trip_snapshot_route_name, " +
-    "passenger_count, refund_status, refund_requested_at, reschedule_requested_at";
+    "passenger_count, refund_status, refund_requested_at";
 
   // Query 1: bookings made while logged in (created_by = passenger's profile id)
   const { data: byOwnerRaw } = await supabase
