@@ -47,10 +47,12 @@ export function PassengerActiveTickets({ tickets }: Props) {
         if (!dateStr) return true;
 
         try {
-          // Build Manila departure datetime
-          const timeComponent = timeStr ? timeStr.slice(0, 5) : "00:00";
-          // Parse as Manila time (+08:00)
+          const timeComponent = timeStr ? timeStr.trim().slice(0, 5) : "00:00";
           const depManila = new Date(`${dateStr}T${timeComponent}:00+08:00`);
+          // If date is invalid/unparseable → SHOW the ticket (safe fallback).
+          // NOTE: ph-time.ts returns true (hide) on NaN — we do the opposite here
+          // because hiding a valid ticket is worse than showing an old one.
+          if (Number.isNaN(depManila.getTime())) return true;
           const hideAfter = new Date(depManila.getTime() + 6 * 60 * 60 * 1000);
           return current < hideAfter;
         } catch {
