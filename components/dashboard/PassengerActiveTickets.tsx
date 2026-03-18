@@ -67,9 +67,11 @@ export function PassengerActiveTickets({ tickets }: Props) {
     return () => clearInterval(interval);
   }, [tickets]);
 
-  // Don't render anything until client is mounted (prevents hydration error)
-  if (!mounted) return null;
-  if (visibleTickets.length === 0) return null;
+  // Before mount: show all tickets passed in (already server-pre-filtered by 6hr rule).
+  // After mount: switch to client-filtered list (re-checks time in real time).
+  // This prevents the "blank on first load" problem while keeping hydration safe.
+  const displayTickets = mounted ? visibleTickets : tickets;
+  if (displayTickets.length === 0) return null;
 
   return (
     <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5 shadow-sm">
@@ -81,14 +83,14 @@ export function PassengerActiveTickets({ tickets }: Props) {
           </span>
         </div>
         <span className="text-xs text-emerald-600 font-medium">
-          {visibleTickets.length} ticket{visibleTickets.length !== 1 ? "s" : ""}
+          {displayTickets.length} ticket{displayTickets.length !== 1 ? "s" : ""}
         </span>
       </div>
       <p className="mb-3 text-xs text-emerald-700">
         Show your QR code at the ticket booth when boarding. Tickets shown here up to 6 hours after departure.
       </p>
       <ul className="space-y-3">
-        {visibleTickets.map((b) => {
+        {displayTickets.map((b) => {
           const depDate = b.trip_snapshot_departure_date;
           const depTime = b.trip_snapshot_departure_time;
 
@@ -112,7 +114,8 @@ export function PassengerActiveTickets({ tickets }: Props) {
 
           // Check if departed (for "boarding window" indicator)
           let isDeparted = false;
-          if (depDate && now) {
+          // Only compute departed status after mount (now is available)
+          if (depDate && mounted && now) {
             try {
               const timeComponent = depTime ? depTime.slice(0, 5) : "00:00";
               const depManila = new Date(`${depDate}T${timeComponent}:00+08:00`);
