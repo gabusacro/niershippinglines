@@ -37,11 +37,14 @@ export async function GET(request: NextRequest) {
   }
 
   // Get all non-cancelled bookings for these trips
+  // ── FIX: also fetch admin_fee_cents and gcash_fee_cents so we can
+  //         show FARE ONLY for online bookings (excluding platform fees)
   const { data: bookings, error } = await supabase
     .from("bookings")
     .select(`
       reference, booking_source, is_walk_in,
       passenger_count, total_amount_cents,
+      admin_fee_cents, gcash_fee_cents,
       customer_full_name, status, created_at,
       trip:trips!bookings_trip_id_fkey(departure_date, departure_time)
     `)
@@ -54,20 +57,27 @@ export async function GET(request: NextRequest) {
   let cashTotal = 0, onlineTotal = 0, cashPax = 0, onlinePax = 0;
 
   const rows = (bookings ?? []).map(b => {
-    const trip = Array.isArray(b.trip) ? b.trip[0] : b.trip;
+    const trip     = Array.isArray(b.trip) ? b.trip[0] : b.trip;
     const isWalkIn = b.is_walk_in || b.booking_source !== "online";
-    const pax    = b.passenger_count ?? 0;
-    const amount = b.total_amount_cents ?? 0;
+    const pax      = b.passenger_count ?? 0;
+    const total    = b.total_amount_cents ?? 0;
 
-    if (isWalkIn) { cashTotal += amount; cashPax += pax; }
-    else          { onlineTotal += amount; onlinePax += pax; }
+    // ── Walk-in: full amount is fare (no platform/processing fees charged)
+    // ── Online:  subtract platform service fee + payment processing fee
+    //            so we show only the actual fare, matching vessel owner view
+    const adminFee = (b as { admin_fee_cents?: number }).admin_fee_cents ?? 0;
+    const gcashFee = (b as { gcash_fee_cents?: number }).gcash_fee_cents ?? 0;
+    const fareAmount = isWalkIn ? total : total - adminFee - gcashFee;
+
+    if (isWalkIn) { cashTotal  += fareAmount; cashPax   += pax; }
+    else          { onlineTotal += fareAmount; onlinePax += pax; }
 
     return {
       reference:          b.reference ?? "—",
       booking_source:     b.booking_source ?? "—",
       is_walk_in:         b.is_walk_in ?? false,
       passenger_count:    pax,
-      total_amount_cents: amount,
+      total_amount_cents: fareAmount,   // ← fare only, fees excluded
       customer_full_name: b.customer_full_name ?? "—",
       status:             b.status ?? "—",
       created_at:         b.created_at ?? "",
