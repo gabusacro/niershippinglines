@@ -167,7 +167,11 @@ export async function getTripManifestData(tripId: string): Promise<TripManifestD
 
     let source = "Online";
     if (b.is_walk_in) {
-      source = role === "ticket_booth" ? "Walk-in (booth)" : role === "admin" ? "Walk-in (admin)" : "Walk-in";
+      source = role === "ticket_booth" ? "Walk-in (booth)"
+        : role === "admin"     ? "Walk-in (admin)"
+        : role === "captain"   ? "Walk-in (captain)"
+        : role === "deck_crew" ? "Walk-in (crew)"
+        : "Walk-in";
     }
 
     if (pd.length > 0) {

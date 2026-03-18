@@ -128,8 +128,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "We noticed unusual activity and have temporarily restricted your account. If you believe this is an error, please contact us at gabu.sacro@gmail.com." }, { status: 403 });
       }
 
-      // ── Ticket booth vessel restriction ─────────────────────────────────
-      // If the user is a ticket_booth operator, they can only book trips for
+      // ── Vessel assignment restriction for booth, captain and crew ────────
+      // ticket_booth, captain, and deck_crew can only book trips for
       // vessels they are assigned to in boat_assignments.
       const { data: profile } = await adminForCheck
         .from("profiles")
@@ -137,7 +137,8 @@ export async function POST(request: NextRequest) {
         .eq("id", authUser.id)
         .maybeSingle();
 
-      if (profile?.role === "ticket_booth") {
+      const restrictedRoles = ["ticket_booth", "captain", "deck_crew"];
+      if (profile?.role && restrictedRoles.includes(profile.role)) {
         // Get the boat_id for this trip
         const { data: tripBoat } = await adminForCheck
           .from("trips")
@@ -149,13 +150,18 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Trip not found." }, { status: 404 });
         }
 
-        // Check if this ticket booth is assigned to this vessel
+        // Determine the correct assignment_role to check
+        const assignmentRole = profile.role === "ticket_booth" ? "ticket_booth"
+          : profile.role === "captain" ? "captain"
+          : "deck_crew";
+
+        // Check if this user is assigned to this vessel
         const { data: assignment } = await adminForCheck
           .from("boat_assignments")
           .select("id")
           .eq("profile_id", authUser.id)
           .eq("boat_id", tripBoat.boat_id)
-          .eq("assignment_role", "ticket_booth")
+          .eq("assignment_role", assignmentRole)
           .maybeSingle();
 
         if (!assignment) {
@@ -242,15 +248,19 @@ export async function POST(request: NextRequest) {
     ? notifyAlsoEmailRaw.trim() : null;
 
   // ── Determine booking_source ──────────────────────────────────────────────
-  // online             = passenger booking via website
+  // online               = passenger booking via website
   // ticket_booth_walk_in = ticket booth staff booking on behalf of walk-in passenger
-  // admin_walk_in      = admin manually creating a booking
+  // captain_walk_in      = captain issuing a walk-in ticket at boarding
+  // deck_crew_walk_in    = deck crew issuing a walk-in ticket
+  // admin_walk_in        = admin manually creating a booking
   let bookingSource = "online";
   if (isWalkIn && authUser?.id) {
     const { data: bookerProfile } = await supabase
       .from("profiles").select("role").eq("id", authUser.id).maybeSingle();
-    if (bookerProfile?.role === "ticket_booth") bookingSource = "ticket_booth_walk_in";
-    else if (bookerProfile?.role === "admin") bookingSource = "admin_walk_in";
+    if (bookerProfile?.role === "ticket_booth")       bookingSource = "ticket_booth_walk_in";
+    else if (bookerProfile?.role === "captain")       bookingSource = "captain_walk_in";
+    else if (bookerProfile?.role === "deck_crew")     bookingSource = "deck_crew_walk_in";
+    else if (bookerProfile?.role === "admin")         bookingSource = "admin_walk_in";
     else bookingSource = "walk_in";
   }
 

@@ -117,16 +117,24 @@ export default async function DashboardPage({
   let crewCaptainData: {
     boatIds: string[];
     todayTrips: Awaited<ReturnType<typeof getTodaysTripsForBoats>>;
+    upcomingTrips: Awaited<ReturnType<typeof getUpcomingTripsForBoats>>;
     currentTrip: ReturnType<typeof getCurrentTripFromTodays>;
     selectedTripId: string | null;
     manifest: Awaited<ReturnType<typeof getTripManifestData>>;
     avatarUrl: string | null;
   } | null = null;
 
+
+
+
   if (user.role === "crew" || user.role === "captain") {
-    const boatIds     = await getCrewCaptainAssignedBoatIds(user.id);
-    const todayTrips  = await getTodaysTripsForBoats(boatIds);
-    const currentTrip = getCurrentTripFromTodays(todayTrips);
+    const boatIds       = await getCrewCaptainAssignedBoatIds(user.id);
+    const todayTrips    = await getTodaysTripsForBoats(boatIds);
+    const upcomingTrips = await getUpcomingTripsForBoats(boatIds);
+    const currentTrip   = getCurrentTripFromTodays(todayTrips);
+
+
+
     const selectedTripId =
       params.tripId && todayTrips.some(t => t.id === params.tripId)
         ? params.tripId
@@ -134,8 +142,7 @@ export default async function DashboardPage({
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
     const { data: crewProfile } = await (await import("@/lib/supabase/server"))
       .createClient().then(sb => sb.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle());
-    crewCaptainData = { boatIds, todayTrips, currentTrip, selectedTripId, manifest, avatarUrl: crewProfile?.avatar_url ?? null };
-  }
+    crewCaptainData = { boatIds, todayTrips, upcomingTrips, currentTrip, selectedTripId, manifest, avatarUrl: crewProfile?.avatar_url ?? null };  }
 
   // ── Ticket Booth data — ONLY assigned vessel ─────────────────────────────
   let ticketBoothData: {
@@ -589,12 +596,16 @@ export default async function DashboardPage({
           ) : (
             <CrewCaptainManifestSection
             roleLabel={yourRoleLabel}
+            role={user.role}
             todayTrips={crewCaptainData.todayTrips}
+            upcomingTrips={crewCaptainData.upcomingTrips}
             currentTrip={crewCaptainData.currentTrip}
             selectedTripId={crewCaptainData.selectedTripId}
             manifest={crewCaptainData.manifest}
             ownerName={welcomeName ?? user.email ?? undefined}
             avatarUrl={crewCaptainData.avatarUrl ?? null}
+            loggedInEmail={loggedInEmail}
+            loggedInAddress={loggedInAddress}
           />
           )}
         </>
