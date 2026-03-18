@@ -19,6 +19,8 @@ type IssuedBooking = {
   passenger_count: number;
   created_at: string;
   trip_id?: string | null;
+  issuer_name?: string;
+  issuer_role?: string;
 };
 
 type Props = {
@@ -39,6 +41,19 @@ type Props = {
 function peso(cents: number) {
   return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
 }
+
+const ISSUER_ROLE_BADGE: Record<string, string> = {
+  ticket_booth: "bg-pink-100 text-pink-800",
+  captain:      "bg-sky-100 text-sky-800",
+  deck_crew:    "bg-orange-100 text-orange-800",
+  admin:        "bg-purple-100 text-purple-800",
+};
+const ISSUER_ROLE_LABEL: Record<string, string> = {
+  ticket_booth: "Booth",
+  captain:      "Captain",
+  deck_crew:    "Crew",
+  admin:        "Admin",
+};
 
 function fmt12(t: string) {
   if (!t) return "—";
@@ -507,6 +522,48 @@ export function TicketBoothDashboard({
               <span className="text-xs font-bold uppercase tracking-widest text-[#0c7b93]">Tickets Issued Today</span>
               <div className="h-px flex-1 bg-teal-200" />
             </div>
+
+            {/* Per-staff subtotals — only shown when multiple staff issued tickets */}
+            {(() => {
+              const staffMap = new Map<string, { name: string; role: string; total: number; pax: number; count: number }>();
+              for (const b of issuedToday) {
+                const key = `${b.issuer_name ?? "Unknown"}::${b.issuer_role ?? "—"}`;
+                if (!staffMap.has(key)) staffMap.set(key, { name: b.issuer_name ?? "Unknown", role: b.issuer_role ?? "—", total: 0, pax: 0, count: 0 });
+                const s = staffMap.get(key)!;
+                s.total += b.total_amount_cents;
+                s.pax   += b.passenger_count;
+                s.count += 1;
+              }
+              const staffList = Array.from(staffMap.values());
+              if (staffList.length <= 1) return null;
+              return (
+                <div className="mb-3 rounded-xl border-2 border-teal-100 overflow-hidden">
+                  <div className="bg-teal-50 px-4 py-2 border-b border-teal-100">
+                    <span className="text-xs font-bold text-[#134e4a] uppercase tracking-wide">Staff Breakdown — Today</span>
+                  </div>
+                  <div className="divide-y divide-teal-50">
+                    {staffList.map(s => (
+                      <div key={`${s.name}::${s.role}`} className="flex items-center justify-between px-4 py-2.5 flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center text-xs font-black text-[#0c7b93]">
+                            {s.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+                          </div>
+                          <span className="text-sm font-semibold text-[#134e4a]">{s.name}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ISSUER_ROLE_BADGE[s.role] ?? "bg-gray-100 text-gray-600"}`}>
+                            {ISSUER_ROLE_LABEL[s.role] ?? s.role}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400">{s.pax} pax · {s.count} booking{s.count !== 1 ? "s" : ""}</span>
+                          <span className="font-black text-[#0c7b93]">{peso(s.total)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="rounded-xl border border-teal-200 bg-white shadow-sm overflow-hidden">
               <table className="min-w-full text-sm divide-y divide-teal-50">
                 <thead>
@@ -514,6 +571,7 @@ export function TicketBoothDashboard({
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Reference</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Passenger</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e] hidden sm:table-cell">Trip</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Issued By</th>
                     <th className="px-4 py-2.5 text-right text-xs font-semibold text-[#0f766e]">Pax</th>
                     <th className="px-4 py-2.5 text-right text-xs font-semibold text-[#0f766e]">Amount</th>
                     <th className="px-4 py-2.5 text-left text-xs font-semibold text-[#0f766e]">Time</th>
@@ -532,9 +590,18 @@ export function TicketBoothDashboard({
                       <td className="px-4 py-2.5 text-xs text-[#0f766e] hidden sm:table-cell">
                         {b.trip_id ? (tripLabelMap.get(b.trip_id) ?? "—") : "—"}
                       </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-semibold text-[#134e4a]">{b.issuer_name ?? "—"}</span>
+                          {b.issuer_role && (
+                            <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${ISSUER_ROLE_BADGE[b.issuer_role] ?? "bg-gray-100 text-gray-600"}`}>
+                              {ISSUER_ROLE_LABEL[b.issuer_role] ?? b.issuer_role}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-2.5 text-right font-semibold text-[#134e4a]">{b.passenger_count}</td>
                       <td className="px-4 py-2.5 text-right font-bold text-[#0c7b93]">{peso(b.total_amount_cents)}</td>
-                      {/* Safe: only rendered after mount */}
                       <td className="px-4 py-2.5 text-xs text-[#0f766e]">
                         {mounted ? formatTimestamp(b.created_at) : ""}
                       </td>
@@ -543,7 +610,7 @@ export function TicketBoothDashboard({
                 </tbody>
                 <tfoot>
                   <tr className="bg-teal-50/60 border-t-2 border-teal-200">
-                    <td colSpan={3} className="px-4 py-2.5 text-xs font-bold text-[#134e4a]">Total issued today</td>
+                    <td colSpan={4} className="px-4 py-2.5 text-xs font-bold text-[#134e4a]">Total issued today</td>
                     <td className="px-4 py-2.5 text-right font-bold text-[#134e4a]">
                       {issuedToday.reduce((s, b) => s + b.passenger_count, 0)} pax
                     </td>

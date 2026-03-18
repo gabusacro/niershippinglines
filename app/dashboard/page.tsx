@@ -156,7 +156,7 @@ export default async function DashboardPage({
     manifest: Awaited<ReturnType<typeof getTripManifestData>>;
     avatarUrl: string | null;  // ← ADD THIS LINE
     pendingPayments: { reference: string; customer_full_name: string; total_amount_cents: number }[];
-    issuedToday: { reference: string; customer_full_name: string; total_amount_cents: number; passenger_count: number; created_at: string }[];
+    issuedToday: { reference: string; customer_full_name: string; total_amount_cents: number; passenger_count: number; created_at: string; trip_id: string | null; issuer_name: string; issuer_role: string }[];
   } | null = null;
 
   if (user.role === "ticket_booth") {
@@ -206,13 +206,18 @@ export default async function DashboardPage({
           .limit(10)
       : { data: [] };
 
-    const { data: issuedRaw } = await sb
-      .from("bookings")
-      .select("reference, customer_full_name, total_amount_cents, passenger_count, created_at")
-      .eq("created_by", user.id)
-      .eq("booking_source", "ticket_booth_walk_in")
-      .gte("created_at", `${todayManila}T00:00:00+08:00`)
-      .order("created_at", { ascending: false });
+    // Show ALL walk-in bookings for this vessel today (from any staff)
+    // so the ticket booth operator can see the full accountability picture
+    const todayTripIds = todayTrips.map(t => t.id);
+    const { data: issuedRaw } = todayTripIds.length > 0
+      ? await sb
+          .from("bookings")
+          .select("reference, customer_full_name, total_amount_cents, passenger_count, created_at, trip_id, creator:profiles!bookings_created_by_fkey(full_name, role)")
+          .in("trip_id", todayTripIds)
+          .eq("is_walk_in", true)
+          .not("status", "in", '("cancelled","refunded")')
+          .order("created_at", { ascending: false })
+      : { data: [] };
 
 
 
@@ -241,13 +246,20 @@ export default async function DashboardPage({
         customer_full_name: (b as { customer_full_name: string }).customer_full_name ?? "",
         total_amount_cents: (b as { total_amount_cents: number }).total_amount_cents ?? 0,
       })),
-      issuedToday: (issuedRaw ?? []).map(b => ({
-        reference: (b as { reference: string }).reference ?? "",
-        customer_full_name: (b as { customer_full_name: string }).customer_full_name ?? "",
-        total_amount_cents: (b as { total_amount_cents: number }).total_amount_cents ?? 0,
-        passenger_count: (b as { passenger_count: number }).passenger_count ?? 0,
-        created_at: (b as { created_at: string }).created_at ?? "",
-      })),
+      issuedToday: (issuedRaw ?? []).map(b => {
+        const bx = b as { reference?: string; customer_full_name?: string; total_amount_cents?: number; passenger_count?: number; created_at?: string; trip_id?: string; creator?: { full_name?: string; role?: string } | null };
+        const creator = Array.isArray(bx.creator) ? bx.creator[0] : bx.creator;
+        return {
+          reference:          bx.reference ?? "",
+          customer_full_name: bx.customer_full_name ?? "",
+          total_amount_cents: bx.total_amount_cents ?? 0,
+          passenger_count:    bx.passenger_count ?? 0,
+          created_at:         bx.created_at ?? "",
+          trip_id:            bx.trip_id ?? null,
+          issuer_name:        (creator as { full_name?: string } | null)?.full_name ?? "Unknown",
+          issuer_role:        (creator as { role?: string } | null)?.role ?? "—",
+        };
+      }),
     };
   }
 
