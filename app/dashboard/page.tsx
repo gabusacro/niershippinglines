@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { getUpcomingTrips } from "@/lib/dashboard/get-upcoming-trips";
 import { getPendingPaymentBookings } from "@/lib/dashboard/get-pending-payment-bookings";
@@ -28,6 +29,7 @@ import { DiscoverSiargao } from "@/components/dashboard/DiscoverSiargao";
 import { getDiscoverItems } from "@/lib/dashboard/get-discover-items";
 import { DashboardShareWidget } from "@/components/dashboard/DashboardShareWidget";
 import { TicketBoothDashboard } from "@/components/dashboard/TicketBoothDashboard";
+import { PassengerActiveTickets } from "@/components/dashboard/PassengerActiveTickets";
 
 export async function generateMetadata() {
   const branding = await getSiteBranding();
@@ -36,7 +38,6 @@ export async function generateMetadata() {
 
 export const dynamic = "force-dynamic";
 
-// ── FIX: pinned locale helper so server and browser always format the same way ──
 function peso(cents: number) {
   return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
@@ -85,11 +86,11 @@ export default async function DashboardPage({
     crew: "Deck crew", passenger: "Passenger",
     vessel_owner: "Vessel Owner", investor: "Investor",
   };
-  const yourRoleLabel  = roleLabel[user.role] ?? user.role;
-  const isPassenger    = user.role === "passenger";
-  const loggedInEmail  = user.email ?? "";
+  const yourRoleLabel   = roleLabel[user.role] ?? user.role;
+  const isPassenger     = user.role === "passenger";
+  const loggedInEmail   = user.email ?? "";
   const loggedInAddress = user.address ?? "";
-  const isAdmin = false;
+  const isAdmin         = false;
 
   const displayName  = user.fullName?.trim() || null;
   const salutation   = user.salutation?.trim() || null;
@@ -110,8 +111,24 @@ export default async function DashboardPage({
     isPassenger ? getDiscoverItems() : Promise.resolve([]),
   ]);
 
+  // ── Fetch passenger avatar (same pattern as crew/booth) ──────────────────
+  let passengerAvatarUrl: string | null = null;
+  if (isPassenger) {
+    const sb = await (await import("@/lib/supabase/server")).createClient();
+    const { data: passengerProfile } = await sb
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
+    passengerAvatarUrl = passengerProfile?.avatar_url ?? null;
+  }
+
   const awaitingPayment      = allPending.filter(b => !b.payment_proof_path);
   const awaitingConfirmation = allPending.filter(b => !!b.payment_proof_path);
+
+  // ── Active ticket count for hero badge ───────────────────────────────────
+  // recentlyConfirmed includes all confirmed bookings — the 6hr filter runs client-side
+  const totalTrips = recentlyConfirmed.length + awaitingConfirmation.length + awaitingPayment.length;
 
   // ── Crew / Captain data ──────────────────────────────────────────────────
   let crewCaptainData: {
@@ -124,17 +141,11 @@ export default async function DashboardPage({
     avatarUrl: string | null;
   } | null = null;
 
-
-
-
   if (user.role === "crew" || user.role === "captain") {
     const boatIds       = await getCrewCaptainAssignedBoatIds(user.id);
     const todayTrips    = await getTodaysTripsForBoats(boatIds);
     const upcomingTrips = await getUpcomingTripsForBoats(boatIds);
     const currentTrip   = getCurrentTripFromTodays(todayTrips);
-
-
-
     const selectedTripId =
       params.tripId && todayTrips.some(t => t.id === params.tripId)
         ? params.tripId
@@ -142,9 +153,10 @@ export default async function DashboardPage({
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
     const { data: crewProfile } = await (await import("@/lib/supabase/server"))
       .createClient().then(sb => sb.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle());
-    crewCaptainData = { boatIds, todayTrips, upcomingTrips, currentTrip, selectedTripId, manifest, avatarUrl: crewProfile?.avatar_url ?? null };  }
+    crewCaptainData = { boatIds, todayTrips, upcomingTrips, currentTrip, selectedTripId, manifest, avatarUrl: crewProfile?.avatar_url ?? null };
+  }
 
-  // ── Ticket Booth data — ONLY assigned vessel ─────────────────────────────
+  // ── Ticket Booth data ────────────────────────────────────────────────────
   let ticketBoothData: {
     vesselName: string | null;
     boatId: string | null;
@@ -154,14 +166,13 @@ export default async function DashboardPage({
     currentTrip: ReturnType<typeof getCurrentTripFromTodays>;
     selectedTripId: string | null;
     manifest: Awaited<ReturnType<typeof getTripManifestData>>;
-    avatarUrl: string | null;  // ← ADD THIS LINE
+    avatarUrl: string | null;
     pendingPayments: { reference: string; customer_full_name: string; total_amount_cents: number }[];
     issuedToday: { reference: string; customer_full_name: string; total_amount_cents: number; passenger_count: number; created_at: string; trip_id: string | null; issuer_name: string; issuer_role: string }[];
   } | null = null;
 
   if (user.role === "ticket_booth") {
     const sb = await (await import("@/lib/supabase/server")).createClient();
-
     const { data: assignments } = await sb
       .from("boat_assignments")
       .select("boat_id, boats(id, name)")
@@ -175,9 +186,7 @@ export default async function DashboardPage({
 
     const boatId = firstAssignment?.boat_id ?? null;
     const boatRecord = firstAssignment
-      ? (Array.isArray(firstAssignment.boats)
-          ? firstAssignment.boats[0]
-          : firstAssignment.boats) as { id: string; name: string } | null
+      ? (Array.isArray(firstAssignment.boats) ? firstAssignment.boats[0] : firstAssignment.boats) as { id: string; name: string } | null
       : null;
     const vesselName = boatRecord?.name ?? null;
     const boatIds = boatId ? [boatId] : [];
@@ -191,13 +200,9 @@ export default async function DashboardPage({
         : currentTrip?.id ?? null;
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
 
-    // ── FIX: compute date string once ──
-    const todayManila = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
     const tripIds = todayTrips.map(t => t.id);
-
     const { data: pendingRaw } = tripIds.length > 0
-      ? await sb
-          .from("bookings")
+      ? await sb.from("bookings")
           .select("reference, customer_full_name, total_amount_cents")
           .eq("status", "pending_payment")
           .not("payment_proof_path", "is", null)
@@ -206,12 +211,9 @@ export default async function DashboardPage({
           .limit(10)
       : { data: [] };
 
-    // Show ALL walk-in bookings for this vessel today (from any staff)
-    // so the ticket booth operator can see the full accountability picture
     const todayTripIds = todayTrips.map(t => t.id);
     const { data: issuedRaw } = todayTripIds.length > 0
-      ? await sb
-          .from("bookings")
+      ? await sb.from("bookings")
           .select("reference, customer_full_name, total_amount_cents, passenger_count, created_at, trip_id, creator:profiles!bookings_created_by_fkey(full_name, role)")
           .in("trip_id", todayTripIds)
           .eq("is_walk_in", true)
@@ -219,28 +221,11 @@ export default async function DashboardPage({
           .order("created_at", { ascending: false })
       : { data: [] };
 
-
-
-
-      const { data: boothProfile } = await sb
-  .from("profiles")
-  .select("avatar_url")
-  .eq("id", user.id)
-  .maybeSingle();
-
-
-
+    const { data: boothProfile } = await sb.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle();
 
     ticketBoothData = {
       avatarUrl: boothProfile?.avatar_url ?? null,
-      vesselName,
-      boatId,
-      boatIds,
-      todayTrips,
-      upcomingTrips,
-      currentTrip,
-      selectedTripId,
-      manifest,
+      vesselName, boatId, boatIds, todayTrips, upcomingTrips, currentTrip, selectedTripId, manifest,
       pendingPayments: (pendingRaw ?? []).map(b => ({
         reference: (b as { reference: string }).reference ?? "",
         customer_full_name: (b as { customer_full_name: string }).customer_full_name ?? "",
@@ -250,20 +235,18 @@ export default async function DashboardPage({
         const bx = b as { reference?: string; customer_full_name?: string; total_amount_cents?: number; passenger_count?: number; created_at?: string; trip_id?: string; creator?: { full_name?: string; role?: string } | null };
         const creator = Array.isArray(bx.creator) ? bx.creator[0] : bx.creator;
         return {
-          reference:          bx.reference ?? "",
+          reference: bx.reference ?? "",
           customer_full_name: bx.customer_full_name ?? "",
           total_amount_cents: bx.total_amount_cents ?? 0,
-          passenger_count:    bx.passenger_count ?? 0,
-          created_at:         bx.created_at ?? "",
-          trip_id:            bx.trip_id ?? null,
-          issuer_name:        (creator as { full_name?: string } | null)?.full_name ?? "Unknown",
-          issuer_role:        (creator as { role?: string } | null)?.role ?? "—",
+          passenger_count: bx.passenger_count ?? 0,
+          created_at: bx.created_at ?? "",
+          trip_id: bx.trip_id ?? null,
+          issuer_name: (creator as { full_name?: string } | null)?.full_name ?? "Unknown",
+          issuer_role: (creator as { role?: string } | null)?.role ?? "—",
         };
       }),
     };
   }
-
-  const totalTrips = recentlyConfirmed.length + awaitingConfirmation.length + awaitingPayment.length;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -271,57 +254,127 @@ export default async function DashboardPage({
       {isPassenger ? (
         <div className="space-y-6">
 
-          {/* HERO WELCOME BANNER */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-8 text-white shadow-lg">
-            <div className="pointer-events-none absolute inset-0 opacity-10"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='120' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 40 Q30 20 60 40 Q90 60 120 40' stroke='white' fill='none' stroke-width='2'/%3E%3Cpath d='M0 50 Q30 30 60 50 Q90 70 120 50' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E")`,
-                backgroundSize: "240px 120px",
-                backgroundRepeat: "repeat",
-              }}
-            />
-            <span className="pointer-events-none absolute -right-4 top-0 select-none text-[8rem] leading-none opacity-[0.07]">🌴</span>
+          {/* ═══════════════════════════════════════════════════════════════
+              HERO BANNER — Island vibes with profile photo
+          ═══════════════════════════════════════════════════════════════ */}
+          <div className="relative overflow-hidden rounded-3xl shadow-2xl"
+            style={{ background: "linear-gradient(135deg, #064e3b 0%, #065f60 30%, #0c7b93 65%, #0891b2 100%)" }}>
 
-            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/60">Passenger Dashboard</p>
-                <h1 className="mt-1 font-bold text-3xl leading-tight">
-                  {showWelcomeName ? <>Welcome back, {showWelcomeName}! 👋</> : <>Welcome aboard! 👋</>}
-                </h1>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white/75">
-                  {loggedInAddress && (
-                    <span className="rounded-full bg-white/15 px-3 py-0.5 text-xs font-medium">📍 {loggedInAddress}</span>
-                  )}
-                  {!displayName && (
-                    <span className="text-white/60 text-xs">Set your name so we can greet you properly</span>
+            {/* Animated wave layers */}
+            <div className="pointer-events-none absolute inset-0">
+              {/* Wave 1 — bottom */}
+              <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 120" preserveAspectRatio="none" style={{ opacity: 0.18 }}>
+                <path d="M0,60 C240,100 480,20 720,60 C960,100 1200,20 1440,60 L1440,120 L0,120 Z" fill="white"/>
+              </svg>
+              {/* Wave 2 — slightly higher */}
+              <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 80" preserveAspectRatio="none" style={{ opacity: 0.10 }}>
+                <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,30 1440,40 L1440,80 L0,80 Z" fill="white"/>
+              </svg>
+              {/* Tropical palm silhouette right side */}
+              <div className="absolute right-0 top-0 bottom-0 w-48 opacity-[0.06] select-none pointer-events-none overflow-hidden">
+                <svg viewBox="0 0 200 400" className="h-full w-full" fill="white">
+                  <path d="M100,400 L100,150 M100,150 C100,150 60,80 10,60 C60,90 100,150 100,150 M100,150 C100,150 140,70 190,40 C145,75 100,150 100,150 M100,150 C100,150 50,110 20,130 C55,115 100,150 100,150 M100,150 C100,150 150,100 180,110 C148,105 100,150 100,150" stroke="white" strokeWidth="4" fill="none"/>
+                  <circle cx="100" cy="145" r="8" fill="white"/>
+                </svg>
+              </div>
+              {/* Floating dots / bubbles */}
+              <div className="absolute top-6 left-1/4 w-2 h-2 rounded-full bg-white opacity-20" />
+              <div className="absolute top-12 left-1/3 w-1 h-1 rounded-full bg-white opacity-15" />
+              <div className="absolute top-4 right-1/3 w-1.5 h-1.5 rounded-full bg-white opacity-20" />
+            </div>
+
+            {/* Content */}
+            <div className="relative px-6 pt-7 pb-6">
+              <div className="flex items-start gap-5 flex-wrap">
+
+                {/* Profile photo */}
+                <div className="shrink-0">
+                  {passengerAvatarUrl ? (
+                    <div className="relative">
+                      <Image
+                        src={passengerAvatarUrl}
+                        alt={displayName ?? "Profile"}
+                        width={72}
+                        height={72}
+                        className="rounded-2xl object-cover border-2 border-white/30 shadow-lg"
+                        style={{ width: 72, height: 72 }}
+                      />
+                      {/* Online indicator */}
+                      <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-emerald-400 border-2 border-white shadow-sm" />
+                    </div>
+                  ) : (
+                    <div className="flex h-[72px] w-[72px] items-center justify-center rounded-2xl border-2 border-white/20 shadow-lg text-3xl"
+                      style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}>
+                      🧑‍✈️
+                    </div>
                   )}
                 </div>
+
+                {/* Name + location */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.55)" }}>
+                    Passenger Dashboard
+                  </p>
+                  <h1 className="mt-0.5 font-extrabold text-white leading-tight" style={{ fontSize: "clamp(1.25rem, 4vw, 1.75rem)" }}>
+                    {showWelcomeName ? <>Welcome back, {showWelcomeName}! 👋</> : <>Welcome aboard! 👋</>}
+                  </h1>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {loggedInAddress && (
+                      <span className="inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-semibold"
+                        style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.85)" }}>
+                        📍 {loggedInAddress}
+                      </span>
+                    )}
+                    {!displayName && (
+                      <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+                        Set your name so we can greet you properly
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Active bookings badge */}
+                {totalTrips > 0 && (
+                  <div className="shrink-0 rounded-2xl border border-white/20 px-5 py-3 text-center"
+                    style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}>
+                    <div className="text-3xl font-black text-white leading-none">{totalTrips}</div>
+                    <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>Active Bookings</div>
+                  </div>
+                )}
               </div>
-              {totalTrips > 0 && (
-                <div className="shrink-0 rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-center backdrop-blur-sm">
-                  <div className="text-3xl font-bold leading-none">{totalTrips}</div>
-                  <div className="mt-1 text-xs text-white/65 tracking-wide">Active Bookings</div>
+
+              {/* Address / name form */}
+              {displayName ? (
+                <div className="mt-5 border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.15)" }}>
+                  <p className="text-xs font-semibold mb-1.5" style={{ color: "rgba(255,255,255,0.7)" }}>
+                    📋 Address for tickets &amp; Coast Guard manifest
+                  </p>
+                  <SetAddressForm initialAddress={user.address ?? ""} />
+                </div>
+              ) : (
+                <div className="mt-5 border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.15)" }}>
+                  <SetDisplayNameForm />
                 </div>
               )}
             </div>
 
-            {displayName && (
-              <div className="relative mt-4 border-t border-white/15 pt-4">
-                <p className="text-xs font-semibold text-white/70 mb-1">📋 Address for tickets & Coast Guard manifest</p>
-                <SetAddressForm initialAddress={user.address ?? ""} />
-              </div>
-            )}
-            {!displayName && (
-              <div className="relative mt-4 border-t border-white/15 pt-4">
-                <SetDisplayNameForm />
-              </div>
-            )}
+            {/* Bottom island scene strip */}
+            <div className="relative h-10 overflow-hidden" style={{ background: "linear-gradient(180deg, transparent 0%, rgba(0,60,40,0.4) 100%)" }}>
+              <svg viewBox="0 0 800 40" className="absolute bottom-0 w-full" preserveAspectRatio="none" style={{ opacity: 0.35 }}>
+                {/* Gentle island hills */}
+                <ellipse cx="120" cy="40" rx="80" ry="25" fill="#064e3b"/>
+                <ellipse cx="680" cy="40" rx="100" ry="30" fill="#065f46"/>
+                {/* Tiny boat silhouette */}
+                <path d="M380,28 L370,35 L390,35 Z" fill="white" opacity="0.6"/>
+                <path d="M380,20 L380,28" stroke="white" strokeWidth="1" opacity="0.5"/>
+              </svg>
+            </div>
           </div>
 
           {params.ref ? <ClaimBookingFromRef refParam={params.ref} /> : null}
           <ClaimGuestBookingsByEmail />
 
-          {/* RESTRICTION NOTICES */}
+          {/* ── Restriction notices ── */}
           {passengerRestriction && passengerRestriction.booking_warnings >= 1 && !isBlockedNow(passengerRestriction) && (
             <div className="rounded-2xl border-2 border-amber-500 bg-amber-50 p-6 shadow-sm">
               <h2 className="text-lg font-bold text-amber-900">⚠️ Notice about your account</h2>
@@ -343,10 +396,34 @@ export default async function DashboardPage({
             </div>
           )}
 
-          {/* BOOKING STATUS CARDS */}
-          {(awaitingPayment.length > 0 || awaitingConfirmation.length > 0 || recentlyConfirmed.length > 0 || refundedBookings.length > 0) && (
+          {/* ═══════════════════════════════════════════════════════════════
+              ACTIVE TICKETS — confirmed, upcoming + 6hr post-departure window
+              Client component handles time filtering safely
+          ═══════════════════════════════════════════════════════════════ */}
+          {recentlyConfirmed.length > 0 && (
             <div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">My Active Bookings</p>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Your Active Tickets</p>
+              <PassengerActiveTickets
+                tickets={recentlyConfirmed.map(b => ({
+                  id: b.id,
+                  reference: b.reference,
+                  trip_snapshot_departure_date: b.trip_snapshot_departure_date ?? null,
+                  trip_snapshot_departure_time: b.trip_snapshot_departure_time ?? null,
+                  trip_snapshot_route_name: (b as { trip_snapshot_route_name?: string | null }).trip_snapshot_route_name ?? null,
+                  refund_status: b.refund_status ?? null,
+                  reschedule_requested_at: b.reschedule_requested_at ?? null,
+                  passenger_count: (b as { passenger_count?: number }).passenger_count ?? 1,
+                }))}
+              />
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════
+              PENDING BOOKINGS — payment & confirmation
+          ═══════════════════════════════════════════════════════════════ */}
+          {(awaitingPayment.length > 0 || awaitingConfirmation.length > 0 || refundedBookings.length > 0) && (
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Booking Status</p>
               <div className="grid gap-4 sm:grid-cols-2">
 
                 {awaitingPayment.length > 0 && (
@@ -367,7 +444,6 @@ export default async function DashboardPage({
                                 <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
                                 <div className="text-xs text-[#6B8886] mt-0.5">{routeName}</div>
                               </div>
-                              {/* ── FIX: pinned locale via peso() helper ── */}
                               <div className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</div>
                             </Link>
                           </li>
@@ -405,7 +481,6 @@ export default async function DashboardPage({
                                 <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
                                 <div className="text-xs text-[#6B8886] mt-0.5">{routeName}</div>
                               </div>
-                              {/* ── FIX: pinned locale via peso() helper ── */}
                               <div className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</div>
                             </Link>
                           </li>
@@ -414,66 +489,6 @@ export default async function DashboardPage({
                     </ul>
                     <Link href={ROUTES.myBookings}
                       className="mt-3 inline-flex items-center gap-1 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700">
-                      View all bookings →
-                    </Link>
-                  </div>
-                )}
-
-                {recentlyConfirmed.length > 0 && (
-                  <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-                    <div className="mb-3 flex items-center gap-2">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(5,150,105,0.2)]" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-800">✅ Confirmed — Tickets Ready</span>
-                    </div>
-                    <p className="mb-2 text-xs text-emerald-700">Your tickets are confirmed. Show QR code when boarding.</p>
-                    <ul className="space-y-2">
-                      {recentlyConfirmed.map(b => {
-                        const refundBadge =
-                          b.refund_status === "pending"      ? { emoji: "⏳", label: "Refund pending",      color: "bg-amber-100 text-amber-800"    } :
-                          b.refund_status === "under_review" ? { emoji: "🔍", label: "Refund under review", color: "bg-blue-100 text-blue-800"      } :
-                          b.refund_status === "approved"     ? { emoji: "✅", label: "Refund approved",     color: "bg-emerald-100 text-emerald-800" } :
-                          b.refund_status === "processed"    ? { emoji: "💸", label: "Refunded",            color: "bg-teal-100 text-teal-800"       } :
-                          b.refund_status === "rejected"     ? { emoji: "❌", label: "Refund rejected",     color: "bg-red-100 text-red-800"         } :
-                          null;
-                        const isRescheduleRequested = !!b.reschedule_requested_at;
-                        return (
-                          <li key={b.id} className="rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-sm space-y-2">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div>
-                                <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
-                                {b.trip_snapshot_departure_date && (
-                                  <div className="text-xs text-[#6B8886] mt-0.5">
-                                    {b.trip_snapshot_departure_date}
-                                    {b.trip_snapshot_departure_time ? ` · ${b.trip_snapshot_departure_time}` : ""}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {refundBadge && (
-                                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${refundBadge.color}`}>
-                                    {refundBadge.emoji} {refundBadge.label}
-                                  </span>
-                                )}
-                                {isRescheduleRequested && (
-                                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800">
-                                    🔄 Reschedule requested
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Link href={`/dashboard/bookings/${b.reference}`}
-                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
-                                View &amp; Print Ticket
-                              </Link>
-                              <PrintTicketsTrigger reference={b.reference} />
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <Link href={ROUTES.myBookings}
-                      className="mt-3 inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-700">
                       View all bookings →
                     </Link>
                   </div>
@@ -508,7 +523,7 @@ export default async function DashboardPage({
             />
           )}
 
-          {/* QUICK ACTIONS */}
+          {/* ── Quick Actions ── */}
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Quick Actions</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -539,7 +554,7 @@ export default async function DashboardPage({
             </div>
           </div>
 
-          {/* TRIP CALENDAR */}
+          {/* ── Trip Calendar ── */}
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Scheduled Trips</p>
             <TripCalendarWrapper
@@ -607,18 +622,18 @@ export default async function DashboardPage({
             </div>
           ) : (
             <CrewCaptainManifestSection
-            roleLabel={yourRoleLabel}
-            role={user.role}
-            todayTrips={crewCaptainData.todayTrips}
-            upcomingTrips={crewCaptainData.upcomingTrips}
-            currentTrip={crewCaptainData.currentTrip}
-            selectedTripId={crewCaptainData.selectedTripId}
-            manifest={crewCaptainData.manifest}
-            ownerName={welcomeName ?? user.email ?? undefined}
-            avatarUrl={crewCaptainData.avatarUrl ?? null}
-            loggedInEmail={loggedInEmail}
-            loggedInAddress={loggedInAddress}
-          />
+              roleLabel={yourRoleLabel}
+              role={user.role}
+              todayTrips={crewCaptainData.todayTrips}
+              upcomingTrips={crewCaptainData.upcomingTrips}
+              currentTrip={crewCaptainData.currentTrip}
+              selectedTripId={crewCaptainData.selectedTripId}
+              manifest={crewCaptainData.manifest}
+              ownerName={welcomeName ?? user.email ?? undefined}
+              avatarUrl={crewCaptainData.avatarUrl ?? null}
+              loggedInEmail={loggedInEmail}
+              loggedInAddress={loggedInAddress}
+            />
           )}
         </>
 
