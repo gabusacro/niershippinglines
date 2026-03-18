@@ -120,6 +120,7 @@ export default async function DashboardPage({
     currentTrip: ReturnType<typeof getCurrentTripFromTodays>;
     selectedTripId: string | null;
     manifest: Awaited<ReturnType<typeof getTripManifestData>>;
+    avatarUrl: string | null;
   } | null = null;
 
   if (user.role === "crew" || user.role === "captain") {
@@ -131,7 +132,9 @@ export default async function DashboardPage({
         ? params.tripId
         : currentTrip?.id ?? null;
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
-    crewCaptainData = { boatIds, todayTrips, currentTrip, selectedTripId, manifest };
+    const { data: crewProfile } = await (await import("@/lib/supabase/server"))
+      .createClient().then(sb => sb.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle());
+    crewCaptainData = { boatIds, todayTrips, currentTrip, selectedTripId, manifest, avatarUrl: crewProfile?.avatar_url ?? null };
   }
 
   // ── Ticket Booth data — ONLY assigned vessel ─────────────────────────────
@@ -585,13 +588,14 @@ export default async function DashboardPage({
             </div>
           ) : (
             <CrewCaptainManifestSection
-              roleLabel={yourRoleLabel}
-              todayTrips={crewCaptainData.todayTrips}
-              currentTrip={crewCaptainData.currentTrip}
-              selectedTripId={crewCaptainData.selectedTripId}
-              manifest={crewCaptainData.manifest}
-              ownerName={welcomeName ?? user.email ?? undefined}
-            />
+            roleLabel={yourRoleLabel}
+            todayTrips={crewCaptainData.todayTrips}
+            currentTrip={crewCaptainData.currentTrip}
+            selectedTripId={crewCaptainData.selectedTripId}
+            manifest={crewCaptainData.manifest}
+            ownerName={welcomeName ?? user.email ?? undefined}
+            avatarUrl={crewCaptainData.avatarUrl ?? null}
+          />
           )}
         </>
 
