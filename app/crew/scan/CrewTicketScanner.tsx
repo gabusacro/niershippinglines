@@ -393,18 +393,58 @@ export function CrewTicketScanner() {
     <div className="space-y-4">
 
       {/* Scan button */}
-      {!scanning && !starting && (
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={startScan}
-            disabled={loading}
-            className="w-full min-h-[52px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50"
-          >
-            {loading ? "Validating…" : "📷 Scan QR Code"}
-          </button>
-        </div>
-      )}
+{!scanning && !starting && (
+  <div className="space-y-3">
+    <button
+      type="button"
+      onClick={startScan}
+      disabled={loading}
+      className="w-full min-h-[52px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50"
+    >
+      {loading ? "Validating…" : "📷 Scan QR Code"}
+    </button>
+
+    {/* Manual entry — for walk-in tickets without QR */}
+    <div className="rounded-xl border-2 border-teal-100 bg-teal-50/50 p-4">
+      <p className="text-xs font-bold text-[#0f766e] uppercase tracking-wide mb-2">
+        Or ENTER Ticket Number / Reference Manually
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder="e.g. GMML9VCJBD or L37GQ52FS2"
+          className="flex-1 rounded-xl border-2 border-teal-200 bg-white px-3 py-2.5 text-sm text-[#134e4a] placeholder:text-gray-400 focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/20 uppercase"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              const val = (e.target as HTMLInputElement).value.trim().toUpperCase();
+              if (val) { validateTicket(val); (e.target as HTMLInputElement).value = ""; }
+            }
+          }}
+          id="manual-ticket-input"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+        />
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => {
+            const input = document.getElementById("manual-ticket-input") as HTMLInputElement;
+            const val = input?.value.trim().toUpperCase();
+            if (val) { validateTicket(val); input.value = ""; }
+          }}
+          className="rounded-xl bg-[#0c7b93] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors"
+        >
+          Check
+        </button>
+      </div>
+      <p className="mt-1.5 text-xs text-[#0f766e]/60">
+        Press Enter or tap Check. Works with ticket numbers and booking references.
+      </p>
+    </div>
+  </div>
+)}
 
       {/* Starting state */}
       {starting && (
