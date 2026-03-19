@@ -78,6 +78,20 @@ type OwedTrip = {
   paidAt: string | null;
 };
 
+type RefundRow = {
+  reference: string;
+  customer_full_name: string;
+  total_amount_cents: number;
+  passenger_count: number;
+  is_walk_in: boolean;
+  booking_source: string | null;
+  refund_status: string | null;
+  departure_date: string;
+  departure_time: string;
+  boat_name: string;
+  route_name: string;
+};
+
 type Vessel = { boatId: string; boatName: string; patronagePct: number; bonusCents: number };
 type MonthTotals = { onlinePax: number; walkInPax: number; onlineNetFareCents: number; walkInFareCents: number };
 type NextMonthPreview = {
@@ -95,6 +109,10 @@ interface Props {
   totalPatronageBonusCents: number; nextMonthPreview: NextMonthPreview;
   owedTrips: OwedTrip[]; totalOwedCents: number; totalPaidCents: number;
   avatarUrl?: string | null;
+  refundRows: RefundRow[];
+  refundTotalCents: number;
+  refundOnlineCents: number;
+  refundCashCents: number;
 }
 
 // ── Badges ────────────────────────────────────────────────────────────────────
@@ -430,6 +448,10 @@ export function VesselOwnerClient({
   monthTotals, totalPatronageBonusCents, nextMonthPreview,
   owedTrips, totalOwedCents, totalPaidCents,
   avatarUrl,
+  refundRows = [],
+  refundTotalCents = 0,
+  refundOnlineCents = 0,
+  refundCashCents = 0,
 }: Props) {
   const router = useRouter();
   const [activeVessel, setActiveVessel] = useState<string | null>(vessels[0]?.boatId ?? null);
@@ -662,7 +684,7 @@ export function VesselOwnerClient({
 
       {/* ── Walk-in Cash Accountability ── */}
       {!isViewingNextMonth && activeVessel && (
-        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 shadow-sm">
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50/70 p-5 shadow-sm">
           <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
             <div>
               <p className="text-sm font-bold text-amber-900">
@@ -688,6 +710,92 @@ export function VesselOwnerClient({
             Only days with walk-in bookings are shown. Mark as received once your ticket booth
             hands over the cash — by hand or via GCash transfer.
           </p>
+        </div>
+      )}
+
+
+      {/* ── Refunds This Month ── */}
+      {refundRows.length > 0 && !isViewingNextMonth && (
+        <div className="rounded-xl border-2 border-red-200 bg-red-50/50 overflow-hidden shadow-sm">
+          <div className="bg-red-50 px-5 py-3 border-b border-red-100 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-sm font-bold text-red-900">
+                ↩ Refunds — {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+              </p>
+              <p className="text-xs text-red-700 mt-0.5">
+                {refundRows.length} booking{refundRows.length !== 1 ? "s" : ""} refunded · Total: {peso(refundTotalCents)} deducted from your revenue
+              </p>
+            </div>
+            <div className="flex gap-4 text-xs font-semibold">
+              {refundOnlineCents > 0 && (
+                <span className="text-teal-700">Online (admin refunds GCash): −{peso(refundOnlineCents)}</span>
+              )}
+              {refundCashCents > 0 && (
+                <span className="text-amber-700">Cash (booth refunds cash): −{peso(refundCashCents)}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Explanation */}
+          <div className="px-5 py-2 bg-white border-b border-red-100 text-xs text-red-700">
+            <strong>📱 Online refunds</strong> — admin returns the GCash payment. Deducted from what admin owes you.
+            {refundCashCents > 0 && (
+              <> &nbsp;·&nbsp; <strong>💵 Cash refunds</strong> — ticket booth returns cash directly to passenger. Deducted from booth cash handover.</>
+            )}
+          </div>
+
+          {/* Refund table */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="bg-red-50/60 border-b border-red-100">
+                  <th className="px-4 py-2.5 text-left font-semibold text-red-700">Reference</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-red-700">Passenger</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-red-700">Route</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-red-700">Trip Date</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-red-700">Type</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-red-700">Status</th>
+                  <th className="px-4 py-2.5 text-right font-semibold text-red-700">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-red-100 bg-white">
+                {refundRows.map((r, i) => (
+                  <tr key={r.reference} className={i % 2 === 0 ? "bg-white" : "bg-red-50/20"}>
+                    <td className="px-4 py-2.5 font-mono font-semibold text-red-700">{r.reference}</td>
+                    <td className="px-4 py-2.5 font-medium text-[#134e4a]">
+                      {r.customer_full_name}
+                      <span className="ml-1 text-gray-400">({r.passenger_count} pax)</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-[#0f766e] max-w-[140px] truncate">{r.route_name}</td>
+                    <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">
+                      {r.departure_date ? formatDate(r.departure_date, true) : "—"}
+                      {r.departure_time && <span className="ml-1 text-gray-400">{formatTime(r.departure_time)}</span>}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {r.is_walk_in
+                        ? <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 font-semibold">💵 Cash</span>
+                        : <span className="rounded-full bg-teal-100 text-teal-800 px-2 py-0.5 font-semibold">📱 Online</span>}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {r.refund_status === "processed"
+                        ? <span className="rounded-full bg-green-100 text-green-800 px-2 py-0.5 font-semibold">✓ Processed</span>
+                        : <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 font-semibold">⏳ Approved</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-black text-red-600">−{peso(r.total_amount_cents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-red-100 border-t-2 border-red-200">
+                  <td colSpan={5} className="px-4 py-2.5 text-xs font-bold text-red-900">
+                    Total refunded — deducted from your revenue
+                  </td>
+                  <td />
+                  <td className="px-4 py-2.5 text-right font-black text-red-900">−{peso(refundTotalCents)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
 

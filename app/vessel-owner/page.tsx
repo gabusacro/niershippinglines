@@ -80,6 +80,58 @@ export default async function VesselOwnerDashboard({
 
   const tripIds = (trips ?? []).map((t) => t.id);
 
+  // ── Fetch refunded bookings for this month (accountability) ────────────────
+  let refundedBookings: {
+    reference: string;
+    customer_full_name: string;
+    total_amount_cents: number;
+    passenger_count: number;
+    is_walk_in: boolean;
+    booking_source: string | null;
+    trip_id: string;
+    refund_status: string | null;
+  }[] = [];
+
+  if (tripIds.length > 0) {
+    const { data: rb } = await supabase
+      .from("bookings")
+      .select("reference, customer_full_name, total_amount_cents, passenger_count, is_walk_in, booking_source, trip_id, refund_status")
+      .in("trip_id", tripIds)
+      .in("refund_status", ["approved", "processed"]);
+    refundedBookings = (rb ?? []) as typeof refundedBookings;
+  }
+
+  // Build refund rows with trip info
+  const tripInfoMap = new Map<string, { departure_date: string; departure_time: string; route_name: string; boat_name: string }>();
+  for (const t of trips ?? []) {
+    const boat  = (t as { boat?: { name?: string } | null }).boat;
+    const route = (t as { route?: { display_name?: string; origin?: string; destination?: string } | null }).route;
+    tripInfoMap.set(t.id, {
+      departure_date: t.departure_date,
+      departure_time: t.departure_time,
+      boat_name:  boat?.name ?? "—",
+      route_name: route?.display_name ?? [route?.origin, route?.destination].filter(Boolean).join(" → ") ?? "—",
+    });
+  }
+
+  const refundRows = refundedBookings.map(b => ({
+    reference:          b.reference,
+    customer_full_name: b.customer_full_name,
+    total_amount_cents: b.total_amount_cents,
+    passenger_count:    b.passenger_count,
+    is_walk_in:         b.is_walk_in,
+    booking_source:     b.booking_source,
+    refund_status:      b.refund_status,
+    departure_date:     tripInfoMap.get(b.trip_id)?.departure_date ?? "",
+    departure_time:     tripInfoMap.get(b.trip_id)?.departure_time ?? "",
+    boat_name:          tripInfoMap.get(b.trip_id)?.boat_name ?? "—",
+    route_name:         tripInfoMap.get(b.trip_id)?.route_name ?? "—",
+  }));
+
+  const refundTotalCents  = refundRows.reduce((s, r) => s + r.total_amount_cents, 0);
+  const refundOnlineCents = refundRows.filter(r => !r.is_walk_in).reduce((s, r) => s + r.total_amount_cents, 0);
+  const refundCashCents   = refundRows.filter(r =>  r.is_walk_in).reduce((s, r) => s + r.total_amount_cents, 0);
+
   const completedTripIds = (trips ?? []).filter((t) => t.departure_date < todayManila).map((t) => t.id);
   const todayTripIds     = (trips ?? []).filter((t) => t.departure_date === todayManila).map((t) => t.id);
   const upcomingTripIds  = (trips ?? []).filter((t) => t.departure_date > todayManila).map((t) => t.id);
@@ -318,6 +370,10 @@ export default async function VesselOwnerDashboard({
       avatarUrl={avatarUrl}
       vessels={vesselList}
       tripRows={tripRows}
+      refundRows={refundRows}
+      refundTotalCents={refundTotalCents}
+      refundOnlineCents={refundOnlineCents}
+      refundCashCents={refundCashCents}
       todayTripIds={todayTripIds}
       completedTripCount={completedTripIds.length}
       todayTripCount={todayTripIds.length}
