@@ -1,46 +1,21 @@
-import { redirect } from "next/navigation";
+"use client";
 import Link from "next/link";
-import { getAuthUser } from "@/lib/auth/get-user";
-
-export const metadata = {
-  title: "Pay Parking — Admin",
-  description: "Manage parking lots, sessions, and reservations",
-};
-
-export default async function AdminParkingPage() {
-  const user = await getAuthUser();
-  if (!user || user.role !== "admin") redirect("/dashboard");
-
+export default function ParkingParkingLotsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 px-6 py-8 text-white shadow-lg sm:px-8">
-        <p className="text-sm font-medium uppercase tracking-wider text-white/80">Admin — Parking</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">🚗 Pay Parking Management</h1>
-        <p className="mt-2 max-w-xl text-sm text-white/90">
-          Manage parking lots, vehicle check-in/out, reservations, and overstay monitoring.
-        </p>
+      <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 px-6 py-8 text-white shadow-lg">
+        <p className="text-sm font-medium uppercase tracking-wider text-white/80">Pay Parking — Admin</p>
+        <h1 className="mt-1 text-2xl font-bold">🅿️ Parking Lots</h1>
+        <p className="mt-2 text-sm text-white/90">Manage parking lots, zones, and capacity.</p>
       </div>
-
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {[
-          { href: "/admin/parking/lots",        label: "🅿️ Parking Lots"    },
-          { href: "/admin/parking/checkin",      label: "🚘 Check In"        },
-          { href: "/admin/parking/sessions",     label: "📋 Active Sessions" },
-          { href: "/admin/parking/reservations", label: "📅 Reservations"    },
-          { href: "/admin/parking/overstay",     label: "⚠️ Overstay"        },
-          { href: "/admin/parking/refunds",      label: "💸 Refunds"         },
-          { href: "/admin/parking/expenses",     label: "🧾 Expenses"        },
-          { href: "/admin/parking/settings",     label: "⚙️ Settings"        },
-        ].map(({ href, label }) => (
-          <Link key={href} href={href}
-            className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-50">
-            {label}
-          </Link>
-        ))}
-        <Link href="/admin"
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
-          ← Back to Admin
-        </Link>
+      <div className="mt-6 flex gap-3 flex-wrap">
+        <Link href="/admin/parking" className="rounded-xl border-2 border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-800 hover:bg-blue-50">← Back to Parking</Link>
+        <Link href="/admin" className="rounded-xl border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Admin Dashboard</Link>
+      </div>
+      <div className="mt-8 rounded-2xl border-2 border-blue-200 bg-blue-50 p-10 text-center">
+        <div className="text-5xl mb-4">🅿️</div>
+        <h2 className="text-xl font-bold text-blue-900">Parking Lots — Coming Soon</h2>
+        <p className="mt-2 text-sm text-blue-700 max-w-md mx-auto">Manage parking lots, zones, and capacity. This section is being built.</p>
       </div>
     </div>
   );
