@@ -25,6 +25,7 @@ export default function ParkingSettingsPage() {
     car_rate:         "250",
     motorcycle_rate:  "250",
     van_rate:         "",
+    truck_rate:       "",
     commission:       "100",
     platform_fee:     "35",
     processing_fee:   "30",
@@ -48,6 +49,7 @@ export default function ParkingSettingsPage() {
           car_rate:         centsToInput(data.default_car_rate_cents        ?? 25000),
           motorcycle_rate:  centsToInput(data.default_motorcycle_rate_cents ?? 25000),
           van_rate:         centsToInput(data.default_van_rate_cents),
+          truck_rate:       centsToInput(data.default_truck_rate_cents),
           commission:       centsToInput(data.commission_per_vehicle_cents  ?? 10000),
           platform_fee:     centsToInput(data.platform_fee_cents            ?? 3500),
           processing_fee:   centsToInput(data.processing_fee_cents          ?? 3000),
@@ -82,6 +84,7 @@ export default function ParkingSettingsPage() {
           default_car_rate_cents:        inputToCents(form.car_rate)        ?? 25000,
           default_motorcycle_rate_cents: inputToCents(form.motorcycle_rate) ?? 25000,
           default_van_rate_cents:        inputToCents(form.van_rate),
+          default_truck_rate_cents:      inputToCents(form.truck_rate),
           commission_per_vehicle_cents:  inputToCents(form.commission)      ?? 10000,
           platform_fee_cents:            inputToCents(form.platform_fee)    ?? 3500,
           processing_fee_cents:          inputToCents(form.processing_fee)  ?? 3000,
@@ -161,7 +164,12 @@ export default function ParkingSettingsPage() {
             <label className={labelCls}>🚐 Van (₱/day) — optional</label>
             <input type="number" min={0} step={0.01} value={form.van_rate} placeholder="Leave blank if none" onChange={e => update("van_rate", e.target.value)} className={inputCls} />
           </div>
+          <div>
+            <label className={labelCls}>🚛 Truck (₱/day) — optional</label>
+            <input type="number" min={0} step={0.01} value={form.truck_rate} placeholder="Leave blank if none" onChange={e => update("truck_rate", e.target.value)} className={inputCls} />
+          </div>
         </div>
+        <p className="text-xs text-gray-400 mt-3">Leave blank = that vehicle type is not offered. Each parking lot can also override these rates individually.</p>
       </div>
 
       {/* Fees & Commission */}
