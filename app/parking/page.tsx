@@ -14,7 +14,7 @@ async function getLotsWithAvailability() {
     const supabase = await createClient();
     const { data: lots } = await supabase
       .from("parking_lots")
-      .select("id, name, slug, address, description, distance_from_port, total_slots_car, total_slots_motorcycle, total_slots_van, total_slots_truck, car_rate_cents, motorcycle_rate_cents, van_rate_cents, truck_rate_cents, is_24hrs")
+      .select("id, name, slug, address, description, distance_from_port, total_slots_car, total_slots_motorcycle, total_slots_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents, accepts_car, accepts_motorcycle, accepts_van, is_24hrs")
       .eq("is_active", true)
       .order("name");
 
@@ -23,7 +23,7 @@ async function getLotsWithAvailability() {
     // Get live availability from view
     const { data: avail } = await supabase
       .from("parking_slot_availability")
-      .select("lot_id, booked_car, booked_motorcycle, booked_van, booked_truck");
+      .select("lot_id, booked_car, booked_motorcycle, booked_van");
 
     const availMap = new Map((avail ?? []).map(a => [a.lot_id, a]));
 
@@ -34,7 +34,9 @@ async function getLotsWithAvailability() {
         available_car:        lot.total_slots_car        - (a?.booked_car        ?? 0),
         available_motorcycle: lot.total_slots_motorcycle - (a?.booked_motorcycle ?? 0),
         available_van:        lot.total_slots_van        - (a?.booked_van        ?? 0),
-        available_truck:      lot.total_slots_truck      - (a?.booked_truck      ?? 0),
+        accepts_car:          lot.accepts_car        ?? true,
+        accepts_motorcycle:   lot.accepts_motorcycle ?? true,
+        accepts_van:          lot.accepts_van        ?? true,
       };
     });
   } catch {
@@ -47,14 +49,13 @@ async function getParkingSettings() {
     const supabase = await createClient();
     const { data } = await supabase
       .from("parking_settings")
-      .select("default_car_rate_cents, default_motorcycle_rate_cents, default_van_rate_cents, default_truck_rate_cents, platform_fee_cents, processing_fee_cents, commission_per_vehicle_cents, max_parking_days, required_documents_text")
+      .select("default_car_rate_cents, default_motorcycle_rate_cents, default_van_rate_cents, platform_fee_cents, processing_fee_cents, commission_per_vehicle_cents, max_parking_days, required_documents_text")
       .eq("id", 1)
       .maybeSingle();
     return {
       carRate:         data?.default_car_rate_cents        ?? 25000,
       motorcycleRate:  data?.default_motorcycle_rate_cents ?? 25000,
       vanRate:         data?.default_van_rate_cents        ?? null,
-      truckRate:       data?.default_truck_rate_cents      ?? null,
       platformFee:     data?.platform_fee_cents            ?? 3500,
       processingFee:   data?.processing_fee_cents          ?? 3000,
       commission:      data?.commission_per_vehicle_cents  ?? 10000,
@@ -62,7 +63,7 @@ async function getParkingSettings() {
       requiredDocs:    data?.required_documents_text       ?? "Valid government-issued ID and complete vehicle papers (OR/CR).",
     };
   } catch {
-    return { carRate: 25000, motorcycleRate: 25000, vanRate: null, truckRate: null, platformFee: 3500, processingFee: 3000, commission: 10000, maxDays: 45, requiredDocs: "Valid ID and OR/CR required." };
+    return { carRate: 25000, motorcycleRate: 25000, vanRate: null, platformFee: 3500, processingFee: 3000, commission: 10000, maxDays: 45, requiredDocs: "Valid ID and OR/CR required." };
   }
 }
 
