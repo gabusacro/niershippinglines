@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { NextRequest, NextResponse } from "next/server";
 
+// Refund statuses that mean money is committed to be returned — exclude from revenue
+const EXCLUDE_REFUND = '("approved","processed")';
+
 // GET /api/admin/ticket-booth-summary?boat_id=xxx&start=2026-03-01&end=2026-03-31
 export async function GET(request: NextRequest) {
   const user = await getAuthUser();
@@ -20,7 +23,6 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient();
 
-  // Get all trips for this vessel in the date range
   const { data: trips } = await supabase
     .from("trips")
     .select("id")
@@ -37,7 +39,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Fetch bookings with passenger_details for per-passenger expansion
   const { data: bookings, error } = await supabase
     .from("bookings")
     .select(`
@@ -51,12 +52,12 @@ export async function GET(request: NextRequest) {
     `)
     .in("trip_id", tripIds)
     .not("status", "in", '("cancelled","refunded")')
-    .not("refund_status", "in", '("approved","processed")')
+    // Exclude approved/processed refunds — money committed to be returned
+    .not("refund_status", "in", EXCLUDE_REFUND)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Fetch tickets for ticket numbers
   const bookingIds = (bookings ?? []).map(b => b.id);
   const ticketsByBooking = new Map<string, { passenger_index: number; ticket_number: string }[]>();
   if (bookingIds.length > 0) {
@@ -72,8 +73,6 @@ export async function GET(request: NextRequest) {
 
   let cashTotal = 0, onlineTotal = 0, cashPax = 0, onlinePax = 0;
 
-  // ── Staff rows: one entry per staff per payment type ──────────────────────
-  // Key: "issuerName::issuerRole::cash" or "::online"
   type PassengerItem = {
     name:       string;
     fare_type:  string;
@@ -116,11 +115,9 @@ export async function GET(request: NextRequest) {
     const paymentType  = isWalkIn ? "cash" : "online";
     const staffKey     = `${issuerName}::${issuerRole}::${paymentType}`;
 
-    // Accumulate grand totals
     if (isWalkIn) { cashTotal   += fareAmount; cashPax   += pax; }
     else          { onlineTotal += fareAmount; onlinePax += pax; }
 
-    // Build per-passenger list for this booking
     const bookingTickets = ticketsByBooking.get(b.id) ?? [];
     const ticketByIndex  = new Map(bookingTickets.map(t => [t.passenger_index, t.ticket_number]));
     const pd = (b as { passenger_details?: { full_name?: string; fare_type?: string; address?: string; ticket_number?: string }[] | null }).passenger_details;
@@ -140,7 +137,6 @@ export async function GET(request: NextRequest) {
         });
       });
     } else {
-      // Single passenger booking — use booking-level fields
       const ticketNum = ticketByIndex.get(0) ?? b.reference ?? "—";
       passengers.push({
         name:       b.customer_full_name ?? "—",
@@ -151,16 +147,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Accumulate into staff row
     if (!staffRowMap.has(staffKey)) {
       staffRowMap.set(staffKey, {
-        key:          staffKey,
-        issuer_name:  issuerName,
-        issuer_role:  issuerRole,
+        key: staffKey, issuer_name: issuerName, issuer_role: issuerRole,
         payment_type: paymentType as "cash" | "online",
-        pax:          0,
-        total:        0,
-        passengers:   [],
+        pax: 0, total: 0, passengers: [],
       });
     }
     const staffRow = staffRowMap.get(staffKey)!;
@@ -184,19 +175,53 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  // Sort staff rows: cash first, then online; within each, most pax first
   const staffRows = Array.from(staffRowMap.values()).sort((a, b) => {
     if (a.payment_type !== b.payment_type) return a.payment_type === "cash" ? -1 : 1;
     return b.pax - a.pax;
   });
 
+  // ── Fetch refunded bookings for this period (for accountability display) ──
+  const { data: refundedRaw } = tripIds.length > 0
+    ? await supabase
+        .from("bookings")
+        .select("reference, customer_full_name, total_amount_cents, passenger_count, is_walk_in, trip:trips!bookings_trip_id_fkey(departure_date, departure_time), creator:profiles!bookings_created_by_fkey(full_name, role)")
+        .in("trip_id", tripIds)
+        .in("refund_status", ["approved", "processed"])
+        .order("created_at", { ascending: false })
+    : { data: [] };
+
+  const refundedRows = (refundedRaw ?? []).map(b => {
+    const trip    = Array.isArray(b.trip)    ? b.trip[0]    : b.trip;
+    const creator = Array.isArray(b.creator) ? b.creator[0] : b.creator;
+    return {
+      reference:          (b as { reference?: string }).reference ?? "—",
+      customer_full_name: (b as { customer_full_name?: string }).customer_full_name ?? "—",
+      total_amount_cents: (b as { total_amount_cents?: number }).total_amount_cents ?? 0,
+      passenger_count:    (b as { passenger_count?: number }).passenger_count ?? 0,
+      is_walk_in:         (b as { is_walk_in?: boolean }).is_walk_in ?? false,
+      departure_date:     (trip as { departure_date?: string } | null)?.departure_date ?? "",
+      departure_time:     (trip as { departure_time?: string } | null)?.departure_time ?? "",
+      issuer_name:        (creator as { full_name?: string } | null)?.full_name ?? "Unknown",
+      issuer_role:        (creator as { role?: string }     | null)?.role       ?? "—",
+    };
+  });
+
+  const refundCashTotal   = refundedRows.filter(r => r.is_walk_in).reduce((s, r) => s + r.total_amount_cents, 0);
+  const refundOnlineTotal = refundedRows.filter(r => !r.is_walk_in).reduce((s, r) => s + r.total_amount_cents, 0);
+  const refundCashPax     = refundedRows.filter(r => r.is_walk_in).reduce((s, r) => s + r.passenger_count, 0);
+  const refundOnlinePax   = refundedRows.filter(r => !r.is_walk_in).reduce((s, r) => s + r.passenger_count, 0);
+
   return NextResponse.json({
-    rows,
-    staffRows,
-    cashTotal,
-    onlineTotal,
-    cashPax,
-    onlinePax,
+    rows, staffRows,
+    cashTotal, onlineTotal,
+    cashPax, onlinePax,
     totalBookings: rows.length,
+    // Refund accountability
+    refundedRows,
+    refundCashTotal,
+    refundOnlineTotal,
+    refundCashPax,
+    refundOnlinePax,
+    refundCount: refundedRows.length,
   });
 }
