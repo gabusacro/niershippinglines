@@ -627,7 +627,8 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
             ))}
           </div>
         </div>
-
+ 
+ 
         {/* Policy */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <h2 className="text-base font-bold text-gray-700 mb-3">⚠️ Parking Policy</h2>
