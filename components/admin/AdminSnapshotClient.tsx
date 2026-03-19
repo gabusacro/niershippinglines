@@ -344,7 +344,12 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
           <SnapshotCard
             title="Total Revenue" icon={TrendingUp}
             total={peso(s.total_revenue_cents)}
-            totalLabel={`Fare: ${peso(s.total_fare_cents)} · ${adminFeeLabel}: ${peso(s.total_platform_fee_cents)} · ${gcashFeeLabel}: ${peso(s.total_processing_fee_cents)}`}
+            totalLabel={[
+  `Fare: ${peso(s.total_fare_cents)}`,
+  `${adminFeeLabel}: ${peso(s.total_platform_fee_cents)}`,
+  `${gcashFeeLabel}: ${peso(s.total_processing_fee_cents)}`,
+  s.total_refunded_amount_cents > 0 ? `Refunded: −${peso(s.total_refunded_amount_cents)}` : null,
+].filter(Boolean).join(' · ')}
             vessels={s.vessels.map(v => ({
               name: v.boat_name,
               value: peso(v.total_revenue_cents),
@@ -398,11 +403,21 @@ export default function AdminSnapshotClient({ initialStats, todayLabel, adminFee
 
           <SnapshotCard
             title="Refund Requests" icon={RotateCcw}
-            total={s.total_refund_requests}
-            totalLabel={s.total_refund_requests > 0 ? "Action needed" : "None pending ✓"}
+           total={s.total_refund_requests + s.total_refunds_approved + s.total_refunds_processed}
+            totalLabel={
+            (s.total_refund_requests + s.total_refunds_approved + s.total_refunds_processed) === 0
+            ? "None pending ✓"
+            : [
+            s.total_refund_requests   > 0 ? `Pending: ${s.total_refund_requests}`     : null,
+             s.total_refunds_approved  > 0 ? `Approved: ${s.total_refunds_approved}`   : null,
+             s.total_refunds_processed > 0 ? `Processed: ${s.total_refunds_processed}` : null,
+              ].filter(Boolean).join(' · ')
+}
+
+
             vessels={[]}
             href="/admin/refunds"
-            accent={s.total_refund_requests > 0 ? "red" : "teal"}
+            accent={(s.total_refund_requests + s.total_refunds_approved) > 0 ? "red" : "teal"}
           />
 
           <FeeBreakdownCards

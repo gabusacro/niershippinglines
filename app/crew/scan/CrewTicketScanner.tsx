@@ -518,7 +518,7 @@ export function CrewTicketScanner() {
                     {result.passenger_age} yrs old
                   </span>
                 )}
-                <StatusBadge status={result.status} />
+                <StatusBadge status={result.refunded ? "refunded" : result.status} />
               </div>
             </div>
 
