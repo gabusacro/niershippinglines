@@ -5,8 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
  *  Crew/ticket_booth/admin only.
  *
  *  Payload formats accepted:
- *    NIER:TICKETNUMBER        — new QR code format
- *    NIER:REFERENCE:INDEX     — legacy QR code format
+ *    TRAVELA:TICKETNUMBER     — current QR code format
+ *    TRAVELA:REFERENCE:INDEX  — current legacy QR format
+ *    NIER:TICKETNUMBER        — old QR format (still supported)
+ *    NIER:REFERENCE:INDEX     — old legacy QR format (still supported)
  *    TICKETNUMBER             — manual entry (e.g. GMML9VCJBD)
  *    REFERENCE                — manual entry (e.g. H8U3VJJXP3)
  */
@@ -27,9 +29,12 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Normalise payload ────────────────────────────────────────────────────
-  // Strip NIER: prefix if present, otherwise treat as raw ticket number or reference
+  // Strip TRAVELA: or NIER: prefix if present (both supported for backward compat)
+  // otherwise treat as raw ticket number or reference (manual entry)
   const payload = rawPayload.trim().toUpperCase();
-  const afterNier = payload.startsWith("NIER:")
+  const afterNier = payload.startsWith("TRAVELA:")
+    ? payload.slice(8).trim()
+    : payload.startsWith("NIER:")
     ? payload.slice(5).trim()
     : payload; // manual entry — use as-is
 

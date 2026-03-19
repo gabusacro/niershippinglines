@@ -2,7 +2,13 @@
 
 import { QRCodeSVG } from "qrcode.react";
 
-/** Payload: NIER:ticketNumber (unique per passenger) or legacy NIER:reference:passengerIndex — crew scans via /api/crew/validate-ticket */
+/**
+ * Payload: TRAVELA:ticketNumber (unique per passenger)
+ * or legacy TRAVELA:reference:passengerIndex
+ *
+ * Old tickets are still accepted by the scanner for backward compatibility.
+ * All new tickets use TRAVELA: prefix.
+ */
 export function TicketQRCode({
   reference,
   passengerIndex,
@@ -12,7 +18,10 @@ export function TicketQRCode({
   passengerIndex: number;
   ticketNumber?: string;
 }) {
-  const payload = ticketNumber?.trim() ? `NIER:${ticketNumber.trim()}` : `NIER:${reference}:${passengerIndex}`;
+  const payload = ticketNumber?.trim()
+    ? `TRAVELA:${ticketNumber.trim()}`
+    : `TRAVELA:${reference}:${passengerIndex}`;
+
   return (
     <div className="mt-3 flex justify-center">
       <QRCodeSVG value={payload} size={120} level="M" includeMargin={false} />
