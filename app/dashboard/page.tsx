@@ -29,6 +29,7 @@ import { getDiscoverItems } from "@/lib/dashboard/get-discover-items";
 import { DashboardShareWidget } from "@/components/dashboard/DashboardShareWidget";
 import { TicketBoothDashboard } from "@/components/dashboard/TicketBoothDashboard";
 import { PassengerActiveTickets } from "@/components/dashboard/PassengerActiveTickets";
+import { createClient } from "@/lib/supabase/server";
 
 export async function generateMetadata() {
   const branding = await getSiteBranding();
@@ -39,6 +40,23 @@ export const dynamic = "force-dynamic";
 
 function peso(cents: number) {
   return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+// ── Parking bookings fetch ────────────────────────────────────────────────────
+async function getPendingParkingBookings(userId: string) {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("parking_reservations")
+      .select("id, reference, status, total_amount_cents, lot_snapshot_name, vehicle_count, park_date_start")
+      .eq("customer_profile_id", userId)
+      .in("status", ["pending_payment", "confirmed"])
+      .order("created_at", { ascending: false })
+      .limit(5);
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 async function TripCalendarWrapper({
@@ -101,6 +119,7 @@ export default async function DashboardPage({
   const [
     branding, passengerRestriction, allPending,
     recentlyConfirmed, refundedBookings, discoverItems,
+    pendingParkingBookings,
   ] = await Promise.all([
     getSiteBranding(),
     isPassenger ? getPassengerRestrictions(user.id) : Promise.resolve(null),
@@ -108,12 +127,13 @@ export default async function DashboardPage({
     isPassenger ? getRecentlyConfirmedBookings(user.id) : Promise.resolve([]),
     isPassenger ? getRefundedBookings(user.id) : Promise.resolve([]),
     isPassenger ? getDiscoverItems() : Promise.resolve([]),
+    isPassenger ? getPendingParkingBookings(user.id) : Promise.resolve([]),
   ]);
 
-  // ── Fetch passenger avatar (same pattern as crew/booth) ──────────────────
+  // ── Fetch passenger avatar ───────────────────────────────────────────────
   let passengerAvatarUrl: string | null = null;
   if (isPassenger) {
-    const sb = await (await import("@/lib/supabase/server")).createClient();
+    const sb = await createClient();
     const { data: passengerProfile } = await sb
       .from("profiles")
       .select("avatar_url")
@@ -124,9 +144,6 @@ export default async function DashboardPage({
 
   const awaitingPayment      = allPending.filter(b => !b.payment_proof_path);
   const awaitingConfirmation = allPending.filter(b => !!b.payment_proof_path);
-
-  // ── Active ticket count for hero badge ───────────────────────────────────
-  // recentlyConfirmed includes all confirmed bookings — the 6hr filter runs client-side
   const totalTrips = recentlyConfirmed.length + awaitingConfirmation.length + awaitingPayment.length;
 
   // ── Crew / Captain data ──────────────────────────────────────────────────
@@ -150,8 +167,8 @@ export default async function DashboardPage({
         ? params.tripId
         : currentTrip?.id ?? null;
     const manifest = selectedTripId ? await getTripManifestData(selectedTripId) : null;
-    const { data: crewProfile } = await (await import("@/lib/supabase/server"))
-      .createClient().then(sb => sb.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle());
+    const sb = await createClient();
+    const { data: crewProfile } = await sb.from("profiles").select("avatar_url").eq("id", user.id).maybeSingle();
     crewCaptainData = { boatIds, todayTrips, upcomingTrips, currentTrip, selectedTripId, manifest, avatarUrl: crewProfile?.avatar_url ?? null };
   }
 
@@ -171,7 +188,7 @@ export default async function DashboardPage({
   } | null = null;
 
   if (user.role === "ticket_booth") {
-    const sb = await (await import("@/lib/supabase/server")).createClient();
+    const sb = await createClient();
     const { data: assignments } = await sb
       .from("boat_assignments")
       .select("boat_id, boats(id, name)")
@@ -253,51 +270,35 @@ export default async function DashboardPage({
       {isPassenger ? (
         <div className="space-y-6">
 
-          {/* ═══════════════════════════════════════════════════════════════
-              HERO BANNER — Island vibes with profile photo
-          ═══════════════════════════════════════════════════════════════ */}
+          {/* ── HERO BANNER ── */}
           <div className="relative overflow-hidden rounded-3xl shadow-2xl"
             style={{ background: "linear-gradient(135deg, #064e3b 0%, #065f60 30%, #0c7b93 65%, #0891b2 100%)" }}>
-
-            {/* Animated wave layers */}
             <div className="pointer-events-none absolute inset-0">
-              {/* Wave 1 — bottom */}
               <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 120" preserveAspectRatio="none" style={{ opacity: 0.18 }}>
                 <path d="M0,60 C240,100 480,20 720,60 C960,100 1200,20 1440,60 L1440,120 L0,120 Z" fill="white"/>
               </svg>
-              {/* Wave 2 — slightly higher */}
               <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 80" preserveAspectRatio="none" style={{ opacity: 0.10 }}>
                 <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,30 1440,40 L1440,80 L0,80 Z" fill="white"/>
               </svg>
-              {/* Tropical palm silhouette right side */}
               <div className="absolute right-0 top-0 bottom-0 w-48 opacity-[0.06] select-none pointer-events-none overflow-hidden">
                 <svg viewBox="0 0 200 400" className="h-full w-full" fill="white">
                   <path d="M100,400 L100,150 M100,150 C100,150 60,80 10,60 C60,90 100,150 100,150 M100,150 C100,150 140,70 190,40 C145,75 100,150 100,150 M100,150 C100,150 50,110 20,130 C55,115 100,150 100,150 M100,150 C100,150 150,100 180,110 C148,105 100,150 100,150" stroke="white" strokeWidth="4" fill="none"/>
                   <circle cx="100" cy="145" r="8" fill="white"/>
                 </svg>
               </div>
-              {/* Floating dots / bubbles */}
               <div className="absolute top-6 left-1/4 w-2 h-2 rounded-full bg-white opacity-20" />
               <div className="absolute top-12 left-1/3 w-1 h-1 rounded-full bg-white opacity-15" />
               <div className="absolute top-4 right-1/3 w-1.5 h-1.5 rounded-full bg-white opacity-20" />
             </div>
 
-            {/* Content */}
             <div className="relative px-6 pt-7 pb-6">
               <div className="flex items-start gap-5 flex-wrap">
-
-                {/* Profile photo */}
                 <div className="shrink-0">
                   {passengerAvatarUrl ? (
                     <div className="relative">
-                      {/* Plain img — same as CrewCaptainManifestSection, avoids next/image domain config */}
-                      <img
-                        src={passengerAvatarUrl}
-                        alt={displayName ?? "Profile"}
+                      <img src={passengerAvatarUrl} alt={displayName ?? "Profile"}
                         className="rounded-2xl object-cover border-2 border-white/30 shadow-lg"
-                        style={{ width: 72, height: 72 }}
-                      />
-                      {/* Online indicator */}
+                        style={{ width: 72, height: 72 }} />
                       <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-emerald-400 border-2 border-white shadow-sm" />
                     </div>
                   ) : (
@@ -307,8 +308,6 @@ export default async function DashboardPage({
                     </div>
                   )}
                 </div>
-
-                {/* Name + location */}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.55)" }}>
                     Passenger Dashboard
@@ -330,8 +329,6 @@ export default async function DashboardPage({
                     )}
                   </div>
                 </div>
-
-                {/* Active bookings badge */}
                 {totalTrips > 0 && (
                   <div className="shrink-0 rounded-2xl border border-white/20 px-5 py-3 text-center"
                     style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}>
@@ -340,8 +337,6 @@ export default async function DashboardPage({
                   </div>
                 )}
               </div>
-
-              {/* Address / name form */}
               {displayName ? (
                 <div className="mt-5 border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.15)" }}>
                   <p className="text-xs font-semibold mb-1.5" style={{ color: "rgba(255,255,255,0.7)" }}>
@@ -356,13 +351,10 @@ export default async function DashboardPage({
               )}
             </div>
 
-            {/* Bottom island scene strip */}
             <div className="relative h-10 overflow-hidden" style={{ background: "linear-gradient(180deg, transparent 0%, rgba(0,60,40,0.4) 100%)" }}>
               <svg viewBox="0 0 800 40" className="absolute bottom-0 w-full" preserveAspectRatio="none" style={{ opacity: 0.35 }}>
-                {/* Gentle island hills */}
                 <ellipse cx="120" cy="40" rx="80" ry="25" fill="#064e3b"/>
                 <ellipse cx="680" cy="40" rx="100" ry="30" fill="#065f46"/>
-                {/* Tiny boat silhouette */}
                 <path d="M380,28 L370,35 L390,35 Z" fill="white" opacity="0.6"/>
                 <path d="M380,20 L380,28" stroke="white" strokeWidth="1" opacity="0.5"/>
               </svg>
@@ -394,10 +386,7 @@ export default async function DashboardPage({
             </div>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════
-              ACTIVE TICKETS — confirmed, upcoming + 6hr post-departure window
-              Client component handles time filtering safely
-          ═══════════════════════════════════════════════════════════════ */}
+          {/* ── Active Tickets ── */}
           {recentlyConfirmed.length > 0 && (
             <div>
               <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Your Active Tickets</p>
@@ -415,14 +404,11 @@ export default async function DashboardPage({
             </div>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════
-              PENDING BOOKINGS — payment & confirmation
-          ═══════════════════════════════════════════════════════════════ */}
+          {/* ── Ferry Booking Status ── */}
           {(awaitingPayment.length > 0 || awaitingConfirmation.length > 0 || refundedBookings.length > 0) && (
             <div>
               <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Booking Status</p>
               <div className="grid gap-4 sm:grid-cols-2">
-
                 {awaitingPayment.length > 0 && (
                   <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
@@ -458,7 +444,6 @@ export default async function DashboardPage({
                     </Link>
                   </div>
                 )}
-
                 {awaitingConfirmation.length > 0 && (
                   <div className="rounded-2xl border-2 border-teal-200 bg-teal-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
@@ -490,7 +475,6 @@ export default async function DashboardPage({
                     </Link>
                   </div>
                 )}
-
                 {refundedBookings.length > 0 && (
                   <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-5 shadow-sm">
                     <div className="mb-3 flex items-center gap-2">
@@ -513,6 +497,49 @@ export default async function DashboardPage({
             </div>
           )}
 
+          {/* ── Parking Bookings ── */}
+          {pendingParkingBookings.length > 0 && (
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Parking Bookings</p>
+              <div className="rounded-2xl border-2 border-teal-200 bg-teal-50 p-5 shadow-sm">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-teal-500 shadow-[0_0_0_3px_rgba(20,184,166,0.2)]" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-teal-800">🚗 Active Parking Bookings</span>
+                </div>
+                <ul className="space-y-2">
+                  {pendingParkingBookings.map(b => {
+                    const isPending = b.status === "pending_payment";
+                    return (
+                      <li key={b.id}>
+                        <Link href={`/dashboard/parking/${b.id}`}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-sm transition-all hover:border-teal-400 hover:shadow-md">
+                          <div>
+                            <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
+                            <div className="text-xs text-[#6B8886] mt-0.5">
+                              {b.lot_snapshot_name ?? "Parking"} · {b.vehicle_count} vehicle{b.vehicle_count !== 1 ? "s" : ""}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                              isPending ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                            }`}>
+                              {isPending ? "Pending" : "Confirmed"}
+                            </span>
+                            <span className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</span>
+                          </div>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <Link href="/dashboard/parking"
+                  className="mt-3 inline-flex items-center gap-1 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700">
+                  View all parking bookings →
+                </Link>
+              </div>
+            </div>
+          )}
+
           {recentlyConfirmed.length > 0 && (
             <ConfirmationToast
               items={recentlyConfirmed.map(b => ({ reference: b.reference }))}
@@ -523,7 +550,7 @@ export default async function DashboardPage({
           {/* ── Quick Actions ── */}
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Quick Actions</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Link href={ROUTES.book}
                 className="group flex flex-col rounded-2xl border-2 border-[#0c7b93] bg-[#0c7b93] p-5 text-white shadow-lg shadow-[#0c7b93]/20 transition-all hover:bg-[#0f766e] hover:shadow-xl hover:-translate-y-0.5">
                 <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-xl">🚢</span>
@@ -541,6 +568,18 @@ export default async function DashboardPage({
                 <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">🗓️</span>
                 <span className="text-lg font-bold">View Schedule</span>
                 <span className="mt-1 text-xs text-[#6B8886]">Departure times and routes</span>
+              </Link>
+              <Link href="/parking"
+                className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
+                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">🚗</span>
+                <span className="text-lg font-bold">Book Parking</span>
+                <span className="mt-1 text-xs text-[#6B8886]">Near Dapa Port, from ₱250/day</span>
+              </Link>
+              <Link href="/dashboard/parking"
+                className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
+                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">🅿️</span>
+                <span className="text-lg font-bold">My Parking</span>
+                <span className="mt-1 text-xs text-[#6B8886]">Your parking bookings</span>
               </Link>
               <Link href={ROUTES.account}
                 className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
@@ -609,9 +648,7 @@ export default async function DashboardPage({
           <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email}. Your role: <strong>{yourRoleLabel}</strong>.</p>
           {crewCaptainData.boatIds.length === 0 ? (
             <div className="mt-6 space-y-4">
-              <p className="text-sm text-[#0f766e]/80">
-                You have no vessel assignments. Contact admin to be assigned to a vessel.
-              </p>
+              <p className="text-sm text-[#0f766e]/80">You have no vessel assignments. Contact admin to be assigned to a vessel.</p>
               <Link href={ROUTES.crewScan}
                 className="inline-flex min-h-[44px] items-center rounded-xl bg-[#0c7b93] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0f766e] transition-colors">
                 Scan ticket (QR code)

@@ -2,196 +2,221 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { NextRequest, NextResponse } from "next/server";
 
-function generateParkingRef(): string {
+type VehiclePayload = {
+  vehicle_type:     "car" | "motorcycle" | "van";
+  plate_number:     string;
+  make_model:       string | null;
+  color:            string | null;
+  or_cr_number:     string;
+  driver_id_type:   string;
+  driver_id_number: string;
+  or_cr_path:       string | null;
+  id_photo_path:    string | null;
+};
+
+type ReserveBody = {
+  lot_id:                      string;
+  vehicles:                    VehiclePayload[];
+  park_date_start:             string;
+  total_days:                  number;
+  gcash_proof_path:            string;
+  gcash_transaction_reference: string | null;
+};
+
+function generateReference(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const rand = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  return `TRV-PRK-${rand}`;
+  let s = "";
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return `TRV-PRK-${s}`;
+}
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days - 1);
+  return d.toISOString().split("T")[0];
+}
+
+function getTodayManila(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 }
 
 export async function POST(request: NextRequest) {
-  // Must be logged in
   const user = await getAuthUser();
-  if (!user) return NextResponse.json({ error: "You must be logged in to reserve parking." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "You must be logged in." }, { status: 401 });
 
-  let body: Record<string, unknown>;
+  let body: ReserveBody;
   try { body = await request.json(); }
-  catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
 
-  const { lot_id, vehicles, park_date_start, total_days } = body as {
-    lot_id: string;
-    vehicles: {
-      vehicle_type: string;
-      plate_number: string;
-      make_model?: string;
-      color?: string;
-      or_cr_number: string;
-      driver_id_type: string;
-      driver_id_number: string;
-    }[];
-    park_date_start: string;
-    total_days: number;
-  };
+  const { lot_id, vehicles, park_date_start, total_days, gcash_proof_path, gcash_transaction_reference } = body;
 
-  if (!lot_id)                       return NextResponse.json({ error: "Parking lot is required." }, { status: 400 });
-  if (!vehicles?.length)             return NextResponse.json({ error: "At least one vehicle is required." }, { status: 400 });
-  if (!park_date_start)              return NextResponse.json({ error: "Start date is required." }, { status: 400 });
-  if (!total_days || total_days < 1) return NextResponse.json({ error: "Duration must be at least 1 day." }, { status: 400 });
+  if (!lot_id || !Array.isArray(vehicles) || vehicles.length === 0)
+    return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+  if (!park_date_start || !/^\d{4}-\d{2}-\d{2}$/.test(park_date_start))
+    return NextResponse.json({ error: "Invalid start date." }, { status: 400 });
+  if (park_date_start < getTodayManila())
+    return NextResponse.json({ error: "Start date cannot be in the past." }, { status: 400 });
+  if (!total_days || total_days < 1)
+    return NextResponse.json({ error: "Total days must be at least 1." }, { status: 400 });
+  if (!gcash_proof_path)
+    return NextResponse.json({ error: "GCash payment screenshot is required." }, { status: 400 });
 
   for (const [i, v] of vehicles.entries()) {
-    if (!v.plate_number?.trim())    return NextResponse.json({ error: `Vehicle ${i + 1}: plate number is required.` }, { status: 400 });
-    if (!v.or_cr_number?.trim())    return NextResponse.json({ error: `Vehicle ${i + 1}: OR/CR number is required.` }, { status: 400 });
-    if (!v.driver_id_number?.trim()) return NextResponse.json({ error: `Vehicle ${i + 1}: ID number is required.` }, { status: 400 });
+    const n = i + 1;
+    if (!["car","motorcycle","van"].includes(v.vehicle_type))
+      return NextResponse.json({ error: `Vehicle ${n}: invalid type.` }, { status: 400 });
+    if (!v.plate_number?.trim())
+      return NextResponse.json({ error: `Vehicle ${n}: plate number required.` }, { status: 400 });
+    if (!v.or_cr_number?.trim())
+      return NextResponse.json({ error: `Vehicle ${n}: OR/CR number required.` }, { status: 400 });
+    if (!v.driver_id_number?.trim())
+      return NextResponse.json({ error: `Vehicle ${n}: ID number required.` }, { status: 400 });
   }
 
   const supabase = await createClient();
 
-  // Fetch lot
   const { data: lot } = await supabase
     .from("parking_lots")
-    .select("id, name, address, distance_from_port, car_rate_cents, motorcycle_rate_cents, van_rate_cents, truck_rate_cents, total_slots_car, total_slots_motorcycle, total_slots_van, total_slots_truck")
-    .eq("id", lot_id)
-    .eq("is_active", true)
-    .maybeSingle();
+    .select("id, name, address, distance_from_port, is_active, accepts_car, accepts_motorcycle, accepts_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents")
+    .eq("id", lot_id).eq("is_active", true).maybeSingle();
 
-  if (!lot) return NextResponse.json({ error: "Parking lot not found." }, { status: 404 });
+  if (!lot) return NextResponse.json({ error: "Parking lot not found or unavailable." }, { status: 404 });
 
-  // Fetch settings for rates + fees
-  const { data: settingsRow } = await supabase
-    .from("parking_settings")
-    .select("default_car_rate_cents, default_motorcycle_rate_cents, default_van_rate_cents, default_truck_rate_cents, commission_per_vehicle_cents, platform_fee_cents, processing_fee_cents, max_parking_days")
-    .eq("id", 1)
-    .maybeSingle();
-
-  const maxDays          = settingsRow?.max_parking_days            ?? 45;
-  const commissionPerVeh = settingsRow?.commission_per_vehicle_cents ?? 10000;
-  const platformFee      = settingsRow?.platform_fee_cents           ?? 3500;
-  const processingFee    = settingsRow?.processing_fee_cents         ?? 3000;
-
-  const days = Math.max(1, Math.min(maxDays, total_days));
-
-  // Compute rate per vehicle — lot and settingsRow are confirmed non-null by this point
-  const defaultCar        = settingsRow?.default_car_rate_cents        ?? 25000;
-  const defaultMotorcycle = settingsRow?.default_motorcycle_rate_cents ?? 25000;
-  const defaultVan        = settingsRow?.default_van_rate_cents        ?? 25000;
-  const defaultTruck      = settingsRow?.default_truck_rate_cents      ?? 25000;
-
-  function rateForType(type: string): number {
-    if (type === "car")        return (lot!.car_rate_cents        ?? defaultCar);
-    if (type === "motorcycle") return (lot!.motorcycle_rate_cents ?? defaultMotorcycle);
-    if (type === "van")        return (lot!.van_rate_cents        ?? defaultVan);
-    if (type === "truck")      return (lot!.truck_rate_cents      ?? defaultTruck);
-    return defaultCar;
+  for (const [i, v] of vehicles.entries()) {
+    const n = i + 1;
+    if (v.vehicle_type === "car"        && !lot.accepts_car)        return NextResponse.json({ error: `Vehicle ${n}: lot does not accept cars.` },        { status: 400 });
+    if (v.vehicle_type === "motorcycle" && !lot.accepts_motorcycle) return NextResponse.json({ error: `Vehicle ${n}: lot does not accept motorcycles.` }, { status: 400 });
+    if (v.vehicle_type === "van"        && !lot.accepts_van)        return NextResponse.json({ error: `Vehicle ${n}: lot does not accept vans.` },         { status: 400 });
   }
 
-  // Check slot availability per vehicle type
+  const { data: settings } = await supabase
+    .from("parking_settings")
+    .select("default_car_rate_cents, default_motorcycle_rate_cents, default_van_rate_cents, commission_per_vehicle_cents, platform_fee_cents, processing_fee_cents, max_parking_days")
+    .eq("id", 1).maybeSingle();
+
+  const maxDays          = settings?.max_parking_days             ?? 45;
+  const commissionPerVeh = settings?.commission_per_vehicle_cents ?? 10000;
+  const platformFee      = settings?.platform_fee_cents           ?? 3500;
+  const processingFee    = settings?.processing_fee_cents         ?? 3000;
+  const defaultCarRate   = settings?.default_car_rate_cents        ?? 25000;
+  const defaultMotoRate  = settings?.default_motorcycle_rate_cents ?? 25000;
+  const defaultVanRate   = settings?.default_van_rate_cents        ?? null;
+
+  if (total_days > maxDays)
+    return NextResponse.json({ error: `Maximum parking duration is ${maxDays} days.` }, { status: 400 });
+
   const { data: avail } = await supabase
     .from("parking_slot_availability")
-    .select("booked_car, booked_motorcycle, booked_van, booked_truck")
-    .eq("lot_id", lot_id)
-    .maybeSingle();
+    .select("booked_car, booked_motorcycle, booked_van, total_slots_car, total_slots_motorcycle, total_slots_van")
+    .eq("lot_id", lot_id).maybeSingle();
 
-  const availCar        = (lot.total_slots_car        ?? 0) - (avail?.booked_car        ?? 0);
-  const availMotorcycle = (lot.total_slots_motorcycle ?? 0) - (avail?.booked_motorcycle ?? 0);
-  const availVan        = (lot.total_slots_van        ?? 0) - (avail?.booked_van        ?? 0);
-  const availTruck      = (lot.total_slots_truck      ?? 0) - (avail?.booked_truck      ?? 0);
-
-  // Count how many of each type requested
-  const reqCar        = vehicles.filter(v => v.vehicle_type === "car").length;
-  const reqMotorcycle = vehicles.filter(v => v.vehicle_type === "motorcycle").length;
-  const reqVan        = vehicles.filter(v => v.vehicle_type === "van").length;
-  const reqTruck      = vehicles.filter(v => v.vehicle_type === "truck").length;
-
-  if (reqCar        > availCar)        return NextResponse.json({ error: `Only ${availCar} car slot(s) available.` }, { status: 409 });
-  if (reqMotorcycle > availMotorcycle) return NextResponse.json({ error: `Only ${availMotorcycle} motorcycle slot(s) available.` }, { status: 409 });
-  if (reqVan        > availVan)        return NextResponse.json({ error: `Only ${availVan} van slot(s) available.` }, { status: 409 });
-  if (reqTruck      > availTruck)      return NextResponse.json({ error: `Only ${availTruck} truck slot(s) available.` }, { status: 409 });
-
-  // Financials
-  const parkingFee    = vehicles.reduce((sum, v) => sum + rateForType(v.vehicle_type) * days, 0);
-  const commission    = commissionPerVeh * vehicles.length;
-  const totalAmount   = parkingFee + platformFee + processingFee;
-  const ownerReceivable = parkingFee - commission;
-  const ratePerVehiclePerDay = rateForType(vehicles[0]?.vehicle_type ?? "car");
-
-  // Compute end date
-  const startDate = new Date(`${park_date_start}T00:00:00+08:00`);
-  const endDate   = new Date(startDate.getTime() + (days - 1) * 24 * 60 * 60 * 1000);
-  const endDateStr = endDate.toISOString().slice(0, 10);
-
-  // Generate unique reference
-  let reference = generateParkingRef();
-  for (let i = 0; i < 5; i++) {
-    const { data: ex } = await supabase.from("parking_reservations").select("id").eq("reference", reference).maybeSingle();
-    if (!ex) break;
-    reference = generateParkingRef();
+  if (avail) {
+    const reqCar  = vehicles.filter(v => v.vehicle_type === "car").length;
+    const reqMoto = vehicles.filter(v => v.vehicle_type === "motorcycle").length;
+    const reqVan  = vehicles.filter(v => v.vehicle_type === "van").length;
+    const avCar   = avail.total_slots_car        - (avail.booked_car        ?? 0);
+    const avMoto  = avail.total_slots_motorcycle - (avail.booked_motorcycle ?? 0);
+    const avVan   = avail.total_slots_van        - (avail.booked_van        ?? 0);
+    if (reqCar  > avCar)  return NextResponse.json({ error: `Only ${avCar} confirmed car slot(s) available.` },        { status: 409 });
+    if (reqMoto > avMoto) return NextResponse.json({ error: `Only ${avMoto} confirmed motorcycle slot(s) available.` }, { status: 409 });
+    if (reqVan  > avVan)  return NextResponse.json({ error: `Only ${avVan} confirmed van slot(s) available.` },         { status: 409 });
   }
 
-  // Clean vehicles for JSONB storage
-  const vehiclesJson = vehicles.map(v => ({
-    vehicle_type:    v.vehicle_type,
-    plate_number:    v.plate_number.trim().toUpperCase(),
-    make_model:      v.make_model?.trim() || null,
-    color:           v.color?.trim() || null,
-    or_cr_number:    v.or_cr_number.trim(),
-    driver_id_type:  v.driver_id_type,
-    driver_id_number: v.driver_id_number.trim(),
-    rate_cents_per_day: rateForType(v.vehicle_type),
-  }));
+  const lotCarRate  = lot.car_rate_cents        ?? defaultCarRate;
+  const lotMotoRate = lot.motorcycle_rate_cents ?? defaultMotoRate;
+  const lotVanRate  = lot.van_rate_cents        ?? defaultVanRate ?? defaultCarRate;
 
-  const { error: insertError } = await supabase
+  function rateFor(type: string): number {
+    if (type === "car")        return lotCarRate;
+    if (type === "motorcycle") return lotMotoRate;
+    if (type === "van")        return lotVanRate;
+    return lotCarRate;
+  }
+
+  const parkingFee      = vehicles.reduce((s, v) => s + rateFor(v.vehicle_type) * total_days, 0);
+  const commission      = commissionPerVeh * vehicles.length;
+  const totalAmount     = parkingFee + platformFee + processingFee;
+  const ownerReceivable = parkingFee - commission;
+  const parkDateEnd     = addDays(park_date_start, total_days);
+
+  let reference = "";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = generateReference();
+    const { data: existing } = await supabase
+      .from("parking_reservations").select("reference").eq("reference", candidate).maybeSingle();
+    if (!existing) { reference = candidate; break; }
+  }
+  if (!reference)
+    return NextResponse.json({ error: "Could not generate reference. Please try again." }, { status: 500 });
+
+  // Use user.fullName (camelCase) — matches what getAuthUser() returns
+  const customerName = user.fullName?.trim() || user.email;
+
+  const { data: booking, error: insertErr } = await supabase
     .from("parking_reservations")
     .insert({
       reference,
       lot_id,
-      customer_profile_id:   user.id,
-      customer_full_name:    user.fullName ?? user.email ?? "—",
-      customer_email:        user.email ?? "—",
-      customer_mobile:       null,
-      vehicles:              vehiclesJson,
-      vehicle_count:         vehicles.length,
+      customer_profile_id:         user.id,
+      customer_full_name:          customerName,
+      customer_email:              user.email,
+      customer_mobile:             null,   // not collected at booking time
+      vehicles: vehicles.map(v => ({
+        vehicle_type:     v.vehicle_type,
+        plate_number:     v.plate_number.toUpperCase(),
+        make_model:       v.make_model   ?? null,
+        color:            v.color        ?? null,
+        or_cr_number:     v.or_cr_number,
+        driver_id_type:   v.driver_id_type,
+        driver_id_number: v.driver_id_number,
+        or_cr_path:       v.or_cr_path   ?? null,
+        id_photo_path:    v.id_photo_path ?? null,
+      })),
+      vehicle_count:               vehicles.length,
       park_date_start,
-      park_date_end:         endDateStr,
-      total_days:            days,
-      rate_cents_per_vehicle_per_day: ratePerVehiclePerDay,
-      parking_fee_cents:     parkingFee,
-      commission_cents:      commission,
-      platform_fee_cents:    platformFee,
-      processing_fee_cents:  processingFee,
-      total_amount_cents:    totalAmount,
-      owner_receivable_cents: ownerReceivable,
-      payment_method:        "gcash",
-      payment_status:        "pending",
-      status:                "pending_payment",
-      lot_snapshot_name:     lot.name,
-      lot_snapshot_address:  lot.address,
-      lot_snapshot_distance: lot.distance_from_port,
-      created_by:            user.id,
-    });
+      park_date_end:               parkDateEnd,
+      total_days,
+      rate_cents_per_vehicle_per_day: rateFor(vehicles[0].vehicle_type),
+      parking_fee_cents:           parkingFee,
+      commission_cents:            commission,
+      platform_fee_cents:          platformFee,
+      processing_fee_cents:        processingFee,
+      total_amount_cents:          totalAmount,
+      owner_receivable_cents:      ownerReceivable,
+      payment_method:              "gcash",
+      payment_status:              "pending",
+      payment_proof_path:          gcash_proof_path,
+      gcash_transaction_reference: gcash_transaction_reference ?? null,
+      status:                      "pending_payment",
+      lot_snapshot_name:           lot.name,
+      lot_snapshot_address:        lot.address,
+      lot_snapshot_distance:       lot.distance_from_port ?? null,
+      rate_snapshot_label:         `₱${(rateFor(vehicles[0].vehicle_type) / 100).toLocaleString()}/day`,
+      created_by:                  user.id,
+    })
+    .select("id, reference")
+    .single();
 
-  if (insertError) {
-    console.error("[parking/reserve]", insertError.message);
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  if (insertErr || !booking) {
+    console.error("[reserve] insert error:", insertErr);
+    return NextResponse.json({ error: "Failed to create booking. Please try again." }, { status: 500 });
   }
 
-  // Log the event
   await supabase.from("parking_reservation_logs").insert({
-    reservation_id: (await supabase.from("parking_reservations").select("id").eq("reference", reference).maybeSingle()).data?.id,
+    reservation_id: booking.id,
     event_type:     "created",
     performed_by:   user.id,
-    notes:          `Reservation created online. ${vehicles.length} vehicle(s), ${days} days.`,
-  });
-
-  return NextResponse.json({
-    ok:        true,
-    reference,
-    total:     totalAmount,
-    breakdown: {
-      parking_fee:     parkingFee,
-      commission:      commission,
-      platform_fee:    platformFee,
-      processing_fee:  processingFee,
-      total:           totalAmount,
-      owner_receives:  ownerReceivable,
+    notes:          `Booking submitted with GCash proof. ${vehicles.length} vehicle(s), ${total_days} day(s). Total: ₱${(totalAmount / 100).toLocaleString()}.`,
+    metadata: {
+      vehicles:           vehicles.map(v => ({ plate: v.plate_number, type: v.vehicle_type })),
+      park_date_start,
+      park_date_end:      parkDateEnd,
+      total_days,
+      total_amount_cents: totalAmount,
+      gcash_proof_path,
+      gcash_ref:          gcash_transaction_reference ?? null,
     },
   });
+
+  return NextResponse.json({ reference: booking.reference, id: booking.id });
 }

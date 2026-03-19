@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import ParkingLotsClient from "./ParkingLotsClient";
+import { GCASH_NUMBER, GCASH_ACCOUNT_NAME } from "@/lib/constants";
 
 export const metadata = {
   title: "Pay Parking — Siargao Island | Travela Siargao",
@@ -20,7 +21,6 @@ async function getLotsWithAvailability() {
 
     if (!lots?.length) return [];
 
-    // Get live availability from view
     const { data: avail } = await supabase
       .from("parking_slot_availability")
       .select("lot_id, booked_car, booked_motorcycle, booked_van");
@@ -52,23 +52,37 @@ async function getParkingSettings() {
       .select("default_car_rate_cents, default_motorcycle_rate_cents, default_van_rate_cents, platform_fee_cents, processing_fee_cents, commission_per_vehicle_cents, max_parking_days, required_documents_text")
       .eq("id", 1)
       .maybeSingle();
+
     return {
-      carRate:         data?.default_car_rate_cents        ?? 25000,
-      motorcycleRate:  data?.default_motorcycle_rate_cents ?? 25000,
-      vanRate:         data?.default_van_rate_cents        ?? null,
-      platformFee:     data?.platform_fee_cents            ?? 3500,
-      processingFee:   data?.processing_fee_cents          ?? 3000,
-      commission:      data?.commission_per_vehicle_cents  ?? 10000,
-      maxDays:         data?.max_parking_days              ?? 45,
-      requiredDocs:    data?.required_documents_text       ?? "Valid government-issued ID and complete vehicle papers (OR/CR).",
+      carRate:        data?.default_car_rate_cents         ?? 25000,
+      motorcycleRate: data?.default_motorcycle_rate_cents  ?? 25000,
+      vanRate:        data?.default_van_rate_cents         ?? null,
+      platformFee:    data?.platform_fee_cents             ?? 3500,
+      processingFee:  data?.processing_fee_cents           ?? 3000,
+      commission:     data?.commission_per_vehicle_cents   ?? 10000,
+      maxDays:        data?.max_parking_days               ?? 45,
+      requiredDocs:   data?.required_documents_text        ?? "Valid government-issued ID and complete vehicle papers (OR/CR).",
+      // GCash details — same constants used across the whole app
+      gcashNumber:    GCASH_NUMBER    ?? "",
+      gcashName:      GCASH_ACCOUNT_NAME ?? "",
     };
   } catch {
-    return { carRate: 25000, motorcycleRate: 25000, vanRate: null, platformFee: 3500, processingFee: 3000, commission: 10000, maxDays: 45, requiredDocs: "Valid ID and OR/CR required." };
+    return {
+      carRate: 25000, motorcycleRate: 25000, vanRate: null,
+      platformFee: 3500, processingFee: 3000, commission: 10000,
+      maxDays: 45,
+      requiredDocs: "Valid ID and OR/CR required.",
+      gcashNumber: GCASH_NUMBER    ?? "",
+      gcashName:   GCASH_ACCOUNT_NAME ?? "",
+    };
   }
 }
 
 export default async function ParkingPage() {
-  const [lots, settings] = await Promise.all([getLotsWithAvailability(), getParkingSettings()]);
+  const [lots, settings] = await Promise.all([
+    getLotsWithAvailability(),
+    getParkingSettings(),
+  ]);
 
   return <ParkingLotsClient lots={lots} settings={settings} />;
 }

@@ -35,6 +35,8 @@ type Settings = {
   commission: number;
   maxDays: number;
   requiredDocs: string;
+  gcashNumber: string;
+  gcashName: string;
 };
 
 type Props = { lots: ParkingLot[]; settings: Settings };
@@ -55,32 +57,27 @@ type VehicleForm = {
 function peso(cents: number) {
   return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
 }
-
 function getRate(lot: ParkingLot, type: string, settings: Settings): number | null {
   if (type === "car")        return lot.car_rate_cents        ?? settings.carRate;
   if (type === "motorcycle") return lot.motorcycle_rate_cents ?? settings.motorcycleRate;
   if (type === "van")        return lot.van_rate_cents        ?? settings.vanRate;
   return null;
 }
-
 function getAvailable(lot: ParkingLot, type: string): number {
   if (type === "car")        return lot.available_car;
   if (type === "motorcycle") return lot.available_motorcycle;
   if (type === "van")        return lot.available_van;
   return 0;
 }
-
 function getTotal(lot: ParkingLot, type: string): number {
   if (type === "car")        return lot.total_slots_car;
   if (type === "motorcycle") return lot.total_slots_motorcycle;
   if (type === "van")        return lot.total_slots_van;
   return 0;
 }
-
 function getTodayLocal() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 }
-
 function getAcceptedTypes(lot: ParkingLot) {
   return [
     lot.accepts_car        && { value: "car",        label: "Car",        emoji: "🚗" },
@@ -98,6 +95,44 @@ const ID_TYPES = [
   { value: "voter_id",       label: "Voter's ID" },
   { value: "other",          label: "Other Government ID" },
 ];
+
+// ── Photo compression → WebP ──────────────────────────────────────────────────
+// Always compress to WebP. If file > 5MB, reduce quality progressively.
+async function compressToWebP(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX_DIM = 1400;
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        if (width > height) { height = Math.round((height / width) * MAX_DIM); width = MAX_DIM; }
+        else                { width  = Math.round((width / height) * MAX_DIM); height = MAX_DIM; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+
+      // Try quality 0.85 first, drop to 0.7 if still >3MB, then 0.55
+      const tryQuality = (q: number) => {
+        canvas.toBlob((blob) => {
+          if (!blob) { resolve(file); return; }
+          if (blob.size > 3 * 1024 * 1024 && q > 0.55) {
+            tryQuality(q - 0.15);
+            return;
+          }
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), {
+            type: "image/webp", lastModified: Date.now(),
+          }));
+        }, "image/webp", q);
+      };
+      tryQuality(0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
 
 // ── Slot Bar ──────────────────────────────────────────────────────────────────
 function SlotBar({ available, total, emoji }: { available: number; total: number; emoji: string }) {
@@ -118,48 +153,10 @@ function SlotBar({ available, total, emoji }: { available: number; total: number
   );
 }
 
-// ── Image compression helper (same pattern as profile photo upload) ───────────
-async function compressToWebP(file: File, maxDim = 1200, quality = 0.85): Promise<File> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      // Scale down if larger than maxDim
-      let { width, height } = img;
-      if (width > maxDim || height > maxDim) {
-        if (width > height) { height = Math.round((height / width) * maxDim); width = maxDim; }
-        else                { width  = Math.round((width / height) * maxDim); height = maxDim; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width  = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) { resolve(file); return; }
-          const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), {
-            type: "image/webp",
-            lastModified: Date.now(),
-          });
-          resolve(compressed);
-        },
-        "image/webp",
-        quality
-      );
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
-}
-
-// ── File Upload Button with WebP compression ──────────────────────────────────
+// ── File Upload Button ────────────────────────────────────────────────────────
 function FileUploadButton({ label, file, onChange, accept = "image/*" }: {
-  label: string;
-  file: File | null;
-  onChange: (f: File | null) => void;
-  accept?: string;
+  label: string; file: File | null;
+  onChange: (f: File | null) => void; accept?: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [compressing, setCompressing] = useState(false);
@@ -167,22 +164,25 @@ function FileUploadButton({ label, file, onChange, accept = "image/*" }: {
   async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.files?.[0];
     if (!raw) return;
+    if (raw.size > 20 * 1024 * 1024) {
+      alert("File is too large (max 20 MB). Please choose a smaller image.");
+      return;
+    }
     setCompressing(true);
     try {
-      const compressed = await compressToWebP(raw, 1200, 0.85);
+      const compressed = await compressToWebP(raw);
       onChange(compressed);
     } catch {
-      onChange(raw); // fallback to original if compression fails
+      onChange(raw);
     } finally {
       setCompressing(false);
-      // Reset input so same file can be re-selected
       if (ref.current) ref.current.value = "";
     }
   }
 
   const sizeLabel = file ? (() => {
     const kb = file.size / 1024;
-    return kb > 1024 ? `${(kb/1024).toFixed(1)} MB` : `${Math.round(kb)} KB`;
+    return kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.round(kb)} KB`;
   })() : null;
 
   return (
@@ -190,89 +190,62 @@ function FileUploadButton({ label, file, onChange, accept = "image/*" }: {
       <input ref={ref} type="file" accept={accept} className="hidden" onChange={handleChange} />
       <button type="button" onClick={() => ref.current?.click()} disabled={compressing}
         className={`w-full rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition-all flex items-center gap-2 ${
-          compressing
-            ? "border-teal-200 bg-teal-50 text-teal-500 cursor-wait"
-            : file
-            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-            : "border-dashed border-teal-200 bg-white text-[#0f766e] hover:border-[#0c7b93] hover:bg-teal-50"
+          compressing ? "border-teal-200 bg-teal-50 text-teal-500 cursor-wait"
+          : file       ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+          : "border-dashed border-teal-200 bg-white text-[#0f766e] hover:border-[#0c7b93] hover:bg-teal-50"
         }`}>
         {compressing ? (
-          <>
-            <span className="animate-spin text-sm">⏳</span>
-            <span className="text-xs">Compressing to WebP…</span>
-          </>
+          <><span className="animate-spin text-sm">⏳</span><span className="text-xs">Compressing to WebP…</span></>
         ) : file ? (
-          <>
-            <span className="text-emerald-500 shrink-0">✓</span>
-            <span className="truncate text-xs flex-1">{file.name}</span>
-            <span className="text-xs text-emerald-600 shrink-0">{sizeLabel} · Change</span>
-          </>
+          <><span className="text-emerald-500 shrink-0">✓</span><span className="truncate text-xs flex-1">{file.name}</span><span className="text-xs text-emerald-600 shrink-0">{sizeLabel} · Change</span></>
         ) : (
-          <>
-            <span>📎</span>
-            <span className="text-xs flex-1">{label}</span>
-            <span className="ml-auto text-xs text-teal-400 shrink-0">Required</span>
-          </>
+          <><span>📎</span><span className="text-xs flex-1">{label}</span><span className="ml-auto text-xs text-teal-400 shrink-0">Required</span></>
         )}
       </button>
     </div>
   );
 }
 
-// ── Urgency / Ad Section ──────────────────────────────────────────────────────
+// ── Urgency Section ───────────────────────────────────────────────────────────
 function UrgencySection({ lots }: { lots: ParkingLot[] }) {
   const totalAvailable = lots.reduce((s, l) => s + l.available_car + l.available_motorcycle + l.available_van, 0);
   const totalCapacity  = lots.reduce((s, l) => s + l.total_slots_car + l.total_slots_motorcycle + l.total_slots_van, 0);
   const pctFull        = totalCapacity > 0 ? Math.round(((totalCapacity - totalAvailable) / totalCapacity) * 100) : 0;
-  const isScarce       = pctFull >= 70;
-  const isVeryBusy     = pctFull >= 50;
-
+  const isScarce = pctFull >= 70;
+  const isVeryBusy = pctFull >= 50;
   return (
     <div className="rounded-2xl overflow-hidden shadow-sm border-2 border-[#0c7b93]/20"
       style={{ background: "linear-gradient(135deg,#0c7b93 0%,#064e3b 100%)" }}>
       <div className="px-6 py-7 text-white">
-
-        {/* Scarcity badge */}
         {isScarce && (
           <div className="inline-flex items-center gap-2 rounded-full bg-red-500/20 border border-red-400/40 px-3 py-1 mb-4">
             <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse inline-block" />
-            <span className="text-xs font-bold text-red-200 uppercase tracking-wide">
-              {pctFull}% of slots already taken today
-            </span>
+            <span className="text-xs font-bold text-red-200 uppercase tracking-wide">{pctFull}% of slots already taken today</span>
           </div>
         )}
         {!isScarce && isVeryBusy && (
           <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/20 border border-amber-400/40 px-3 py-1 mb-4">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" />
-            <span className="text-xs font-bold text-amber-200 uppercase tracking-wide">
-              Slots filling up — book now to secure yours
-            </span>
+            <span className="text-xs font-bold text-amber-200 uppercase tracking-wide">Slots filling up — book now to secure yours</span>
           </div>
         )}
         {!isVeryBusy && (
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-1 mb-4">
             <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-            <span className="text-xs font-bold text-emerald-200 uppercase tracking-wide">
-              Slots available now — reserve before they're gone
-            </span>
+            <span className="text-xs font-bold text-emerald-200 uppercase tracking-wide">Slots available now — reserve before they&apos;re gone</span>
           </div>
         )}
-
         <h2 className="text-2xl font-black text-white leading-tight mb-3">
-          Don't get stuck parking<br />
-          <span style={{ color: "#7dd3fc" }}>far from the port.</span>
+          Don&apos;t get stuck parking<br /><span style={{ color: "#7dd3fc" }}>far from the port.</span>
         </h2>
-
         <p className="text-white/80 text-sm leading-relaxed mb-5 max-w-lg">
-          Parking near Dapa Port fills up fast — especially during peak travel days. Once a slot is booked, it's held exclusively for that vehicle for the entire duration. <strong className="text-white">We cannot give your slot to someone else.</strong>
+          Parking near Dapa Port fills up fast. Submit your booking with payment — admin approves and locks your slot. <strong className="text-white">Slot is only confirmed after admin approval.</strong>
         </p>
-
-        {/* Key points */}
         <div className="grid sm:grid-cols-3 gap-3 mb-5">
           {[
-            { icon: "🔒", title: "Your slot, locked", desc: "The moment you book, that space is yours. No one else can take it." },
-            { icon: "📅", title: "Book today, arrive later", desc: "Even if you arrive tomorrow, your slot is secured from the day you booked." },
-            { icon: "🚶", title: "Walk to the port", desc: "Our lots are 100–300 meters from the port. No long tricycle rides with your bags." },
+            { icon: "📋", title: "Submit everything", desc: "Vehicle docs, ID photo, and GCash payment — all in one form." },
+            { icon: "✅", title: "Admin confirms", desc: "We verify your documents and payment. You get a reference number." },
+            { icon: "🚶", title: "Walk to the port", desc: "Our lots are 100–300 meters from the port." },
           ].map(p => (
             <div key={p.title} className="rounded-xl bg-white/10 border border-white/20 p-4">
               <div className="text-2xl mb-2">{p.icon}</div>
@@ -281,25 +254,19 @@ function UrgencySection({ lots }: { lots: ParkingLot[] }) {
             </div>
           ))}
         </div>
-
-        {/* Live capacity bar */}
         {totalCapacity > 0 && (
           <div className="rounded-xl bg-black/20 border border-white/10 px-4 py-3">
             <div className="flex justify-between text-xs font-semibold text-white/80 mb-2">
               <span>Overall occupancy right now</span>
-              <span>{totalCapacity - totalAvailable} of {totalCapacity} slots taken</span>
+              <span>{totalCapacity - totalAvailable} of {totalCapacity} slots confirmed</span>
             </div>
             <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
-              <div
-                className={`h-3 rounded-full transition-all ${pctFull >= 80 ? "bg-red-400" : pctFull >= 50 ? "bg-amber-400" : "bg-emerald-400"}`}
-                style={{ width: `${pctFull}%` }}
-              />
+              <div className={`h-3 rounded-full transition-all ${pctFull >= 80 ? "bg-red-400" : pctFull >= 50 ? "bg-amber-400" : "bg-emerald-400"}`}
+                style={{ width: `${pctFull}%` }} />
             </div>
             <div className="flex justify-between text-xs text-white/50 mt-1">
               <span>Empty</span>
-              <span className="font-bold" style={{ color: pctFull >= 80 ? "#f87171" : pctFull >= 50 ? "#fbbf24" : "#34d399" }}>
-                {pctFull}% full
-              </span>
+              <span className="font-bold" style={{ color: pctFull >= 80 ? "#f87171" : pctFull >= 50 ? "#fbbf24" : "#34d399" }}>{pctFull}% full</span>
               <span>Full</span>
             </div>
           </div>
@@ -311,27 +278,29 @@ function UrgencySection({ lots }: { lots: ParkingLot[] }) {
 
 // ── Booking Modal ─────────────────────────────────────────────────────────────
 function BookingModal({ lot, settings, onClose }: {
-  lot: ParkingLot;
-  settings: Settings;
-  onClose: () => void;
+  lot: ParkingLot; settings: Settings; onClose: () => void;
 }) {
   const today = getTodayLocal();
   const acceptedTypes = getAcceptedTypes(lot);
   const defaultType = acceptedTypes[0]?.value ?? "car";
 
   const [vehicles, setVehicles] = useState<VehicleForm[]>([{
-    vehicle_type: defaultType,
-    plate_number: "", make_model: "", color: "",
+    vehicle_type: defaultType, plate_number: "", make_model: "", color: "",
     or_cr_number: "", driver_id_type: "driver_license", driver_id_number: "",
     or_cr_file: null, id_photo_file: null,
   }]);
-  const [dateStart, setDateStart] = useState(today);
-  const [days, setDays]     = useState(1);
-  const [step, setStep]     = useState<"vehicles" | "confirm" | "success">("vehicles");
-  const [uploading, setUploading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError]   = useState<string | null>(null);
+  const [dateStart, setDateStart]     = useState(today);
+  const [days, setDays]               = useState(1);
+  const [gcashFile, setGcashFile]     = useState<File | null>(null);
+  const [gcashRef, setGcashRef]       = useState("");
+  const [gcashCompressing, setGcashCompressing] = useState(false);
+  const gcashInputRef = useRef<HTMLInputElement>(null);
+
+  // step: "vehicles" | "payment" | "confirm" | "submitting" | "success"
+  const [step, setStep]       = useState<"vehicles" | "payment" | "confirm" | "submitting" | "success">("vehicles");
+  const [error, setError]     = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState("");
 
   const vehicleCount = vehicles.length;
   const parkingFee   = vehicles.reduce((sum, v) => {
@@ -359,31 +328,56 @@ function BookingModal({ lot, settings, onClose }: {
       if (!v.or_cr_number.trim())     return `Vehicle ${n}: OR/CR number is required.`;
       if (!v.driver_id_number.trim()) return `Vehicle ${n}: ID number is required.`;
       if (!v.or_cr_file)              return `Vehicle ${n}: OR/CR photo is required.`;
-      if (!v.id_photo_file)           return `Vehicle ${n}: Driver's ID photo is required.`;
+      if (!v.id_photo_file)           return `Vehicle ${n}: Driver ID photo is required.`;
       if (getAvailable(lot, v.vehicle_type) <= 0)
         return `No available ${v.vehicle_type} slots for this lot.`;
     }
     return null;
   }
 
-  function handleNext() {
+  async function handleGcashFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.files?.[0];
+    if (!raw) return;
+    if (raw.size > 20 * 1024 * 1024) {
+      alert("File is too large (max 20 MB).");
+      return;
+    }
+    setGcashCompressing(true);
+    try {
+      const compressed = await compressToWebP(raw);
+      setGcashFile(compressed);
+    } catch {
+      setGcashFile(raw);
+    } finally {
+      setGcashCompressing(false);
+      if (gcashInputRef.current) gcashInputRef.current.value = "";
+    }
+  }
+
+  function handleNextToPayment() {
     setError(null);
     const err = validateVehicles();
     if (err) { setError(err); return; }
+    setStep("payment");
+  }
+
+  function handleNextToConfirm() {
+    setError(null);
+    if (!gcashFile) { setError("Please upload your GCash payment screenshot."); return; }
     setStep("confirm");
   }
 
   async function handleSubmit() {
     setError(null);
-    setSubmitting(true);
-    setUploading(true);
+    setStep("submitting");
 
     try {
-      // Upload photos first
+      // 1. Upload vehicle docs
       const uploadedPaths: { vehicle_index: number; or_cr_path: string; id_photo_path: string }[] = [];
 
       for (const [i, v] of vehicles.entries()) {
         if (!v.or_cr_file || !v.id_photo_file) continue;
+        setUploadProgress(`Uploading docs for vehicle ${i + 1} of ${vehicles.length}…`);
 
         const formData = new FormData();
         formData.append("or_cr", v.or_cr_file);
@@ -391,32 +385,38 @@ function BookingModal({ lot, settings, onClose }: {
         formData.append("vehicle_index", String(i));
         formData.append("plate_number", v.plate_number.toUpperCase());
 
-        const uploadRes = await fetch("/api/parking/upload-docs", {
-          method: "POST",
-          body: formData,
-        });
+        const uploadRes = await fetch("/api/parking/upload-docs", { method: "POST", body: formData });
         const uploadData = await uploadRes.json();
         if (!uploadRes.ok) {
           setError(uploadData.error ?? "Photo upload failed. Please try again.");
           setStep("vehicles");
           return;
         }
-        uploadedPaths.push({
-          vehicle_index: i,
-          or_cr_path:    uploadData.or_cr_path,
-          id_photo_path: uploadData.id_photo_path,
-        });
+        uploadedPaths.push({ vehicle_index: i, or_cr_path: uploadData.or_cr_path, id_photo_path: uploadData.id_photo_path });
       }
 
-      setUploading(false);
+      // 2. Upload GCash screenshot
+      setUploadProgress("Uploading payment screenshot…");
+      const gcashForm = new FormData();
+      gcashForm.append("gcash_proof", gcashFile!);
+      if (gcashRef.trim()) gcashForm.append("gcash_ref", gcashRef.trim());
 
-      // Submit reservation
+      const gcashRes = await fetch("/api/parking/upload-gcash", { method: "POST", body: gcashForm });
+      const gcashData = await gcashRes.json();
+      if (!gcashRes.ok) {
+        setError(gcashData.error ?? "GCash screenshot upload failed. Please try again.");
+        setStep("payment");
+        return;
+      }
+
+      // 3. Create booking
+      setUploadProgress("Creating your booking…");
       const res = await fetch("/api/parking/reserve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lot_id: lot.id,
-          vehicles: vehicles.map((v, i) => ({
+          lot_id:          lot.id,
+          vehicles:        vehicles.map((v, i) => ({
             vehicle_type:     v.vehicle_type,
             plate_number:     v.plate_number.toUpperCase(),
             make_model:       v.make_model || null,
@@ -427,24 +427,24 @@ function BookingModal({ lot, settings, onClose }: {
             or_cr_path:       uploadedPaths[i]?.or_cr_path ?? null,
             id_photo_path:    uploadedPaths[i]?.id_photo_path ?? null,
           })),
-          park_date_start: dateStart,
-          total_days:      days,
+          park_date_start:        dateStart,
+          total_days:             days,
+          gcash_proof_path:       gcashData.path,
+          gcash_transaction_reference: gcashRef.trim() || null,
         }),
       });
+
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Reservation failed. Please try again.");
-        setStep("vehicles");
+        setError(data.error ?? "Booking failed. Please try again.");
+        setStep("confirm");
         return;
       }
       setReference(data.reference);
       setStep("success");
     } catch {
-      setError("Network error. Please try again.");
-      setStep("vehicles");
-    } finally {
-      setSubmitting(false);
-      setUploading(false);
+      setError("Network error. Please check your connection and try again.");
+      setStep("confirm");
     }
   }
 
@@ -454,35 +454,40 @@ function BookingModal({ lot, settings, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ backgroundColor: "rgba(0,0,0,0.65)" }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-
+      onClick={e => { if (e.target === e.currentTarget && step !== "submitting") onClose(); }}>
       <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl max-h-[95vh] flex flex-col">
 
         {/* Header */}
         <div className="px-5 py-4 border-b border-teal-100 flex items-center justify-between shrink-0"
           style={{ background: "linear-gradient(135deg,#064e3b,#0c7b93)" }}>
           <div>
-            <p className="text-xs text-white/60 font-bold uppercase tracking-wide">Reserve Parking</p>
+            <p className="text-xs text-white/60 font-bold uppercase tracking-wide">
+              {step === "vehicles"   ? "Step 1 of 3 — Vehicle Details"
+               : step === "payment"  ? "Step 2 of 3 — Payment"
+               : step === "confirm"  ? "Step 3 of 3 — Review"
+               : step === "submitting" ? "Submitting…"
+               : "Booking Submitted"}
+            </p>
             <h2 className="text-base font-black text-white">{lot.name}</h2>
             <p className="text-xs text-white/70 mt-0.5">📍 {lot.distance_from_port}</p>
           </div>
-          <button onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 text-lg">
-            ×
-          </button>
+          {step !== "submitting" && (
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 text-lg">×</button>
+          )}
         </div>
 
-        {/* Success */}
+        {/* ── Success ── */}
         {step === "success" && (
           <div className="flex-1 overflow-y-auto p-6 text-center">
-            <div className="text-5xl mb-4">✅</div>
-            <h3 className="text-xl font-black text-emerald-900">Booking Submitted!</h3>
+            <div className="text-5xl mb-4">📋</div>
+            <h3 className="text-xl font-black text-[#134e4a]">Booking Submitted!</h3>
             <div className="mt-3 inline-block rounded-xl bg-teal-50 border-2 border-teal-200 px-6 py-3">
               <p className="text-xs text-[#0f766e] mb-1">Your reference number</p>
               <span className="font-mono text-xl font-black text-[#0c7b93]">{reference}</span>
             </div>
             <p className="mt-4 text-sm text-gray-600 max-w-xs mx-auto">
-              Send your GCash payment and upload the screenshot. Admin will confirm shortly.
+              Admin will review your documents and payment. You&apos;ll receive confirmation once approved — your slot is <strong>not yet locked</strong> until then.
             </p>
             <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-4 text-left text-sm text-amber-800">
               <p className="font-semibold mb-2">📋 Bring on arrival:</p>
@@ -493,9 +498,9 @@ function BookingModal({ lot, settings, onClose }: {
               </ul>
             </div>
             <div className="mt-5 flex flex-col gap-2">
-              <Link href="/dashboard" onClick={onClose}
+              <Link href="/dashboard/parking" onClick={onClose}
                 className="w-full rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#085f72] transition-colors">
-                View My Booking & Upload Payment →
+                View My Parking Bookings →
               </Link>
               <button onClick={onClose}
                 className="w-full rounded-xl border-2 border-teal-200 px-4 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
@@ -505,7 +510,17 @@ function BookingModal({ lot, settings, onClose }: {
           </div>
         )}
 
-        {/* Confirm step */}
+        {/* ── Submitting ── */}
+        {step === "submitting" && (
+          <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
+            <div className="text-4xl animate-pulse mb-4">⏳</div>
+            <p className="font-bold text-[#134e4a] mb-2">Please wait…</p>
+            <p className="text-sm text-[#0f766e]">{uploadProgress || "Processing your booking…"}</p>
+            <p className="text-xs text-gray-400 mt-3">Do not close this window</p>
+          </div>
+        )}
+
+        {/* ── Confirm step ── */}
         {step === "confirm" && (
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
             <h3 className="font-bold text-[#134e4a]">Review Your Booking</h3>
@@ -535,6 +550,14 @@ function BookingModal({ lot, settings, onClose }: {
               <span className="font-semibold text-[#134e4a]">{dateStart} · {days} day{days > 1 ? "s" : ""}</span>
             </div>
 
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-600">✓</span>
+                <span className="text-emerald-800 font-semibold">GCash screenshot uploaded</span>
+              </div>
+              {gcashRef && <p className="text-xs text-emerald-700 mt-1">Ref: {gcashRef}</p>}
+            </div>
+
             <div className="rounded-xl border-2 border-teal-200 overflow-hidden">
               <div className="bg-teal-50 px-4 py-2 text-xs font-bold text-[#134e4a] uppercase">Payment Breakdown</div>
               <div className="px-4 py-3 space-y-2 text-sm">
@@ -543,43 +566,119 @@ function BookingModal({ lot, settings, onClose }: {
                   <span className="font-semibold">{peso(parkingFee)}</span>
                 </div>
                 <div className="flex justify-between text-gray-500">
-                  <span>Platform Service Fee</span>
-                  <span>{peso(settings.platformFee)}</span>
+                  <span>Platform Service Fee</span><span>{peso(settings.platformFee)}</span>
                 </div>
                 <div className="flex justify-between text-gray-500">
-                  <span>Payment Processing Fee</span>
-                  <span>{peso(settings.processingFee)}</span>
+                  <span>Payment Processing Fee</span><span>{peso(settings.processingFee)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t-2 border-teal-200">
-                  <span className="font-black text-[#134e4a]">Total to Pay</span>
+                  <span className="font-black text-[#134e4a]">Total Paid</span>
                   <span className="font-black text-xl text-[#0c7b93]">{peso(total)}</span>
                 </div>
               </div>
             </div>
 
             <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
-              ⚠️ <strong>No refunds</strong> after booking is confirmed. You may extend your stay from your dashboard before expiry.
+              ⚠️ Slot is <strong>not locked</strong> until admin confirms. You will be notified once approved.
             </div>
 
             {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
 
             <div className="flex gap-3">
-              <button onClick={() => setStep("vehicles")} disabled={submitting}
-                className="flex-1 rounded-xl border-2 border-teal-200 px-4 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 disabled:opacity-50">
+              <button onClick={() => setStep("payment")}
+                className="flex-1 rounded-xl border-2 border-teal-200 px-4 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
                 ← Back
               </button>
-              <button onClick={handleSubmit} disabled={submitting}
-                className="flex-1 rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#085f72] disabled:opacity-50 transition-colors">
-                {uploading ? "Uploading photos…" : submitting ? "Submitting…" : "Confirm & Pay via GCash"}
+              <button onClick={handleSubmit}
+                className="flex-1 rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#085f72] transition-colors">
+                Submit Booking →
               </button>
             </div>
           </div>
         )}
 
-        {/* Vehicle entry step */}
+        {/* ── Payment step ── */}
+        {step === "payment" && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            <div>
+              <h3 className="font-bold text-[#134e4a] mb-1">Step 2 — Pay via GCash</h3>
+              <p className="text-xs text-[#0f766e]">Send the exact amount below to our GCash, then upload the screenshot.</p>
+            </div>
+
+            {/* Amount to pay */}
+            <div className="rounded-xl bg-teal-50 border-2 border-teal-200 overflow-hidden">
+              <div className="px-4 py-3 space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Parking fee ({vehicleCount} vehicle{vehicleCount > 1 ? "s" : ""} × {days} day{days > 1 ? "s" : ""})</span>
+                  <span className="font-semibold">{peso(parkingFee)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-400">
+                  <span>Platform Service Fee</span><span>{peso(settings.platformFee)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-400">
+                  <span>Payment Processing Fee</span><span>{peso(settings.processingFee)}</span>
+                </div>
+              </div>
+              <div className="flex justify-between font-black text-base px-4 py-3 border-t-2 border-teal-200 bg-teal-100/40">
+                <span className="text-[#134e4a]">Total to Send</span>
+                <span className="text-[#0c7b93]">{peso(total)}</span>
+              </div>
+            </div>
+
+            {/* GCash details */}
+            {settings.gcashNumber && (
+              <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm">
+                <p className="text-xs font-bold text-blue-700 uppercase mb-1">Send to GCash</p>
+                <p className="font-mono font-black text-blue-900 text-lg">{settings.gcashNumber}</p>
+                {settings.gcashName && <p className="text-xs text-blue-700 mt-0.5">{settings.gcashName}</p>}
+              </div>
+            )}
+
+            {/* Screenshot upload */}
+            <div>
+              <p className={labelCls}>GCash Payment Screenshot <span className="text-red-500">*</span></p>
+              <input ref={gcashInputRef} type="file" accept="image/*" className="hidden" onChange={handleGcashFileChange} />
+              <button type="button" onClick={() => gcashInputRef.current?.click()} disabled={gcashCompressing}
+                className={`w-full rounded-xl border-2 px-3 py-3 text-sm font-semibold transition-all flex items-center gap-2 ${
+                  gcashCompressing ? "border-teal-200 bg-teal-50 text-teal-500 cursor-wait"
+                  : gcashFile       ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                  : "border-dashed border-teal-200 bg-white text-[#0f766e] hover:border-[#0c7b93] hover:bg-teal-50"
+                }`}>
+                {gcashCompressing ? (
+                  <><span className="animate-spin">⏳</span><span className="text-xs">Compressing…</span></>
+                ) : gcashFile ? (
+                  <><span className="text-emerald-500 shrink-0">✓</span><span className="truncate text-xs flex-1">{gcashFile.name}</span><span className="text-xs text-emerald-600 shrink-0">Change</span></>
+                ) : (
+                  <><span>📸</span><span className="text-xs flex-1">Upload GCash screenshot</span><span className="ml-auto text-xs text-teal-400 shrink-0">Required</span></>
+                )}
+              </button>
+            </div>
+
+            {/* GCash ref optional */}
+            <div>
+              <label className={labelCls}>GCash Reference No. <span className="text-gray-400">(optional)</span></label>
+              <input type="text" value={gcashRef} onChange={e => setGcashRef(e.target.value)}
+                placeholder="e.g. 9012345678" className={inputCls} />
+            </div>
+
+            {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+            <div className="flex gap-3">
+              <button onClick={() => setStep("vehicles")}
+                className="flex-1 rounded-xl border-2 border-teal-200 px-4 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">
+                ← Back
+              </button>
+              <button onClick={handleNextToConfirm}
+                className="flex-1 rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#085f72] transition-colors">
+                Review Booking →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Vehicle entry step ── */}
         {step === "vehicles" && (
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
-
             {/* Duration */}
             <div>
               <p className="text-xs font-bold text-[#134e4a] uppercase tracking-wide mb-3">📅 Parking Duration</p>
@@ -602,12 +701,10 @@ function BookingModal({ lot, settings, onClose }: {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-bold text-[#134e4a] uppercase tracking-wide">🚗 Vehicles</p>
-                <button onClick={addVehicle} type="button"
-                  className="text-xs font-bold text-[#0c7b93] hover:underline">
+                <button onClick={addVehicle} type="button" className="text-xs font-bold text-[#0c7b93] hover:underline">
                   + Add vehicle
                 </button>
               </div>
-
               <div className="space-y-4">
                 {vehicles.map((v, i) => (
                   <div key={i} className="rounded-xl border-2 border-teal-100 p-4 relative">
@@ -631,11 +728,9 @@ function BookingModal({ lot, settings, onClose }: {
                               onClick={() => updateVehicle(i, "vehicle_type", t.value)}
                               disabled={avail <= 0}
                               className={`rounded-xl border-2 px-3 py-2.5 text-left transition-all ${
-                                v.vehicle_type === t.value
-                                  ? "border-[#0c7b93] bg-teal-50"
-                                  : avail <= 0
-                                  ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
-                                  : "border-teal-100 hover:border-teal-300"
+                                v.vehicle_type === t.value ? "border-[#0c7b93] bg-teal-50"
+                                : avail <= 0 ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
+                                : "border-teal-100 hover:border-teal-300"
                               }`}>
                               <div className="text-lg">{t.emoji}</div>
                               <div className="text-xs font-semibold text-[#134e4a]">{t.label}</div>
@@ -658,7 +753,7 @@ function BookingModal({ lot, settings, onClose }: {
                           placeholder="ABC 1234" className={inputCls} style={{ textTransform: "uppercase" }} />
                       </div>
                       <div>
-                        <label className={labelCls}>Make & Model</label>
+                        <label className={labelCls}>Make &amp; Model</label>
                         <input type="text" value={v.make_model}
                           onChange={e => updateVehicle(i, "make_model", e.target.value)}
                           placeholder="Toyota Vios" className={inputCls} />
@@ -694,6 +789,7 @@ function BookingModal({ lot, settings, onClose }: {
                     {/* Photo uploads */}
                     <div className="space-y-2">
                       <p className="text-xs font-bold text-[#134e4a]">📎 Document Photos <span className="text-red-500">*</span></p>
+                      <p className="text-xs text-gray-400">Photos are automatically compressed to WebP for fast upload.</p>
                       <FileUploadButton
                         label="Upload OR/CR photo (front)"
                         file={v.or_cr_file}
@@ -718,12 +814,10 @@ function BookingModal({ lot, settings, onClose }: {
                   <span className="font-semibold text-[#134e4a]">{peso(parkingFee)}</span>
                 </div>
                 <div className="flex justify-between text-xs text-gray-400">
-                  <span>Platform Service Fee</span>
-                  <span>{peso(settings.platformFee)}</span>
+                  <span>Platform Service Fee</span><span>{peso(settings.platformFee)}</span>
                 </div>
                 <div className="flex justify-between text-xs text-gray-400">
-                  <span>Payment Processing Fee</span>
-                  <span>{peso(settings.processingFee)}</span>
+                  <span>Payment Processing Fee</span><span>{peso(settings.processingFee)}</span>
                 </div>
               </div>
               <div className="flex justify-between font-black text-base px-4 py-3 border-t-2 border-teal-200 bg-teal-100/40">
@@ -732,13 +826,11 @@ function BookingModal({ lot, settings, onClose }: {
               </div>
             </div>
 
-            {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
-            )}
+            {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-            <button onClick={handleNext} type="button"
+            <button onClick={handleNextToPayment} type="button"
               className="w-full min-h-[52px] rounded-xl bg-[#0c7b93] font-bold text-white text-sm hover:bg-[#085f72] transition-colors shadow-sm">
-              Review Booking →
+              Next — Upload Payment →
             </button>
           </div>
         )}
@@ -753,7 +845,6 @@ function LotCard({ lot, settings, onBook }: { lot: ParkingLot; settings: Setting
   const totalAvailable = accepted.reduce((s, t) => s + getAvailable(lot, t.value), 0);
   const totalAll       = accepted.reduce((s, t) => s + getTotal(lot, t.value), 0);
   const isFull = totalAvailable === 0;
-
   return (
     <div className={`rounded-2xl border-2 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md ${isFull ? "border-red-200" : "border-teal-200 hover:border-[#0c7b93]"}`}>
       <div className={`h-1.5 ${isFull ? "bg-red-400" : "bg-gradient-to-r from-[#0c7b93] to-emerald-400"}`} />
@@ -771,24 +862,21 @@ function LotCard({ lot, settings, onBook }: { lot: ParkingLot; settings: Setting
             {isFull ? "FULL" : `${totalAvailable} avail.`}
           </span>
         </div>
-
         <div className="space-y-2 mb-4">
           {lot.accepts_car        && lot.total_slots_car        > 0 && <SlotBar available={lot.available_car}        total={lot.total_slots_car}        emoji="🚗" />}
           {lot.accepts_motorcycle && lot.total_slots_motorcycle > 0 && <SlotBar available={lot.available_motorcycle} total={lot.total_slots_motorcycle} emoji="🏍️" />}
           {lot.accepts_van        && lot.total_slots_van        > 0 && <SlotBar available={lot.available_van}        total={lot.total_slots_van}        emoji="🚐" />}
         </div>
-
         <div className="flex flex-wrap gap-2 mb-4">
           {lot.accepts_car        && <span className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-xs font-semibold text-[#0c7b93]">🚗 {peso(lot.car_rate_cents ?? settings.carRate)}/day</span>}
           {lot.accepts_motorcycle && <span className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-xs font-semibold text-[#0c7b93]">🏍️ {peso(lot.motorcycle_rate_cents ?? settings.motorcycleRate)}/day</span>}
-          {lot.accepts_van        && lot.van_rate_cents && <span className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-xs font-semibold text-[#0c7b93]">🚐 {peso(lot.van_rate_cents)}/day</span>}
+          {lot.accepts_van && lot.van_rate_cents && <span className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-xs font-semibold text-[#0c7b93]">🚐 {peso(lot.van_rate_cents)}/day</span>}
         </div>
-
         <button onClick={onBook} disabled={isFull}
           className={`w-full min-h-[44px] rounded-xl font-bold text-sm transition-colors ${
             isFull ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-[#0c7b93] text-white hover:bg-[#085f72] shadow-sm"
           }`}>
-          {isFull ? "No slots available" : "Reserve a Slot →"}
+          {isFull ? "No slots available" : "Book a Slot →"}
         </button>
       </div>
     </div>
@@ -798,15 +886,11 @@ function LotCard({ lot, settings, onBook }: { lot: ParkingLot; settings: Setting
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ParkingLotsClient({ lots, settings }: Props) {
   const [selectedLot, setSelectedLot] = useState<ParkingLot | null>(null);
-
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f8f6f0" }}>
-
       {/* Hero */}
-      <div className="relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg,#064e3b 0%,#0c7b93 55%,#0891b2 100%)" }}>
-        <svg className="absolute bottom-0 left-0 w-full pointer-events-none" viewBox="0 0 1440 80"
-          preserveAspectRatio="none" style={{ opacity: 0.12 }}>
+      <div className="relative overflow-hidden" style={{ background: "linear-gradient(135deg,#064e3b 0%,#0c7b93 55%,#0891b2 100%)" }}>
+        <svg className="absolute bottom-0 left-0 w-full pointer-events-none" viewBox="0 0 1440 80" preserveAspectRatio="none" style={{ opacity: 0.12 }}>
           <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,20 1440,40 L1440,80 L0,80 Z" fill="white"/>
         </svg>
         <div className="relative mx-auto max-w-5xl px-4 py-14 sm:px-6 lg:px-8">
@@ -815,7 +899,7 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-white/60">Travela Siargao</p>
               <h1 className="text-3xl sm:text-4xl font-black text-white mt-1">Pay Parking</h1>
-              <p className="text-white/80 text-sm mt-2 max-w-md">Safe, monitored parking near Dapa Port. Reserve online, pay via GCash.</p>
+              <p className="text-white/80 text-sm mt-2 max-w-md">Safe, monitored parking near Dapa Port. Submit docs + GCash payment, admin confirms your slot.</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">₱250/day</span>
                 <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">Up to {settings.maxDays} days</span>
@@ -827,19 +911,15 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
       </div>
 
       <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8 space-y-10">
-
-        {/* Urgency section — between hero and lots */}
         {lots.length > 0 && <UrgencySection lots={lots} />}
 
-        {/* Lot cards */}
         <div>
           <h2 className="text-xl font-black text-[#134e4a] mb-1">Available Parking Lots</h2>
-          <p className="text-sm text-[#0f766e] mb-5">Live slot availability — updated in real time. Click a lot to reserve.</p>
+          <p className="text-sm text-[#0f766e] mb-5">Confirmed slot counts only — pending bookings don&apos;t hold a slot.</p>
           {lots.length === 0 ? (
             <div className="rounded-2xl border-2 border-teal-100 bg-white p-10 text-center">
               <div className="text-4xl mb-3">🚗</div>
               <p className="font-bold text-[#134e4a]">Parking lots coming soon</p>
-              <p className="text-sm text-[#0f766e] mt-1">Contact us for walk-in parking.</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -855,10 +935,10 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
           <h2 className="text-xl font-black text-[#134e4a] mb-5">How It Works</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { emoji: "📋", title: "Reserve Online", desc: "Pick your lot, vehicle type, and dates. Upload your OR/CR and ID photo. Booking locks your slot immediately." },
-              { emoji: "💸", title: "Pay via GCash", desc: "Send payment to our GCash number and upload your screenshot from your dashboard." },
-              { emoji: "✅", title: "Get Confirmed", desc: "Admin verifies your documents and payment. You receive a QR code reference." },
-              { emoji: "🔑", title: "Scan & Park", desc: "Arrive with your original ID and OR/CR. Staff scans your QR for entry and exit." },
+              { emoji: "📋", title: "Fill the Form", desc: "Pick lot, vehicle type, and dates. Upload your OR/CR and ID photo." },
+              { emoji: "💸", title: "Pay via GCash", desc: "Send exact amount and upload your GCash screenshot — all in one form." },
+              { emoji: "✅", title: "Admin Approves", desc: "We verify your documents and payment. Slot locked only after approval." },
+              { emoji: "🔑", title: "Arrive & Park", desc: "Show your reference number and original docs to the crew on arrival." },
             ].map((s, idx) => (
               <div key={idx} className="rounded-2xl bg-white border-2 border-teal-100 p-5 relative overflow-hidden">
                 <div className="absolute top-3 right-3 text-5xl font-black opacity-[0.04] text-[#0c7b93]">{idx + 1}</div>
@@ -877,7 +957,7 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
           <div className="grid sm:grid-cols-2 gap-3">
             {[
               { icon: "🪪", label: "Valid Government-Issued ID", sub: "UMID, Driver's License, Passport, PhilSys, etc." },
-              { icon: "📄", label: "OR/CR", sub: "Official Receipt & Certificate of Registration. Current registration required." },
+              { icon: "📄", label: "OR/CR", sub: "Official Receipt & Certificate of Registration." },
             ].map(r => (
               <div key={r.label} className="flex items-start gap-3 rounded-xl bg-white/70 p-3 border border-amber-200">
                 <span className="text-2xl shrink-0">{r.icon}</span>
@@ -894,9 +974,9 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <h2 className="text-base font-bold text-gray-700 mb-3">⚠️ Parking Policy</h2>
           <ul className="space-y-2 text-sm text-gray-600">
-            <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Maximum duration is <strong>{settings.maxDays} days</strong>. Extend from your dashboard before expiry.</li>
-            <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Booking locks your slot for the entire period. <strong>No refunds</strong> after confirmation.</li>
-            <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Rate is locked at booking time.</li>
+            <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Maximum duration is <strong>{settings.maxDays} days</strong>.</li>
+            <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Slot is only locked after admin confirms your payment and documents.</li>
+            <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Rate is locked at booking time once confirmed.</li>
             <li className="flex items-start gap-2"><span className="text-amber-500 shrink-0">•</span>Overstay requires settlement before vehicle exit.</li>
           </ul>
         </div>
