@@ -711,16 +711,22 @@ function BookingModal({ lot, settings, onClose }: {
             </div>
 
             {/* Live fee preview */}
-            <div className="rounded-xl bg-teal-50 border-2 border-teal-200 px-4 py-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-[#0f766e]">{vehicleCount} vehicle{vehicleCount > 1 ? "s" : ""} × {days} day{days > 1 ? "s" : ""}</span>
-                <span className="font-semibold text-[#134e4a]">{peso(parkingFee)}</span>
+            <div className="rounded-xl bg-teal-50 border-2 border-teal-200 overflow-hidden">
+              <div className="px-4 py-3 space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[#0f766e]">Parking fee ({vehicleCount} vehicle{vehicleCount > 1 ? "s" : ""} × {days} day{days > 1 ? "s" : ""})</span>
+                  <span className="font-semibold text-[#134e4a]">{peso(parkingFee)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-400">
+                  <span>Platform Service Fee</span>
+                  <span>{peso(settings.platformFee)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-400">
+                  <span>Payment Processing Fee</span>
+                  <span>{peso(settings.processingFee)}</span>
+                </div>
               </div>
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>Platform + Processing fees</span>
-                <span>{peso(settings.platformFee + settings.processingFee)}</span>
-              </div>
-              <div className="flex justify-between font-black text-base mt-2 pt-2 border-t border-teal-200">
+              <div className="flex justify-between font-black text-base px-4 py-3 border-t-2 border-teal-200 bg-teal-100/40">
                 <span className="text-[#134e4a]">Total</span>
                 <span className="text-[#0c7b93]">{peso(total)}</span>
               </div>
