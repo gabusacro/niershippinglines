@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
     `)
     .in("trip_id", tripIds)
     .not("status", "in", '("cancelled","refunded")')
+    .not("refund_status", "in", '("approved","processed")')
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

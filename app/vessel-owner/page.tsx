@@ -12,6 +12,8 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 const PAID_STATUSES = ["confirmed", "checked_in", "boarded", "completed"];
+// Refund statuses that mean money is committed to be returned — exclude from all revenue
+const EXCLUDE_REFUND = '("approved","processed")';
 
 export default async function VesselOwnerDashboard({
   searchParams,
@@ -25,7 +27,6 @@ export default async function VesselOwnerDashboard({
   const params = await searchParams;
   const supabase = await createClient();
 
-  // ── FIX: compute date string ONCE, then parse from that string ──
   const todayManila  = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
   const currentYear  = parseInt(todayManila.slice(0, 4), 10);
   const currentMonth = parseInt(todayManila.slice(5, 7), 10);
@@ -38,7 +39,6 @@ export default async function VesselOwnerDashboard({
   const isViewingCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
   const isLast5Days = isViewingCurrentMonth && todayDay >= daysInCurrentMonth - 4;
 
-  // ── Fetch avatar from profiles ─────────────────────────────────────────────
   const { data: profile } = await supabase
     .from("profiles")
     .select("avatar_url")
@@ -47,7 +47,6 @@ export default async function VesselOwnerDashboard({
 
   const avatarUrl = profile?.avatar_url ?? null;
 
-  // Owner's vessel assignments
   const { data: assignments } = await supabase
     .from("vessel_assignments")
     .select("id, boat_id, patronage_bonus_percent, boat:boats(id, name)")
@@ -70,7 +69,6 @@ export default async function VesselOwnerDashboard({
   const lastDay    = new Date(selectedYear, selectedMonth, 0).getDate();
   const monthEnd   = `${selectedYear}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
 
-  // All trips this month for owner's vessels
   const { data: trips } = await supabase
     .from("trips")
     .select("id, boat_id, departure_date, departure_time, boat:boats(name), route:routes(display_name, origin, destination)")
@@ -82,18 +80,11 @@ export default async function VesselOwnerDashboard({
 
   const tripIds = (trips ?? []).map((t) => t.id);
 
-  // ── Trip progress counters ──────────────────────────────────────────────
-  const completedTripIds = (trips ?? [])
-    .filter((t) => t.departure_date < todayManila)
-    .map((t) => t.id);
-  const todayTripIds = (trips ?? [])
-    .filter((t) => t.departure_date === todayManila)
-    .map((t) => t.id);
-  const upcomingTripIds = (trips ?? [])
-    .filter((t) => t.departure_date > todayManila)
-    .map((t) => t.id);
+  const completedTripIds = (trips ?? []).filter((t) => t.departure_date < todayManila).map((t) => t.id);
+  const todayTripIds     = (trips ?? []).filter((t) => t.departure_date === todayManila).map((t) => t.id);
+  const upcomingTripIds  = (trips ?? []).filter((t) => t.departure_date > todayManila).map((t) => t.id);
 
-  // Bookings with creator profile
+  // ── Main bookings query — excludes approved/processed refunds ─────────────
   const { data: bookings } = tripIds.length > 0
     ? await supabase
         .from("bookings")
@@ -107,17 +98,14 @@ export default async function VesselOwnerDashboard({
         `)
         .in("trip_id", tripIds)
         .in("status", PAID_STATUSES)
+        .not("refund_status", "in", EXCLUDE_REFUND)
         .order("created_at", { ascending: false })
     : { data: [] };
 
   type PassengerDetail = {
-    fare_type: string;
-    full_name: string;
-    gender?: string | null;
-    address?: string | null;
-    birthdate?: string | null;
-    nationality?: string | null;
-    ticket_number?: string | null;
+    fare_type: string; full_name: string;
+    gender?: string | null; address?: string | null;
+    birthdate?: string | null; nationality?: string | null; ticket_number?: string | null;
   };
 
   type BookingLine = {
@@ -126,10 +114,8 @@ export default async function VesselOwnerDashboard({
     totalAmountCents: number; netFareCents: number;
     platformFeeCents: number; processingFeeCents: number;
     customerName: string; createdByName: string; createdByRole: string;
-    bookingSource: string | null;
-    createdAt: string; status: string;
-    passengerDetails: PassengerDetail[] | null;
-    fareType: string;
+    bookingSource: string | null; createdAt: string; status: string;
+    passengerDetails: PassengerDetail[] | null; fareType: string;
   };
 
   const bookingLines: BookingLine[] = (bookings ?? []).map((b) => {
@@ -174,20 +160,19 @@ export default async function VesselOwnerDashboard({
     const agg: TripAgg = { onlinePax:0, walkInPax:0, onlineNetFareCents:0, walkInFareCents:0, totalGrossCents:0, platformFeeCents:0, processingFeeCents:0 };
     for (const bl of lines) {
       if (bl.isOnline) {
-        agg.onlinePax           += bl.passengerCount;
-        agg.onlineNetFareCents  += bl.netFareCents;
-        agg.platformFeeCents    += bl.platformFeeCents;
-        agg.processingFeeCents  += bl.processingFeeCents;
+        agg.onlinePax          += bl.passengerCount;
+        agg.onlineNetFareCents += bl.netFareCents;
+        agg.platformFeeCents   += bl.platformFeeCents;
+        agg.processingFeeCents += bl.processingFeeCents;
       } else {
-        agg.walkInPax         += bl.passengerCount;
-        agg.walkInFareCents   += bl.netFareCents;
+        agg.walkInPax       += bl.passengerCount;
+        agg.walkInFareCents += bl.netFareCents;
       }
       agg.totalGrossCents += bl.netFareCents;
     }
     byTrip.set(tripId, agg);
   }
 
-  // Payment status per trip from trip_fare_payments
   const { data: farePayments } = tripIds.length > 0
     ? await supabase
         .from("trip_fare_payments")
@@ -201,22 +186,17 @@ export default async function VesselOwnerDashboard({
   }>();
   for (const p of farePayments ?? []) {
     if (p) paymentByTrip.set(p.trip_id, {
-      status: p.status,
-      method: p.payment_method,
-      reference: p.payment_reference,
-      paidAt: p.paid_at,
-      netPayoutCents: p.net_payout_cents ?? 0,
-      grossFareCents: p.gross_fare_cents ?? 0,
+      status: p.status, method: p.payment_method,
+      reference: p.payment_reference, paidAt: p.paid_at,
+      netPayoutCents: p.net_payout_cents ?? 0, grossFareCents: p.gross_fare_cents ?? 0,
     });
   }
 
-  // ── Admin Owes Me calculation ─────────────────────────────────────────────
   type OwedTrip = {
     tripId: string; boatName: string; routeName: string;
     departureDate: string; departureTime: string;
     onlinePax: number; netFareCents: number;
-    paymentStatus: "pending" | "paid" | "failed";
-    paidAt: string | null;
+    paymentStatus: "pending" | "paid" | "failed"; paidAt: string | null;
   };
 
   const owedTrips: OwedTrip[] = [];
@@ -225,43 +205,30 @@ export default async function VesselOwnerDashboard({
 
   for (const t of trips ?? []) {
     if (t.departure_date > todayManila) continue;
-
     const agg = byTrip.get(t.id);
     if (!agg || agg.onlineNetFareCents === 0) continue;
-
     const pay = paymentByTrip.get(t.id);
     const status = (pay?.status ?? "pending") as "pending" | "paid" | "failed";
-
     const boat  = (t as { boat?: { name?: string } | null }).boat;
     const route = (t as { route?: { display_name?: string; origin?: string; destination?: string } | null }).route;
-
     owedTrips.push({
       tripId: t.id,
       boatName: boat?.name ?? "—",
       routeName: route?.display_name ?? [route?.origin, route?.destination].filter(Boolean).join(" → ") ?? "—",
-      departureDate: t.departure_date,
-      departureTime: t.departure_time,
-      onlinePax: agg.onlinePax,
-      netFareCents: agg.onlineNetFareCents,
-      paymentStatus: status,
-      paidAt: pay?.paidAt ?? null,
+      departureDate: t.departure_date, departureTime: t.departure_time,
+      onlinePax: agg.onlinePax, netFareCents: agg.onlineNetFareCents,
+      paymentStatus: status, paidAt: pay?.paidAt ?? null,
     });
-
-    if (status === "paid") {
-      totalPaidCents += agg.onlineNetFareCents;
-    } else {
-      totalOwedCents += agg.onlineNetFareCents;
-    }
+    if (status === "paid") totalPaidCents += agg.onlineNetFareCents;
+    else totalOwedCents += agg.onlineNetFareCents;
   }
 
-  // Sort: pending first, then paid
   owedTrips.sort((a, b) => {
     if (a.paymentStatus === "pending" && b.paymentStatus !== "pending") return -1;
     if (a.paymentStatus !== "pending" && b.paymentStatus === "pending") return 1;
     return b.departureDate.localeCompare(a.departureDate);
   });
 
-  // Patronage bonus
   const bonusByBoat = new Map<string, number>();
   for (const a of assignments ?? []) {
     let vesselFees = 0;
@@ -274,7 +241,6 @@ export default async function VesselOwnerDashboard({
   }
   const totalPatronageBonus = Math.max(0, [...bonusByBoat.values()].reduce((s, v) => s + v, 0));
 
-  // Month totals
   let monthOnlinePax = 0, monthWalkInPax = 0, monthOnlineNetFare = 0, monthWalkInFare = 0;
   for (const t of trips ?? []) {
     const agg = byTrip.get(t.id);
@@ -297,8 +263,7 @@ export default async function VesselOwnerDashboard({
       departureDate: t.departure_date, departureTime: t.departure_time,
       isToday: t.departure_date === todayManila,
       onlinePax: agg.onlinePax, walkInPax: agg.walkInPax,
-      onlineNetFareCents: agg.onlineNetFareCents,
-      walkInFareCents: agg.walkInFareCents,
+      onlineNetFareCents: agg.onlineNetFareCents, walkInFareCents: agg.walkInFareCents,
       totalGrossCents: agg.totalGrossCents,
       paymentStatus: pay.status as "pending" | "paid" | "failed",
       paymentMethod: pay.method, paymentReference: pay.reference, paidAt: pay.paidAt,
@@ -311,7 +276,6 @@ export default async function VesselOwnerDashboard({
     return { boatId: a.boat_id, boatName: boat?.name ?? "—", patronagePct: Number(a.patronage_bonus_percent), bonusCents: bonusByBoat.get(a.boat_id) ?? 0 };
   });
 
-  // Next month preview
   type NextMonthPreview = {
     month: number; year: number; monthName: string;
     onlinePax: number; walkInPax: number; tripCount: number; onlineNetFareCents: number;
@@ -334,7 +298,10 @@ export default async function VesselOwnerDashboard({
       const { data: nextBookings } = await supabase
         .from("bookings")
         .select("trip_id, booking_source, is_walk_in, passenger_count, total_amount_cents, admin_fee_cents, gcash_fee_cents")
-        .in("trip_id", nextTripIds).in("status", PAID_STATUSES);
+        .in("trip_id", nextTripIds)
+        .in("status", PAID_STATUSES)
+        // Also exclude refunds from next month preview
+        .not("refund_status", "in", EXCLUDE_REFUND);
       for (const b of nextBookings ?? []) {
         const isOnline = b.booking_source === "online" && !b.is_walk_in;
         const pax = b.passenger_count ?? 0;
