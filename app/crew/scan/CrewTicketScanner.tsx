@@ -48,7 +48,7 @@ type ScanResult = {
 const REFUND_STATUS_LABELS: Record<string, string> = {
   pending: "Pending review",
   under_review: "Under review",
-  approved: "Approved — awaiting GCash transfer",
+  approved: "Approved — REFUND Successfully Transferred",
   processed: "Processed — GCash sent",
   rejected: "Rejected",
 };
@@ -455,7 +455,7 @@ export function CrewTicketScanner() {
               <p className="font-bold text-orange-800 text-lg">⚠ REFUND IN PROGRESS</p>
               <p className="text-sm text-orange-700 mt-1">
                 Refund status: <strong>{REFUND_STATUS_LABELS[result.refund_status ?? ""] ?? result.refund_status}</strong>.
-                Contact admin before allowing boarding.
+                Contact <a href="mailto:support@travelasiargao.com" className="underline font-semibold">support@travelasiargao.com</a> before allowing boarding.
               </p>
             </div>
           ) : (
