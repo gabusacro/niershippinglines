@@ -118,7 +118,43 @@ function SlotBar({ available, total, emoji }: { available: number; total: number
   );
 }
 
-// ── File Upload Button ────────────────────────────────────────────────────────
+// ── Image compression helper (same pattern as profile photo upload) ───────────
+async function compressToWebP(file: File, maxDim = 1200, quality = 0.85): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      // Scale down if larger than maxDim
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) { height = Math.round((height / width) * maxDim); width = maxDim; }
+        else                { width  = Math.round((width / height) * maxDim); height = maxDim; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width  = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), {
+            type: "image/webp",
+            lastModified: Date.now(),
+          });
+          resolve(compressed);
+        },
+        "image/webp",
+        quality
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
+// ── File Upload Button with WebP compression ──────────────────────────────────
 function FileUploadButton({ label, file, onChange, accept = "image/*" }: {
   label: string;
   file: File | null;
@@ -126,26 +162,55 @@ function FileUploadButton({ label, file, onChange, accept = "image/*" }: {
   accept?: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  const [compressing, setCompressing] = useState(false);
+
+  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.files?.[0];
+    if (!raw) return;
+    setCompressing(true);
+    try {
+      const compressed = await compressToWebP(raw, 1200, 0.85);
+      onChange(compressed);
+    } catch {
+      onChange(raw); // fallback to original if compression fails
+    } finally {
+      setCompressing(false);
+      // Reset input so same file can be re-selected
+      if (ref.current) ref.current.value = "";
+    }
+  }
+
+  const sizeLabel = file ? (() => {
+    const kb = file.size / 1024;
+    return kb > 1024 ? `${(kb/1024).toFixed(1)} MB` : `${Math.round(kb)} KB`;
+  })() : null;
+
   return (
     <div>
-      <input ref={ref} type="file" accept={accept} className="hidden"
-        onChange={e => onChange(e.target.files?.[0] ?? null)} />
-      <button type="button" onClick={() => ref.current?.click()}
+      <input ref={ref} type="file" accept={accept} className="hidden" onChange={handleChange} />
+      <button type="button" onClick={() => ref.current?.click()} disabled={compressing}
         className={`w-full rounded-xl border-2 px-3 py-2.5 text-sm font-semibold transition-all flex items-center gap-2 ${
-          file
+          compressing
+            ? "border-teal-200 bg-teal-50 text-teal-500 cursor-wait"
+            : file
             ? "border-emerald-300 bg-emerald-50 text-emerald-700"
             : "border-dashed border-teal-200 bg-white text-[#0f766e] hover:border-[#0c7b93] hover:bg-teal-50"
         }`}>
-        {file ? (
+        {compressing ? (
           <>
-            <span className="text-emerald-500">✓</span>
-            <span className="truncate text-xs">{file.name}</span>
-            <span className="ml-auto text-xs text-emerald-600 shrink-0">Change</span>
+            <span className="animate-spin text-sm">⏳</span>
+            <span className="text-xs">Compressing to WebP…</span>
+          </>
+        ) : file ? (
+          <>
+            <span className="text-emerald-500 shrink-0">✓</span>
+            <span className="truncate text-xs flex-1">{file.name}</span>
+            <span className="text-xs text-emerald-600 shrink-0">{sizeLabel} · Change</span>
           </>
         ) : (
           <>
             <span>📎</span>
-            <span className="text-xs">{label}</span>
+            <span className="text-xs flex-1">{label}</span>
             <span className="ml-auto text-xs text-teal-400 shrink-0">Required</span>
           </>
         )}
