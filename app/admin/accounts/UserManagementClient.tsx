@@ -60,7 +60,13 @@ const ROLE_LABELS: Record<string, string> = {
 const VESSEL_ROLES = ["captain", "crew", "ticket_booth"];
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+  try {
+    const d = new Date(iso);
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+  } catch {
+    return "—";
+  }
 }
 
 function PromotionBanner({
