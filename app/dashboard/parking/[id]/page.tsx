@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
 import CancelBookingButton from "./CancelBookingButton";
+import VehiclePhotos from "./VehiclePhotos";
 
 export const dynamic = "force-dynamic";
 
@@ -178,6 +179,9 @@ export default async function ParkingBookingDetailPage({ params }: { params: Pro
           </div>
         </div>
 
+        {/* Vehicle condition photos */}
+        <VehiclePhotos reservationId={booking.id} />
+
         {/* Footer actions */}
         <div className="flex flex-wrap gap-3 pb-6">
           <Link href="/dashboard/parking" className="rounded-xl border-2 border-teal-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#134e4a] hover:bg-teal-50 transition-colors">← All Bookings</Link>
@@ -194,4 +198,3 @@ export default async function ParkingBookingDetailPage({ params }: { params: Pro
     </div>
   );
 }
-
