@@ -284,6 +284,8 @@ export default function AdminParkingReservationsPage() {
   const [page, setPage]               = useState(1);
   const [loading, setLoading]         = useState(true);
   const [selected, setSelected]       = useState<Reservation | null>(null);
+  const [extensions, setExtensions]   = useState<{id:string;reference:string;reservation_id:string;additional_days:number;new_end_date:string;total_amount_cents:number;payment_proof_path:string|null;reservation:{reference:string;customer_full_name:string;lot_snapshot_name:string|null}}[]>([]);
+  const [extActing, setExtActing]     = useState<string|null>(null);
 
   const fetchReservations = useCallback(async () => {
     setLoading(true);
@@ -300,6 +302,9 @@ export default function AdminParkingReservationsPage() {
 
   useEffect(() => { fetchReservations(); }, [fetchReservations]);
   useEffect(() => { setPage(1); }, [activeTab, search]);
+  useEffect(() => {
+    fetch("/api/admin/parking/extensions").then(r => r.json()).then(d => setExtensions(Array.isArray(d) ? d : []));
+  }, []);
 
   async function handleAction(id: string, action: string, notes?: string) {
     const res = await fetch("/api/admin/parking/reservations", {
@@ -310,6 +315,17 @@ export default function AdminParkingReservationsPage() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Action failed.");
     await fetchReservations();
+  }
+
+  async function handleExtensionAction(extId: string, action: "approve" | "reject") {
+    setExtActing(extId);
+    try {
+      const res = await fetch("/api/admin/parking/extensions", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extension_id: extId, action }),
+      });
+      if (res.ok) setExtensions(e => e.filter(x => x.id !== extId));
+    } finally { setExtActing(null); }
   }
 
   const totalPages = Math.ceil(total / 20);
@@ -329,6 +345,39 @@ export default function AdminParkingReservationsPage() {
       </div>
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+
+        {/* Pending extensions alert */}
+        {extensions.length > 0 && (
+          <div className="mb-6 rounded-2xl border-2 border-purple-200 bg-purple-50 p-5">
+            <h2 className="font-bold text-purple-800 mb-3">📅 Pending Extend Stay Payments ({extensions.length})</h2>
+            <div className="space-y-2">
+              {extensions.map(ext => {
+                const res = ext.reservation as { reference: string; customer_full_name: string; lot_snapshot_name: string | null };
+                return (
+                  <div key={ext.id} className="rounded-xl bg-white border border-purple-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <span className="font-mono text-sm font-black text-purple-700">{ext.reference}</span>
+                      <span className="text-xs text-gray-400 ml-2">for booking {res?.reference}</span>
+                      <p className="text-sm text-gray-700">{res?.customer_full_name} · {res?.lot_snapshot_name}</p>
+                      <p className="text-xs text-gray-400">+{ext.additional_days} days · New end: {ext.new_end_date} · ₱{(ext.total_amount_cents/100).toLocaleString()}</p>
+                      {ext.payment_proof_path && <p className="text-xs text-emerald-600 mt-0.5">✓ GCash screenshot uploaded</p>}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleExtensionAction(ext.id, "reject")} disabled={extActing === ext.id}
+                        className="rounded-xl border-2 border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50">
+                        Reject
+                      </button>
+                      <button onClick={() => handleExtensionAction(ext.id, "approve")} disabled={extActing === ext.id}
+                        className="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50">
+                        {extActing === ext.id ? "…" : "Approve"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="mb-4">
