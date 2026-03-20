@@ -9,28 +9,48 @@ export async function GET() {
 
   const supabase = await createClient();
 
-  const { data: lots } = await supabase
-    .from("parking_lots")
-    .select("id, name, slug, address, distance_from_port, total_slots_car, total_slots_motorcycle, total_slots_van, accepts_car, accepts_motorcycle, accepts_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents, is_active, is_24hrs")
-    .order("name");
-
-  const { data: avail } = await supabase
-    .from("parking_slot_availability")
-    .select("lot_id, booked_car, booked_motorcycle, booked_van, total_slots_car, total_slots_motorcycle, total_slots_van");
+  const [{ data: lots }, { data: avail }, { data: owners }, { data: allCrew }, { data: crewAssigns }] = await Promise.all([
+    supabase.from("parking_lots")
+      .select("id, name, slug, address, distance_from_port, owner_id, total_slots_car, total_slots_motorcycle, total_slots_van, accepts_car, accepts_motorcycle, accepts_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents, is_active, is_24hrs")
+      .order("name"),
+    supabase.from("parking_slot_availability")
+      .select("lot_id, booked_car, booked_motorcycle, booked_van, total_slots_car, total_slots_motorcycle, total_slots_van"),
+    supabase.from("profiles")
+      .select("id, full_name, email")
+      .eq("role", "parking_owner")
+      .order("full_name"),
+    supabase.from("profiles")
+      .select("id, full_name, email")
+      .eq("role", "parking_crew")
+      .order("full_name"),
+    supabase.from("parking_lot_crew")
+      .select("id, lot_id, crew_id, is_active, profiles!crew_id(id, full_name, email)")
+      .eq("is_active", true),
+  ]);
 
   const availMap = new Map((avail ?? []).map(a => [a.lot_id, a]));
+  const crewByLot = new Map<string, { id: string; crew_id: string; full_name: string; email: string }[]>();
+  (crewAssigns ?? []).forEach((c: { id: string; lot_id: string; crew_id: string; profiles: { full_name: string; email: string } | { full_name: string; email: string }[] | null }) => {
+    if (!crewByLot.has(c.lot_id)) crewByLot.set(c.lot_id, []);
+    const profile = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
+    crewByLot.get(c.lot_id)!.push({ id: c.id, crew_id: c.crew_id, full_name: profile?.full_name ?? "—", email: (profile as { email?: string })?.email ?? "—" });
+  });
+  const ownerMap = new Map((owners ?? []).map(o => [o.id, o]));
 
   const result = (lots ?? []).map(lot => {
     const a = availMap.get(lot.id);
+    const owner = lot.owner_id ? ownerMap.get(lot.owner_id) ?? null : null;
     return {
       ...lot,
+      owner,
+      crew: crewByLot.get(lot.id) ?? [],
       available_car:        (a?.total_slots_car        ?? lot.total_slots_car)        - (a?.booked_car        ?? 0),
       available_motorcycle: (a?.total_slots_motorcycle ?? lot.total_slots_motorcycle) - (a?.booked_motorcycle ?? 0),
       available_van:        (a?.total_slots_van        ?? lot.total_slots_van)        - (a?.booked_van        ?? 0),
     };
   });
 
-  return NextResponse.json(result);
+  return NextResponse.json({ lots: result, owners: owners ?? [], crew: allCrew ?? [] });
 }
 
 // POST — update existing lot

@@ -2,11 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import LotAssignmentSection from "./LotAssignmentSection";
 
 type LotMedia = { id: string; photo_url: string; seo_name: string; is_cover: boolean; sort_order: number };
+type Profile = { id: string; full_name: string | null; email: string | null };
+type CrewMember = { id: string; crew_id: string; full_name: string; email: string };
 type Lot = {
   id: string; name: string; slug: string; address: string;
   distance_from_port: string | null;
+  owner_id: string | null; owner: Profile | null; crew: CrewMember[];
   total_slots_car: number; total_slots_motorcycle: number; total_slots_van: number;
   accepts_car: boolean; accepts_motorcycle: boolean; accepts_van: boolean;
   car_rate_cents: number | null; motorcycle_rate_cents: number | null; van_rate_cents: number | null;
@@ -201,7 +205,9 @@ function LotPhotoManager({ lot, onUpdate }: { lot: Lot; onUpdate: () => void }) 
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AdminParkingLotsPage() {
-  const [lots, setLots]       = useState<Lot[]>([]);
+  const [lots, setLots]           = useState<Lot[]>([]);
+  const [allOwners, setAllOwners] = useState<Profile[]>([]);
+  const [allCrew, setAllCrew]     = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Lot | null>(null);
   const [adding, setAdding]   = useState(false);
@@ -221,8 +227,12 @@ export default function AdminParkingLotsPage() {
         if (!mediaByLot.has(m.lot_id)) mediaByLot.set(m.lot_id, []);
         mediaByLot.get(m.lot_id)!.push(m);
       });
-      const withMedia = (lotsRes ?? []).map((l: Lot) => ({ ...l, media: mediaByLot.get(l.id) ?? [] }));
+      // API now returns { lots, owners, crew }
+      const lotsArray = lotsRes?.lots ?? lotsRes ?? [];
+      const withMedia = lotsArray.map((l: Lot) => ({ ...l, media: mediaByLot.get(l.id) ?? [] }));
       setLots(withMedia);
+      if (lotsRes?.owners) setAllOwners(lotsRes.owners);
+      if (lotsRes?.crew)   setAllCrew(lotsRes.crew);
     } finally { setLoading(false); }
   }, []);
 
@@ -362,6 +372,15 @@ export default function AdminParkingLotsPage() {
 
                   {/* Photo manager inline */}
                   <LotPhotoManager lot={lot} onUpdate={fetchLots} />
+                  <LotAssignmentSection
+                    lotId={lot.id}
+                    lotName={lot.name}
+                    currentOwner={lot.owner ?? null}
+                    currentCrew={lot.crew ?? []}
+                    availableOwners={allOwners}
+                    availableCrew={allCrew}
+                    onRefresh={fetchLots}
+                  />
                 </div>
               </div>
             );
