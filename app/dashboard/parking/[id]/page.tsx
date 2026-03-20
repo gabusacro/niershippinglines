@@ -4,6 +4,7 @@ import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
 import CancelBookingButton from "./CancelBookingButton";
 import VehiclePhotos from "./VehiclePhotos";
+import ParkingQRCode from "./ParkingQRCode";
 
 export const dynamic = "force-dynamic";
 
@@ -178,6 +179,9 @@ export default async function ParkingBookingDetailPage({ params }: { params: Pro
               : <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-800">⏳ No payment proof on record</div>}
           </div>
         </div>
+
+        {/* QR code for confirmed bookings */}
+        <ParkingQRCode reference={booking.reference} status={booking.status} />
 
         {/* Vehicle condition photos */}
         <VehiclePhotos reservationId={booking.id} />
