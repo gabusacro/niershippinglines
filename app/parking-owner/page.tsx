@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { createClient } from "@/lib/supabase/server";
+import ScanButton from "./ScanButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Parking Owner Dashboard | Travela Siargao" };
@@ -94,6 +95,7 @@ export default async function ParkingOwnerPage() {
           <div className="mt-4 flex gap-2">
             <Link href="/dashboard" className="rounded-xl bg-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/25 transition-colors">Dashboard</Link>
             <Link href="/dashboard/parking-crew" className="rounded-xl border border-white/30 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition-colors">Check-in View</Link>
+            <ScanButton />
           </div>
         </div>
       </div>

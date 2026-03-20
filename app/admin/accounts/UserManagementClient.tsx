@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-type AppRole = "admin" | "captain" | "crew" | "ticket_booth" | "passenger" | "vessel_owner" | "investor" | "tour_operator" | "tour_guide";
+type AppRole = "admin" | "captain" | "crew" | "ticket_booth" | "passenger" | "vessel_owner" | "investor" | "tour_operator" | "tour_guide" | "parking_owner" | "parking_crew";
 
 interface UserRow {
   id: string;
@@ -25,7 +25,8 @@ interface Props {
 
 const ROLE_OPTIONS: AppRole[] = [
   "passenger", "crew", "captain", "ticket_booth",
-  "vessel_owner", "investor", "tour_operator", "tour_guide", "admin",
+  "vessel_owner", "investor", "tour_operator", "tour_guide",
+  "parking_owner", "parking_crew", "admin",
 ];
 
 const ROLE_STYLES: Record<string, string> = {
@@ -38,6 +39,8 @@ const ROLE_STYLES: Record<string, string> = {
   passenger:     "bg-gray-100 text-gray-700",
   tour_operator: "bg-emerald-100 text-emerald-800",
   tour_guide:    "bg-blue-100 text-blue-800",
+  parking_owner: "bg-teal-100 text-teal-800",
+  parking_crew:  "bg-cyan-100 text-cyan-800",
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -50,6 +53,8 @@ const ROLE_LABELS: Record<string, string> = {
   passenger:     "Passenger",
   tour_operator: "Tour Operator",
   tour_guide:    "Tour Guide",
+  parking_owner: "Parking Owner",
+  parking_crew:  "Parking Crew",
 };
 
 const VESSEL_ROLES = ["captain", "crew", "ticket_booth"];

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import ParkingQRScanner from "@/components/parking/ParkingQRScanner";
 
 type Booking = {
   id: string; reference: string; status: string;
@@ -28,6 +29,7 @@ export default function AdminParkingCheckinPage() {
   const [loading, setLoading] = useState(false);
   const [acting, setActing]   = useState(false);
   const [msg, setMsg]         = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   async function handleSearch() {
     if (!search.trim()) return;
@@ -36,6 +38,19 @@ export default function AdminParkingCheckinPage() {
       const res = await fetch(`/api/admin/parking/checkin-lookup?q=${encodeURIComponent(search.trim())}`);
       const d = await res.json();
       if (!res.ok || !d) { setMsg("No booking found for that reference or plate number."); return; }
+      setBooking(d);
+    } catch { setMsg("Network error."); }
+    finally { setLoading(false); }
+  }
+
+  async function handleQRScan(ref: string) {
+    setShowScanner(false);
+    setSearch(ref);
+    setLoading(true); setMsg(null); setBooking(null);
+    try {
+      const res = await fetch(`/api/admin/parking/checkin-lookup?q=${encodeURIComponent(ref)}`);
+      const d = await res.json();
+      if (!res.ok || !d) { setMsg(`No booking found for: ${ref}`); return; }
       setBooking(d);
     } catch { setMsg("Network error."); }
     finally { setLoading(false); }
@@ -78,6 +93,10 @@ export default function AdminParkingCheckinPage() {
             onKeyDown={e => e.key === "Enter" && handleSearch()}
             placeholder="Reference (TRV-PRK-XXXXXX) or plate number"
             className="flex-1 rounded-xl border-2 border-blue-100 bg-white px-4 py-2.5 text-sm text-gray-800 focus:border-blue-400 focus:outline-none" />
+          <button onClick={() => setShowScanner(true)}
+            className="rounded-xl bg-[#0c7b93] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#085f72] transition-colors">
+            📷
+          </button>
           <button onClick={handleSearch} disabled={loading}
             className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
             {loading ? "…" : "Search"}
@@ -146,6 +165,7 @@ export default function AdminParkingCheckinPage() {
           </div>
         </div>
       )}
+      {showScanner && <ParkingQRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />}
     </div>
   );
 }
