@@ -15,17 +15,26 @@ async function getLotsWithAvailability() {
     const supabase = await createClient();
     const { data: lots } = await supabase
       .from("parking_lots")
-      .select("id, name, slug, address, description, distance_from_port, image_url, total_slots_car, total_slots_motorcycle, total_slots_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents, accepts_car, accepts_motorcycle, accepts_van, is_24hrs")
+      .select("id, name, slug, address, description, distance_from_port, total_slots_car, total_slots_motorcycle, total_slots_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents, accepts_car, accepts_motorcycle, accepts_van, is_24hrs")
       .eq("is_active", true)
       .order("name");
 
     if (!lots?.length) return [];
 
-    const { data: avail } = await supabase
-      .from("parking_slot_availability")
-      .select("lot_id, booked_car, booked_motorcycle, booked_van");
+    const [availRes, mediaRes] = await Promise.all([
+      supabase.from("parking_slot_availability")
+        .select("lot_id, booked_car, booked_motorcycle, booked_van"),
+      supabase.from("parking_lot_media")
+        .select("id, lot_id, photo_url, is_cover, sort_order")
+        .order("sort_order", { ascending: true }),
+    ]);
 
-    const availMap = new Map((avail ?? []).map(a => [a.lot_id, a]));
+    const availMap = new Map((availRes.data ?? []).map(a => [a.lot_id, a]));
+    const mediaByLot = new Map<string, typeof mediaRes.data>(); 
+    (mediaRes.data ?? []).forEach(m => {
+      if (!mediaByLot.has(m.lot_id)) mediaByLot.set(m.lot_id, []);
+      mediaByLot.get(m.lot_id)!.push(m);
+    });
 
     return lots.map(lot => {
       const a = availMap.get(lot.id);
@@ -37,6 +46,7 @@ async function getLotsWithAvailability() {
         accepts_car:          lot.accepts_car        ?? true,
         accepts_motorcycle:   lot.accepts_motorcycle ?? true,
         accepts_van:          lot.accepts_van        ?? true,
+        media:                mediaByLot.get(lot.id) ?? [],
       };
     });
   } catch {

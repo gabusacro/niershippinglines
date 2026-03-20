@@ -3,10 +3,11 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 
+type LotMedia = { id: string; photo_url: string; is_cover: boolean; sort_order: number };
 type ParkingLot = {
   id: string; name: string; slug: string; address: string;
   description: string | null; distance_from_port: string | null;
-  image_url: string | null;
+  media: LotMedia[];
   total_slots_car: number; total_slots_motorcycle: number; total_slots_van: number;
   car_rate_cents: number | null; motorcycle_rate_cents: number | null; van_rate_cents: number | null;
   accepts_car: boolean; accepts_motorcycle: boolean; accepts_van: boolean;
@@ -210,6 +211,7 @@ function UrgencySection({ lots }: { lots: ParkingLot[] }) {
 }
 
 function BookingModal({ lot, settings, onClose }: { lot: ParkingLot; settings: Settings; onClose: () => void }) {
+  const [modalLightbox, setModalLightbox] = useState<number | null>(null);
   const today = getTodayLocal();
   const acceptedTypes = getAcceptedTypes(lot);
   const defaultType = acceptedTypes[0]?.value ?? "car";
@@ -319,6 +321,16 @@ function BookingModal({ lot, settings, onClose }: { lot: ParkingLot; settings: S
             </p>
             <h2 className="text-base font-black text-white">{lot.name}</h2>
             <p className="text-xs text-white/70 mt-0.5">📍 {lot.distance_from_port}</p>
+            {/* Photo thumbnails inside modal — click to open lightbox */}
+            {lot.media.length > 0 && (
+              <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
+                {lot.media.map((m, i) => (
+                  <img key={m.id} src={m.photo_url} alt=""
+                    onClick={e => { e.stopPropagation(); setModalLightbox(i); }}
+                    className="w-10 h-10 rounded-lg object-cover shrink-0 cursor-pointer border-2 border-white/30 hover:border-white/80 transition-colors" />
+                ))}
+              </div>
+            )}
           </div>
           {step !== "submitting" && <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 text-lg">×</button>}
         </div>
@@ -528,6 +540,43 @@ function BookingModal({ lot, settings, onClose }: { lot: ParkingLot; settings: S
           </div>
         )}
       </div>
+      {/* Lightbox inside booking modal */}
+      {modalLightbox !== null && lot.media.length > 0 && (
+        <LotPhotoLightbox photos={lot.media} startIndex={modalLightbox} onClose={() => setModalLightbox(null)} />
+      )}
+    </div>
+  );
+}
+
+function LotPhotoLightbox({ photos, startIndex, onClose }: { photos: LotMedia[]; startIndex: number; onClose: () => void }) {
+  const [idx, setIdx] = useState(startIndex);
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90"
+      onClick={onClose}>
+      <img
+        src={photos[idx].photo_url}
+        alt=""
+        className="max-w-full max-h-full rounded-xl object-contain"
+        style={{ maxHeight: "90vh", maxWidth: "90vw" }}
+        onClick={e => e.stopPropagation()}
+      />
+      {photos.length > 1 && (
+        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2"
+          onClick={e => e.stopPropagation()}>
+          {photos.map((_, i) => (
+            <button key={i} onClick={() => setIdx(i)}
+              className={`w-2 h-2 rounded-full transition-all ${i === idx ? "bg-white scale-125" : "bg-white/40"}`} />
+          ))}
+        </div>
+      )}
+      {photos.length > 1 && (
+        <>
+          <button onClick={e => { e.stopPropagation(); setIdx(i => (i - 1 + photos.length) % photos.length); }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-white/40 text-xl">‹</button>
+          <button onClick={e => { e.stopPropagation(); setIdx(i => (i + 1) % photos.length); }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-white/40 text-xl">›</button>
+        </>
+      )}
     </div>
   );
 }
@@ -537,17 +586,42 @@ function LotCard({ lot, settings, onBook }: { lot: ParkingLot; settings: Setting
   const totalAvailable = accepted.reduce((s, t) => s + getAvailable(lot, t.value), 0);
   const totalAll = accepted.reduce((s, t) => s + getTotal(lot, t.value), 0);
   const isFull = totalAvailable === 0;
+  const cover = lot.media.find(m => m.is_cover) ?? lot.media[0];
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+
   return (
     <div className={`rounded-2xl border-2 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md ${isFull ? "border-red-200" : "border-teal-200 hover:border-[#0c7b93]"}`}>
       <div className={`h-1.5 ${isFull ? "bg-red-400" : "bg-gradient-to-r from-[#0c7b93] to-emerald-400"}`} />
-      {lot.image_url && (
-        <img src={lot.image_url} alt={lot.name} className="w-full h-40 object-cover" />
+
+      {/* Cover photo — click to open lightbox */}
+      {cover && (
+        <div className="relative cursor-pointer" onClick={() => setLightboxIdx(0)}>
+          <img src={cover.photo_url} alt={lot.name} className="w-full h-40 object-cover hover:opacity-95 transition-opacity" />
+          {lot.media.length > 1 && (
+            <span className="absolute bottom-2 right-2 rounded-full bg-black/50 text-white text-xs font-bold px-2 py-0.5">
+              📸 {lot.media.length}
+            </span>
+          )}
+        </div>
       )}
+
       <div className="p-5">
         <div className="flex items-start justify-between gap-2 mb-3">
           <div><h3 className="font-black text-[#134e4a] text-base leading-tight">{lot.name}</h3><p className="text-xs text-[#0f766e] mt-0.5">📍 {lot.distance_from_port ?? lot.address}</p></div>
           <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${isFull ? "bg-red-100 text-red-700" : totalAvailable <= totalAll * 0.2 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{isFull ? "FULL" : `${totalAvailable} avail.`}</span>
         </div>
+
+        {/* Thumbnail strip — click any to open lightbox at that index */}
+        {lot.media.length > 1 && (
+          <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
+            {lot.media.map((m, i) => (
+              <img key={m.id} src={m.photo_url} alt=""
+                onClick={() => setLightboxIdx(i)}
+                className="w-12 h-12 rounded-lg object-cover shrink-0 cursor-pointer hover:opacity-80 transition-opacity border-2 border-transparent hover:border-[#0c7b93]" />
+            ))}
+          </div>
+        )}
+
         <div className="space-y-2 mb-4">
           {lot.accepts_car        && lot.total_slots_car        > 0 && <SlotBar available={lot.available_car}        total={lot.total_slots_car}        emoji="🚗" />}
           {lot.accepts_motorcycle && lot.total_slots_motorcycle > 0 && <SlotBar available={lot.available_motorcycle} total={lot.total_slots_motorcycle} emoji="🏍️" />}
@@ -562,6 +636,11 @@ function LotCard({ lot, settings, onBook }: { lot: ParkingLot; settings: Setting
           {isFull ? "No slots available" : "Book a Slot →"}
         </button>
       </div>
+
+      {/* Lightbox */}
+      {lightboxIdx !== null && lot.media.length > 0 && (
+        <LotPhotoLightbox photos={lot.media} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+      )}
     </div>
   );
 }
