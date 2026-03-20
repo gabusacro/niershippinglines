@@ -386,7 +386,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
             ))}
           </svg>
 
-          <div className="relative z-10 flex flex-col justify-end px-5 pb-8" style={{ minHeight: 380 }}>
+          <div className="relative z-10 max-w-3xl mx-auto px-4 flex flex-col justify-end pb-8" style={{ minHeight: 380 }}>
             <div className="flex items-center gap-2 mb-3 text-[10px] tracking-[0.25em] uppercase text-white/40 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#1AB5A3] animate-pulse" />
               Travela Siargao — updated by locals
