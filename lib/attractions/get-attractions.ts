@@ -1,51 +1,65 @@
+// lib/attractions/get-attractions.ts
+// Reads from your real `attractions` table
+
 import { createClient } from "@/lib/supabase/server";
+import type { Attraction } from "./types";
 
-export type AttractionRow = {
-  id: string;
-  title: string;
-  slug: string;
-  description: string | null;
-  image_url: string | null;
-  sort_order: number;
-  image_urls?: string[];
-};
+const TABLE = "attractions";
 
-/**
- * Fetches published attractions from Supabase, with gallery images (image_url + attraction_images).
- */
-export async function getAttractionsFromSupabase(): Promise<AttractionRow[]> {
+// ── Public page — only published items ───────────────────────────────────────
+export async function getAttractions(category?: string): Promise<Attraction[]> {
   const supabase = await createClient();
-  const { data: rows, error } = await supabase
-    .from("attractions")
-    .select("id, title, slug, description, image_url, sort_order")
+
+  let query = supabase
+    .from(TABLE)
+    .select("*")
     .eq("is_published", true)
-    .order("sort_order")
-    .order("title");
+    .order("is_featured", { ascending: false })
+    .order("sort_order",  { ascending: true })
+    .order("created_at",  { ascending: false });
 
-  if (error || !rows?.length) return [];
-
-  const ids = rows.map((r) => r.id);
-  const { data: imgRows } = await supabase
-    .from("attraction_images")
-    .select("attraction_id, image_url, sort_order")
-    .in("attraction_id", ids)
-    .order("sort_order");
-
-  const imagesByAttractionId = new Map<string, string[]>();
-  for (const row of imgRows ?? []) {
-    const r = row as { attraction_id: string; image_url: string; sort_order: number };
-    const arr = imagesByAttractionId.get(r.attraction_id) ?? [];
-    arr.push(r.image_url);
-    imagesByAttractionId.set(r.attraction_id, arr);
+  if (category && category !== "all") {
+    if (category === "video") {
+      query = query.eq("type", "video");
+    } else {
+      query = query.eq("category", category);
+    }
   }
 
-  return (rows as AttractionRow[]).map((a) => {
-    const mainUrl = a.image_url ?? null;
-    const extraUrls = imagesByAttractionId.get(a.id) ?? [];
-    const image_urls = mainUrl ? [mainUrl, ...extraUrls] : extraUrls;
-    return {
-      ...a,
-      image_urls: image_urls.length > 0 ? image_urls : undefined,
-    };
-  });
+  const { data, error } = await query;
+  if (error) {
+    console.error("[getAttractions]", error.message);
+    return [];
+  }
+  return (data ?? []) as Attraction[];
+}
+
+// ── Admin — all items including unpublished ───────────────────────────────────
+export async function getAllAttractionsAdmin(): Promise<Attraction[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .order("sort_order",  { ascending: true })
+    .order("created_at",  { ascending: false });
+
+  if (error) {
+    console.error("[getAllAttractionsAdmin]", error.message);
+    return [];
+  }
+  return (data ?? []) as Attraction[];
+}
+
+// ── Single item by slug ───────────────────────────────────────────────────────
+export async function getAttractionBySlug(slug: string): Promise<Attraction | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("slug", slug)
+    .eq("is_published", true)
+    .single();
+
+  if (error) return null;
+  return data as Attraction;
 }
