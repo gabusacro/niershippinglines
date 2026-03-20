@@ -415,7 +415,9 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
         <NewsTicker items={items} />
 
         {/* ── Filter bar ── */}
-        <div className="flex gap-2 px-4 py-3 overflow-x-auto hide-scroll border-b border-slate-100 sticky top-0 bg-white/95 z-20">
+        <div className="sticky top-0 bg-white/95 z-20 border-b border-slate-100">
+  <div className="max-w-3xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto hide-scroll">
+
           {CATEGORIES.map((cat) => (
             <button
               key={cat.key}
@@ -428,6 +430,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               {cat.label}
             </button>
           ))}
+            </div>
         </div>
 
         {/* ── Empty state ── */}
