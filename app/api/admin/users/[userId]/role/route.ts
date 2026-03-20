@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-const VALID_ROLES = ["admin", "captain", "crew", "ticket_booth", "passenger", "vessel_owner", "investor", "tour_operator", "tour_guide"];
+const VALID_ROLES = ["admin", "captain", "crew", "ticket_booth", "passenger", "vessel_owner", "investor", "tour_operator", "tour_guide", "parking_owner", "parking_crew"];
 
 // PATCH /api/admin/users/[userId]/role
 export async function PATCH(
@@ -38,8 +38,7 @@ export async function PATCH(
     const { data: targetProfile } = await supabase
       .from("profiles").select("role").eq("id", userId).single();
 
-    if (targetProfile?.role === "admin"
-&& (count ?? 0) <= 1) {
+    if (targetProfile?.role === "admin" && (count ?? 0) <= 1) {
       return NextResponse.json({
         error: "Cannot remove the last admin. Promote another user to admin first."
       }, { status: 400 });
@@ -51,19 +50,19 @@ export async function PATCH(
     .update({ role: body.role, updated_at: new Date().toISOString() })
     .eq("id", userId);
 
-    // Deactivate tour assignments if role is no longer tour_guide or tour_operator
-if (body.role !== "tour_guide") {
-  await supabase
-    .from("tour_guide_assignments")
-    .update({ is_active: false })
-    .eq("tour_guide_id", userId);
-}
-if (body.role !== "tour_operator") {
-  await supabase
-    .from("tour_guide_assignments")
-    .update({ is_active: false })
-    .eq("tour_operator_id", userId);
-}
+  // Deactivate tour assignments if role is no longer tour_guide or tour_operator
+  if (body.role !== "tour_guide") {
+    await supabase
+      .from("tour_guide_assignments")
+      .update({ is_active: false })
+      .eq("tour_guide_id", userId);
+  }
+  if (body.role !== "tour_operator") {
+    await supabase
+      .from("tour_guide_assignments")
+      .update({ is_active: false })
+      .eq("tour_operator_id", userId);
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
