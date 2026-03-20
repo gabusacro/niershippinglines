@@ -146,3 +146,4 @@ function BookingCard({ b }: { b: Booking }) {
     </Link>
   );
 }
+

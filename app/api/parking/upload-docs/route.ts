@@ -93,3 +93,4 @@ export async function POST(request: NextRequest) {
     id_photo_path: idPhotoUpload.data.path,
   });
 }
+

@@ -17,3 +17,4 @@ export async function GET() {
     default_moto_rate:    data?.default_motorcycle_rate_cents  ?? 25000,
   });
 }
+

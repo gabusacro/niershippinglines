@@ -52,3 +52,4 @@ export default function CancelBookingButton({ bookingId }: { bookingId: string }
     </button>
   );
 }
+

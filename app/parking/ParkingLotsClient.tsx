@@ -636,3 +636,4 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
     </div>
   );
 }
+

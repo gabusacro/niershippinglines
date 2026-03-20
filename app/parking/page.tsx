@@ -86,3 +86,4 @@ export default async function ParkingPage() {
 
   return <ParkingLotsClient lots={lots} settings={settings} />;
 }
+

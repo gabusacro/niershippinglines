@@ -220,3 +220,4 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ reference: booking.reference, id: booking.id });
 }
+
