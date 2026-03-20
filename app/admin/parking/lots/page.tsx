@@ -6,6 +6,7 @@ import Link from "next/link";
 type Lot = {
   id: string; name: string; slug: string; address: string;
   distance_from_port: string | null;
+  image_url: string | null;
   total_slots_car: number; total_slots_motorcycle: number; total_slots_van: number;
   accepts_car: boolean; accepts_motorcycle: boolean; accepts_van: boolean;
   car_rate_cents: number | null; motorcycle_rate_cents: number | null; van_rate_cents: number | null;
@@ -44,6 +45,9 @@ export default function AdminParkingLotsPage() {
   const [form, setForm]       = useState<LotForm>(emptyForm);
   const [saving, setSaving]   = useState(false);
   const [msg, setMsg]         = useState<string | null>(null);
+  const [photoFile, setPhotoFile]       = useState<File | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoRef = typeof window !== "undefined" ? { current: null as HTMLInputElement | null } : { current: null };
 
   useEffect(() => { fetchLots(); }, []);
 
@@ -53,6 +57,21 @@ export default function AdminParkingLotsPage() {
       const res = await fetch("/api/admin/parking/lots");
       if (res.ok) { const d = await res.json(); setLots(d); }
     } finally { setLoading(false); }
+  }
+
+  async function uploadLotPhoto(lotId: string) {
+    if (!photoFile) return;
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("photo", photoFile);
+      fd.append("lot_id", lotId);
+      const res = await fetch("/api/admin/parking/lots/photo", { method: "POST", body: fd });
+      const d = await res.json();
+      if (!res.ok) { setMsg(d.error ?? "Photo upload failed."); return; }
+      setMsg("✅ Photo uploaded."); setPhotoFile(null); await fetchLots();
+    } catch { setMsg("Network error."); }
+    finally { setPhotoUploading(false); }
   }
 
   async function saveLot() {
@@ -164,7 +183,11 @@ export default function AdminParkingLotsPage() {
       ) : (
         <div className="space-y-4">
           {lots.map(lot => (
-            <div key={lot.id} className="rounded-2xl border-2 border-blue-100 bg-white p-5">
+            <div key={lot.id} className="rounded-2xl border-2 border-blue-100 bg-white overflow-hidden">
+              {lot.image_url && (
+                <img src={lot.image_url} alt={lot.name} className="w-full h-40 object-cover" />
+              )}
+              <div className="p-5">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -178,10 +201,11 @@ export default function AdminParkingLotsPage() {
                     {lot.accepts_van        && <span className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-blue-800">🚐 {lot.total_slots_van} slots · {lot.van_rate_cents ? peso(lot.van_rate_cents) : "default"}/day · {lot.available_van} avail</span>}
                   </div>
                 </div>
-                <button onClick={() => setEditing({ ...lot })}
+                <button onClick={() => { setEditing({ ...lot }); setPhotoFile(null); setMsg(null); }}
                   className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 transition-colors">
                   Edit
                 </button>
+              </div>
               </div>
             </div>
           ))}
@@ -217,6 +241,29 @@ export default function AdminParkingLotsPage() {
                 ))}
               </div>
               {msg && <div className={`rounded-xl px-4 py-3 text-sm ${msg.startsWith("✅") ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{msg}</div>}
+
+              {/* Lot photo upload */}
+              <div className="rounded-xl border-2 border-blue-100 p-4 space-y-2">
+                <p className="text-xs font-bold text-gray-600 uppercase">Lot Cover Photo</p>
+                {editing.image_url && (
+                  <img src={editing.image_url} alt="Current cover" className="w-full h-32 object-cover rounded-lg" />
+                )}
+                <input type="file" accept="image/*" className="hidden"
+                  ref={el => { if (el) photoRef.current = el; }}
+                  onChange={e => setPhotoFile(e.target.files?.[0] ?? null)} />
+                <button type="button" onClick={() => photoRef.current?.click()}
+                  className={`w-full rounded-xl border-2 px-3 py-2.5 text-sm font-semibold flex items-center gap-2 ${photoFile ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-dashed border-blue-200 text-blue-600 hover:bg-blue-50"}`}>
+                  <span>📸</span>
+                  <span>{photoFile ? photoFile.name : editing.image_url ? "Replace photo" : "Upload cover photo"}</span>
+                </button>
+                {photoFile && (
+                  <button onClick={() => uploadLotPhoto(editing.id)} disabled={photoUploading}
+                    className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                    {photoUploading ? "Uploading…" : "Upload Photo"}
+                  </button>
+                )}
+              </div>
+
               <div className="flex gap-3">
                 <button onClick={() => setEditing(null)} className="flex-1 rounded-xl border-2 border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
                 <button onClick={saveLot} disabled={saving} className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors">{saving ? "Saving…" : "Save Changes"}</button>

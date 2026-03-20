@@ -15,7 +15,7 @@ async function getLotsWithAvailability() {
     const supabase = await createClient();
     const { data: lots } = await supabase
       .from("parking_lots")
-      .select("id, name, slug, address, description, distance_from_port, total_slots_car, total_slots_motorcycle, total_slots_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents, accepts_car, accepts_motorcycle, accepts_van, is_24hrs")
+      .select("id, name, slug, address, description, distance_from_port, image_url, total_slots_car, total_slots_motorcycle, total_slots_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents, accepts_car, accepts_motorcycle, accepts_van, is_24hrs")
       .eq("is_active", true)
       .order("name");
 
@@ -86,4 +86,3 @@ export default async function ParkingPage() {
 
   return <ParkingLotsClient lots={lots} settings={settings} />;
 }
-

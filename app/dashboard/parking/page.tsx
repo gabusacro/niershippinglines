@@ -23,9 +23,9 @@ type Booking = {
 };
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
-  pending_payment: { label: "Pending Approval",  color: "bg-amber-100 text-amber-800 border-amber-200"       },
-  confirmed:       { label: "Confirmed",          color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  checked_in:      { label: "Checked In",         color: "bg-blue-100 text-blue-800 border-blue-200"         },
+  pending_payment: { label: "⏳ Pending Approval",       color: "bg-amber-100 text-amber-800 border-amber-200"       },
+  confirmed:       { label: "✅ Confirmed — Slot Locked", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  checked_in:      { label: "🚘 Checked In",             color: "bg-blue-100 text-blue-800 border-blue-200"         },
   completed:       { label: "Completed",           color: "bg-gray-100 text-gray-600 border-gray-200"         },
   overstay:        { label: "Overstay",            color: "bg-red-100 text-red-700 border-red-200"            },
   cancelled:       { label: "Cancelled",           color: "bg-gray-100 text-gray-400 border-gray-200"         },
@@ -143,7 +143,21 @@ function BookingCard({ b }: { b: Booking }) {
           ⏳ Submitted — waiting for admin to verify documents and payment
         </div>
       )}
+      {b.status === "confirmed" && (
+        <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 font-semibold">
+          ✅ Slot locked — bring original ID and OR/CR on arrival
+        </div>
+      )}
+      {b.status === "checked_in" && (
+        <div className="mt-3 rounded-xl bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800 font-semibold">
+          🚘 Vehicle is currently parked
+        </div>
+      )}
+      {b.status === "overstay" && (
+        <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800 font-semibold">
+          ⚠️ Overstay — please settle at the parking lot
+        </div>
+      )}
     </Link>
   );
 }
-

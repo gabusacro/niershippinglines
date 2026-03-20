@@ -6,6 +6,7 @@ import Link from "next/link";
 type ParkingLot = {
   id: string; name: string; slug: string; address: string;
   description: string | null; distance_from_port: string | null;
+  image_url: string | null;
   total_slots_car: number; total_slots_motorcycle: number; total_slots_van: number;
   car_rate_cents: number | null; motorcycle_rate_cents: number | null; van_rate_cents: number | null;
   accepts_car: boolean; accepts_motorcycle: boolean; accepts_van: boolean;
@@ -539,6 +540,9 @@ function LotCard({ lot, settings, onBook }: { lot: ParkingLot; settings: Setting
   return (
     <div className={`rounded-2xl border-2 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md ${isFull ? "border-red-200" : "border-teal-200 hover:border-[#0c7b93]"}`}>
       <div className={`h-1.5 ${isFull ? "bg-red-400" : "bg-gradient-to-r from-[#0c7b93] to-emerald-400"}`} />
+      {lot.image_url && (
+        <img src={lot.image_url} alt={lot.name} className="w-full h-40 object-cover" />
+      )}
       <div className="p-5">
         <div className="flex items-start justify-between gap-2 mb-3">
           <div><h3 className="font-black text-[#134e4a] text-base leading-tight">{lot.name}</h3><p className="text-xs text-[#0f766e] mt-0.5">📍 {lot.distance_from_port ?? lot.address}</p></div>
@@ -636,4 +640,3 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
     </div>
   );
 }
-
