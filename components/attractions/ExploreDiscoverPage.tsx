@@ -19,8 +19,13 @@ function toEmbedUrl(url: string): string | null {
   } catch { return null; }
 }
 
+// ✅ FIX 1 — Always use Asia/Manila timezone so server + client agree exactly
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    timeZone: "Asia/Manila",
+  });
 }
 
 function GradientBox({ item, className = "" }: { item: Attraction; className?: string }) {
@@ -31,7 +36,6 @@ function GradientBox({ item, className = "" }: { item: Attraction; className?: s
   );
 }
 
-// ─── Badges ───────────────────────────────────────────────────────────────────
 function LiveBadge() {
   return (
     <span className="inline-flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-800 text-[9px] font-semibold px-2 py-0.5 rounded-full">
@@ -59,7 +63,6 @@ function CategoryBadge({ item }: { item: Attraction }) {
   );
 }
 
-// ─── Video modal ──────────────────────────────────────────────────────────────
 function VideoModal({ item, onClose }: { item: Attraction; onClose: () => void }) {
   const embed = item.image_url ? toEmbedUrl(item.image_url) : null;
   useEffect(() => {
@@ -124,7 +127,10 @@ function CardHorizontal({ item, onClick }: { item: Attraction; onClick: () => vo
       <div className="flex flex-col justify-center px-3 py-2.5 min-w-0">
         <CategoryBadge item={item} />
         <h3 className="text-[12px] font-semibold text-slate-800 leading-snug line-clamp-2 mt-1 mb-0.5">{item.title}</h3>
-        <p className="text-[10px] text-slate-400">{formatDate(item.created_at)}</p>
+        {/* ✅ FIX 2 — suppressHydrationWarning on date elements */}
+        <p className="text-[10px] text-slate-400" suppressHydrationWarning>
+          {formatDate(item.created_at)}
+        </p>
       </div>
     </article>
   );
@@ -229,13 +235,15 @@ function CardTall({ item, onClick }: { item: Attraction; onClick: () => void }) 
       <div className="p-3">
         <CategoryBadge item={item} />
         <h3 className="text-[13px] font-semibold text-slate-800 leading-snug mt-1.5 mb-1">{item.title}</h3>
-        <p className="text-[10px] text-slate-400">{formatDate(item.created_at)}</p>
+        {/* ✅ FIX 2 — suppressHydrationWarning on date elements */}
+        <p className="text-[10px] text-slate-400" suppressHydrationWarning>
+          {formatDate(item.created_at)}
+        </p>
       </div>
     </article>
   );
 }
 
-// ─── News ticker ──────────────────────────────────────────────────────────────
 function NewsTicker({ items }: { items: Attraction[] }) {
   const tickerItems = items.filter((i) => i.is_live || i.is_featured).slice(0, 6);
   if (!tickerItems.length) return null;
@@ -255,16 +263,14 @@ function NewsTicker({ items }: { items: Attraction[] }) {
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
   const [filter,      setFilter]      = useState("all");
   const [activeVideo, setActiveVideo] = useState<Attraction | null>(null);
-  const [entered,     setEntered]     = useState(false);
 
-  useEffect(() => {
-    const t = setTimeout(() => setEntered(true), 60);
-    return () => clearTimeout(t);
-  }, []);
+  // ✅ FIX 3 — Track mount separately; never control visible DOM with pre-mount state
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const filtered =
     filter === "all"   ? items :
@@ -290,7 +296,6 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
     window.location.href = `/attractions/${item.slug}`;
   }
 
-  // Shared max-width — matches homepage max-w-7xl
   const WRAP = "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8";
 
   return (
@@ -307,10 +312,11 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
 
       <div className="min-h-screen bg-white">
 
-        {/* ── Hero — full bleed, text constrained to WRAP ── */}
+        {/* ✅ FIX 3 — opacity controlled by mounted class, not inline style tied to state */}
         <div
-          className="relative overflow-hidden bg-[#04342C]"
-          style={{ minHeight: 420, opacity: entered ? 1 : 0, transition: "opacity 0.5s ease" }}
+          className="relative overflow-hidden bg-[#04342C] transition-opacity duration-500"
+          style={{ minHeight: 420, opacity: mounted ? 1 : 0 }}
+          suppressHydrationWarning
         >
           <svg className="absolute inset-0 w-full h-full opacity-[0.06]" preserveAspectRatio="none">
             {[80, 180, 280, 360].map((y) => (
@@ -321,7 +327,6 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
             ))}
           </svg>
 
-          {/* ✅ Hero content constrained to max-w-7xl */}
           <div className={`relative z-10 ${WRAP} flex flex-col justify-end pb-10`} style={{ minHeight: 420 }}>
             <div className="flex items-center gap-2 mb-3 text-[10px] tracking-[0.25em] uppercase text-white/40 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#1AB5A3] animate-pulse" />
@@ -342,10 +347,8 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
           </div>
         </div>
 
-        {/* ── Ticker — full bleed ── */}
         <NewsTicker items={items} />
 
-        {/* ── Filter bar — constrained to WRAP ── */}
         <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 border-b border-slate-100">
           <div className={`${WRAP} py-3 flex gap-2 overflow-x-auto hide-scroll`}>
             {CATEGORIES.map((cat) => (
@@ -363,7 +366,6 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
           </div>
         </div>
 
-        {/* ── Empty state ── */}
         {filtered.length === 0 && (
           <div className="py-20 text-center px-4">
             <div className="text-4xl mb-3">🌊</div>
@@ -371,11 +373,9 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
           </div>
         )}
 
-        {/* ── Broken grid — constrained to WRAP ── */}
         {filtered.length > 0 && (
           <div className={`${WRAP} py-6 space-y-4`}>
 
-            {/* ROW 1 — Big portrait + 3 horizontal */}
             {featured && (
               <div className="grid gap-4" style={{ gridTemplateColumns: "1.65fr 1fr" }}>
                 <div className="fade-up" style={{ animationDelay: "0.05s" }}>
@@ -391,14 +391,12 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
-            {/* ROW 2 — Wide diagonal */}
             {wideCard && (
               <div className="fade-up" style={{ animationDelay: "0.28s" }}>
                 <CardWide item={wideCard} onClick={() => handleClick(wideCard)} />
               </div>
             )}
 
-            {/* ROW 3 — 3 equal medium */}
             {threeRow.length > 0 && (
               <div className="grid grid-cols-3 gap-4">
                 {threeRow.map((item, i) => (
@@ -409,14 +407,12 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
-            {/* ROW 4 — Full cinematic */}
             {cinemaCard && (
               <div className="fade-up" style={{ animationDelay: "0.45s" }}>
                 <CardCinema item={cinemaCard} onClick={() => handleClick(cinemaCard)} />
               </div>
             )}
 
-            {/* ROW 5 — Asymmetric 2-col */}
             {(asymLeft || asymRight) && (
               <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1.4fr" }}>
                 {asymLeft && (
@@ -432,7 +428,6 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
-            {/* REMAINDER — overflow 3-col */}
             {remainder.length > 0 && (
               <div className="grid grid-cols-3 gap-4">
                 {remainder.map((item, i) => (
@@ -443,7 +438,6 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
-            {/* ── Ferry CTA ── */}
             <div className="fade-up rounded-2xl overflow-hidden" style={{ animationDelay: "0.65s" }}>
               <div className="flex items-center gap-4 p-6 bg-gradient-to-r from-[#085C52] to-[#0c7b93]">
                 <div className="flex-1">
