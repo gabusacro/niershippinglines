@@ -1,21 +1,18 @@
 // app/attractions/[slug]/page.tsx
-// Fixes the 404 when clicking any attraction card
-// Each attraction gets its own SEO-optimized page
+// ✅ FIX: Removed generateStaticParams — it can't use cookies() at build time.
+// This page is now fully dynamic (rendered on each request), which is actually
+// BETTER for SEO because Google always gets fresh content from Supabase.
 
 import { notFound } from "next/navigation";
-import { getAttractionBySlug, getAttractions } from "@/lib/attractions/get-attractions";
-import type { Attraction } from "@/lib/attractions/types";
+import { getAttractionBySlug } from "@/lib/attractions/get-attractions";
 
-// ── Generate all static slugs at build time (good for SEO) ──────────────────
-export async function generateStaticParams() {
-  const items = await getAttractions();
-  return items.map((item) => ({ slug: item.slug }));
-}
+// ✅ Tell Next.js this is a dynamic route — do NOT try to pre-render at build time
+export const dynamic = "force-dynamic";
 
-// ── Per-page SEO metadata ────────────────────────────────────────────────────
+// ── Per-page SEO metadata ─────────────────────────────────────────────────────
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const item = await getAttractionBySlug(params.slug);
-  if (!item) return { title: "Not found" };
+  if (!item) return { title: "Not found | Travela Siargao" };
 
   return {
     title: `${item.title} — Siargao Island | Travela Siargao`,
@@ -40,7 +37,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-// ── Page component ───────────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default async function AttractionDetailPage({ params }: { params: { slug: string } }) {
   const item = await getAttractionBySlug(params.slug);
   if (!item) notFound();
@@ -48,7 +45,7 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
   return (
     <div className="min-h-screen bg-white">
 
-      {/* Hero image */}
+      {/* Hero */}
       <div className="relative h-[420px] sm:h-[520px] bg-[#04342C] overflow-hidden">
         {item.image_url
           ? <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover" />
@@ -62,15 +59,12 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
 
         {/* Back button */}
         <div className="absolute top-5 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <a
-            href="/attractions"
-            className="inline-flex items-center gap-2 text-[12px] text-white/70 hover:text-white transition-colors"
-          >
+          <a href="/attractions" className="inline-flex items-center gap-2 text-[12px] text-white/70 hover:text-white transition-colors">
             ← Back to Explore & Discover
           </a>
         </div>
 
-        {/* Title overlay */}
+        {/* Title */}
         <div className="absolute bottom-0 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
           {item.is_featured && (
             <span className="inline-block bg-amber-400 text-amber-900 text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full mb-3">
@@ -78,7 +72,7 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
             </span>
           )}
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] tracking-[0.2em] uppercase text-white/50 font-semibold">
+            <span className="text-[10px] tracking-[0.2em] uppercase text-white/50 font-semibold capitalize">
               {item.category ?? item.type}
             </span>
             {item.is_live && (
@@ -98,7 +92,7 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="max-w-3xl">
 
-          {/* SEO tags */}
+          {/* SEO keyword tags */}
           {item.seo_tags && item.seo_tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-6">
               {item.seo_tags.map((tag) => (
@@ -111,28 +105,19 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
 
           {/* Description */}
           {item.description && (
-            <div className="prose prose-slate max-w-none">
-              <p className="text-[16px] text-slate-700 leading-relaxed whitespace-pre-line">
-                {item.description}
-              </p>
-            </div>
+            <p className="text-[16px] text-slate-700 leading-relaxed whitespace-pre-line">
+              {item.description}
+            </p>
           )}
 
           {/* Ferry CTA */}
           <div className="mt-10 rounded-2xl overflow-hidden">
             <div className="flex items-center gap-4 p-6 bg-gradient-to-r from-[#085C52] to-[#0c7b93]">
               <div className="flex-1">
-                <p className="text-[16px] font-semibold text-white mb-1">
-                  Ready to visit {item.title}?
-                </p>
-                <p className="text-[13px] text-white/55">
-                  Book your ferry to Siargao online — skip the queue, secure your seat.
-                </p>
+                <p className="text-[16px] font-semibold text-white mb-1">Ready to visit {item.title}?</p>
+                <p className="text-[13px] text-white/55">Book your ferry to Siargao online — skip the queue, secure your seat.</p>
               </div>
-              <a
-                href="/book"
-                className="shrink-0 px-5 py-2.5 bg-white text-[#085C52] rounded-full text-[13px] font-semibold hover:bg-[#f0fdfa] transition-colors whitespace-nowrap"
-              >
+              <a href="/book" className="shrink-0 px-5 py-2.5 bg-white text-[#085C52] rounded-full text-[13px] font-semibold hover:bg-[#f0fdfa] transition-colors whitespace-nowrap">
                 Book a trip →
               </a>
             </div>
@@ -141,7 +126,7 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
         </div>
       </div>
 
-      {/* Back link at bottom */}
+      {/* Bottom back link */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         <a href="/attractions" className="text-[13px] text-[#0c7b93] hover:underline">
           ← Back to all attractions
