@@ -23,18 +23,9 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
 }
 
-// Gradient fallback when no image_url
-function GradientBox({
-  item,
-  className = "",
-}: {
-  item: Attraction;
-  className?: string;
-}) {
+function GradientBox({ item, className = "" }: { item: Attraction; className?: string }) {
   return (
-    <div
-      className={`bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#0c7b93]"} flex items-center justify-center ${className}`}
-    >
+    <div className={`bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#0c7b93]"} flex items-center justify-center ${className}`}>
       <span style={{ fontSize: 40 }}>{item.cover_emoji ?? "🌴"}</span>
     </div>
   );
@@ -51,12 +42,7 @@ function LiveBadge() {
 }
 
 function CategoryBadge({ item }: { item: Attraction }) {
-  const label = item.category
-    ? item.category.replace("-", " ")
-    : item.type === "video"
-    ? "video"
-    : "attraction";
-
+  const label = item.category ? item.category.replace("-", " ") : item.type === "video" ? "video" : "attraction";
   const color =
     item.type === "video"          ? "bg-purple-50 text-purple-800 border-purple-200" :
     item.category === "surf"       ? "bg-teal-50 text-teal-800 border-teal-200" :
@@ -66,7 +52,6 @@ function CategoryBadge({ item }: { item: Attraction }) {
     item.category === "events"     ? "bg-pink-50 text-pink-800 border-pink-200" :
     item.category === "local-life" ? "bg-green-50 text-green-800 border-green-200" :
     "bg-emerald-50 text-emerald-800 border-emerald-200";
-
   return (
     <span className={`inline-block text-[9px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded-full border capitalize ${color}`}>
       {label}
@@ -77,51 +62,32 @@ function CategoryBadge({ item }: { item: Attraction }) {
 // ─── Video modal ──────────────────────────────────────────────────────────────
 function VideoModal({ item, onClose }: { item: Attraction; onClose: () => void }) {
   const embed = item.image_url ? toEmbedUrl(item.image_url) : null;
-
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full max-w-2xl rounded-2xl overflow-hidden bg-[#04342C]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80 transition-colors text-lg font-bold"
-        >
-          ×
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+      <div className="relative w-full max-w-3xl rounded-2xl overflow-hidden bg-[#04342C]" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/80 transition-colors text-lg font-bold">×</button>
         {embed
           ? <div className="aspect-video"><iframe src={embed} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen /></div>
           : <div className="aspect-video flex items-center justify-center text-white/40 text-sm">Video unavailable</div>
         }
         <div className="p-4">
           <h3 className="text-[15px] font-semibold text-white leading-snug">{item.title}</h3>
-          {item.description && (
-            <p className="text-[12px] text-white/50 mt-1 leading-relaxed line-clamp-3">{item.description}</p>
-          )}
+          {item.description && <p className="text-[12px] text-white/50 mt-1 leading-relaxed line-clamp-3">{item.description}</p>}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Card: XL portrait (Row 1 left) ──────────────────────────────────────────
+// ─── Cards ────────────────────────────────────────────────────────────────────
 function CardXL({ item, onClick }: { item: Attraction; onClick: () => void }) {
   return (
-    <article
-      onClick={onClick}
-      className="relative overflow-hidden rounded-2xl cursor-pointer group"
-      style={{ aspectRatio: "3/4" }}
-    >
+    <article onClick={onClick} className="relative overflow-hidden rounded-2xl cursor-pointer group" style={{ aspectRatio: "3/4" }}>
       {item.image_url
         ? <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
         : <GradientBox item={item} className="absolute inset-0" />
@@ -138,25 +104,17 @@ function CardXL({ item, onClick }: { item: Attraction; onClick: () => void }) {
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 p-4">
-        <div className="mb-2">
-          {item.is_live ? <LiveBadge /> : <CategoryBadge item={item} />}
-        </div>
+        <div className="mb-2">{item.is_live ? <LiveBadge /> : <CategoryBadge item={item} />}</div>
         <h2 className="text-[15px] font-semibold text-white leading-snug mb-1">{item.title}</h2>
-        {item.read_minutes ? (
-          <p className="text-[10px] text-white/40">{item.read_minutes} min read</p>
-        ) : null}
+        {item.read_minutes ? <p className="text-[10px] text-white/40">{item.read_minutes} min read</p> : null}
       </div>
     </article>
   );
 }
 
-// ─── Card: Horizontal compact (Row 1 right stack) ─────────────────────────────
 function CardHorizontal({ item, onClick }: { item: Attraction; onClick: () => void }) {
   return (
-    <article
-      onClick={onClick}
-      className="flex overflow-hidden rounded-xl border border-slate-100 bg-white cursor-pointer group hover:border-[#0c7b93] transition-colors"
-    >
+    <article onClick={onClick} className="flex overflow-hidden rounded-xl border border-slate-100 bg-white cursor-pointer group hover:border-[#0c7b93] transition-colors">
       <div className="w-[68px] shrink-0 overflow-hidden">
         {item.image_url
           ? <img src={item.image_url} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
@@ -172,28 +130,20 @@ function CardHorizontal({ item, onClick }: { item: Attraction; onClick: () => vo
   );
 }
 
-// ─── Card: Wide diagonal (Row 2) ──────────────────────────────────────────────
 function CardWide({ item, onClick }: { item: Attraction; onClick: () => void }) {
   return (
-    <article
-      onClick={onClick}
-      className="rounded-2xl overflow-hidden cursor-pointer bg-[#04342C] group"
-    >
+    <article onClick={onClick} className="rounded-2xl overflow-hidden cursor-pointer bg-[#04342C] group">
       <div className="flex min-h-[148px]">
         <div className="flex-1 flex flex-col justify-center p-5 pr-4">
-          <div className="mb-3">
-            {item.is_live ? <LiveBadge /> : <CategoryBadge item={item} />}
-          </div>
+          <div className="mb-3">{item.is_live ? <LiveBadge /> : <CategoryBadge item={item} />}</div>
           <h2 className="text-[17px] font-semibold text-white leading-snug mb-2 tracking-tight">{item.title}</h2>
-          {item.description && (
-            <p className="text-[12px] text-white/45 leading-relaxed mb-3 line-clamp-2">{item.description}</p>
-          )}
+          {item.description && <p className="text-[12px] text-white/45 leading-relaxed mb-3 line-clamp-2">{item.description}</p>}
           <span className="inline-flex items-center gap-1 text-[11px] text-[#5DCAA5] border border-[#1D9E75]/40 rounded-full px-3 py-1 w-fit group-hover:bg-[#1D9E75]/20 transition-colors">
             {item.type === "video" ? "Watch now →" : "Explore →"}
           </span>
         </div>
         <div
-          className={`w-[148px] shrink-0 flex items-center justify-center text-5xl bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#1AB5A3]"}`}
+          className={`w-[200px] shrink-0 flex items-center justify-center text-5xl bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#1AB5A3]"}`}
           style={{ clipPath: "polygon(18% 0%, 100% 0%, 100% 100%, 0% 100%)" }}
         >
           {item.image_url
@@ -206,14 +156,10 @@ function CardWide({ item, onClick }: { item: Attraction; onClick: () => void }) 
   );
 }
 
-// ─── Card: Medium 3-column (Row 3) ────────────────────────────────────────────
 function CardMedium({ item, onClick }: { item: Attraction; onClick: () => void }) {
   return (
-    <article
-      onClick={onClick}
-      className="rounded-xl overflow-hidden border border-slate-100 bg-white cursor-pointer group hover:border-[#0c7b93] hover:-translate-y-0.5 transition-all duration-200"
-    >
-      <div className="h-[96px] overflow-hidden relative">
+    <article onClick={onClick} className="rounded-xl overflow-hidden border border-slate-100 bg-white cursor-pointer group hover:border-[#0c7b93] hover:-translate-y-0.5 transition-all duration-200">
+      <div className="h-[140px] overflow-hidden relative">
         {item.image_url
           ? <img src={item.image_url} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
           : <GradientBox item={item} className="w-full h-full" />
@@ -226,20 +172,16 @@ function CardMedium({ item, onClick }: { item: Attraction; onClick: () => void }
       </div>
       <div className="p-3">
         <CategoryBadge item={item} />
-        <h3 className="text-[12px] font-semibold text-slate-800 leading-snug mt-1.5 line-clamp-2">{item.title}</h3>
+        <h3 className="text-[13px] font-semibold text-slate-800 leading-snug mt-1.5 line-clamp-2">{item.title}</h3>
       </div>
     </article>
   );
 }
 
-// ─── Card: Cinematic full-width (Row 4) ───────────────────────────────────────
 function CardCinema({ item, onClick }: { item: Attraction; onClick: () => void }) {
   return (
-    <article
-      onClick={onClick}
-      className="rounded-2xl overflow-hidden cursor-pointer group bg-[#04342C]"
-    >
-      <div className="relative h-[200px]">
+    <article onClick={onClick} className="rounded-2xl overflow-hidden cursor-pointer group bg-[#04342C]">
+      <div className="relative h-[280px]">
         {item.image_url
           ? <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
           : <GradientBox item={item} className="absolute inset-0" />
@@ -254,7 +196,7 @@ function CardCinema({ item, onClick }: { item: Attraction; onClick: () => void }
           <p className="text-[9px] tracking-[0.2em] uppercase text-[#5DCAA5] mb-2 font-semibold">
             {item.is_featured ? "✦ Featured · " : ""}{item.category ?? item.type}
           </p>
-          <h2 className="text-[20px] font-semibold text-white leading-snug tracking-tight">{item.title}</h2>
+          <h2 className="text-[24px] font-semibold text-white leading-snug tracking-tight">{item.title}</h2>
         </div>
       </div>
       <div className="flex items-start gap-4 p-5">
@@ -270,14 +212,10 @@ function CardCinema({ item, onClick }: { item: Attraction; onClick: () => void }
   );
 }
 
-// ─── Card: Tall asymmetric (Row 5) ────────────────────────────────────────────
 function CardTall({ item, onClick }: { item: Attraction; onClick: () => void }) {
   return (
-    <article
-      onClick={onClick}
-      className="rounded-xl overflow-hidden border border-slate-100 bg-white cursor-pointer group hover:border-[#0c7b93] transition-colors"
-    >
-      <div className="h-[160px] overflow-hidden relative">
+    <article onClick={onClick} className="rounded-xl overflow-hidden border border-slate-100 bg-white cursor-pointer group hover:border-[#0c7b93] transition-colors">
+      <div className="h-[200px] overflow-hidden relative">
         {item.image_url
           ? <img src={item.image_url} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
           : <GradientBox item={item} className="w-full h-full" />
@@ -307,9 +245,7 @@ function NewsTicker({ items }: { items: Attraction[] }) {
       <div className="flex whitespace-nowrap" style={{ animation: "ticker 30s linear infinite" }}>
         {doubled.map((item, i) => (
           <span key={i} className="inline-flex items-center gap-2 px-6 text-[11px] text-white/45 tracking-wide shrink-0">
-            <b className="text-[#1AB5A3] font-semibold">
-              {item.is_live ? "Live" : item.is_featured ? "Featured" : item.category ?? item.type}
-            </b>
+            <b className="text-[#1AB5A3] font-semibold">{item.is_live ? "Live" : item.is_featured ? "Featured" : item.category ?? item.type}</b>
             {item.title}
             <span className="text-white/20 ml-2">·</span>
           </span>
@@ -319,7 +255,7 @@ function NewsTicker({ items }: { items: Attraction[] }) {
   );
 }
 
-// ─── Main page component ──────────────────────────────────────────────────────
+// ─── Main page ────────────────────────────────────────────────────────────────
 export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
   const [filter,      setFilter]      = useState("all");
   const [activeVideo, setActiveVideo] = useState<Attraction | null>(null);
@@ -330,13 +266,11 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
     return () => clearTimeout(t);
   }, []);
 
-  // ── Filter ──
   const filtered =
     filter === "all"   ? items :
     filter === "video" ? items.filter((i) => i.type === "video") :
     items.filter((i) => i.category === filter);
 
-  // ── Assign items to layout slots ──
   const featured   = filtered.find((i) => i.is_featured) ?? filtered[0];
   const rest       = filtered.filter((i) => i.id !== featured?.id);
   const sideStack  = rest.slice(0, 3);
@@ -356,6 +290,9 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
     window.location.href = `/attractions/${item.slug}`;
   }
 
+  // Shared max-width — matches homepage max-w-7xl
+  const WRAP = "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8";
+
   return (
     <>
       <style>{`
@@ -366,19 +303,17 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
         .hide-scroll { -ms-overflow-style:none; scrollbar-width:none }
       `}</style>
 
-      {activeVideo && (
-        <VideoModal item={activeVideo} onClose={() => setActiveVideo(null)} />
-      )}
+      {activeVideo && <VideoModal item={activeVideo} onClose={() => setActiveVideo(null)} />}
 
       <div className="min-h-screen bg-white">
 
-        {/* ── Hero ── */}
+        {/* ── Hero — full bleed, text constrained to WRAP ── */}
         <div
           className="relative overflow-hidden bg-[#04342C]"
-          style={{ minHeight: 380, opacity: entered ? 1 : 0, transition: "opacity 0.5s ease" }}
+          style={{ minHeight: 420, opacity: entered ? 1 : 0, transition: "opacity 0.5s ease" }}
         >
           <svg className="absolute inset-0 w-full h-full opacity-[0.06]" preserveAspectRatio="none">
-            {[80, 180, 280].map((y) => (
+            {[80, 180, 280, 360].map((y) => (
               <line key={y} x1="0" y1={y} x2="100%" y2={y} stroke="white" strokeWidth="0.5" />
             ))}
             {["25%", "50%", "75%"].map((x) => (
@@ -386,51 +321,46 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
             ))}
           </svg>
 
-          <div className="relative z-10 max-w-3xl mx-auto px-4 flex flex-col justify-end pb-8" style={{ minHeight: 380 }}>
+          {/* ✅ Hero content constrained to max-w-7xl */}
+          <div className={`relative z-10 ${WRAP} flex flex-col justify-end pb-10`} style={{ minHeight: 420 }}>
             <div className="flex items-center gap-2 mb-3 text-[10px] tracking-[0.25em] uppercase text-white/40 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#1AB5A3] animate-pulse" />
               Travela Siargao — updated by locals
             </div>
-            <h1 className="text-[clamp(28px,7vw,50px)] font-semibold text-white leading-[1.05] tracking-[-0.03em] mb-4">
+            <h1 className="text-[clamp(32px,6vw,60px)] font-semibold text-white leading-[1.05] tracking-[-0.03em] mb-5">
               Explore &<br />
               <span className="text-[#5DCAA5]">Discover Siargao.</span>
             </h1>
             <div className="flex flex-wrap items-center gap-2">
               {["Cloud 9 surf", "Hidden beaches", "Ferry tips", "Local eats", "Island life"].map((tag) => (
-                <span key={tag} className="px-3 py-1 border border-white/15 rounded-full text-[11px] text-white/50">
-                  {tag}
-                </span>
+                <span key={tag} className="px-3 py-1 border border-white/15 rounded-full text-[11px] text-white/50">{tag}</span>
               ))}
-              <a
-                href="/book"
-                className="ml-auto flex items-center gap-1.5 px-4 py-2 bg-[#1AB5A3] text-[#04342C] rounded-full text-[12px] font-semibold hover:bg-[#5DCAA5] transition-colors"
-              >
+              <a href="/book" className="ml-auto flex items-center gap-1.5 px-5 py-2 bg-[#1AB5A3] text-[#04342C] rounded-full text-[12px] font-semibold hover:bg-[#5DCAA5] transition-colors">
                 Book ferry →
               </a>
             </div>
           </div>
         </div>
 
-        {/* ── Ticker ── */}
+        {/* ── Ticker — full bleed ── */}
         <NewsTicker items={items} />
 
-        {/* ── Filter bar ── */}
-        <div className="sticky top-0 bg-white/95 z-20 border-b border-slate-100">
-  <div className="max-w-3xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto hide-scroll">
-
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.key}
-              onClick={() => setFilter(cat.key)}
-              className={`shrink-0 px-4 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap border transition-all
-                ${filter === cat.key
-                  ? "bg-[#085C52] text-[#9FE1CB] border-[#085C52]"
-                  : "bg-transparent text-slate-500 border-slate-200 hover:border-[#0c7b93] hover:text-[#0c7b93]"}`}
-            >
-              {cat.label}
-            </button>
-          ))}
-            </div>
+        {/* ── Filter bar — constrained to WRAP ── */}
+        <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 border-b border-slate-100">
+          <div className={`${WRAP} py-3 flex gap-2 overflow-x-auto hide-scroll`}>
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.key}
+                onClick={() => setFilter(cat.key)}
+                className={`shrink-0 px-4 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap border transition-all
+                  ${filter === cat.key
+                    ? "bg-[#085C52] text-[#9FE1CB] border-[#085C52]"
+                    : "bg-transparent text-slate-500 border-slate-200 hover:border-[#0c7b93] hover:text-[#0c7b93]"}`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ── Empty state ── */}
@@ -441,17 +371,17 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
           </div>
         )}
 
-        {/* ── Broken grid ── */}
+        {/* ── Broken grid — constrained to WRAP ── */}
         {filtered.length > 0 && (
-          <div className="max-w-3xl mx-auto px-4 py-5 space-y-3">
+          <div className={`${WRAP} py-6 space-y-4`}>
 
             {/* ROW 1 — Big portrait + 3 horizontal */}
             {featured && (
-              <div className="grid gap-3" style={{ gridTemplateColumns: "1.65fr 1fr" }}>
+              <div className="grid gap-4" style={{ gridTemplateColumns: "1.65fr 1fr" }}>
                 <div className="fade-up" style={{ animationDelay: "0.05s" }}>
                   <CardXL item={featured} onClick={() => handleClick(featured)} />
                 </div>
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-4">
                   {sideStack.map((item, i) => (
                     <div key={item.id} className="fade-up" style={{ animationDelay: `${0.1 + i * 0.06}s` }}>
                       <CardHorizontal item={item} onClick={() => handleClick(item)} />
@@ -470,7 +400,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
 
             {/* ROW 3 — 3 equal medium */}
             {threeRow.length > 0 && (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-4">
                 {threeRow.map((item, i) => (
                   <div key={item.id} className="fade-up" style={{ animationDelay: `${0.33 + i * 0.05}s` }}>
                     <CardMedium item={item} onClick={() => handleClick(item)} />
@@ -488,7 +418,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
 
             {/* ROW 5 — Asymmetric 2-col */}
             {(asymLeft || asymRight) && (
-              <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1.4fr" }}>
+              <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1.4fr" }}>
                 {asymLeft && (
                   <div className="fade-up" style={{ animationDelay: "0.5s" }}>
                     <CardTall item={asymLeft} onClick={() => handleClick(asymLeft)} />
@@ -504,7 +434,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
 
             {/* REMAINDER — overflow 3-col */}
             {remainder.length > 0 && (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-4">
                 {remainder.map((item, i) => (
                   <div key={item.id} className="fade-up" style={{ animationDelay: `${0.55 + i * 0.04}s` }}>
                     <CardMedium item={item} onClick={() => handleClick(item)} />
@@ -515,15 +445,12 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
 
             {/* ── Ferry CTA ── */}
             <div className="fade-up rounded-2xl overflow-hidden" style={{ animationDelay: "0.65s" }}>
-              <div className="flex items-center gap-4 p-5 bg-gradient-to-r from-[#085C52] to-[#0c7b93]">
+              <div className="flex items-center gap-4 p-6 bg-gradient-to-r from-[#085C52] to-[#0c7b93]">
                 <div className="flex-1">
-                  <p className="text-[16px] font-semibold text-white mb-1">Ready to sail to Siargao?</p>
-                  <p className="text-[12px] text-white/50">Book your ferry online — skip the queue, secure your seat.</p>
+                  <p className="text-[18px] font-semibold text-white mb-1">Ready to sail to Siargao?</p>
+                  <p className="text-[13px] text-white/50">Book your ferry online — skip the queue, secure your seat.</p>
                 </div>
-                <a
-                  href="/book"
-                  className="shrink-0 px-5 py-2.5 bg-white text-[#085C52] rounded-full text-[12px] font-semibold hover:bg-[#f0fdfa] transition-colors whitespace-nowrap"
-                >
+                <a href="/book" className="shrink-0 px-6 py-3 bg-white text-[#085C52] rounded-full text-[13px] font-semibold hover:bg-[#f0fdfa] transition-colors whitespace-nowrap">
                   Book a trip →
                 </a>
               </div>
