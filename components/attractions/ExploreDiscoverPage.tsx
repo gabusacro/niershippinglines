@@ -309,7 +309,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
         {/* ── Hero — full bleed background, content constrained to max-w-6xl ── */}
         <section
           className="relative overflow-hidden bg-[#04342C] transition-opacity duration-500"
-          style={{ minHeight: 380, opacity: mounted ? 1 : 0 }}
+          style={{ minHeight: 280, opacity: mounted ? 1 : 0 }}
           suppressHydrationWarning
         >
           <svg className="absolute inset-0 w-full h-full opacity-[0.06]" preserveAspectRatio="none">
@@ -320,7 +320,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               <line key={x} x1={x} y1="0" x2={x} y2="100%" stroke="white" strokeWidth="0.5" />
             ))}
           </svg>
-          <div className={`relative z-10 ${WRAP} flex flex-col justify-end pb-10`} style={{ minHeight: 380 }}>
+          <div className={`relative z-10 ${WRAP} flex flex-col justify-end pb-8`} style={{ minHeight: 280 }}>
             <div className="flex items-center gap-2 mb-3 text-[10px] tracking-[0.25em] uppercase text-white/40 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#1AB5A3] animate-pulse" />
               Travela Siargao — updated by locals
