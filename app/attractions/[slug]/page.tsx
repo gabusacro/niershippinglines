@@ -1,15 +1,12 @@
 // app/attractions/[slug]/page.tsx
-// ✅ FIX: Removed generateStaticParams — it can't use cookies() at build time.
-// This page is now fully dynamic (rendered on each request), which is actually
-// BETTER for SEO because Google always gets fresh content from Supabase.
+// ✅ Works now because getAttractionBySlug uses anon client (no cookies)
 
 import { notFound } from "next/navigation";
 import { getAttractionBySlug } from "@/lib/attractions/get-attractions";
 
-// ✅ Tell Next.js this is a dynamic route — do NOT try to pre-render at build time
 export const dynamic = "force-dynamic";
 
-// ── Per-page SEO metadata ─────────────────────────────────────────────────────
+// ── SEO metadata per attraction ───────────────────────────────────────────────
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const item = await getAttractionBySlug(params.slug);
   if (!item) return { title: "Not found | Travela Siargao" };
@@ -45,7 +42,7 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
   return (
     <div className="min-h-screen bg-white">
 
-      {/* Hero */}
+      {/* Hero image */}
       <div className="relative h-[420px] sm:h-[520px] bg-[#04342C] overflow-hidden">
         {item.image_url
           ? <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover" />
@@ -58,14 +55,14 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
         {/* Back button */}
-        <div className="absolute top-5 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <a href="/attractions" className="inline-flex items-center gap-2 text-[12px] text-white/70 hover:text-white transition-colors">
-            ← Back to Explore & Discover
+        <div className="absolute top-5 left-0 right-0 mx-auto max-w-6xl px-4 sm:px-6">
+          <a href="/attractions" className="inline-flex items-center gap-2 text-[12px] font-semibold text-white/70 hover:text-white transition-colors">
+            ← Back to Explore &amp; Discover
           </a>
         </div>
 
-        {/* Title */}
-        <div className="absolute bottom-0 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        {/* Title overlay */}
+        <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-6xl px-4 sm:px-6 pb-8">
           {item.is_featured && (
             <span className="inline-block bg-amber-400 text-amber-900 text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full mb-3">
               ✦ Featured
@@ -82,21 +79,21 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
               </span>
             )}
           </div>
-          <h1 className="text-[clamp(24px,5vw,48px)] font-semibold text-white leading-tight tracking-tight">
+          <h1 className="text-[clamp(24px,5vw,48px)] font-black text-white leading-tight tracking-tight">
             {item.title}
           </h1>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* Content body */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
         <div className="max-w-3xl">
 
           {/* SEO keyword tags */}
           {item.seo_tags && item.seo_tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-6">
               {item.seo_tags.map((tag) => (
-                <span key={tag} className="px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full text-[11px] font-medium">
+                <span key={tag} className="px-3 py-1 bg-[#0c7b93]/10 border border-[#0c7b93]/20 text-[#0c7b93] rounded-full text-[11px] font-semibold">
                   {tag}
                 </span>
               ))}
@@ -105,32 +102,28 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
 
           {/* Description */}
           {item.description && (
-            <p className="text-[16px] text-slate-700 leading-relaxed whitespace-pre-line">
+            <p className="text-base text-[#134e4a] leading-relaxed whitespace-pre-line font-medium">
               {item.description}
             </p>
           )}
 
-          {/* Ferry CTA */}
-          <div className="mt-10 rounded-2xl overflow-hidden">
-            <div className="flex items-center gap-4 p-6 bg-gradient-to-r from-[#085C52] to-[#0c7b93]">
-              <div className="flex-1">
-                <p className="text-[16px] font-semibold text-white mb-1">Ready to visit {item.title}?</p>
-                <p className="text-[13px] text-white/55">Book your ferry to Siargao online — skip the queue, secure your seat.</p>
-              </div>
-              <a href="/book" className="shrink-0 px-5 py-2.5 bg-white text-[#085C52] rounded-full text-[13px] font-semibold hover:bg-[#f0fdfa] transition-colors whitespace-nowrap">
-                Book a trip →
+          {/* Ferry CTA — matches homepage style */}
+          <div className="mt-10 rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-8 text-center text-white shadow-lg">
+            <h2 className="text-xl font-black">Ready to visit {item.title}? 🌊</h2>
+            <p className="mt-2 text-white/75 font-semibold text-sm">
+              Book your ferry to Siargao online — skip the queue, secure your seat.
+            </p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4">
+              <a href="/book" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-7 py-3 text-sm font-extrabold text-[#085C52] shadow-md hover:bg-[#fef9e7] hover:-translate-y-0.5 transition-all">
+                🚢 Book a Trip
+              </a>
+              <a href="/attractions" className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-white/30 bg-white/10 px-7 py-3 text-sm font-extrabold text-white hover:bg-white/20 hover:-translate-y-0.5 transition-all">
+                ← More Attractions
               </a>
             </div>
           </div>
 
         </div>
-      </div>
-
-      {/* Bottom back link */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        <a href="/attractions" className="text-[13px] text-[#0c7b93] hover:underline">
-          ← Back to all attractions
-        </a>
       </div>
 
     </div>

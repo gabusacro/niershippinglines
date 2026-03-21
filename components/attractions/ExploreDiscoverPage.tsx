@@ -19,7 +19,7 @@ function toEmbedUrl(url: string): string | null {
   } catch { return null; }
 }
 
-// ✅ FIX 1 — Always use Asia/Manila timezone so server + client agree exactly
+// ✅ Fixed timezone — server and client always agree
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-PH", {
     month: "short",
@@ -127,10 +127,7 @@ function CardHorizontal({ item, onClick }: { item: Attraction; onClick: () => vo
       <div className="flex flex-col justify-center px-3 py-2.5 min-w-0">
         <CategoryBadge item={item} />
         <h3 className="text-[12px] font-semibold text-slate-800 leading-snug line-clamp-2 mt-1 mb-0.5">{item.title}</h3>
-        {/* ✅ FIX 2 — suppressHydrationWarning on date elements */}
-        <p className="text-[10px] text-slate-400" suppressHydrationWarning>
-          {formatDate(item.created_at)}
-        </p>
+        <p className="text-[10px] text-slate-400" suppressHydrationWarning>{formatDate(item.created_at)}</p>
       </div>
     </article>
   );
@@ -235,10 +232,7 @@ function CardTall({ item, onClick }: { item: Attraction; onClick: () => void }) 
       <div className="p-3">
         <CategoryBadge item={item} />
         <h3 className="text-[13px] font-semibold text-slate-800 leading-snug mt-1.5 mb-1">{item.title}</h3>
-        {/* ✅ FIX 2 — suppressHydrationWarning on date elements */}
-        <p className="text-[10px] text-slate-400" suppressHydrationWarning>
-          {formatDate(item.created_at)}
-        </p>
+        <p className="text-[10px] text-slate-400" suppressHydrationWarning>{formatDate(item.created_at)}</p>
       </div>
     </article>
   );
@@ -267,9 +261,8 @@ function NewsTicker({ items }: { items: Attraction[] }) {
 export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
   const [filter,      setFilter]      = useState("all");
   const [activeVideo, setActiveVideo] = useState<Attraction | null>(null);
+  const [mounted,     setMounted]     = useState(false);
 
-  // ✅ FIX 3 — Track mount separately; never control visible DOM with pre-mount state
-  const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   const filtered =
@@ -296,7 +289,8 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
     window.location.href = `/attractions/${item.slug}`;
   }
 
-  const WRAP = "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8";
+  // ✅ Matches your homepage exactly: max-w-6xl px-4 sm:px-6
+  const WRAP = "mx-auto max-w-6xl px-4 sm:px-6";
 
   return (
     <>
@@ -312,53 +306,53 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
 
       <div className="min-h-screen bg-white">
 
-        {/* ✅ FIX 3 — opacity controlled by mounted class, not inline style tied to state */}
-        <div
+        {/* ── Hero — full bleed background, content constrained to max-w-6xl ── */}
+        <section
           className="relative overflow-hidden bg-[#04342C] transition-opacity duration-500"
-          style={{ minHeight: 420, opacity: mounted ? 1 : 0 }}
+          style={{ minHeight: 380, opacity: mounted ? 1 : 0 }}
           suppressHydrationWarning
         >
           <svg className="absolute inset-0 w-full h-full opacity-[0.06]" preserveAspectRatio="none">
-            {[80, 180, 280, 360].map((y) => (
+            {[80, 180, 280].map((y) => (
               <line key={y} x1="0" y1={y} x2="100%" y2={y} stroke="white" strokeWidth="0.5" />
             ))}
             {["25%", "50%", "75%"].map((x) => (
               <line key={x} x1={x} y1="0" x2={x} y2="100%" stroke="white" strokeWidth="0.5" />
             ))}
           </svg>
-
-          <div className={`relative z-10 ${WRAP} flex flex-col justify-end pb-10`} style={{ minHeight: 420 }}>
+          <div className={`relative z-10 ${WRAP} flex flex-col justify-end pb-10`} style={{ minHeight: 380 }}>
             <div className="flex items-center gap-2 mb-3 text-[10px] tracking-[0.25em] uppercase text-white/40 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#1AB5A3] animate-pulse" />
               Travela Siargao — updated by locals
             </div>
-            <h1 className="text-[clamp(32px,6vw,60px)] font-semibold text-white leading-[1.05] tracking-[-0.03em] mb-5">
-              Explore &<br />
-              <span className="text-[#5DCAA5]">Discover Siargao.</span>
+            <h1 className="text-[clamp(28px,5vw,52px)] font-black text-white leading-[1.05] tracking-tight mb-5">
+              Explore &amp; <span className="text-[#5DCAA5]">Discover Siargao.</span>
             </h1>
             <div className="flex flex-wrap items-center gap-2">
               {["Cloud 9 surf", "Hidden beaches", "Ferry tips", "Local eats", "Island life"].map((tag) => (
-                <span key={tag} className="px-3 py-1 border border-white/15 rounded-full text-[11px] text-white/50">{tag}</span>
+                <span key={tag} className="px-3 py-1 border border-white/15 rounded-full text-[11px] text-white/50 font-semibold">{tag}</span>
               ))}
-              <a href="/book" className="ml-auto flex items-center gap-1.5 px-5 py-2 bg-[#1AB5A3] text-[#04342C] rounded-full text-[12px] font-semibold hover:bg-[#5DCAA5] transition-colors">
-                Book ferry →
+              <a href="/book" className="ml-auto inline-flex items-center gap-1.5 rounded-2xl bg-[#0c7b93] px-5 py-2.5 text-sm font-extrabold text-white shadow-lg hover:bg-[#0f766e] transition-colors">
+                🚢 Book ferry →
               </a>
             </div>
           </div>
-        </div>
+        </section>
 
+        {/* ── Ticker ── */}
         <NewsTicker items={items} />
 
-        <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 border-b border-slate-100">
+        {/* ── Filter bar ── */}
+        <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 border-b border-teal-200/50">
           <div className={`${WRAP} py-3 flex gap-2 overflow-x-auto hide-scroll`}>
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.key}
                 onClick={() => setFilter(cat.key)}
-                className={`shrink-0 px-4 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap border transition-all
+                className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-extrabold tracking-wide whitespace-nowrap border transition-all
                   ${filter === cat.key
                     ? "bg-[#085C52] text-[#9FE1CB] border-[#085C52]"
-                    : "bg-transparent text-slate-500 border-slate-200 hover:border-[#0c7b93] hover:text-[#0c7b93]"}`}
+                    : "bg-transparent text-[#0f766e] border-teal-200 hover:border-[#0c7b93] hover:text-[#0c7b93]"}`}
               >
                 {cat.label}
               </button>
@@ -366,16 +360,19 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
           </div>
         </div>
 
+        {/* ── Empty state ── */}
         {filtered.length === 0 && (
           <div className="py-20 text-center px-4">
             <div className="text-4xl mb-3">🌊</div>
-            <p className="text-slate-500 text-sm font-medium">Nothing here yet — check back soon.</p>
+            <p className="text-[#0f766e] text-sm font-semibold">Nothing here yet — check back soon.</p>
           </div>
         )}
 
+        {/* ── Broken grid ── */}
         {filtered.length > 0 && (
           <div className={`${WRAP} py-6 space-y-4`}>
 
+            {/* ROW 1 — Big portrait + 3 horizontal */}
             {featured && (
               <div className="grid gap-4" style={{ gridTemplateColumns: "1.65fr 1fr" }}>
                 <div className="fade-up" style={{ animationDelay: "0.05s" }}>
@@ -391,12 +388,14 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
+            {/* ROW 2 — Wide diagonal */}
             {wideCard && (
               <div className="fade-up" style={{ animationDelay: "0.28s" }}>
                 <CardWide item={wideCard} onClick={() => handleClick(wideCard)} />
               </div>
             )}
 
+            {/* ROW 3 — 3 equal medium */}
             {threeRow.length > 0 && (
               <div className="grid grid-cols-3 gap-4">
                 {threeRow.map((item, i) => (
@@ -407,12 +406,14 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
+            {/* ROW 4 — Cinematic full */}
             {cinemaCard && (
               <div className="fade-up" style={{ animationDelay: "0.45s" }}>
                 <CardCinema item={cinemaCard} onClick={() => handleClick(cinemaCard)} />
               </div>
             )}
 
+            {/* ROW 5 — Asymmetric 2-col */}
             {(asymLeft || asymRight) && (
               <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1.4fr" }}>
                 {asymLeft && (
@@ -428,6 +429,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
+            {/* REMAINDER — overflow 3-col */}
             {remainder.length > 0 && (
               <div className="grid grid-cols-3 gap-4">
                 {remainder.map((item, i) => (
@@ -438,15 +440,16 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
-            <div className="fade-up rounded-2xl overflow-hidden" style={{ animationDelay: "0.65s" }}>
-              <div className="flex items-center gap-4 p-6 bg-gradient-to-r from-[#085C52] to-[#0c7b93]">
-                <div className="flex-1">
-                  <p className="text-[18px] font-semibold text-white mb-1">Ready to sail to Siargao?</p>
-                  <p className="text-[13px] text-white/50">Book your ferry online — skip the queue, secure your seat.</p>
+            {/* ── Ferry CTA — matches homepage style ── */}
+            <div className="fade-up" style={{ animationDelay: "0.65s" }}>
+              <div className="rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-10 text-center text-white shadow-lg">
+                <h2 className="text-2xl font-black">Ready to sail to Siargao? 🌊</h2>
+                <p className="mt-2 text-white/75 font-semibold">Book your ferry in 2 minutes. Safe, reliable, hassle-free.</p>
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center sm:gap-4">
+                  <a href="/book" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-7 py-3.5 text-base font-extrabold text-[#085C52] shadow-md transition-all hover:bg-[#fef9e7] hover:-translate-y-0.5">
+                    🚢 Book a Trip
+                  </a>
                 </div>
-                <a href="/book" className="shrink-0 px-6 py-3 bg-white text-[#085C52] rounded-full text-[13px] font-semibold hover:bg-[#f0fdfa] transition-colors whitespace-nowrap">
-                  Book a trip →
-                </a>
               </div>
             </div>
 
