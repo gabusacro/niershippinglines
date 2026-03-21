@@ -1,21 +1,18 @@
 // app/attractions/[slug]/page.tsx
-// ✅ Works now because getAttractionBySlug uses anon client (no cookies)
 
 import { notFound } from "next/navigation";
 import { getAttractionBySlug } from "@/lib/attractions/get-attractions";
 
 export const dynamic = "force-dynamic";
 
-// ── SEO metadata per attraction ───────────────────────────────────────────────
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const item = await getAttractionBySlug(params.slug);
   if (!item) return { title: "Not found | Travela Siargao" };
-
   return {
     title: `${item.title} — Siargao Island | Travela Siargao`,
     description: item.description
       ? item.description.slice(0, 160)
-      : `Discover ${item.title} on Siargao Island, Philippines. Book your ferry with Travela Siargao.`,
+      : `Discover ${item.title} on Siargao Island, Philippines.`,
     keywords: [
       item.title.toLowerCase(),
       "siargao island",
@@ -34,7 +31,6 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 export default async function AttractionDetailPage({ params }: { params: { slug: string } }) {
   const item = await getAttractionBySlug(params.slug);
   if (!item) notFound();
@@ -42,7 +38,7 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
   return (
     <div className="min-h-screen bg-white">
 
-      {/* Hero image */}
+      {/* Hero */}
       <div className="relative h-[420px] sm:h-[520px] bg-[#04342C] overflow-hidden">
         {item.image_url
           ? <img src={item.image_url} alt={item.title} className="absolute inset-0 w-full h-full object-cover" />
@@ -54,14 +50,14 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
         }
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-        {/* Back button */}
+        {/* Back */}
         <div className="absolute top-5 left-0 right-0 mx-auto max-w-6xl px-4 sm:px-6">
           <a href="/attractions" className="inline-flex items-center gap-2 text-[12px] font-semibold text-white/70 hover:text-white transition-colors">
             ← Back to Explore &amp; Discover
           </a>
         </div>
 
-        {/* Title overlay */}
+        {/* Title */}
         <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-6xl px-4 sm:px-6 pb-8">
           {item.is_featured && (
             <span className="inline-block bg-amber-400 text-amber-900 text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full mb-3">
@@ -85,11 +81,11 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
         </div>
       </div>
 
-      {/* Content body */}
+      {/* Content */}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10">
         <div className="max-w-3xl">
 
-          {/* SEO keyword tags */}
+          {/* SEO tags */}
           {item.seo_tags && item.seo_tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-6">
               {item.seo_tags.map((tag) => (
@@ -107,7 +103,7 @@ export default async function AttractionDetailPage({ params }: { params: { slug:
             </p>
           )}
 
-          {/* Ferry CTA — matches homepage style */}
+          {/* CTA */}
           <div className="mt-10 rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-8 text-center text-white shadow-lg">
             <h2 className="text-xl font-black">Ready to visit {item.title}? 🌊</h2>
             <p className="mt-2 text-white/75 font-semibold text-sm">
