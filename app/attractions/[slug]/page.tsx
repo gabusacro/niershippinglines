@@ -1,11 +1,9 @@
-// app/attractions/[slug]/page.tsx
-"use client" //is NOT here — this stays a server component
-// The photo modal is a separate client component below
-
 import { notFound } from "next/navigation";
 import { getAttractionBySlug } from "@/lib/attractions/get-attractions";
 import { getActiveAd } from "@/lib/attractions/get-ads";
+import { getRecentAttractions } from "@/lib/attractions/get-recent-attractions";
 import type { Ad } from "@/lib/attractions/get-ads";
+import type { Attraction } from "@/lib/attractions/types";
 import { AttractionPhotoModal } from "@/components/attractions/AttractionPhotoModal";
 
 export const dynamic = "force-dynamic";
@@ -42,45 +40,175 @@ export async function generateMetadata({
 function AdSlot({ ad }: { ad: Ad }) {
   if (ad.type === "adsense" && ad.adsense_client && ad.adsense_slot) {
     return (
-      <div className="my-6 rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 p-3 text-center">
-        <p className="text-[9px] uppercase tracking-widest text-slate-300 mb-2 font-semibold">Advertisement</p>
-        <ins className="adsbygoogle" style={{ display: "block" }}
-          data-ad-client={ad.adsense_client} data-ad-slot={ad.adsense_slot}
-          data-ad-format="auto" data-full-width-responsive="true" />
-        <script dangerouslySetInnerHTML={{ __html: "(adsbygoogle = window.adsbygoogle || []).push({});" }} />
+      <div className="mb-4 rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 p-3 text-center">
+        <p className="text-[9px] uppercase tracking-widest text-slate-300 mb-2 font-semibold">
+          Advertisement
+        </p>
+        <ins
+          className="adsbygoogle"
+          style={{ display: "block" }}
+          data-ad-client={ad.adsense_client}
+          data-ad-slot={ad.adsense_slot}
+          data-ad-format="auto"
+          data-full-width-responsive="true"
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "(adsbygoogle = window.adsbygoogle || []).push({});",
+          }}
+        />
       </div>
     );
   }
   if (ad.type === "custom") {
     const inner = (
-      <div className="relative overflow-hidden rounded-2xl group cursor-pointer"
-        style={{ background: ad.image_url ? undefined : "linear-gradient(135deg,#085C52,#0c7b93)" }}>
+      <div
+        className="relative overflow-hidden rounded-2xl group cursor-pointer"
+        style={{
+          background: ad.image_url ? undefined : "linear-gradient(135deg,#085C52,#0c7b93)",
+        }}
+      >
         {ad.image_url && (
-          <img src={ad.image_url} alt={ad.image_alt ?? ad.title ?? "Ad"}
-            className="w-full h-[160px] object-cover transition-transform duration-500 group-hover:scale-105" />
+          <img
+            src={ad.image_url}
+            alt={ad.image_alt ?? ad.title ?? "Ad"}
+            className="w-full h-[150px] object-cover transition-transform duration-500 group-hover:scale-105"
+          />
         )}
-        <div className="absolute inset-0" style={{
-          background: ad.image_url
-            ? "linear-gradient(to right,rgba(4,52,44,0.88) 0%,rgba(4,52,44,0.4) 60%,transparent 100%)"
-            : undefined,
-        }} />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: ad.image_url
+              ? "linear-gradient(to right,rgba(4,52,44,0.88) 0%,rgba(4,52,44,0.4) 60%,transparent 100%)"
+              : undefined,
+          }}
+        />
         <div className={`${ad.image_url ? "absolute inset-0" : ""} flex flex-col justify-center p-5`}>
-          <p className="text-[9px] uppercase tracking-widest text-white/40 font-semibold mb-2">Sponsored</p>
-          {ad.title && <p className="text-[16px] font-black text-white leading-snug mb-1">{ad.title}</p>}
-          {ad.description && <p className="text-[12px] text-white/65 font-medium mb-3 line-clamp-2">{ad.description}</p>}
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#5DCAA5] w-fit">Learn more →</span>
+          <p className="text-[9px] uppercase tracking-widest text-white/40 font-semibold mb-1">
+            Sponsored
+          </p>
+          {ad.title && (
+            <p className="text-[15px] font-black text-white leading-snug mb-1">{ad.title}</p>
+          )}
+          {ad.description && (
+            <p className="text-[12px] text-white/65 font-medium mb-3 line-clamp-2">
+              {ad.description}
+            </p>
+          )}
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#5DCAA5] w-fit">
+            Learn more →
+          </span>
         </div>
       </div>
     );
     return (
-      <div className="my-6">
-        {ad.link_url
-          ? <a href={ad.link_url} target="_blank" rel="noopener noreferrer" className="block">{inner}</a>
-          : inner}
+      <div className="mb-4">
+        {ad.link_url ? (
+          <a href={ad.link_url} target="_blank" rel="noopener noreferrer" className="block">
+            {inner}
+          </a>
+        ) : inner}
       </div>
     );
   }
   return null;
+}
+
+// ── Recently added attractions strip ─────────────────────────────────────────
+function RecentAttractions({ items }: { items: Attraction[] }) {
+  if (!items.length) return null;
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-2 mb-3">
+        <span
+          className="w-1 h-4 rounded-full"
+          style={{ background: "#1AB5A3" }}
+        />
+        <p
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            color: "#6B7280",
+          }}
+        >
+          Recently added
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {items.map((item) => (
+          <a
+            key={item.id}
+            href={`/attractions/${item.slug}`}
+            className="group block rounded-xl overflow-hidden border border-slate-100 hover:border-[#0c7b93] transition-colors"
+            style={{ textDecoration: "none" }}
+          >
+            {/* Thumbnail */}
+            <div className="relative h-[80px] overflow-hidden">
+              {item.image_url ? (
+                <img
+                  src={item.image_url}
+                  alt={item.title}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                />
+              ) : (
+                <div
+                  className={`w-full h-full bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#0c7b93]"} flex items-center justify-center`}
+                >
+                  <span style={{ fontSize: 22 }}>{item.cover_emoji ?? "🌴"}</span>
+                </div>
+              )}
+              {item.is_featured && (
+                <div className="absolute top-1 left-1">
+                  <span
+                    style={{
+                      background: "#F59E0B",
+                      color: "#78350F",
+                      fontSize: 8,
+                      fontWeight: 700,
+                      padding: "1px 5px",
+                      borderRadius: 999,
+                    }}
+                  >
+                    ✦
+                  </span>
+                </div>
+              )}
+            </div>
+            {/* Label */}
+            <div className="p-2">
+              <p
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  color: "#9CA3AF",
+                  marginBottom: 2,
+                  textDecoration: "none",
+                }}
+              >
+                {item.category?.replace("-", " ") ?? item.type}
+              </p>
+              <p
+                className="group-hover:text-[#0c7b93] transition-colors line-clamp-2"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#111827",
+                  lineHeight: 1.3,
+                  textDecoration: "none",
+                }}
+              >
+                {item.title}
+              </p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -92,10 +220,13 @@ export default async function AttractionDetailPage({
   const { slug } = await Promise.resolve(params);
   if (!slug) notFound();
 
-  const [item, ad] = await Promise.all([
+  // Fetch all three in parallel — fast!
+  const [item, ad, recentItems] = await Promise.all([
     getAttractionBySlug(slug),
     getActiveAd("attraction_detail"),
+    getRecentAttractions(slug, 4),
   ]);
+
   if (!item) notFound();
 
   const categoryLabel = item.category?.replace("-", " ") ?? item.type;
@@ -117,26 +248,36 @@ export default async function AttractionDetailPage({
 
       <div className="min-h-screen bg-white">
 
-        {/* ── HERO ── */}
+        {/* ── Hero ── */}
         <div className="relative overflow-hidden" style={{ height: 480, background: "#04342C" }}>
           {item.image_url && (
-            <img src={item.image_url} alt={item.title}
+            <img
+              src={item.image_url}
+              alt={item.title}
               className="hero-zoom absolute inset-0 w-full h-full object-cover"
-              style={{ objectPosition: heroPosition }} />
+              style={{ objectPosition: heroPosition }}
+            />
           )}
-          <div className="absolute inset-0" style={{
-            background: "linear-gradient(to bottom,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0) 30%,rgba(0,0,0,0) 38%,rgba(2,20,40,0.55) 68%,rgba(2,20,40,0.92) 100%)",
-          }} />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to bottom,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0) 30%,rgba(0,0,0,0) 38%,rgba(2,20,40,0.55) 68%,rgba(2,20,40,0.92) 100%)",
+            }}
+          />
 
-          {/* Back */}
           <div className="absolute top-5 left-0 right-0 mx-auto max-w-6xl px-4 sm:px-6">
-            <a href="/attractions" style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              background: "rgba(0,0,0,0.35)", backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.16)",
-              color: "rgba(255,255,255,0.88)", padding: "7px 16px", borderRadius: 999,
-              fontSize: 12, fontWeight: 600, textDecoration: "none",
-            }}>
+            <a
+              href="/attractions"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: "rgba(0,0,0,0.35)", backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255,255,255,0.16)",
+                color: "rgba(255,255,255,0.88)", padding: "7px 16px",
+                borderRadius: 999, fontSize: 12, fontWeight: 600, textDecoration: "none",
+              }}
+            >
               ← Explore &amp; Discover
             </a>
           </div>
@@ -148,7 +289,9 @@ export default async function AttractionDetailPage({
                 background: "rgba(251,191,36,0.18)", backdropFilter: "blur(10px)",
                 border: "1px solid rgba(251,191,36,0.38)", color: "#FCD34D",
                 padding: "6px 14px", borderRadius: 999, fontSize: 11, fontWeight: 700,
-              }}>✦ Featured spot</div>
+              }}>
+                ✦ Featured spot
+              </div>
             </div>
           )}
 
@@ -156,50 +299,77 @@ export default async function AttractionDetailPage({
             <div className="fade-up">
               <span style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
-                background: "rgba(26,181,163,0.18)", border: "1px solid rgba(26,181,163,0.38)",
+                background: "rgba(26,181,163,0.18)",
+                border: "1px solid rgba(26,181,163,0.38)",
                 color: "#5DCAA5", padding: "4px 12px", borderRadius: 999,
                 fontSize: 10, fontWeight: 700, letterSpacing: "0.16em",
                 textTransform: "uppercase", marginBottom: 12,
               }}>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#1AB5A3", display: "inline-block" }} />
+                <span style={{
+                  width: 5, height: 5, borderRadius: "50%",
+                  background: "#1AB5A3", display: "inline-block",
+                }} />
                 {categoryLabel} · Siargao Island
               </span>
             </div>
-            <h1 className="fade-up-2 font-black text-white" style={{
-              fontSize: "clamp(28px,5.5vw,52px)", lineHeight: 1.0,
-              letterSpacing: "-0.03em", textShadow: "0 2px 28px rgba(0,0,0,0.4)",
-            }}>
+            <h1
+              className="fade-up-2 font-black text-white"
+              style={{
+                fontSize: "clamp(28px,5.5vw,52px)",
+                lineHeight: 1.0, letterSpacing: "-0.03em",
+                textShadow: "0 2px 28px rgba(0,0,0,0.4)",
+              }}
+            >
               {item.title}
             </h1>
           </div>
         </div>
 
-        {/* ── BODY ── */}
+        {/* ── Body ── */}
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
 
           {/* Stat cards */}
-          <div className="fade-up-3 grid grid-cols-3 gap-3 relative z-10" style={{ marginTop: -32, marginBottom: 28 }}>
+          <div
+            className="fade-up-3 grid grid-cols-3 gap-3 relative z-10"
+            style={{ marginTop: -32, marginBottom: 28 }}
+          >
             {[
               { emoji: "📍", label: "Category", value: categoryLabel },
               { emoji: "🚢", label: "Get here",  value: "Ferry + land" },
               { emoji: "📖", label: "Read time", value: `${item.read_minutes ?? 2} min` },
             ].map(({ emoji, label, value }) => (
               <div key={label} style={{
-                background: "white", border: "1px solid #E5E7EB", borderRadius: 16,
-                padding: "14px 10px", textAlign: "center",
+                background: "white", border: "1px solid #E5E7EB",
+                borderRadius: 16, padding: "14px 10px", textAlign: "center",
                 boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
               }}>
                 <div style={{ fontSize: 20, marginBottom: 4 }}>{emoji}</div>
-                <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
-                <div style={{ fontSize: 13, color: "#111827", fontWeight: 700, marginTop: 2, textTransform: "capitalize" }}>{value}</div>
+                <div style={{
+                  fontSize: 10, color: "#6B7280", fontWeight: 700,
+                  textTransform: "uppercase", letterSpacing: "0.06em",
+                }}>
+                  {label}
+                </div>
+                <div style={{
+                  fontSize: 13, color: "#111827", fontWeight: 700,
+                  marginTop: 2, textTransform: "capitalize",
+                }}>
+                  {value}
+                </div>
               </div>
             ))}
           </div>
 
           <div style={{ maxWidth: 720 }}>
 
-            {/* Ad slot */}
+            {/* ── AD + RECENTLY ADDED SECTION ──
+                Logic:
+                - Ad active   → show ad first, recently added below
+                - No ad       → show recently added only
+                - AdSense     → AdSense loads async, recently added shows immediately below
+            */}
             {ad && <AdSlot ad={ad} />}
+            <RecentAttractions items={recentItems} />
 
             {/* SEO tags */}
             {item.seo_tags && item.seo_tags.length > 0 && (
@@ -209,17 +379,16 @@ export default async function AttractionDetailPage({
                     padding: "5px 13px", background: "#F0FDF4",
                     border: "1px solid #BBF7D0", color: "#166534",
                     borderRadius: 999, fontSize: 11, fontWeight: 600,
-                  }}>{tag}</span>
+                  }}>
+                    {tag}
+                  </span>
                 ))}
               </div>
             )}
 
-            {/* ── CLICKABLE PHOTO INSIDE CONTENT ── */}
+            {/* Clickable photo */}
             {item.image_url && (
-              <AttractionPhotoModal
-                imageUrl={item.image_url}
-                title={item.title}
-              />
+              <AttractionPhotoModal imageUrl={item.image_url} title={item.title} />
             )}
 
             {/* Description */}
@@ -233,26 +402,54 @@ export default async function AttractionDetailPage({
             )}
 
             {/* Ferry CTA */}
-            <div className="rounded-2xl text-center" style={{
-              background: "linear-gradient(135deg,#085C52 0%,#0c7b93 50%,#1AB5A3 100%)",
-              padding: "36px 24px", marginBottom: 40,
-            }}>
-              <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>
+            <div
+              className="rounded-2xl text-center"
+              style={{
+                background: "linear-gradient(135deg,#085C52 0%,#0c7b93 50%,#1AB5A3 100%)",
+                padding: "36px 24px", marginBottom: 40,
+              }}
+            >
+              <p style={{
+                color: "rgba(255,255,255,0.55)", fontSize: 11,
+                fontWeight: 700, letterSpacing: "0.15em",
+                textTransform: "uppercase", marginBottom: 8,
+              }}>
                 Ready to visit?
               </p>
-              <h2 className="font-black text-white" style={{ fontSize: 22, letterSpacing: "-0.02em", marginBottom: 8 }}>
+              <h2
+                className="font-black text-white"
+                style={{ fontSize: 22, letterSpacing: "-0.02em", marginBottom: 8 }}
+              >
                 Book your ferry to Siargao 🌊
               </h2>
-              <p style={{ color: "rgba(255,255,255,0.62)", fontSize: 13, fontWeight: 500, marginBottom: 22 }}>
+              <p style={{
+                color: "rgba(255,255,255,0.62)", fontSize: 13,
+                fontWeight: 500, marginBottom: 22,
+              }}>
                 Skip the queue — book online in 2 minutes, pay via GCash.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <a href="/book" className="inline-flex items-center justify-center gap-2 font-extrabold hover:-translate-y-0.5 transition-all"
-                  style={{ background: "white", color: "#085C52", padding: "12px 28px", borderRadius: 14, fontSize: 14, textDecoration: "none" }}>
+                <a
+                  href="/book"
+                  className="inline-flex items-center justify-center gap-2 font-extrabold hover:-translate-y-0.5 transition-all"
+                  style={{
+                    background: "white", color: "#085C52",
+                    padding: "12px 28px", borderRadius: 14,
+                    fontSize: 14, textDecoration: "none",
+                  }}
+                >
                   🚢 Book a Trip
                 </a>
-                <a href="/attractions" className="inline-flex items-center justify-center gap-2 font-bold hover:-translate-y-0.5 transition-all"
-                  style={{ background: "rgba(255,255,255,0.1)", border: "2px solid rgba(255,255,255,0.25)", color: "white", padding: "12px 28px", borderRadius: 14, fontSize: 14, textDecoration: "none" }}>
+                <a
+                  href="/attractions"
+                  className="inline-flex items-center justify-center gap-2 font-bold hover:-translate-y-0.5 transition-all"
+                  style={{
+                    background: "rgba(255,255,255,0.1)",
+                    border: "2px solid rgba(255,255,255,0.25)",
+                    color: "white", padding: "12px 28px",
+                    borderRadius: 14, fontSize: 14, textDecoration: "none",
+                  }}
+                >
                   ← More Attractions
                 </a>
               </div>
