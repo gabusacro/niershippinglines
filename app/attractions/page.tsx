@@ -1,5 +1,5 @@
 // app/attractions/page.tsx
-// REPLACE your existing attractions page with this file
+// REPLACE your entire existing file with this
 
 import { getAttractions } from "@/lib/attractions/get-attractions";
 import { ExploreDiscoverPage } from "@/components/attractions/ExploreDiscoverPage";
