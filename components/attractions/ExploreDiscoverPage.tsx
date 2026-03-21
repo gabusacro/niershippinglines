@@ -19,7 +19,6 @@ function toEmbedUrl(url: string): string | null {
   } catch { return null; }
 }
 
-// ✅ Fixed timezone — server and client always agree
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-PH", {
     month: "short",
@@ -289,15 +288,19 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
     window.open(`/attractions/${item.slug}`, "_self");
   }
 
-  // ✅ Matches your homepage exactly: max-w-6xl px-4 sm:px-6
   const WRAP = "mx-auto max-w-6xl px-4 sm:px-6";
+
+  // Use the featured item's photo as hero background, fallback to first item
+  const heroBg = featured?.image_url ?? items[0]?.image_url ?? null;
 
   return (
     <>
       <style>{`
-        @keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-        .fade-up { animation: fadeUp 0.5s ease both }
+        @keyframes ticker  { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+        @keyframes fadeUp  { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes heroZoom{ from{transform:scale(1.05)} to{transform:scale(1)} }
+        .fade-up   { animation: fadeUp 0.5s ease both }
+        .hero-zoom { animation: heroZoom 8s ease forwards }
         .hide-scroll::-webkit-scrollbar { display:none }
         .hide-scroll { -ms-overflow-style:none; scrollbar-width:none }
       `}</style>
@@ -306,33 +309,78 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
 
       <div className="min-h-screen bg-white">
 
-        {/* ── Hero — full bleed background, content constrained to max-w-6xl ── */}
+        {/* ── CINEMATIC HERO ── */}
         <section
-          className="relative overflow-hidden bg-[#04342C] transition-opacity duration-500"
-          style={{ minHeight: 280, opacity: mounted ? 1 : 0 }}
+          className="relative overflow-hidden"
+          style={{ minHeight: 420, opacity: mounted ? 1 : 0, transition: "opacity 0.5s ease", background: "#04342C" }}
           suppressHydrationWarning
         >
-          <svg className="absolute inset-0 w-full h-full opacity-[0.06]" preserveAspectRatio="none">
-            {[80, 180, 280].map((y) => (
-              <line key={y} x1="0" y1={y} x2="100%" y2={y} stroke="white" strokeWidth="0.5" />
-            ))}
-            {["25%", "50%", "75%"].map((x) => (
-              <line key={x} x1={x} y1="0" x2={x} y2="100%" stroke="white" strokeWidth="0.5" />
-            ))}
-          </svg>
-          <div className={`relative z-10 ${WRAP} flex flex-col justify-end pb-8`} style={{ minHeight: 280 }}>
-            <div className="flex items-center gap-2 mb-3 text-[10px] tracking-[0.25em] uppercase text-white/40 font-semibold">
+          {/* Real photo background — uses featured item's photo */}
+          {heroBg && (
+            <img
+              src={heroBg}
+              alt="Explore Siargao"
+              className="hero-zoom absolute inset-0 w-full h-full object-cover"
+              style={{ objectPosition: "center 40%" }}
+            />
+          )}
+
+          {/* Cinema-quality gradient overlay */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: heroBg
+                ? "linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 25%, rgba(0,0,0,0) 35%, rgba(2,20,40,0.6) 65%, rgba(2,20,40,0.92) 100%)"
+                : "linear-gradient(135deg,#04342C 0%,#085C52 40%,#0c7b93 70%,#1AB5A3 100%)",
+            }}
+          />
+
+          {/* Content */}
+          <div
+            className={`relative z-10 ${WRAP} flex flex-col justify-end pb-10`}
+            style={{ minHeight: 420 }}
+          >
+            <div className="flex items-center gap-2 mb-3 text-[10px] tracking-[0.25em] uppercase text-white/50 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#1AB5A3] animate-pulse" />
               Travela Siargao — updated by locals
             </div>
-            <h1 className="text-[clamp(28px,5vw,52px)] font-black text-white leading-[1.05] tracking-tight mb-5">
-              Explore &amp; <span className="text-[#5DCAA5]">Discover Siargao.</span>
+            <h1
+              className="font-black text-white leading-[1.0] tracking-tight mb-5"
+              style={{
+                fontSize: "clamp(32px,5.5vw,58px)",
+                textShadow: "0 2px 24px rgba(0,0,0,0.4)",
+              }}
+            >
+              Explore &amp;{" "}
+              <span className="text-[#5DCAA5]">Discover Siargao.</span>
             </h1>
             <div className="flex flex-wrap items-center gap-2">
               {["Cloud 9 surf", "Hidden beaches", "Ferry tips", "Local eats", "Island life"].map((tag) => (
-                <span key={tag} className="px-3 py-1 border border-white/15 rounded-full text-[11px] text-white/50 font-semibold">{tag}</span>
+                <span
+                  key={tag}
+                  className="px-3 py-1 rounded-full text-[11px] font-semibold"
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    background: "rgba(0,0,0,0.2)",
+                    backdropFilter: "blur(8px)",
+                    color: "rgba(255,255,255,0.75)",
+                  }}
+                >
+                  {tag}
+                </span>
               ))}
-              <a href="/book" className="ml-auto inline-flex items-center gap-1.5 rounded-2xl bg-[#0c7b93] px-5 py-2.5 text-sm font-extrabold text-white shadow-lg hover:bg-[#0f766e] transition-colors">
+              <a
+                href="/book"
+                className="ml-auto inline-flex items-center gap-1.5 font-extrabold text-white transition-all hover:-translate-y-0.5"
+                style={{
+                  background: "#0c7b93",
+                  padding: "10px 20px",
+                  borderRadius: 999,
+                  fontSize: 13,
+                  boxShadow: "0 4px 20px rgba(12,123,147,0.4)",
+                  textDecoration: "none",
+                }}
+              >
                 🚢 Book ferry →
               </a>
             </div>
@@ -372,7 +420,6 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
         {filtered.length > 0 && (
           <div className={`${WRAP} py-6 space-y-4`}>
 
-            {/* ROW 1 — Big portrait + 3 horizontal */}
             {featured && (
               <div className="grid gap-4" style={{ gridTemplateColumns: "1.65fr 1fr" }}>
                 <div className="fade-up" style={{ animationDelay: "0.05s" }}>
@@ -388,14 +435,12 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
-            {/* ROW 2 — Wide diagonal */}
             {wideCard && (
               <div className="fade-up" style={{ animationDelay: "0.28s" }}>
                 <CardWide item={wideCard} onClick={() => handleClick(wideCard)} />
               </div>
             )}
 
-            {/* ROW 3 — 3 equal medium */}
             {threeRow.length > 0 && (
               <div className="grid grid-cols-3 gap-4">
                 {threeRow.map((item, i) => (
@@ -406,14 +451,12 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
-            {/* ROW 4 — Cinematic full */}
             {cinemaCard && (
               <div className="fade-up" style={{ animationDelay: "0.45s" }}>
                 <CardCinema item={cinemaCard} onClick={() => handleClick(cinemaCard)} />
               </div>
             )}
 
-            {/* ROW 5 — Asymmetric 2-col */}
             {(asymLeft || asymRight) && (
               <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1.4fr" }}>
                 {asymLeft && (
@@ -429,7 +472,6 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
-            {/* REMAINDER — overflow 3-col */}
             {remainder.length > 0 && (
               <div className="grid grid-cols-3 gap-4">
                 {remainder.map((item, i) => (
@@ -440,7 +482,6 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
               </div>
             )}
 
-            {/* ── Ferry CTA — matches homepage style ── */}
             <div className="fade-up" style={{ animationDelay: "0.65s" }}>
               <div className="rounded-2xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3] px-6 py-10 text-center text-white shadow-lg">
                 <h2 className="text-2xl font-black">Ready to sail to Siargao? 🌊</h2>
