@@ -286,7 +286,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
 
   function handleClick(item: Attraction) {
     if (item.type === "video") { setActiveVideo(item); return; }
-    window.location.href = `/attractions/${item.slug}`;
+    window.open(`/attractions/${item.slug}`, "_self");
   }
 
   // ✅ Matches your homepage exactly: max-w-6xl px-4 sm:px-6
