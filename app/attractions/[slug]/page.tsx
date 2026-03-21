@@ -1,9 +1,12 @@
 // app/attractions/[slug]/page.tsx
+"use client" //is NOT here — this stays a server component
+// The photo modal is a separate client component below
 
 import { notFound } from "next/navigation";
 import { getAttractionBySlug } from "@/lib/attractions/get-attractions";
 import { getActiveAd } from "@/lib/attractions/get-ads";
 import type { Ad } from "@/lib/attractions/get-ads";
+import { AttractionPhotoModal } from "@/components/attractions/AttractionPhotoModal";
 
 export const dynamic = "force-dynamic";
 
@@ -35,90 +38,48 @@ export async function generateMetadata({
   };
 }
 
-// ── Ad slot component ─────────────────────────────────────────────────────────
+// ── Ad slot ───────────────────────────────────────────────────────────────────
 function AdSlot({ ad }: { ad: Ad }) {
   if (ad.type === "adsense" && ad.adsense_client && ad.adsense_slot) {
     return (
       <div className="my-6 rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 p-3 text-center">
-        <p className="text-[9px] uppercase tracking-widest text-slate-300 mb-2 font-semibold">
-          Advertisement
-        </p>
-        {/* Google AdSense */}
-        <ins
-          className="adsbygoogle"
-          style={{ display: "block" }}
-          data-ad-client={ad.adsense_client}
-          data-ad-slot={ad.adsense_slot}
-          data-ad-format="auto"
-          data-full-width-responsive="true"
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: "(adsbygoogle = window.adsbygoogle || []).push({});",
-          }}
-        />
+        <p className="text-[9px] uppercase tracking-widest text-slate-300 mb-2 font-semibold">Advertisement</p>
+        <ins className="adsbygoogle" style={{ display: "block" }}
+          data-ad-client={ad.adsense_client} data-ad-slot={ad.adsense_slot}
+          data-ad-format="auto" data-full-width-responsive="true" />
+        <script dangerouslySetInnerHTML={{ __html: "(adsbygoogle = window.adsbygoogle || []).push({});" }} />
       </div>
     );
   }
-
-  // Custom ad
   if (ad.type === "custom") {
-    const content = (
-      <div
-        className="relative overflow-hidden rounded-2xl group cursor-pointer"
-        style={{
-          background: ad.image_url
-            ? undefined
-            : "linear-gradient(135deg,#085C52,#0c7b93)",
-        }}
-      >
+    const inner = (
+      <div className="relative overflow-hidden rounded-2xl group cursor-pointer"
+        style={{ background: ad.image_url ? undefined : "linear-gradient(135deg,#085C52,#0c7b93)" }}>
         {ad.image_url && (
-          <img
-            src={ad.image_url}
-            alt={ad.image_alt ?? ad.title ?? "Advertisement"}
-            className="w-full h-[160px] object-cover transition-transform duration-500 group-hover:scale-105"
-          />
+          <img src={ad.image_url} alt={ad.image_alt ?? ad.title ?? "Ad"}
+            className="w-full h-[160px] object-cover transition-transform duration-500 group-hover:scale-105" />
         )}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: ad.image_url
-              ? "linear-gradient(to right, rgba(4,52,44,0.88) 0%, rgba(4,52,44,0.4) 60%, transparent 100%)"
-              : undefined,
-          }}
-        />
+        <div className="absolute inset-0" style={{
+          background: ad.image_url
+            ? "linear-gradient(to right,rgba(4,52,44,0.88) 0%,rgba(4,52,44,0.4) 60%,transparent 100%)"
+            : undefined,
+        }} />
         <div className={`${ad.image_url ? "absolute inset-0" : ""} flex flex-col justify-center p-5`}>
-          <p className="text-[9px] uppercase tracking-widest text-white/40 font-semibold mb-2">
-            Sponsored
-          </p>
-          {ad.title && (
-            <p className="text-[16px] font-black text-white leading-snug mb-1">
-              {ad.title}
-            </p>
-          )}
-          {ad.description && (
-            <p className="text-[12px] text-white/65 font-medium mb-3 line-clamp-2">
-              {ad.description}
-            </p>
-          )}
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#5DCAA5] w-fit">
-            Learn more →
-          </span>
+          <p className="text-[9px] uppercase tracking-widest text-white/40 font-semibold mb-2">Sponsored</p>
+          {ad.title && <p className="text-[16px] font-black text-white leading-snug mb-1">{ad.title}</p>}
+          {ad.description && <p className="text-[12px] text-white/65 font-medium mb-3 line-clamp-2">{ad.description}</p>}
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#5DCAA5] w-fit">Learn more →</span>
         </div>
       </div>
     );
-
     return (
       <div className="my-6">
-        {ad.link_url ? (
-          <a href={ad.link_url} target="_blank" rel="noopener noreferrer" className="block">
-            {content}
-          </a>
-        ) : content}
+        {ad.link_url
+          ? <a href={ad.link_url} target="_blank" rel="noopener noreferrer" className="block">{inner}</a>
+          : inner}
       </div>
     );
   }
-
   return null;
 }
 
@@ -131,29 +92,24 @@ export default async function AttractionDetailPage({
   const { slug } = await Promise.resolve(params);
   if (!slug) notFound();
 
-  // Fetch attraction + active ad in parallel
   const [item, ad] = await Promise.all([
     getAttractionBySlug(slug),
     getActiveAd("attraction_detail"),
   ]);
-
   if (!item) notFound();
 
   const categoryLabel = item.category?.replace("-", " ") ?? item.type;
-
-  // ✅ Use hero_position from DB — admin sets this per attraction
-  // so Cloud 9 can be "center top", Naked Island "center", Sohoton "center 30%" etc.
-  const heroPosition = (item as any).hero_position ?? "center 35%";
+  const heroPosition  = (item as any).hero_position ?? "center 40%";
 
   return (
     <>
       <style>{`
         @keyframes heroZoom { from{transform:scale(1.06)} to{transform:scale(1)} }
         @keyframes fadeUp   { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-        .hero-zoom  { animation: heroZoom 8s ease forwards }
-        .fade-up    { animation: fadeUp 0.6s ease both }
-        .fade-up-2  { animation: fadeUp 0.6s ease 0.12s both }
-        .fade-up-3  { animation: fadeUp 0.6s ease 0.24s both }
+        .hero-zoom { animation: heroZoom 8s ease forwards }
+        .fade-up   { animation: fadeUp 0.6s ease both }
+        .fade-up-2 { animation: fadeUp 0.6s ease 0.12s both }
+        .fade-up-3 { animation: fadeUp 0.6s ease 0.24s both }
         @media (prefers-reduced-motion: reduce) {
           .hero-zoom,.fade-up,.fade-up-2,.fade-up-3 { animation: none }
         }
@@ -162,67 +118,45 @@ export default async function AttractionDetailPage({
       <div className="min-h-screen bg-white">
 
         {/* ── HERO ── */}
-        <div
-          className="relative overflow-hidden"
-          style={{ height: 480, background: "#04342C" }}
-        >
+        <div className="relative overflow-hidden" style={{ height: 480, background: "#04342C" }}>
           {item.image_url && (
-            <img
-              src={item.image_url}
-              alt={item.title}
+            <img src={item.image_url} alt={item.title}
               className="hero-zoom absolute inset-0 w-full h-full object-cover"
-              style={{ objectPosition: heroPosition }}
-            />
+              style={{ objectPosition: heroPosition }} />
           )}
-
-          {/* Cinema gradient */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background: "linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 38%, rgba(2,20,40,0.55) 68%, rgba(2,20,40,0.92) 100%)",
-            }}
-          />
+          <div className="absolute inset-0" style={{
+            background: "linear-gradient(to bottom,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0) 30%,rgba(0,0,0,0) 38%,rgba(2,20,40,0.55) 68%,rgba(2,20,40,0.92) 100%)",
+          }} />
 
           {/* Back */}
           <div className="absolute top-5 left-0 right-0 mx-auto max-w-6xl px-4 sm:px-6">
-            <a
-              href="/attractions"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                background: "rgba(0,0,0,0.35)", backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-                border: "1px solid rgba(255,255,255,0.16)",
-                color: "rgba(255,255,255,0.88)", padding: "7px 16px",
-                borderRadius: 999, fontSize: 12, fontWeight: 600,
-                textDecoration: "none", letterSpacing: "0.01em",
-              }}
-            >
+            <a href="/attractions" style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: "rgba(0,0,0,0.35)", backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.16)",
+              color: "rgba(255,255,255,0.88)", padding: "7px 16px", borderRadius: 999,
+              fontSize: 12, fontWeight: 600, textDecoration: "none",
+            }}>
               ← Explore &amp; Discover
             </a>
           </div>
 
-          {/* Featured badge */}
           {item.is_featured && (
             <div className="absolute top-5 right-4 sm:right-6">
               <div style={{
                 display: "inline-flex", alignItems: "center", gap: 5,
                 background: "rgba(251,191,36,0.18)", backdropFilter: "blur(10px)",
-                border: "1px solid rgba(251,191,36,0.38)",
-                color: "#FCD34D", padding: "6px 14px", borderRadius: 999,
-                fontSize: 11, fontWeight: 700, letterSpacing: "0.05em",
-              }}>
-                ✦ Featured spot
-              </div>
+                border: "1px solid rgba(251,191,36,0.38)", color: "#FCD34D",
+                padding: "6px 14px", borderRadius: 999, fontSize: 11, fontWeight: 700,
+              }}>✦ Featured spot</div>
             </div>
           )}
 
-          {/* Title */}
           <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-6xl px-4 sm:px-6 pb-8">
             <div className="fade-up">
               <span style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
-                background: "rgba(26,181,163,0.18)",
-                border: "1px solid rgba(26,181,163,0.38)",
+                background: "rgba(26,181,163,0.18)", border: "1px solid rgba(26,181,163,0.38)",
                 color: "#5DCAA5", padding: "4px 12px", borderRadius: 999,
                 fontSize: 10, fontWeight: 700, letterSpacing: "0.16em",
                 textTransform: "uppercase", marginBottom: 12,
@@ -231,14 +165,10 @@ export default async function AttractionDetailPage({
                 {categoryLabel} · Siargao Island
               </span>
             </div>
-            <h1
-              className="fade-up-2 font-black text-white"
-              style={{
-                fontSize: "clamp(28px,5.5vw,52px)",
-                lineHeight: 1.0, letterSpacing: "-0.03em",
-                textShadow: "0 2px 28px rgba(0,0,0,0.4)",
-              }}
-            >
+            <h1 className="fade-up-2 font-black text-white" style={{
+              fontSize: "clamp(28px,5.5vw,52px)", lineHeight: 1.0,
+              letterSpacing: "-0.03em", textShadow: "0 2px 28px rgba(0,0,0,0.4)",
+            }}>
               {item.title}
             </h1>
           </div>
@@ -247,38 +177,28 @@ export default async function AttractionDetailPage({
         {/* ── BODY ── */}
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
 
-          {/* Stat cards — float up from hero */}
-          <div
-            className="fade-up-3 grid grid-cols-3 gap-3 relative z-10"
-            style={{ marginTop: -32, marginBottom: 28 }}
-          >
+          {/* Stat cards */}
+          <div className="fade-up-3 grid grid-cols-3 gap-3 relative z-10" style={{ marginTop: -32, marginBottom: 28 }}>
             {[
               { emoji: "📍", label: "Category", value: categoryLabel },
               { emoji: "🚢", label: "Get here",  value: "Ferry + land" },
               { emoji: "📖", label: "Read time", value: `${item.read_minutes ?? 2} min` },
             ].map(({ emoji, label, value }) => (
-              <div
-                key={label}
-                style={{
-                  background: "white", border: "1px solid #E5E7EB",
-                  borderRadius: 16, padding: "14px 10px", textAlign: "center",
-                  boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
-                }}
-              >
+              <div key={label} style={{
+                background: "white", border: "1px solid #E5E7EB", borderRadius: 16,
+                padding: "14px 10px", textAlign: "center",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
+              }}>
                 <div style={{ fontSize: 20, marginBottom: 4 }}>{emoji}</div>
-                <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  {label}
-                </div>
-                <div style={{ fontSize: 13, color: "#111827", fontWeight: 700, marginTop: 2, textTransform: "capitalize" }}>
-                  {value}
-                </div>
+                <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
+                <div style={{ fontSize: 13, color: "#111827", fontWeight: 700, marginTop: 2, textTransform: "capitalize" }}>{value}</div>
               </div>
             ))}
           </div>
 
           <div style={{ maxWidth: 720 }}>
 
-            {/* ── AD SLOT — shows here if active in admin ── */}
+            {/* Ad slot */}
             {ad && <AdSlot ad={ad} />}
 
             {/* SEO tags */}
@@ -289,11 +209,17 @@ export default async function AttractionDetailPage({
                     padding: "5px 13px", background: "#F0FDF4",
                     border: "1px solid #BBF7D0", color: "#166534",
                     borderRadius: 999, fontSize: 11, fontWeight: 600,
-                  }}>
-                    {tag}
-                  </span>
+                  }}>{tag}</span>
                 ))}
               </div>
+            )}
+
+            {/* ── CLICKABLE PHOTO INSIDE CONTENT ── */}
+            {item.image_url && (
+              <AttractionPhotoModal
+                imageUrl={item.image_url}
+                title={item.title}
+              />
             )}
 
             {/* Description */}
@@ -307,13 +233,10 @@ export default async function AttractionDetailPage({
             )}
 
             {/* Ferry CTA */}
-            <div
-              className="rounded-2xl text-center"
-              style={{
-                background: "linear-gradient(135deg,#085C52 0%,#0c7b93 50%,#1AB5A3 100%)",
-                padding: "36px 24px", marginBottom: 40,
-              }}
-            >
+            <div className="rounded-2xl text-center" style={{
+              background: "linear-gradient(135deg,#085C52 0%,#0c7b93 50%,#1AB5A3 100%)",
+              padding: "36px 24px", marginBottom: 40,
+            }}>
               <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>
                 Ready to visit?
               </p>
