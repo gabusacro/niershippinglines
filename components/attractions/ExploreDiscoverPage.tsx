@@ -239,7 +239,9 @@ function CardTall({ item, onClick }: { item: Attraction; onClick: () => void }) 
 }
 
 function NewsTicker({ items }: { items: Attraction[] }) {
-  const tickerItems = items.filter((i) => i.is_live || i.is_featured).slice(0, 6);
+  const tickerItems = [...items].sort((a, b) => 
+  new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+);
   if (!tickerItems.length) return null;
   const doubled = [...tickerItems, ...tickerItems];
   return (
@@ -247,7 +249,7 @@ function NewsTicker({ items }: { items: Attraction[] }) {
       <div className="flex whitespace-nowrap" style={{ animation: "ticker 30s linear infinite" }}>
         {doubled.map((item, i) => (
           <span key={i} className="inline-flex items-center gap-2 px-6 text-[11px] text-white/45 tracking-wide shrink-0">
-            <b className="text-[#1AB5A3] font-semibold">{item.is_live ? "Live" : item.is_featured ? "Featured" : item.category ?? item.type}</b>
+            <b className="text-[#1AB5A3] font-semibold">{item.category?.replace("-", " ") ?? item.type}</b>
             {item.title}
             <span className="text-white/20 ml-2">·</span>
           </span>

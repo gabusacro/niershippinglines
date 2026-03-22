@@ -9,7 +9,6 @@ import { getSiteBranding } from "@/lib/site-branding";
 import Script from "next/script";
 import PromoPopup from "@/components/PromoPopup";
 
-
 const nunito = Nunito({
   variable: "--font-nunito",
   subsets: ["latin"],
@@ -47,20 +46,18 @@ export default async function RootLayout({
   const branding = await getSiteBranding();
   return (
     <html lang="en" className={nunito.variable} data-scroll-behavior="smooth">
+      <head>
+        {/* Google AdSense — plain script tag to avoid Next.js data-nscript conflict */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4184474089882330"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="min-h-screen min-h-[100dvh] antialiased flex flex-col font-sans bg-[#fef9e7] text-[#134e4a] safe-area-pad overflow-x-hidden selection:bg-[#0c7b93]/20 selection:text-[#134e4a]" suppressHydrationWarning>
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-0FWWPS478B" strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">{`window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-0FWWPS478B');`}</Script>
-
-<Script
-  async
-  src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4184474089882330"
-  crossOrigin="anonymous"
-  strategy="afterInteractive"
-/>
-
         <ActionToastProvider>
-
-
           <ExtensionFriendlyHandlers />
           <Header siteName={branding.site_name} />
           <main className="flex-1">{children}</main>
