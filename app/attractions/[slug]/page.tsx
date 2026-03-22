@@ -175,18 +175,18 @@ const jsonLd = {
   "inLanguage": "en-PH",
 
   // ── Fixes "non-critical" warnings in Rich Results Test ──
-  "telephone": "+639XXXXXXXXX",          // ← replace with your real number
+  "telephone": "+639502778440",          // ← replace with your real number
   "priceRange": "₱₱",
   "currenciesAccepted": "PHP",
   "paymentAccepted": "Cash, GCash",
-  "openingHours": "Mo-Su 06:00-18:00",   // ← adjust if needed
+  "openingHours": "24-hours before departure booking period",   // ← adjust if needed
 
   "address": {
     "@type": "PostalAddress",
-    "streetAddress": "General Luna",
-    "addressLocality": "Siargao Island",
+    "streetAddress": "Borromeo Street", // ← replace with actual address if available
+    "addressLocality": "Surigao City",
     "addressRegion": "Surigao del Norte",
-    "postalCode": "8419",
+    "postalCode": "8400",
     "addressCountry": "PH",
   },
 
