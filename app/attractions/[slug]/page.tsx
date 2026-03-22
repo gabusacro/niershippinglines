@@ -400,7 +400,7 @@ export default async function AttractionDetailPage({
           {/* ── Stat cards — ✅ NO onMouseEnter/Leave, pure CSS hover ── */}
           <div
             className="fade-up-3 grid grid-cols-3 gap-3 relative z-10"
-            style={{ marginTop: -32, marginBottom: 28 }}
+            style={{ marginTop: 24, marginBottom: 28 }}
           >
             {/* Card 1 — Category (not clickable) */}
             <div
