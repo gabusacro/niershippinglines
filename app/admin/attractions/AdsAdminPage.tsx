@@ -298,15 +298,7 @@ function AdFormPanel({
             <label className={label}>Ad slot ID</label>
             <input className={input} value={form.adsense_slot} onChange={(e) => set("adsense_slot", e.target.value)} placeholder="XXXXXXXXXX" />
           </div>
-          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-            <p className="text-[12px] text-blue-700 font-medium">
-              💡 Also add your AdSense script to <code className="bg-blue-100 px-1 rounded">app/layout.tsx</code>:
-            </p>
-            <code className="block text-[11px] text-blue-600 mt-2 bg-blue-100 rounded p-2 whitespace-pre">
-              {`<Script src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXX" async />`}
-            </code>
-          </div>
-        </div>
+                  </div>
       )}
 
       {/* Actions */}

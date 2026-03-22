@@ -215,6 +215,7 @@ function AiSeoButton({ title, description, category, onDone }: {
   );
 }
 
+// ✅ FIX 1: Button label changed to "Rewrite description"
 function EnhanceDescriptionButton({ title, description, category, onDone }: {
   title: string; description: string; category: string;
   onDone: (enhanced: string) => void;
@@ -240,7 +241,7 @@ function EnhanceDescriptionButton({ title, description, category, onDone }: {
           : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
       } disabled:opacity-50`}>
       {state === "loading" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : state === "done" ? <Check className="w-3.5 h-3.5" /> : <Wand2 className="w-3.5 h-3.5" />}
-      {state === "done" ? "Enhanced!" : state === "loading" ? "Enhancing…" : "✨ Enhance with AI"}
+      {state === "done" ? "Rewritten!" : state === "loading" ? "Rewriting…" : "✨ Rewrite description"}
     </button>
   );
 }
@@ -354,9 +355,10 @@ function AttractionFormPanel({
           </div>
           <textarea className={input + " resize-y"} rows={6} value={form.description}
             onChange={(e) => set("description", e.target.value)}
-            placeholder="Write anything — 2 sentences or 500 words. AI can enhance it for you. The card shows a preview, the full text appears on the attraction page." />
+            placeholder="Write anything — a few words or several paragraphs. Hit '✨ Rewrite description' and AI will turn it into polished, SEO-friendly travel content." />
+          {/* ✅ FIX 2: Updated hint text */}
           <p className="text-[10px] text-slate-400 mt-1">
-            💡 Write a rough draft then hit "✨ Enhance with AI" to make it SEO-friendly and engaging.
+            💡 Rough notes or full paragraphs — AI will rewrite into 2–3 engaging, SEO-friendly paragraphs.
           </p>
         </div>
 
@@ -618,6 +620,7 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
         </>
       )}
 
+      {/* ✅ FIX 3: AdsAdminPage — reminder removed from AdsAdminPage.tsx separately */}
       {tab === "ads" && <AdsAdminPage initialAds={[]} />}
     </div>
   );
