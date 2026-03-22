@@ -141,11 +141,75 @@ export default async function AttractionDetailPage({
     ? rawPhotos
     : item.image_url ? [{ url: item.image_url, alt: item.title }] : [];
 
+
+
+
+
   // ✅ Use description_html if available, fallback to plain description
   const descriptionHtml = (item as any).description_html as string | null;
 
+
+
+
+
+
+
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "TouristAttraction",
+  "name": item.title,
+  "description": (item as any).meta_description || item.description?.slice(0, 200) || `Discover ${item.title} on Siargao Island.`,
+  "url": `https://www.travelasiargao.com/attractions/${item.slug}`,
+  "image": photos[0]?.url ?? undefined,
+  "touristType": categoryLabel,
+  "isAccessibleForFree": true,
+  "inLanguage": "en-PH",
+  "location": {
+    "@type": "Place",
+    "name": `${item.title}, Siargao Island`,
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Siargao Island",
+      "addressRegion": "Surigao del Norte",
+      "addressCountry": "PH"
+    }
+  },
+  "provider": {
+    "@type": "TravelAgency",
+    "name": "Travela Siargao",
+    "url": "https://www.travelasiargao.com"
+  },
+  ...(item.seo_tags?.length ? { "keywords": item.seo_tags.join(", ") } : {}),
+};
+
+
+
+
+
+
+
+
+
   return (
+
     <>
+
+
+
+<script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+/>
+
+
+
+
+
+
+
+
+
       <style>{`
         @keyframes heroZoom { from{transform:scale(1.06)} to{transform:scale(1)} }
         @keyframes fadeUp   { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
