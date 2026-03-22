@@ -3,20 +3,17 @@
 import { useState, useRef, useCallback } from "react";
 import {
   Upload, Image as ImageIcon, Sparkles, Search, Plus,
-  ToggleLeft, ToggleRight, ChevronRight, Tag, Clock,
-  MapPin, FileText, Globe, Wand2, Check, Loader2,
-  Trash2, Save, ArrowLeft, Eye, AlignLeft,
+  ChevronRight, Tag, Clock, MapPin, FileText, Globe,
+  Wand2, Check, Loader2, Trash2, Save, ArrowLeft, Eye, AlignLeft,
 } from "lucide-react";
 import type { Attraction, AttractionForm } from "@/lib/attractions/types";
 import { EMPTY_FORM, GRADIENTS, CATEGORIES } from "@/lib/attractions/types";
 import { AdsAdminPage } from "./AdsAdminPage";
 
-// ─── Slug helper ──────────────────────────────────────────────────────────────
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 60);
 }
 
-// ─── SEO live preview ─────────────────────────────────────────────────────────
 function SeoPreview({ title, description, slug }: { title: string; description: string; slug: string }) {
   const url       = `travelasiargao.com/attractions/${slug || slugify(title) || "attraction-name"}`;
   const metaTitle = title ? `${title} — Siargao Island | Travela Siargao` : "Title | Travela Siargao";
@@ -40,7 +37,6 @@ function SeoPreview({ title, description, slug }: { title: string; description: 
   );
 }
 
-// ─── Tag input ────────────────────────────────────────────────────────────────
 function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
   const [input, setInput] = useState("");
   function add() {
@@ -51,13 +47,11 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
   return (
     <div>
       <div className="flex gap-2 mb-2">
-        <input
-          type="text" value={input}
+        <input type="text" value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
           placeholder="e.g. siargao tourist spots 2026"
-          className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-[13px] bg-white focus:outline-none focus:border-[#0c7b93]"
-        />
+          className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-[13px] bg-white focus:outline-none focus:border-[#0c7b93]" />
         <button type="button" onClick={add}
           className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-600 rounded-lg text-[12px] font-medium hover:bg-slate-200 transition-colors">
           <Plus className="w-3.5 h-3.5" /> Add
@@ -67,8 +61,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
         <div className="flex flex-wrap gap-1.5">
           {tags.map((tag) => (
             <span key={tag} className="inline-flex items-center gap-1 bg-[#E1F5EE] text-[#085041] border border-[#9FE1CB] rounded-full px-2.5 py-0.5 text-[11px] font-medium">
-              <Tag className="w-2.5 h-2.5" />
-              {tag}
+              <Tag className="w-2.5 h-2.5" />{tag}
               <button type="button" onClick={() => onChange(tags.filter((t) => t !== tag))} className="text-[#085041]/50 hover:text-[#085041] ml-0.5 leading-none">×</button>
             </span>
           ))}
@@ -78,63 +71,77 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
   );
 }
 
-// ─── Hero position picker ─────────────────────────────────────────────────────
-function HeroPositionPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+// ✅ Fixed: accepts imageUrl prop for live preview
+function HeroPositionPicker({ value, onChange, imageUrl }: {
+  value: string;
+  onChange: (v: string) => void;
+  imageUrl?: string;
+}) {
   const positions = [
-    { label: "Top",    value: "center top",    hint: "Shows sky / treetops" },
-    { label: "30%",    value: "center 30%",    hint: "Slightly above center" },
+    { label: "Top",    value: "center top",    hint: "Sky / treetops" },
+    { label: "30%",    value: "center 30%",    hint: "Above center" },
     { label: "Center", value: "center center", hint: "Default" },
     { label: "50%",    value: "center 50%",    hint: "True middle" },
-    { label: "60%",    value: "center 60%",    hint: "Slightly below" },
-    { label: "Bottom", value: "center bottom", hint: "Shows foreground" },
+    { label: "60%",    value: "center 60%",    hint: "Below center" },
+    { label: "Bottom", value: "center bottom", hint: "Foreground" },
   ];
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {positions.map((p) => (
-        <button key={p.value} type="button" onClick={() => onChange(p.value)}
-          className={`rounded-xl border p-2.5 text-left transition-all ${
-            value === p.value
-              ? "border-[#0c7b93] bg-[#E0F7F4] text-[#085C52]"
-              : "border-slate-200 bg-white text-slate-600 hover:border-[#0c7b93]"
-          }`}>
-          <div className="text-[12px] font-bold">{p.label}</div>
-          <div className="text-[10px] opacity-60 mt-0.5">{p.hint}</div>
-        </button>
-      ))}
+    <div className="space-y-3">
+      {imageUrl && (
+        <div className="rounded-xl overflow-hidden border border-slate-200 relative" style={{ height: 130 }}>
+          <img src={imageUrl} alt="Hero crop preview"
+            className="w-full h-full object-cover transition-all duration-300"
+            style={{ objectPosition: value }} />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between">
+            <p className="text-white text-[11px] font-semibold">Live preview</p>
+            <span className="text-white/70 text-[10px] font-mono bg-black/30 px-2 py-0.5 rounded-full">{value}</span>
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-3 gap-2">
+        {positions.map((p) => (
+          <button key={p.value} type="button" onClick={() => onChange(p.value)}
+            className={`rounded-xl border p-2.5 text-left transition-all ${
+              value === p.value ? "border-[#0c7b93] bg-[#E0F7F4] text-[#085C52]" : "border-slate-200 bg-white text-slate-600 hover:border-[#0c7b93]"
+            }`}>
+            <div className="text-[12px] font-bold">{p.label}</div>
+            <div className="text-[10px] opacity-60 mt-0.5">{p.hint}</div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-// ─── Photo upload ─────────────────────────────────────────────────────────────
-function PhotoUpload({
-  imageUrl, imageAlt, title, category, onDone,
-}: {
+function PhotoUpload({ imageUrl, imageAlt, title, category, onDone }: {
   imageUrl: string; imageAlt: string; title: string; category: string;
   onDone: (url: string, alt: string, tags: string[]) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [state, setState] = useState<"idle" | "uploading" | "ai" | "done" | "error">("idle");
-  const [info,  setInfo]  = useState<{ kb_before: number; kb_after: number; saved: number } | null>(null);
-  const [aiAlt, setAiAlt] = useState(imageAlt);
+  const inputRef            = useRef<HTMLInputElement>(null);
+  const [state,  setState]  = useState<"idle" | "uploading" | "ai" | "done" | "error">("idle");
+  const [info,   setInfo]   = useState<{ kb_before: number; kb_after: number; saved: number } | null>(null);
+  const [errMsg, setErrMsg] = useState("");
+  const [aiAlt,  setAiAlt]  = useState(imageAlt);
 
   const handleFiles = useCallback(async (files: FileList) => {
     const file = files[0];
     if (!file) return;
-    setState("uploading");
+    setState("uploading"); setErrMsg("");
     try {
       const fd = new FormData();
-      fd.append("file",     file);
-      fd.append("title",    title || "siargao attraction");
+      fd.append("file", file);
+      fd.append("title", title || "siargao attraction");
       fd.append("category", category || "attraction");
       setState("ai");
       const res  = await fetch("/api/admin/upload-attraction", { method: "POST", body: fd });
       const data = await res.json();
-      if (!res.ok || data.error) { setState("error"); return; }
+      if (!res.ok || data.error) { setErrMsg(data.error ?? "Upload failed"); setState("error"); return; }
       setInfo({ kb_before: data.compression.original_kb, kb_after: data.compression.compressed_kb, saved: data.compression.saved_percent });
       setAiAlt(data.alt);
       setState("done");
       onDone(data.url, data.alt, data.tags ?? []);
-    } catch { setState("error"); }
+    } catch { setErrMsg("Network error — try again"); setState("error"); }
   }, [title, category, onDone]);
 
   return (
@@ -148,108 +155,127 @@ function PhotoUpload({
             className="absolute bottom-2 right-2 flex items-center gap-1.5 px-3 py-1.5 bg-black/60 text-white text-[11px] font-medium rounded-lg hover:bg-black/80 transition-colors">
             <Upload className="w-3 h-3" /> Replace photo
           </button>
-          {info && (
-            <div className="absolute top-2 left-2 bg-green-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
-              WebP · {info.saved}% smaller
-            </div>
-          )}
+          {info && <div className="absolute top-2 left-2 bg-green-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">WebP · {info.saved}% smaller</div>}
         </div>
       ) : (
-        <div
-          onDragOver={(e) => e.preventDefault()}
+        <div onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
           onClick={() => inputRef.current?.click()}
-          className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:border-[#0c7b93] hover:bg-slate-50 transition-all mb-3"
-        >
+          className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:border-[#0c7b93] hover:bg-slate-50 transition-all mb-3">
           <Upload className="w-8 h-8 mx-auto text-slate-300 mb-2" />
           <p className="text-[13px] font-medium text-slate-600">Drop photo or click to upload</p>
           <p className="text-[11px] text-slate-400 mt-1">Auto-converted to WebP · AI generates alt text + SEO tags</p>
         </div>
       )}
       {state !== "idle" && (
-        <div className={`flex items-center gap-2 text-[12px] font-medium ${
+        <div className={`flex items-start gap-2 text-[12px] font-medium ${
           state === "done" ? "text-green-700" : state === "error" ? "text-red-600" : state === "ai" ? "text-purple-600" : "text-blue-600"
         }`}>
           {state !== "done" && state !== "error"
-            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            : state === "done" ? <Check className="w-3.5 h-3.5" /> : <span>✕</span>
-          }
-          {state === "uploading" && "Compressing to WebP…"}
-          {state === "ai"        && "AI generating alt text + SEO tags…"}
-          {state === "done"      && `Done! ${info ? `(${info.kb_before}KB → ${info.kb_after}KB, ${info.saved}% smaller)` : ""}`}
-          {state === "error"     && "Failed — try again"}
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 mt-0.5" />
+            : state === "done" ? <Check className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <span className="shrink-0">✕</span>}
+          <span>
+            {state === "uploading" && "Compressing to WebP…"}
+            {state === "ai"        && "AI generating alt text + SEO tags…"}
+            {state === "done"      && `Done! ${info ? `(${info.kb_before}KB → ${info.kb_after}KB, ${info.saved}% smaller)` : ""}`}
+            {state === "error"     && (
+              <span>
+                {errMsg || "Failed — try again"}
+                {errMsg?.includes("row-level security") && (
+                  <span className="block text-[11px] font-normal mt-1 text-red-500">
+                    Storage permission error — check Supabase → Storage → Attractions bucket → Policies.
+                  </span>
+                )}
+              </span>
+            )}
+          </span>
         </div>
       )}
     </div>
   );
 }
 
-// ─── AI buttons ───────────────────────────────────────────────────────────────
+// ✅ Friendly AI error messages
+function getAiErrorMessage(data: any): string {
+  const msg = data?.error ?? data?.message ?? "";
+  if (msg.includes("credit balance") || msg.includes("too low"))
+    return "⚠️ No Anthropic credits — go to console.anthropic.com → Plans & Billing → add $5.";
+  if (msg.includes("API key"))
+    return "⚠️ Invalid API key — check ANTHROPIC_API_KEY in Vercel environment variables.";
+  return "AI generation failed — try again.";
+}
+
 function AiSeoButton({ title, description, category, onDone }: {
   title: string; description: string; category: string;
   onDone: (tags: string[], metaDesc: string) => void;
 }) {
-  const [state, setState] = useState<"idle" | "loading" | "done">("idle");
+  const [state,  setState]  = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [errMsg, setErrMsg] = useState("");
   async function generate() {
     if (!title.trim()) { alert("Add a title first!"); return; }
-    setState("loading");
+    setState("loading"); setErrMsg("");
     try {
       const res  = await fetch("/api/admin/attractions/generate-seo", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, description, category, mode: "seo" }),
       });
       const data = await res.json();
+      if (!res.ok || data.error) { setErrMsg(getAiErrorMessage(data)); setState("error"); setTimeout(() => setState("idle"), 8000); return; }
       if (data.tags) { onDone(data.tags, data.description ?? ""); setState("done"); setTimeout(() => setState("idle"), 3000); }
-    } catch { alert("Failed — try again."); setState("idle"); }
+    } catch { setErrMsg("Network error."); setState("error"); setTimeout(() => setState("idle"), 5000); }
   }
   return (
-    <button type="button" onClick={generate} disabled={state === "loading"}
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all border ${
-        state === "done"
-          ? "bg-green-50 text-green-700 border-green-200"
-          : "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
-      } disabled:opacity-50`}>
-      {state === "loading" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : state === "done" ? <Check className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
-      {state === "done" ? "Generated!" : state === "loading" ? "Generating…" : "Auto-generate SEO"}
-    </button>
+    <div className="flex flex-col items-end gap-1">
+      <button type="button" onClick={generate} disabled={state === "loading"}
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all border ${
+          state === "done"  ? "bg-green-50 text-green-700 border-green-200" :
+          state === "error" ? "bg-red-50 text-red-600 border-red-200" :
+          "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+        } disabled:opacity-50`}>
+        {state === "loading" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : state === "done" ? <Check className="w-3.5 h-3.5" /> : state === "error" ? <span>✕</span> : <Sparkles className="w-3.5 h-3.5" />}
+        {state === "done" ? "Generated!" : state === "loading" ? "Generating…" : state === "error" ? "Failed" : "Auto-generate SEO"}
+      </button>
+      {state === "error" && errMsg && <p className="text-[11px] text-red-500 max-w-xs text-right leading-relaxed">{errMsg}</p>}
+    </div>
   );
 }
 
-// ✅ FIX 1: Button label changed to "Rewrite description"
 function EnhanceDescriptionButton({ title, description, category, onDone }: {
   title: string; description: string; category: string;
   onDone: (enhanced: string) => void;
 }) {
-  const [state, setState] = useState<"idle" | "loading" | "done">("idle");
+  const [state,  setState]  = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [errMsg, setErrMsg] = useState("");
   async function enhance() {
     if (!title.trim()) { alert("Add a title first!"); return; }
-    setState("loading");
+    setState("loading"); setErrMsg("");
     try {
       const res  = await fetch("/api/admin/attractions/generate-seo", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, description, category, mode: "enhance" }),
       });
       const data = await res.json();
+      if (!res.ok || data.error) { setErrMsg(getAiErrorMessage(data)); setState("error"); setTimeout(() => setState("idle"), 8000); return; }
       if (data.description) { onDone(data.description); setState("done"); setTimeout(() => setState("idle"), 3000); }
-    } catch { alert("Failed — try again."); setState("idle"); }
+    } catch { setErrMsg("Network error."); setState("error"); setTimeout(() => setState("idle"), 5000); }
   }
   return (
-    <button type="button" onClick={enhance} disabled={state === "loading"}
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all border ${
-        state === "done"
-          ? "bg-green-50 text-green-700 border-green-200"
-          : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-      } disabled:opacity-50`}>
-      {state === "loading" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : state === "done" ? <Check className="w-3.5 h-3.5" /> : <Wand2 className="w-3.5 h-3.5" />}
-      {state === "done" ? "Rewritten!" : state === "loading" ? "Rewriting…" : "✨ Rewrite description"}
-    </button>
+    <div className="flex flex-col items-end gap-1">
+      <button type="button" onClick={enhance} disabled={state === "loading"}
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all border ${
+          state === "done"  ? "bg-green-50 text-green-700 border-green-200" :
+          state === "error" ? "bg-red-50 text-red-600 border-red-200" :
+          "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+        } disabled:opacity-50`}>
+        {state === "loading" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : state === "done" ? <Check className="w-3.5 h-3.5" /> : state === "error" ? <span>✕</span> : <Wand2 className="w-3.5 h-3.5" />}
+        {state === "done" ? "Rewritten!" : state === "loading" ? "Rewriting…" : state === "error" ? "Failed" : "✨ Rewrite description"}
+      </button>
+      {state === "error" && errMsg && <p className="text-[11px] text-red-500 max-w-xs text-right leading-relaxed">{errMsg}</p>}
+    </div>
   );
 }
 
-// ─── Edit / Add form ──────────────────────────────────────────────────────────
-function AttractionFormPanel({
-  item, onSave, onDelete, onCancel,
-}: {
+function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
   item?: Attraction | null;
   onSave:    (f: AttractionForm & { hero_position: string }) => Promise<void>;
   onDelete?: () => Promise<void>;
@@ -275,28 +301,24 @@ function AttractionFormPanel({
     } : EMPTY_FORM
   );
   const [heroPosition, setHeroPosition] = useState<string>((item as any)?.hero_position ?? "center center");
-  const [saving,   setSaving]   = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [deleting,  setDeleting]  = useState(false);
   const [wordCount, setWordCount] = useState(form.description.split(/\s+/).filter(Boolean).length);
 
   function set<K extends keyof AttractionForm>(k: K, v: AttractionForm[K]) {
     setForm((f) => ({ ...f, [k]: v }));
-    if (k === "description") {
-      setWordCount(String(v).split(/\s+/).filter(Boolean).length);
-    }
+    if (k === "description") setWordCount(String(v).split(/\s+/).filter(Boolean).length);
   }
 
   function handleUploadDone(url: string, alt: string, tags: string[]) {
-    set("image_url", url);
-    set("image_alt", alt);
+    set("image_url", url); set("image_alt", alt);
     set("seo_tags", Array.from(new Set([...form.seo_tags, ...tags])));
   }
 
   async function handleSave() {
     if (!form.title.trim()) return;
     setSaving(true);
-    try { await onSave({ ...form, hero_position: heroPosition }); }
-    finally { setSaving(false); }
+    try { await onSave({ ...form, hero_position: heroPosition }); } finally { setSaving(false); }
   }
 
   async function handleDelete() {
@@ -322,46 +344,29 @@ function AttractionFormPanel({
         </button>
       </div>
 
-      {/* Content */}
       <div className={card}>
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-slate-400" />
-          <h2 className="text-[14px] font-semibold text-slate-700">Content</h2>
-        </div>
-
+        <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">Content</h2></div>
         <div>
           <label className={lbl}>Title *</label>
           <input className={input} value={form.title}
             onChange={(e) => { set("title", e.target.value); if (!item) set("slug", slugify(e.target.value)); }}
             placeholder="e.g. Cloud 9 Surf Break" />
         </div>
-
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className={lbl} style={{ marginBottom: 0 }}>
-              <div className="flex items-center gap-1.5">
-                <AlignLeft className="w-3 h-3" /> Description
-              </div>
+              <div className="flex items-center gap-1.5"><AlignLeft className="w-3 h-3" /> Description</div>
             </label>
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-slate-400">{wordCount} words</span>
-              <EnhanceDescriptionButton
-                title={form.title}
-                description={form.description}
-                category={form.category}
-                onDone={(enhanced) => set("description", enhanced)}
-              />
+              <EnhanceDescriptionButton title={form.title} description={form.description} category={form.category} onDone={(v) => set("description", v)} />
             </div>
           </div>
           <textarea className={input + " resize-y"} rows={6} value={form.description}
             onChange={(e) => set("description", e.target.value)}
             placeholder="Write anything — a few words or several paragraphs. Hit '✨ Rewrite description' and AI will turn it into polished, SEO-friendly travel content." />
-          {/* ✅ FIX 2: Updated hint text */}
-          <p className="text-[10px] text-slate-400 mt-1">
-            💡 Rough notes or full paragraphs — AI will rewrite into 2–3 engaging, SEO-friendly paragraphs.
-          </p>
+          <p className="text-[10px] text-slate-400 mt-1">💡 Rough notes or full paragraphs — AI rewrites into 2–3 engaging, SEO-friendly paragraphs.</p>
         </div>
-
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Type</label>
@@ -382,21 +387,16 @@ function AttractionFormPanel({
             </select>
           </div>
         </div>
-
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={lbl}>
-              <div className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Read time (minutes)</div>
-            </label>
-            <input type="number" min={1} max={30} className={input} value={form.read_minutes}
-              onChange={(e) => set("read_minutes", Number(e.target.value))} />
+            <label className={lbl}><div className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Read time (minutes)</div></label>
+            <input type="number" min={1} max={30} className={input} value={form.read_minutes} onChange={(e) => set("read_minutes", Number(e.target.value))} />
           </div>
           <div>
             <label className={lbl}>Emoji fallback</label>
             <input className={input} value={form.cover_emoji} onChange={(e) => set("cover_emoji", e.target.value)} placeholder="🌴" />
           </div>
         </div>
-
         <div>
           <label className={lbl}>Gradient (shown if no photo)</label>
           <div className="grid grid-cols-7 gap-2">
@@ -407,13 +407,10 @@ function AttractionFormPanel({
             ))}
           </div>
         </div>
-
-        {/* Toggles */}
         <div className="flex gap-6 pt-1">
           {(["is_featured", "is_live", "is_published"] as const).map((key) => (
             <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
-              <div className={`w-9 h-5 rounded-full transition-colors relative ${form[key] ? "bg-[#085C52]" : "bg-slate-200"}`}
-                onClick={() => set(key, !form[key])}>
+              <div className={`w-9 h-5 rounded-full transition-colors relative ${form[key] ? "bg-[#085C52]" : "bg-slate-200"}`} onClick={() => set(key, !form[key])}>
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form[key] ? "translate-x-4" : "translate-x-0.5"}`} />
               </div>
               <span className="text-[13px] text-slate-600 capitalize">{key.replace("is_", "")}</span>
@@ -422,73 +419,44 @@ function AttractionFormPanel({
         </div>
       </div>
 
-      {/* Photo */}
       <div className={card}>
-        <div className="flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-slate-400" />
-          <h2 className="text-[14px] font-semibold text-slate-700">Photo</h2>
-        </div>
-        <PhotoUpload
-          imageUrl={form.image_url} imageAlt={form.image_alt}
-          title={form.title} category={form.category}
-          onDone={handleUploadDone}
-        />
+        <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">Photo</h2></div>
+        <PhotoUpload imageUrl={form.image_url} imageAlt={form.image_alt} title={form.title} category={form.category} onDone={handleUploadDone} />
         {form.image_url && (
           <div>
-            <label className={lbl}>
-              <div className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Hero crop position</div>
-            </label>
-            <p className="text-[11px] text-slate-400 mb-2">Adjust if the subject is cut off in the hero banner.</p>
-            <HeroPositionPicker value={heroPosition} onChange={setHeroPosition} />
+            <label className={lbl}><div className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Hero crop position</div></label>
+            <p className="text-[11px] text-slate-400 mb-2">Click a position — the preview updates live so you see exactly how it looks before saving.</p>
+            <HeroPositionPicker value={heroPosition} onChange={setHeroPosition} imageUrl={form.image_url} />
           </div>
         )}
       </div>
 
-      {/* SEO */}
       <div className={card}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-slate-400" />
-            <h2 className="text-[14px] font-semibold text-slate-700">SEO</h2>
-          </div>
-          <AiSeoButton
-            title={form.title} description={form.description} category={form.category}
-            onDone={(tags, metaDesc) => {
-              set("seo_tags", Array.from(new Set([...form.seo_tags, ...tags])));
-            }}
-          />
+          <div className="flex items-center gap-2"><Globe className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">SEO</h2></div>
+          <AiSeoButton title={form.title} description={form.description} category={form.category}
+            onDone={(tags) => set("seo_tags", Array.from(new Set([...form.seo_tags, ...tags])))} />
         </div>
-
         <div>
           <label className={lbl}>URL slug</label>
           <div className="flex items-center gap-2">
             <span className="text-[12px] text-slate-400 whitespace-nowrap shrink-0">travelasiargao.com/attractions/</span>
-            <input className={input} value={form.slug}
-              onChange={(e) => set("slug", slugify(e.target.value))}
-              placeholder="auto-generated from title" />
+            <input className={input} value={form.slug} onChange={(e) => set("slug", slugify(e.target.value))} placeholder="auto-generated from title" />
           </div>
         </div>
-
         <div>
-          <label className={lbl}>
-            <div className="flex items-center gap-1.5"><Tag className="w-3 h-3" /> SEO keyword tags</div>
-          </label>
-          <p className="text-[11px] text-slate-400 mb-2">
-            3–6 phrases tourists search on Google. Hit "Auto-generate SEO" above to fill automatically.
-          </p>
+          <label className={lbl}><div className="flex items-center gap-1.5"><Tag className="w-3 h-3" /> SEO keyword tags</div></label>
+          <p className="text-[11px] text-slate-400 mb-2">3–6 phrases tourists search on Google. Hit "Auto-generate SEO" above to fill automatically.</p>
           <TagInput tags={form.seo_tags} onChange={(t) => set("seo_tags", t)} />
         </div>
-
         <SeoPreview title={form.title} description={form.description} slug={form.slug} />
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-3 pt-2">
         {item && onDelete && (
           <button type="button" onClick={handleDelete} disabled={deleting}
             className="flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors">
-            <Trash2 className="w-4 h-4" />
-            {deleting ? "Deleting…" : "Delete"}
+            <Trash2 className="w-4 h-4" /> {deleting ? "Deleting…" : "Delete"}
           </button>
         )}
         <button type="button" onClick={onCancel}
@@ -505,16 +473,13 @@ function AttractionFormPanel({
   );
 }
 
-// ─── Main page with tabs ──────────────────────────────────────────────────────
 export function AttractionsAdminPage({ initialItems }: { initialItems: Attraction[] }) {
   const [tab,     setTab]     = useState<"attractions" | "ads">("attractions");
   const [items,   setItems]   = useState<Attraction[]>(initialItems);
   const [editing, setEditing] = useState<Attraction | null | "new">(null);
   const [search,  setSearch]  = useState("");
 
-  const filtered = search.trim()
-    ? items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase()))
-    : items;
+  const filtered = search.trim() ? items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase())) : items;
 
   async function handleSave(form: AttractionForm & { hero_position: string }) {
     const body = {
@@ -546,14 +511,7 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
   }
 
   if (editing !== null) {
-    return (
-      <AttractionFormPanel
-        item={editing === "new" ? null : editing}
-        onSave={handleSave}
-        onDelete={editing !== "new" ? handleDelete : undefined}
-        onCancel={() => setEditing(null)}
-      />
-    );
+    return <AttractionFormPanel item={editing === "new" ? null : editing} onSave={handleSave} onDelete={editing !== "new" ? handleDelete : undefined} onCancel={() => setEditing(null)} />;
   }
 
   return (
@@ -570,8 +528,6 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
           </button>
         )}
       </div>
-
-      {/* Tabs */}
       <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-5">
         <button onClick={() => setTab("attractions")}
           className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[13px] font-semibold transition-all ${tab === "attractions" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
@@ -582,8 +538,6 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
           <Sparkles className="w-4 h-4" /> Ad slots
         </button>
       </div>
-
-      {/* Attractions list */}
       {tab === "attractions" && (
         <>
           <div className="relative mb-4">
@@ -597,16 +551,13 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
               <div key={item.id} onClick={() => setEditing(item)}
                 className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-white hover:border-[#0c7b93] cursor-pointer transition-colors group">
                 <div className={`w-14 h-10 rounded-lg overflow-hidden shrink-0 bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#0c7b93]"} flex items-center justify-center text-lg`}>
-                  {item.image_url
-                    ? <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
-                    : item.cover_emoji ?? "🌴"
-                  }
+                  {item.image_url ? <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" /> : item.cover_emoji ?? "🌴"}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <p className="text-[13px] font-semibold text-slate-800 truncate">{item.title}</p>
-                    {item.is_featured  && <span className="shrink-0 text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-semibold">Featured</span>}
-                    {item.is_live      && <span className="shrink-0 text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-semibold">Live</span>}
+                    {item.is_featured   && <span className="shrink-0 text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-semibold">Featured</span>}
+                    {item.is_live       && <span className="shrink-0 text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-semibold">Live</span>}
                     {!item.is_published && <span className="shrink-0 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-semibold">Draft</span>}
                   </div>
                   <p className="text-[11px] text-slate-400 capitalize">
@@ -619,8 +570,6 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
           </div>
         </>
       )}
-
-      {/* ✅ FIX 3: AdsAdminPage — reminder removed from AdsAdminPage.tsx separately */}
       {tab === "ads" && <AdsAdminPage initialAds={[]} />}
     </div>
   );
