@@ -176,10 +176,10 @@ const jsonLd = {
 
   // ── Fixes "non-critical" warnings in Rich Results Test ──
   "telephone": "+639502778440",          // ← replace with your real number
-  "priceRange": "₱₱",
+  "priceRange": "₱650 - ₱7,500",          // ← adjust based on typical tour prices
   "currenciesAccepted": "PHP",
   "paymentAccepted": "Cash, GCash",
-  "openingHours": "24-hours before departure booking period",   // ← adjust if needed
+  "openingHours": "Mo-Su 00:00-23:59",   // ← adjust if needed
 
   "address": {
     "@type": "PostalAddress",
@@ -196,12 +196,13 @@ const jsonLd = {
     "longitude": "126.0458",
   },
 
-  "containedInPlace": {
+  "areaServed": {
     "@type": "Place",
     "name": "Siargao Island",
     "address": {
       "@type": "PostalAddress",
       "addressRegion": "Surigao del Norte",
+      "postalCode": "8419",
       "addressCountry": "PH",
     },
   },
@@ -210,6 +211,7 @@ const jsonLd = {
     "@type": "TravelAgency",
     "name": "Travela Siargao",
     "url": "https://www.travelasiargao.com",
+    "image": "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/logo/01.png",
     "telephone": "+639502778440",        // ← same real number here
     "email": "support@travelasiargao.com", // ← replace with your email
     "address": {
@@ -217,6 +219,7 @@ const jsonLd = {
       "streetAddress": "General Luna",
       "addressLocality": "Siargao Island",
       "addressRegion": "Surigao del Norte",
+      "postalCode": "8419",
       "addressCountry": "PH",
     },
   },
