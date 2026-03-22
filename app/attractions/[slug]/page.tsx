@@ -41,9 +41,7 @@ function AdSlot({ ad }: { ad: Ad }) {
   if (ad.type === "adsense" && ad.adsense_client && ad.adsense_slot) {
     return (
       <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 p-3 text-center mb-4">
-        <p className="text-[9px] uppercase tracking-widest text-slate-300 mb-2 font-semibold">
-          Advertisement
-        </p>
+        <p className="text-[9px] uppercase tracking-widest text-slate-300 mb-2 font-semibold">Advertisement</p>
         <ins className="adsbygoogle" style={{ display: "block" }}
           data-ad-client={ad.adsense_client} data-ad-slot={ad.adsense_slot}
           data-ad-format="auto" data-full-width-responsive="true" />
@@ -83,31 +81,22 @@ function AdSlot({ ad }: { ad: Ad }) {
   return null;
 }
 
-// ── Sidebar recently added — stacked vertically ───────────────────────────────
+// ── Sidebar recently added ────────────────────────────────────────────────────
 function SidebarRecent({ items }: { items: Attraction[] }) {
   if (!items.length) return null;
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
         <span className="w-1 h-4 rounded-full" style={{ background: "#1AB5A3" }} />
-        <p style={{
-          fontSize: 11, fontWeight: 700, textTransform: "uppercase",
-          letterSpacing: "0.1em", color: "#6B7280",
-        }}>
+        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#6B7280" }}>
           Recently added
         </p>
       </div>
-
-      {/* Stacked vertically — 4 items */}
       <div className="flex flex-col gap-2">
         {items.map((item) => (
-          <a
-            key={item.id}
-            href={`/attractions/${item.slug}`}
+          <a key={item.id} href={`/attractions/${item.slug}`}
             className="group flex gap-3 items-center rounded-xl border border-slate-100 bg-white hover:border-[#0c7b93] transition-colors p-2"
-            style={{ textDecoration: "none" }}
-          >
-            {/* Square thumbnail */}
+            style={{ textDecoration: "none" }}>
             <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0">
               {item.image_url ? (
                 <img src={item.image_url} alt={item.title}
@@ -118,12 +107,8 @@ function SidebarRecent({ items }: { items: Attraction[] }) {
                 </div>
               )}
             </div>
-            {/* Text */}
             <div className="min-w-0 flex-1">
-              <p style={{
-                fontSize: 9, fontWeight: 700, textTransform: "uppercase",
-                letterSpacing: "0.08em", color: "#9CA3AF", marginBottom: 2,
-              }}>
+              <p style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9CA3AF", marginBottom: 2 }}>
                 {item.category?.replace("-", " ") ?? item.type}
               </p>
               <p className="group-hover:text-[#0c7b93] transition-colors line-clamp-2"
@@ -162,12 +147,14 @@ export default async function AttractionDetailPage({
       <style>{`
         @keyframes heroZoom { from{transform:scale(1.06)} to{transform:scale(1)} }
         @keyframes fadeUp   { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-        .hero-zoom { animation: heroZoom 8s ease forwards }
-        .fade-up   { animation: fadeUp 0.6s ease both }
-        .fade-up-2 { animation: fadeUp 0.6s ease 0.12s both }
-        .fade-up-3 { animation: fadeUp 0.6s ease 0.24s both }
+        @keyframes ticker   { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+        .hero-zoom  { animation: heroZoom 8s ease forwards }
+        .fade-up    { animation: fadeUp 0.6s ease both }
+        .fade-up-2  { animation: fadeUp 0.6s ease 0.12s both }
+        .fade-up-3  { animation: fadeUp 0.6s ease 0.24s both }
+        .ticker-run { animation: ticker 28s linear infinite }
         @media (prefers-reduced-motion: reduce) {
-          .hero-zoom,.fade-up,.fade-up-2,.fade-up-3 { animation: none }
+          .hero-zoom,.fade-up,.fade-up-2,.fade-up-3,.ticker-run { animation: none }
         }
       `}</style>
 
@@ -229,29 +216,130 @@ export default async function AttractionDetailPage({
           </div>
         </div>
 
+        {/* ── Live ticker ── */}
+        <div className="bg-[#04342C] overflow-hidden py-2 border-t border-white/[0.05]">
+          <div className="flex whitespace-nowrap ticker-run">
+            {[
+              { dot: true,  label: "Ferry tickets",  text: "Book Surigao → Dapa online now",        href: "/book" },
+              { dot: true,  label: "Island tours",   text: "Tri-island, Sohoton & more available",  href: "/tours" },
+              { dot: true,  label: "Weather",        text: "Check live Siargao conditions",          href: "/weather" },
+              { dot: true,  label: "Ferry tickets",  text: "Skip the pier queue — book ahead",       href: "/book" },
+              { dot: true,  label: "Land tours",     text: "Book a local guide for Siargao",        href: "/tours" },
+              { dot: true,  label: "Ferry schedule", text: "View all departure times today",         href: "/book" },
+              // duplicated for seamless loop
+              { dot: true,  label: "Ferry tickets",  text: "Book Surigao → Dapa online now",        href: "/book" },
+              { dot: true,  label: "Island tours",   text: "Tri-island, Sohoton & more available",  href: "/tours" },
+              { dot: true,  label: "Weather",        text: "Check live Siargao conditions",          href: "/weather" },
+              { dot: true,  label: "Ferry tickets",  text: "Skip the pier queue — book ahead",       href: "/book" },
+              { dot: true,  label: "Land tours",     text: "Book a local guide for Siargao",        href: "/tours" },
+              { dot: true,  label: "Ferry schedule", text: "View all departure times today",         href: "/book" },
+            ].map((t, i) => (
+              <a key={i} href={t.href}
+                className="inline-flex items-center gap-2 px-6 text-[11px] text-white/50 tracking-wide shrink-0 hover:text-white/80 transition-colors"
+                style={{ textDecoration: "none" }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1AB5A3] animate-pulse shrink-0" />
+                <b className="text-[#1AB5A3] font-semibold">{t.label}</b>
+                {t.text}
+                <span className="text-white/20 ml-2">·</span>
+              </a>
+            ))}
+          </div>
+        </div>
+
         {/* ── Body ── */}
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
 
-          {/* Stat cards — full width */}
+          {/* ── Enhanced stat cards with Lucide icons ── */}
           <div className="fade-up-3 grid grid-cols-3 gap-3 relative z-10" style={{ marginTop: -32, marginBottom: 28 }}>
-            {[
-              { emoji: "📍", label: "Category", value: categoryLabel },
-              { emoji: "🚢", label: "Get here",  value: "Ferry + land" },
-              { emoji: "📖", label: "Read time", value: `${item.read_minutes ?? 2} min` },
-            ].map(({ emoji, label, value }) => (
-              <div key={label} style={{
-                background: "white", border: "1px solid #E5E7EB", borderRadius: 16,
-                padding: "14px 10px", textAlign: "center",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
-              }}>
-                <div style={{ fontSize: 20, marginBottom: 4 }}>{emoji}</div>
-                <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
-                <div style={{ fontSize: 13, color: "#111827", fontWeight: 700, marginTop: 2, textTransform: "capitalize" }}>{value}</div>
+
+            {/* Card 1 — Category (no link) */}
+            <div style={{
+              background: "white", border: "1px solid #E5E7EB", borderRadius: 16,
+              padding: "16px 12px", textAlign: "center",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
+            }}>
+              {/* Map Pin icon */}
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0c7b93" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 6px" }}>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
+                Category
               </div>
-            ))}
+              <div style={{ fontSize: 13, color: "#111827", fontWeight: 700, textTransform: "capitalize" }}>
+                {categoryLabel}
+              </div>
+            </div>
+
+            {/* Card 2 — Get here → links to /tours */}
+            <a href="/tours" style={{ textDecoration: "none" }}>
+              <div style={{
+                background: "white", border: "1px solid #E5E7EB", borderRadius: 16,
+                padding: "16px 12px", textAlign: "center",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
+                cursor: "pointer", transition: "border-color 0.2s, box-shadow 0.2s",
+              }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "#0c7b93";
+                  (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(12,123,147,0.15)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "#E5E7EB";
+                  (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.07)";
+                }}
+              >
+                {/* Compass icon */}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0c7b93" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 6px" }}>
+                  <circle cx="12" cy="12" r="10"/>
+                  <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+                </svg>
+                <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
+                  Get here
+                </div>
+                <div style={{ fontSize: 13, color: "#0c7b93", fontWeight: 700 }}>
+                  Book a tour →
+                </div>
+              </div>
+            </a>
+
+            {/* Card 3 — Ferry → links to /book */}
+            <a href="/book" style={{ textDecoration: "none" }}>
+              <div style={{
+                background: "white", border: "1px solid #E5E7EB", borderRadius: 16,
+                padding: "16px 12px", textAlign: "center",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
+                cursor: "pointer", transition: "border-color 0.2s, box-shadow 0.2s",
+              }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "#0c7b93";
+                  (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(12,123,147,0.15)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "#E5E7EB";
+                  (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.07)";
+                }}
+              >
+                {/* Anchor/ship icon */}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0c7b93" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto 6px" }}>
+                  <circle cx="12" cy="5" r="3"/>
+                  <line x1="12" y1="22" x2="12" y2="8"/>
+                  <path d="M5 12H2a10 10 0 0 0 20 0h-3"/>
+                </svg>
+                <div style={{ fontSize: 10, color: "#6B7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
+                  Ferry
+                </div>
+                <div style={{ fontSize: 13, color: "#0c7b93", fontWeight: 700 }}>
+                  Book ticket →
+                </div>
+              </div>
+            </a>
+
           </div>
 
-          {/* ── TWO COLUMN LAYOUT ── */}
+          {/* ── Two column layout ── */}
           <div className="flex gap-8 items-start pb-12">
 
             {/* LEFT — main content */}
@@ -302,23 +390,20 @@ export default async function AttractionDetailPage({
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <a href="/book" className="inline-flex items-center justify-center gap-2 font-extrabold hover:-translate-y-0.5 transition-all"
                     style={{ background: "white", color: "#085C52", padding: "12px 28px", borderRadius: 14, fontSize: 14, textDecoration: "none" }}>
-                    🚢 Book a Trip
+                    🚢 Book a Ferry
                   </a>
-                  <a href="/attractions" className="inline-flex items-center justify-center gap-2 font-bold hover:-translate-y-0.5 transition-all"
+                  <a href="/tours" className="inline-flex items-center justify-center gap-2 font-bold hover:-translate-y-0.5 transition-all"
                     style={{ background: "rgba(255,255,255,0.1)", border: "2px solid rgba(255,255,255,0.25)", color: "white", padding: "12px 28px", borderRadius: 14, fontSize: 14, textDecoration: "none" }}>
-                    ← More Attractions
+                    🌴 Book a Tour
                   </a>
                 </div>
               </div>
 
             </div>
 
-            {/* RIGHT — sidebar: ad on top, recently added below */}
+            {/* RIGHT sidebar */}
             <div className="shrink-0 w-64 hidden lg:block">
-              {/* Ad goes here — if active */}
               {ad && <AdSlot ad={ad} />}
-
-              {/* Recently added — always shows */}
               <SidebarRecent items={recentItems} />
             </div>
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Attraction } from "@/lib/attractions/types";
+import { LiveTicker } from "@/components/attractions/LiveTicker";
 import { CATEGORIES } from "@/lib/attractions/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
