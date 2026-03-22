@@ -7,8 +7,11 @@ import {
   Wand2, Check, Loader2, Trash2, Save, ArrowLeft, Eye, AlignLeft,
 } from "lucide-react";
 import type { Attraction, AttractionForm } from "@/lib/attractions/types";
+import { MultiPhotoUpload } from "@/components/attractions/MultiPhotoUpload";
 import { EMPTY_FORM, GRADIENTS, CATEGORIES } from "@/lib/attractions/types";
 import { AdsAdminPage } from "./AdsAdminPage";
+
+type Photo = { url: string; alt: string };
 
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 60);
@@ -71,7 +74,6 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
   );
 }
 
-// ✅ Fixed: accepts imageUrl prop for live preview
 function HeroPositionPicker({ value, onChange, imageUrl }: {
   value: string;
   onChange: (v: string) => void;
@@ -114,88 +116,6 @@ function HeroPositionPicker({ value, onChange, imageUrl }: {
   );
 }
 
-function PhotoUpload({ imageUrl, imageAlt, title, category, onDone }: {
-  imageUrl: string; imageAlt: string; title: string; category: string;
-  onDone: (url: string, alt: string, tags: string[]) => void;
-}) {
-  const inputRef            = useRef<HTMLInputElement>(null);
-  const [state,  setState]  = useState<"idle" | "uploading" | "ai" | "done" | "error">("idle");
-  const [info,   setInfo]   = useState<{ kb_before: number; kb_after: number; saved: number } | null>(null);
-  const [errMsg, setErrMsg] = useState("");
-  const [aiAlt,  setAiAlt]  = useState(imageAlt);
-
-  const handleFiles = useCallback(async (files: FileList) => {
-    const file = files[0];
-    if (!file) return;
-    setState("uploading"); setErrMsg("");
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("title", title || "siargao attraction");
-      fd.append("category", category || "attraction");
-      setState("ai");
-      const res  = await fetch("/api/admin/upload-attraction", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok || data.error) { setErrMsg(data.error ?? "Upload failed"); setState("error"); return; }
-      setInfo({ kb_before: data.compression.original_kb, kb_after: data.compression.compressed_kb, saved: data.compression.saved_percent });
-      setAiAlt(data.alt);
-      setState("done");
-      onDone(data.url, data.alt, data.tags ?? []);
-    } catch { setErrMsg("Network error — try again"); setState("error"); }
-  }, [title, category, onDone]);
-
-  return (
-    <div>
-      <input ref={inputRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-      {imageUrl ? (
-        <div className="relative rounded-xl overflow-hidden border border-slate-200 mb-3">
-          <img src={imageUrl} alt={aiAlt} className="w-full h-48 object-cover" />
-          <button type="button" onClick={() => inputRef.current?.click()}
-            className="absolute bottom-2 right-2 flex items-center gap-1.5 px-3 py-1.5 bg-black/60 text-white text-[11px] font-medium rounded-lg hover:bg-black/80 transition-colors">
-            <Upload className="w-3 h-3" /> Replace photo
-          </button>
-          {info && <div className="absolute top-2 left-2 bg-green-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">WebP · {info.saved}% smaller</div>}
-        </div>
-      ) : (
-        <div onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
-          onClick={() => inputRef.current?.click()}
-          className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:border-[#0c7b93] hover:bg-slate-50 transition-all mb-3">
-          <Upload className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-          <p className="text-[13px] font-medium text-slate-600">Drop photo or click to upload</p>
-          <p className="text-[11px] text-slate-400 mt-1">Auto-converted to WebP · AI generates alt text + SEO tags</p>
-        </div>
-      )}
-      {state !== "idle" && (
-        <div className={`flex items-start gap-2 text-[12px] font-medium ${
-          state === "done" ? "text-green-700" : state === "error" ? "text-red-600" : state === "ai" ? "text-purple-600" : "text-blue-600"
-        }`}>
-          {state !== "done" && state !== "error"
-            ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 mt-0.5" />
-            : state === "done" ? <Check className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <span className="shrink-0">✕</span>}
-          <span>
-            {state === "uploading" && "Compressing to WebP…"}
-            {state === "ai"        && "AI generating alt text + SEO tags…"}
-            {state === "done"      && `Done! ${info ? `(${info.kb_before}KB → ${info.kb_after}KB, ${info.saved}% smaller)` : ""}`}
-            {state === "error"     && (
-              <span>
-                {errMsg || "Failed — try again"}
-                {errMsg?.includes("row-level security") && (
-                  <span className="block text-[11px] font-normal mt-1 text-red-500">
-                    Storage permission error — check Supabase → Storage → Attractions bucket → Policies.
-                  </span>
-                )}
-              </span>
-            )}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ✅ Friendly AI error messages
 function getAiErrorMessage(data: any): string {
   const msg = data?.error ?? data?.message ?? "";
   if (msg.includes("credit balance") || msg.includes("too low"))
@@ -277,7 +197,7 @@ function EnhanceDescriptionButton({ title, description, category, onDone }: {
 
 function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
   item?: Attraction | null;
-  onSave:    (f: AttractionForm & { hero_position: string }) => Promise<void>;
+  onSave:    (f: AttractionForm & { hero_position: string; photos: Photo[] }) => Promise<void>;
   onDelete?: () => Promise<void>;
   onCancel:  () => void;
 }) {
@@ -300,6 +220,16 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
       sort_order:     item.sort_order     ?? 0,
     } : EMPTY_FORM
   );
+
+  // ── Photos state — loads existing photos or falls back to legacy image_url ──
+  const [photos, setPhotos] = useState<Photo[]>(
+    (item as any)?.photos?.length
+      ? (item as any).photos
+      : item?.image_url
+        ? [{ url: item.image_url, alt: item.title }]
+        : []
+  );
+
   const [heroPosition, setHeroPosition] = useState<string>((item as any)?.hero_position ?? "center center");
   const [saving,    setSaving]    = useState(false);
   const [deleting,  setDeleting]  = useState(false);
@@ -310,15 +240,17 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
     if (k === "description") setWordCount(String(v).split(/\s+/).filter(Boolean).length);
   }
 
-  function handleUploadDone(url: string, alt: string, tags: string[]) {
-    set("image_url", url); set("image_alt", alt);
-    set("seo_tags", Array.from(new Set([...form.seo_tags, ...tags])));
+  function handlePhotosChange(p: Photo[]) {
+    setPhotos(p);
+    // Keep legacy image_url in sync with first photo for backwards compatibility
+    set("image_url", p[0]?.url ?? "");
   }
 
   async function handleSave() {
     if (!form.title.trim()) return;
     setSaving(true);
-    try { await onSave({ ...form, hero_position: heroPosition }); } finally { setSaving(false); }
+    try { await onSave({ ...form, hero_position: heroPosition, photos }); }
+    finally { setSaving(false); }
   }
 
   async function handleDelete() {
@@ -344,6 +276,7 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
         </button>
       </div>
 
+      {/* ── Content ── */}
       <div className={card}>
         <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">Content</h2></div>
         <div>
@@ -419,18 +352,39 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
         </div>
       </div>
 
+      {/* ── Photos — multi-upload with swipe gallery preview ── */}
       <div className={card}>
-        <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">Photo</h2></div>
-        <PhotoUpload imageUrl={form.image_url} imageAlt={form.image_alt} title={form.title} category={form.category} onDone={handleUploadDone} />
-        {form.image_url && (
+        <div className="flex items-center gap-2">
+          <ImageIcon className="w-4 h-4 text-slate-400" />
+          <h2 className="text-[14px] font-semibold text-slate-700">Photos</h2>
+        </div>
+
+        <MultiPhotoUpload
+          photos={photos}
+          title={form.title}
+          category={form.category}
+          onChange={handlePhotosChange}
+        />
+
+        {/* Hero crop position — only shows when at least 1 photo uploaded */}
+        {photos.length > 0 && (
           <div>
-            <label className={lbl}><div className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Hero crop position</div></label>
-            <p className="text-[11px] text-slate-400 mb-2">Click a position — the preview updates live so you see exactly how it looks before saving.</p>
-            <HeroPositionPicker value={heroPosition} onChange={setHeroPosition} imageUrl={form.image_url} />
+            <label className={lbl}>
+              <div className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Hero crop position</div>
+            </label>
+            <p className="text-[11px] text-slate-400 mb-2">
+              Click a position — preview updates live. Adjusts how the first photo crops in the hero banner.
+            </p>
+            <HeroPositionPicker
+              value={heroPosition}
+              onChange={setHeroPosition}
+              imageUrl={photos[0]?.url}
+            />
           </div>
         )}
       </div>
 
+      {/* ── SEO ── */}
       <div className={card}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2"><Globe className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">SEO</h2></div>
@@ -452,6 +406,7 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
         <SeoPreview title={form.title} description={form.description} slug={form.slug} />
       </div>
 
+      {/* ── Actions ── */}
       <div className="flex items-center gap-3 pt-2">
         {item && onDelete && (
           <button type="button" onClick={handleDelete} disabled={deleting}
@@ -481,16 +436,25 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
 
   const filtered = search.trim() ? items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase())) : items;
 
-  async function handleSave(form: AttractionForm & { hero_position: string }) {
+  async function handleSave(form: AttractionForm & { hero_position: string; photos: Photo[] }) {
     const body = {
       ...(editing && editing !== "new" ? { id: (editing as Attraction).id } : {}),
-      title: form.title, slug: form.slug, description: form.description,
-      image_url: form.image_url || null, sort_order: form.sort_order,
-      is_published: form.is_published, category: form.category,
-      cover_gradient: form.cover_gradient, cover_emoji: form.cover_emoji,
-      is_live: form.is_live, is_featured: form.is_featured,
-      read_minutes: form.read_minutes, seo_tags: form.seo_tags,
-      type: form.type, hero_position: form.hero_position,
+      title:          form.title,
+      slug:           form.slug,
+      description:    form.description,
+      image_url:      form.image_url      || null,
+      sort_order:     form.sort_order,
+      is_published:   form.is_published,
+      category:       form.category,
+      cover_gradient: form.cover_gradient,
+      cover_emoji:    form.cover_emoji,
+      is_live:        form.is_live,
+      is_featured:    form.is_featured,
+      read_minutes:   form.read_minutes,
+      seo_tags:       form.seo_tags,
+      type:           form.type,
+      hero_position:  form.hero_position,
+      photos:         form.photos,        // ← saves all 3 photos
     };
     const res  = await fetch("/api/admin/attractions/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
