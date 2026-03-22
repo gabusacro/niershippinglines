@@ -50,6 +50,14 @@ export default async function RootLayout({
       <body className="min-h-screen min-h-[100dvh] antialiased flex flex-col font-sans bg-[#fef9e7] text-[#134e4a] safe-area-pad overflow-x-hidden selection:bg-[#0c7b93]/20 selection:text-[#134e4a]" suppressHydrationWarning>
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-0FWWPS478B" strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">{`window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-0FWWPS478B');`}</Script>
+
+<Script
+  async
+  src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4184474089882330"
+  crossOrigin="anonymous"
+  strategy="afterInteractive"
+/>
+
         <ActionToastProvider>
 
 
