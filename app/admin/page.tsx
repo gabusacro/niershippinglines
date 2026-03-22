@@ -10,6 +10,11 @@ import { LiveOperationsTable } from "@/components/admin/LiveOperationsTable";
 import { createClient } from "@/lib/supabase/server";
 import { getTodayInManila } from "@/lib/admin/ph-time";
 import { ROUTES } from "@/lib/constants";
+import {
+  MapPin, Compass, Car, Mail, Waves, Megaphone,
+  Users, ReceiptText, CreditCard, BookOpen, Wallet,
+  Ship, DollarSign, BadgeCheck, Palmtree,
+} from "lucide-react";
 
 export const metadata = {
   title: "Admin dashboard",
@@ -156,9 +161,11 @@ export default async function AdminDashboardPage() {
           </Link>
         ))}
 
+        {/* ID Verifications — keeps badge */}
         <Link href="/admin/id-verifications"
-          className="relative flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-100">
-          🪪 ID Verifications
+          className="relative flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-100">
+          <BadgeCheck className="w-4 h-4 shrink-0" />
+          ID Verifications
           {pendingIdCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
               {pendingIdCount > 9 ? "9+" : pendingIdCount}
@@ -167,40 +174,63 @@ export default async function AdminDashboardPage() {
         </Link>
 
         <Link href={ROUTES.adminManualBooking}
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f766e]">
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-[#0c7b93] bg-[#0c7b93] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0f766e]">
+          <BookOpen className="w-4 h-4 shrink-0" />
           Manual Booking
         </Link>
+
         <Link href="/admin/profit-distribution"
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-emerald-400 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100">
-          💰 Profit Distribution
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-emerald-400 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100">
+          <DollarSign className="w-4 h-4 shrink-0" />
+          Profit Distribution
         </Link>
+
         <Link href="/admin/discover"
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-400 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100">
-          🌊 Discover Content
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-teal-400 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100">
+          <Waves className="w-4 h-4 shrink-0" />
+          Discover Content
         </Link>
+
         <Link href="/admin/announcements"
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 transition-colors hover:bg-blue-100">
-          📢 Announcements
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 transition-colors hover:bg-blue-100">
+          <Megaphone className="w-4 h-4 shrink-0" />
+          Announcements
         </Link>
+
         <Link href="/admin/accounts"
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-800 transition-colors hover:bg-purple-100">
-          👥 Users
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-800 transition-colors hover:bg-purple-100">
+          <Users className="w-4 h-4 shrink-0" />
+          Users
         </Link>
+
         <Link href="/admin/refunds"
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100">
-          💸 Refunds
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100">
+          <ReceiptText className="w-4 h-4 shrink-0" />
+          Refunds
         </Link>
+
         <Link href="/admin/tours"
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100">
-          🏝️ Tours
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100">
+          <Compass className="w-4 h-4 shrink-0" />
+          Tours
         </Link>
+
+        <Link href="/admin/attractions"
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-teal-300 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition-colors hover:border-teal-500 hover:bg-teal-100">
+          <MapPin className="w-4 h-4 shrink-0" />
+          Attractions & Ads
+        </Link>
+
         <Link href="/admin/parking"
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 transition-colors hover:bg-blue-100">
-          🚗 Pay Parking
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 transition-colors hover:bg-blue-100">
+          <Car className="w-4 h-4 shrink-0" />
+          Pay Parking
         </Link>
+
         <Link href="/admin/inquiries"
-          className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100">
-          📩 Customer Inquiries
+          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100">
+          <Mail className="w-4 h-4 shrink-0" />
+          Customer Inquiries
         </Link>
       </div>
 
