@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import type { Attraction, AttractionForm } from "@/lib/attractions/types";
 import { EMPTY_FORM, GRADIENTS, CATEGORIES } from "@/lib/attractions/types";
+import { AdsAdminPage } from "./AdsAdminPage";
 
 // ─── Slug helper ──────────────────────────────────────────────────────────────
 function slugify(text: string) {
@@ -11,11 +12,11 @@ function slugify(text: string) {
 
 // ─── SEO live preview ─────────────────────────────────────────────────────────
 function SeoPreview({ title, description, slug }: { title: string; description: string; slug: string }) {
-  const url     = `travelasiargao.com/attractions/${slug || slugify(title) || "attraction-name"}`;
+  const url       = `travelasiargao.com/attractions/${slug || slugify(title) || "attraction-name"}`;
   const metaTitle = title ? `${title} — Siargao Island | Travela Siargao` : "Title | Travela Siargao";
   const metaDesc  = description || "Discover the best of Siargao Island.";
   const titleOk   = metaTitle.length <= 65;
-  const descOk    = metaDesc.length <= 160;
+  const descOk    = metaDesc.length  <= 160;
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">Google preview</p>
@@ -42,8 +43,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
     <div>
       <div className="flex gap-2 mb-2">
         <input
-          type="text"
-          value={input}
+          type="text" value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
           placeholder="e.g. siargao tourist spots 2026"
@@ -65,18 +65,51 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
   );
 }
 
+// ─── Hero position picker ─────────────────────────────────────────────────────
+function HeroPositionPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const positions = [
+    { label: "Top",    value: "center top",    hint: "Shows sky / treetops" },
+    { label: "30%",    value: "center 30%",    hint: "Slightly above center" },
+    { label: "Center", value: "center center", hint: "Default" },
+    { label: "50%",    value: "center 50%",    hint: "True middle" },
+    { label: "60%",    value: "center 60%",    hint: "Slightly below center" },
+    { label: "Bottom", value: "center bottom", hint: "Shows foreground" },
+  ];
+  return (
+    <div>
+      <p className="text-[11px] text-slate-400 mb-2">
+        Adjust if the subject is cut off in the hero banner.
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {positions.map((p) => (
+          <button
+            key={p.value} type="button" onClick={() => onChange(p.value)}
+            className={`rounded-xl border p-2.5 text-left transition-all ${
+              value === p.value
+                ? "border-[#0c7b93] bg-[#E0F7F4] text-[#085C52]"
+                : "border-slate-200 bg-white text-slate-600 hover:border-[#0c7b93]"
+            }`}
+          >
+            <div className="text-[12px] font-bold">{p.label}</div>
+            <div className="text-[10px] opacity-60 mt-0.5">{p.hint}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Photo upload ─────────────────────────────────────────────────────────────
 function PhotoUpload({
-  imageUrl, imageAlt, title, category,
-  onDone,
+  imageUrl, imageAlt, title, category, onDone,
 }: {
   imageUrl: string; imageAlt: string; title: string; category: string;
   onDone: (url: string, alt: string, tags: string[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [state,  setState]  = useState<"idle" | "uploading" | "ai" | "done" | "error">("idle");
-  const [info,   setInfo]   = useState<{ kb_before: number; kb_after: number; saved: number } | null>(null);
-  const [aiAlt,  setAiAlt]  = useState(imageAlt);
+  const [state, setState] = useState<"idle" | "uploading" | "ai" | "done" | "error">("idle");
+  const [info,  setInfo]  = useState<{ kb_before: number; kb_after: number; saved: number } | null>(null);
+  const [aiAlt, setAiAlt] = useState(imageAlt);
 
   const handleFiles = useCallback(async (files: FileList) => {
     const file = files[0];
@@ -99,10 +132,7 @@ function PhotoUpload({
   }, [title, category, onDone]);
 
   const stateLabel: Record<string, string> = {
-    uploading: "Compressing to WebP…",
-    ai:        "AI generating alt text…",
-    done:      "Done!",
-    error:     "Failed — try again",
+    uploading: "Compressing to WebP…", ai: "AI generating alt text…", done: "Done!", error: "Failed — try again",
   };
   const stateColor: Record<string, string> = {
     uploading: "text-blue-600", ai: "text-purple-600", done: "text-green-700", error: "text-red-600",
@@ -110,16 +140,13 @@ function PhotoUpload({
 
   return (
     <div>
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-
+      <input ref={inputRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => e.target.files && handleFiles(e.target.files)} />
       {imageUrl ? (
         <div className="relative rounded-xl overflow-hidden border border-slate-200 mb-3">
           <img src={imageUrl} alt={aiAlt} className="w-full h-48 object-cover" />
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="absolute bottom-2 right-2 px-3 py-1.5 bg-black/60 text-white text-[11px] font-medium rounded-lg hover:bg-black/80 transition-colors"
-          >
+          <button type="button" onClick={() => inputRef.current?.click()}
+            className="absolute bottom-2 right-2 px-3 py-1.5 bg-black/60 text-white text-[11px] font-medium rounded-lg hover:bg-black/80 transition-colors">
             Replace photo
           </button>
           {info && (
@@ -142,7 +169,6 @@ function PhotoUpload({
           <p className="text-[11px] text-slate-400 mt-1">Auto-converted to WebP · AI alt text generated</p>
         </div>
       )}
-
       {state !== "idle" && (
         <div className={`flex items-center gap-2 text-[12px] font-medium ${stateColor[state] ?? "text-slate-500"}`}>
           {state !== "done" && state !== "error" && (
@@ -160,33 +186,81 @@ function PhotoUpload({
   );
 }
 
+// ─── AI SEO generator ─────────────────────────────────────────────────────────
+function AiSeoButton({
+  title, description, category,
+  onDone,
+}: {
+  title: string; description: string; category: string;
+  onDone: (tags: string[], improvedDesc: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [done,    setDone]    = useState(false);
+
+  async function generate() {
+    if (!title.trim()) { alert("Add a title first!"); return; }
+    setLoading(true);
+    try {
+      const res  = await fetch("/api/admin/attractions/generate-seo", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ title, description, category }),
+      });
+      const data = await res.json();
+      if (data.tags && data.description) {
+        onDone(data.tags, data.description);
+        setDone(true);
+        setTimeout(() => setDone(false), 3000);
+      }
+    } catch { alert("AI generation failed — try again."); }
+    finally  { setLoading(false); }
+  }
+
+  return (
+    <button
+      type="button" onClick={generate} disabled={loading}
+      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold transition-all ${
+        done
+          ? "bg-green-100 text-green-700 border border-green-300"
+          : "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100"
+      } disabled:opacity-50`}
+    >
+      {loading && <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />}
+      {done    ? "✓ SEO generated!" : loading ? "Generating…" : "✨ Auto-generate SEO with AI"}
+    </button>
+  );
+}
+
 // ─── Edit / Add form ──────────────────────────────────────────────────────────
-function AttractionForm({
+function AttractionFormPanel({
   item, onSave, onDelete, onCancel,
 }: {
   item?: Attraction | null;
-  onSave: (f: AttractionForm) => Promise<void>;
+  onSave:   (f: AttractionForm & { hero_position: string }) => Promise<void>;
   onDelete?: () => Promise<void>;
-  onCancel: () => void;
+  onCancel:  () => void;
 }) {
-  const [form,    setForm]    = useState<AttractionForm>(
+  const [form, setForm] = useState<AttractionForm>(
     item ? {
       title:          item.title,
       slug:           item.slug,
-      description:    item.description  ?? "",
-      image_url:      item.image_url    ?? "",
+      description:    item.description    ?? "",
+      image_url:      item.image_url      ?? "",
       image_alt:      "",
-      category:       (item.category    ?? "attractions") as AttractionForm["category"],
+      category:       (item.category      ?? "attractions") as AttractionForm["category"],
       cover_gradient: item.cover_gradient ?? GRADIENTS[0].value,
-      cover_emoji:    item.cover_emoji  ?? "🌴",
+      cover_emoji:    item.cover_emoji    ?? "🌴",
       is_live:        item.is_live,
       is_featured:    item.is_featured,
       is_published:   item.is_published,
-      read_minutes:   item.read_minutes ?? 2,
-      seo_tags:       item.seo_tags     ?? [],
-      type:           item.type         ?? "attraction",
-      sort_order:     item.sort_order   ?? 0,
+      read_minutes:   item.read_minutes   ?? 2,
+      seo_tags:       item.seo_tags       ?? [],
+      type:           item.type           ?? "attraction",
+      sort_order:     item.sort_order     ?? 0,
     } : EMPTY_FORM
+  );
+  const [heroPosition, setHeroPosition] = useState<string>(
+    (item as any)?.hero_position ?? "center center"
   );
   const [saving,   setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -196,16 +270,25 @@ function AttractionForm({
   }
 
   function handleUploadDone(url: string, alt: string, tags: string[]) {
-    set("image_url",  url);
-    set("image_alt",  alt);
+    set("image_url", url);
+    set("image_alt", alt);
     const merged = Array.from(new Set([...form.seo_tags, ...tags]));
     set("seo_tags", merged);
+  }
+
+  function handleAiSeo(tags: string[], improvedDesc: string) {
+    const merged = Array.from(new Set([...form.seo_tags, ...tags]));
+    set("seo_tags", merged);
+    if (improvedDesc && !form.description.trim()) {
+      set("description", improvedDesc);
+    }
   }
 
   async function handleSave() {
     if (!form.title.trim()) return;
     setSaving(true);
-    try { await onSave(form); } finally { setSaving(false); }
+    try { await onSave({ ...form, hero_position: heroPosition }); }
+    finally { setSaving(false); }
   }
 
   async function handleDelete() {
@@ -215,9 +298,9 @@ function AttractionForm({
     try { await onDelete(); } finally { setDeleting(false); }
   }
 
-  const input  = "w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] bg-white focus:outline-none focus:border-[#0c7b93] transition-colors";
-  const label  = "block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5";
-  const card   = "rounded-2xl border border-slate-100 bg-white p-5 space-y-4";
+  const input = "w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] bg-white focus:outline-none focus:border-[#0c7b93] transition-colors";
+  const label = "block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5";
+  const card  = "rounded-2xl border border-slate-100 bg-white p-5 space-y-4";
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -306,11 +389,27 @@ function AttractionForm({
           title={form.title} category={form.category}
           onDone={handleUploadDone}
         />
+
+        {/* Hero position — only show if photo exists */}
+        {form.image_url && (
+          <div>
+            <label className={label}>Hero photo crop position</label>
+            <HeroPositionPicker value={heroPosition} onChange={setHeroPosition} />
+          </div>
+        )}
       </div>
 
       {/* SEO */}
       <div className={card}>
-        <h2 className="text-[14px] font-semibold text-slate-700">SEO</h2>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-[14px] font-semibold text-slate-700">SEO</h2>
+          <AiSeoButton
+            title={form.title}
+            description={form.description}
+            category={form.category}
+            onDone={handleAiSeo}
+          />
+        </div>
         <div>
           <label className={label}>URL slug</label>
           <div className="flex items-center gap-2">
@@ -320,7 +419,7 @@ function AttractionForm({
         </div>
         <div>
           <label className={label}>SEO keyword tags</label>
-          <p className="text-[11px] text-slate-400 mb-2">3–6 phrases tourists would search on Google.</p>
+          <p className="text-[11px] text-slate-400 mb-2">3–6 phrases tourists search on Google. Hit "Auto-generate" above to fill automatically.</p>
           <TagInput tags={form.seo_tags} onChange={(t) => set("seo_tags", t)} />
         </div>
         <SeoPreview title={form.title} description={form.description} slug={form.slug} />
@@ -347,8 +446,9 @@ function AttractionForm({
   );
 }
 
-// ─── Admin list view ──────────────────────────────────────────────────────────
+// ─── Main page with tabs: Attractions | Ads ───────────────────────────────────
 export function AttractionsAdminPage({ initialItems }: { initialItems: Attraction[] }) {
+  const [tab,     setTab]     = useState<"attractions" | "ads">("attractions");
   const [items,   setItems]   = useState<Attraction[]>(initialItems);
   const [editing, setEditing] = useState<Attraction | null | "new">(null);
   const [search,  setSearch]  = useState("");
@@ -357,15 +457,24 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
     ? items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase()))
     : items;
 
-  async function handleSave(form: AttractionForm) {
+  async function handleSave(form: AttractionForm & { hero_position: string }) {
     const body = {
       ...(editing && editing !== "new" ? { id: (editing as Attraction).id } : {}),
-      title: form.title, slug: form.slug, description: form.description,
-      image_url: form.image_url || null, sort_order: form.sort_order,
-      is_published: form.is_published, category: form.category,
-      cover_gradient: form.cover_gradient, cover_emoji: form.cover_emoji,
-      is_live: form.is_live, is_featured: form.is_featured,
-      read_minutes: form.read_minutes, seo_tags: form.seo_tags, type: form.type,
+      title:          form.title,
+      slug:           form.slug,
+      description:    form.description,
+      image_url:      form.image_url      || null,
+      sort_order:     form.sort_order,
+      is_published:   form.is_published,
+      category:       form.category,
+      cover_gradient: form.cover_gradient,
+      cover_emoji:    form.cover_emoji,
+      is_live:        form.is_live,
+      is_featured:    form.is_featured,
+      read_minutes:   form.read_minutes,
+      seo_tags:       form.seo_tags,
+      type:           form.type,
+      hero_position:  form.hero_position,
     };
     const res  = await fetch("/api/admin/attractions/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
@@ -385,57 +494,94 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
     if (res.ok) { setItems((prev) => prev.filter((i) => i.id !== (editing as Attraction).id)); setEditing(null); }
   }
 
+  // Show form when editing
   if (editing !== null) {
-    return <AttractionForm item={editing === "new" ? null : editing} onSave={handleSave} onDelete={editing !== "new" ? handleDelete : undefined} onCancel={() => setEditing(null)} />;
+    return (
+      <AttractionFormPanel
+        item={editing === "new" ? null : editing}
+        onSave={handleSave}
+        onDelete={editing !== "new" ? handleDelete : undefined}
+        onCancel={() => setEditing(null)}
+      />
+    );
   }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
+
+      {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-[20px] font-semibold text-slate-900">Explore & Discover</h1>
-          <p className="text-[13px] text-slate-400 mt-0.5">{items.length} attractions</p>
+          <h1 className="text-[20px] font-semibold text-slate-900">Attractions & Ads</h1>
+          <p className="text-[13px] text-slate-400 mt-0.5">{items.length} attractions · Explore & Discover page</p>
         </div>
-        <button onClick={() => setEditing("new")}
-          className="flex items-center gap-1.5 px-4 py-2.5 bg-[#085C52] text-white text-[13px] font-semibold rounded-xl hover:bg-[#0c7b93] transition-colors">
-          + Add attraction
+        {tab === "attractions" && (
+          <button onClick={() => setEditing("new")}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#085C52] text-white text-[13px] font-semibold rounded-xl hover:bg-[#0c7b93] transition-colors">
+            + Add attraction
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-5">
+        <button
+          onClick={() => setTab("attractions")}
+          className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-all ${tab === "attractions" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          🌴 Attractions
+        </button>
+        <button
+          onClick={() => setTab("ads")}
+          className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-all ${tab === "ads" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          📢 Ad slots
         </button>
       </div>
-      <div className="relative mb-4">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-        </svg>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search attractions…"
-          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:border-[#0c7b93] bg-white" />
-      </div>
-      <div className="space-y-2">
-        {filtered.length === 0 && <div className="py-12 text-center text-slate-400 text-[13px]">No attractions found.</div>}
-        {filtered.map((item) => (
-          <div key={item.id} onClick={() => setEditing(item)}
-            className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-white hover:border-[#0c7b93] cursor-pointer transition-colors group">
-            <div className={`w-14 h-10 rounded-lg overflow-hidden shrink-0 bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#0c7b93]"} flex items-center justify-center text-lg`}>
-              {item.image_url
-                ? <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
-                : item.cover_emoji ?? "🌴"
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-[13px] font-semibold text-slate-800 truncate">{item.title}</p>
-                {item.is_featured && <span className="shrink-0 text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-semibold">Featured</span>}
-                {item.is_live    && <span className="shrink-0 text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-semibold">Live</span>}
-                {!item.is_published && <span className="shrink-0 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-semibold">Draft</span>}
-              </div>
-              <p className="text-[11px] text-slate-400 capitalize">
-                {item.type} · {item.category ?? "–"} · {new Date(item.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
-              </p>
-            </div>
-            <svg className="w-4 h-4 text-slate-300 group-hover:text-[#0c7b93] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+
+      {/* Attractions tab */}
+      {tab === "attractions" && (
+        <>
+          <div className="relative mb-4">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
             </svg>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search attractions…"
+              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:border-[#0c7b93] bg-white" />
           </div>
-        ))}
-      </div>
+          <div className="space-y-2">
+            {filtered.length === 0 && <div className="py-12 text-center text-slate-400 text-[13px]">No attractions found.</div>}
+            {filtered.map((item) => (
+              <div key={item.id} onClick={() => setEditing(item)}
+                className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-white hover:border-[#0c7b93] cursor-pointer transition-colors group">
+                <div className={`w-14 h-10 rounded-lg overflow-hidden shrink-0 bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#0c7b93]"} flex items-center justify-center text-lg`}>
+                  {item.image_url
+                    ? <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
+                    : item.cover_emoji ?? "🌴"
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-[13px] font-semibold text-slate-800 truncate">{item.title}</p>
+                    {item.is_featured && <span className="shrink-0 text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-semibold">Featured</span>}
+                    {item.is_live     && <span className="shrink-0 text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-semibold">Live</span>}
+                    {!item.is_published && <span className="shrink-0 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-semibold">Draft</span>}
+                  </div>
+                  <p className="text-[11px] text-slate-400 capitalize">
+                    {item.type} · {item.category ?? "–"} · {new Date(item.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
+                  </p>
+                </div>
+                <svg className="w-4 h-4 text-slate-300 group-hover:text-[#0c7b93] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Ads tab */}
+      {tab === "ads" && <AdsAdminPage initialAds={[]} />}
     </div>
   );
 }
