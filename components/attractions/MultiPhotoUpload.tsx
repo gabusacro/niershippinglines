@@ -114,7 +114,7 @@ export function MultiPhotoUpload({
                 </div>
                 {photo.credit_name && (
                   <div className="absolute bottom-1.5 left-1.5 right-1.5">
-                    <span style={{ background: "rgba(0,0,0,0.55)", color: "white", fontSize: 9, fontWeight: 500, padding: "2px 6px", borderRadius: 6, display: "block", truncate: true }}>
+                    <span style={{ background: "rgba(0,0,0,0.55)", color: "white", fontSize: 9, fontWeight: 500, padding: "2px 6px", borderRadius: 6, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       📸 {photo.credit_name}
                     </span>
                   </div>
