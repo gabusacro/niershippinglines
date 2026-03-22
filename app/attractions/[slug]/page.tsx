@@ -214,6 +214,7 @@ const jsonLd = {
     "image": "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/logo/01.png",
     "telephone": "+639502778440",        // ← same real number here
     "email": "support@travelasiargao.com", // ← replace with your email
+    "priceRange": "₱650 - ₱7,500",          // ← adjust based on typical tour prices
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "General Luna",
