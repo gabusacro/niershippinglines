@@ -16,10 +16,15 @@ export async function generateMetadata({
   const { slug } = await Promise.resolve(params);
   const item = await getAttractionBySlug(slug);
   if (!item) return { title: "Not found | Travela Siargao" };
+
+  // ✅ Use meta_description for Google — separate from full description
+  const metaDesc = (item as any).meta_description
+    || item.description?.slice(0, 160)
+    || `Discover ${item.title} on Siargao Island, Philippines.`;
+
   return {
     title: `${item.title} — Siargao Island | Travela Siargao`,
-    description: item.description?.slice(0, 160) ??
-      `Discover ${item.title} on Siargao Island, Philippines.`,
+    description: metaDesc,
     keywords: [
       item.title.toLowerCase(),
       "siargao island", "siargao tourist spots", "siargao attractions",
@@ -27,7 +32,7 @@ export async function generateMetadata({
     ],
     openGraph: {
       title: `${item.title} — Siargao Island`,
-      description: item.description?.slice(0, 160) ?? `Discover ${item.title} on Siargao Island.`,
+      description: metaDesc,
       url: `https://www.travelasiargao.com/attractions/${item.slug}`,
       siteName: "Travela Siargao",
       images: item.image_url ? [{ url: item.image_url, alt: item.title }] : [],
@@ -56,9 +61,7 @@ function AdSlot({ ad }: { ad: Ad }) {
           <img src={ad.image_url} alt={ad.image_alt ?? ad.title ?? "Ad"}
             className="w-full h-[130px] object-cover transition-transform duration-500 group-hover:scale-105" />
         )}
-        <div className="absolute inset-0" style={{
-          background: ad.image_url ? "linear-gradient(to bottom,rgba(0,0,0,0) 30%,rgba(4,52,44,0.92) 100%)" : undefined,
-        }} />
+        <div className="absolute inset-0" style={{ background: ad.image_url ? "linear-gradient(to bottom,rgba(0,0,0,0) 30%,rgba(4,52,44,0.92) 100%)" : undefined }} />
         <div className={`${ad.image_url ? "absolute bottom-0 left-0 right-0" : ""} p-4`}>
           <p className="text-[9px] uppercase tracking-widest text-white/40 font-semibold mb-1">Sponsored</p>
           {ad.title && <p className="text-[13px] font-black text-white leading-snug mb-1">{ad.title}</p>}
@@ -82,9 +85,7 @@ function SidebarRecent({ items }: { items: Attraction[] }) {
     <div>
       <div className="flex items-center gap-2 mb-3">
         <span className="w-1 h-4 rounded-full" style={{ background: "#1AB5A3" }} />
-        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#6B7280" }}>
-          Recently added
-        </p>
+        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#6B7280" }}>Recently added</p>
       </div>
       <div className="flex flex-col gap-2">
         {items.map((item) => (
@@ -134,13 +135,14 @@ export default async function AttractionDetailPage({
   const categoryLabel = item.category?.replace("-", " ") ?? item.type;
   const heroPosition  = (item as any).hero_position ?? "center 40%";
 
-  // Build photos array — use new photos column, fallback to legacy image_url
-  const rawPhotos = (item as any).photos as { url: string; alt: string }[] | null;
+  // Build photos array
+  const rawPhotos = (item as any).photos as { url: string; alt: string; credit_name?: string; credit_url?: string; credit_type?: string }[] | null;
   const photos = rawPhotos && rawPhotos.length > 0
     ? rawPhotos
-    : item.image_url
-      ? [{ url: item.image_url, alt: item.title }]
-      : [];
+    : item.image_url ? [{ url: item.image_url, alt: item.title }] : [];
+
+  // ✅ Use description_html if available, fallback to plain description
+  const descriptionHtml = (item as any).description_html as string | null;
 
   return (
     <>
@@ -153,6 +155,10 @@ export default async function AttractionDetailPage({
         .fade-up-2  { animation: fadeUp 0.6s ease 0.12s both }
         .fade-up-3  { animation: fadeUp 0.6s ease 0.24s both }
         .ticker-run { animation: ticker 28s linear infinite }
+        .rich-description a { color: #0c7b93; text-decoration: underline; }
+        .rich-description a:hover { color: #085C52; }
+        .rich-description b, .rich-description strong { font-weight: 700; }
+        .rich-description i, .rich-description em { font-style: italic; }
         @media (prefers-reduced-motion: reduce) {
           .hero-zoom,.fade-up,.fade-up-2,.fade-up-3,.ticker-run { animation: none }
         }
@@ -178,9 +184,7 @@ export default async function AttractionDetailPage({
               WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.16)",
               color: "rgba(255,255,255,0.88)", padding: "7px 16px", borderRadius: 999,
               fontSize: 12, fontWeight: 600, textDecoration: "none",
-            }}>
-              ← Explore &amp; Discover
-            </a>
+            }}>← Explore &amp; Discover</a>
           </div>
 
           {item.is_featured && (
@@ -220,18 +224,18 @@ export default async function AttractionDetailPage({
         <div className="bg-[#04342C] overflow-hidden py-2 border-t border-white/[0.05]">
           <div className="flex whitespace-nowrap ticker-run">
             {[
-              { label: "Ferry tickets",  text: "Book Surigao → Dapa online now",             href: "/book" },
-              { label: "Island tours",   text: "Tri-island, Sohoton & more available",       href: "/tours" },
-              { label: "Weather",        text: "Check live Siargao conditions",              href: "/weather" },
-              { label: "Ferry tickets",  text: "Skip the pier queue — book ahead",           href: "/book" },
-              { label: "Land tours",     text: "Book a local guide for Siargao",             href: "/tours" },
-              { label: "Ferry schedule", text: "View all departure times today",             href: "/book" },
-              { label: "Ferry tickets",  text: "Book Surigao → Dapa online now",             href: "/book" },
-              { label: "Island tours",   text: "Tri-island, Sohoton & more available",       href: "/tours" },
-              { label: "Weather",        text: "Check live Siargao conditions",              href: "/weather" },
-              { label: "Ferry tickets",  text: "Skip the pier queue — book ahead",           href: "/book" },
-              { label: "Land tours",     text: "Book a local guide for Siargao",             href: "/tours" },
-              { label: "Ferry schedule", text: "View all departure times today",             href: "/book" },
+              { label: "Ferry tickets",  text: "Book Surigao → Dapa online now",       href: "/book" },
+              { label: "Island tours",   text: "Tri-island, Sohoton & more available", href: "/tours" },
+              { label: "Weather",        text: "Check live Siargao conditions",        href: "/weather" },
+              { label: "Ferry tickets",  text: "Skip the pier queue — book ahead",     href: "/book" },
+              { label: "Land tours",     text: "Book a local guide for Siargao",       href: "/tours" },
+              { label: "Ferry schedule", text: "View all departure times today",       href: "/book" },
+              { label: "Ferry tickets",  text: "Book Surigao → Dapa online now",       href: "/book" },
+              { label: "Island tours",   text: "Tri-island, Sohoton & more available", href: "/tours" },
+              { label: "Weather",        text: "Check live Siargao conditions",        href: "/weather" },
+              { label: "Ferry tickets",  text: "Skip the pier queue — book ahead",     href: "/book" },
+              { label: "Land tours",     text: "Book a local guide for Siargao",       href: "/tours" },
+              { label: "Ferry schedule", text: "View all departure times today",       href: "/book" },
             ].map((t, i) => (
               <a key={i} href={t.href}
                 className="inline-flex items-center gap-2 px-6 text-[11px] text-white/50 tracking-wide shrink-0 hover:text-white/80 transition-colors"
@@ -277,8 +281,6 @@ export default async function AttractionDetailPage({
 
           {/* Two column layout */}
           <div className="flex gap-8 items-start pb-12">
-
-            {/* LEFT — main content */}
             <div className="flex-1 min-w-0">
 
               {/* SEO tags */}
@@ -290,17 +292,21 @@ export default async function AttractionDetailPage({
                 </div>
               )}
 
-              {/* ── SWIPE GALLERY ── */}
-              {photos.length > 0 && (
-                <AttractionGallery photos={photos} title={item.title} />
-              )}
+              {/* Swipe gallery */}
+              {photos.length > 0 && <AttractionGallery photos={photos} title={item.title} />}
 
-              {/* Description */}
-              {item.description && (
+              {/* ✅ Rich description with links — falls back to plain text */}
+              {descriptionHtml ? (
+                <div
+                  className="rich-description"
+                  dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+                  style={{ fontSize: 16, color: "#1f2937", lineHeight: 1.85, fontWeight: 400, marginBottom: 36 }}
+                />
+              ) : item.description ? (
                 <p style={{ fontSize: 16, color: "#1f2937", lineHeight: 1.85, fontWeight: 400, marginBottom: 36, whiteSpace: "pre-line" }}>
                   {item.description}
                 </p>
-              )}
+              ) : null}
 
               {/* Ferry CTA */}
               <div className="rounded-2xl text-center" style={{ background: "linear-gradient(135deg,#085C52 0%,#0c7b93 50%,#1AB5A3 100%)", padding: "36px 24px" }}>
@@ -320,7 +326,7 @@ export default async function AttractionDetailPage({
               </div>
             </div>
 
-            {/* RIGHT sidebar */}
+            {/* Sidebar */}
             <div className="shrink-0 w-64 hidden lg:block">
               {ad && <AdSlot ad={ad} />}
               <SidebarRecent items={recentItems} />

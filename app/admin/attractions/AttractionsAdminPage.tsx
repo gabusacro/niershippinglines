@@ -6,6 +6,7 @@ import {
   ChevronRight, Tag, Clock, MapPin, FileText, Globe,
   Wand2, Check, Loader2, Trash2, Save, ArrowLeft, Eye, AlignLeft,
 } from "lucide-react";
+
 import type { Attraction, AttractionForm } from "@/lib/attractions/types";
 import { MultiPhotoUpload } from "@/components/attractions/MultiPhotoUpload";
 import { EMPTY_FORM, GRADIENTS, CATEGORIES } from "@/lib/attractions/types";
@@ -17,10 +18,11 @@ function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 60);
 }
 
-function SeoPreview({ title, description, slug }: { title: string; description: string; slug: string }) {
+// ── SEO preview uses meta_description, not full description ──────────────────
+function SeoPreview({ title, metaDescription, slug }: { title: string; metaDescription: string; slug: string }) {
   const url       = `travelasiargao.com/attractions/${slug || slugify(title) || "attraction-name"}`;
   const metaTitle = title ? `${title} — Siargao Island | Travela Siargao` : "Title | Travela Siargao";
-  const metaDesc  = description || "Discover the best of Siargao Island.";
+  const metaDesc  = metaDescription || "Discover the best of Siargao Island.";
   const titleOk   = metaTitle.length <= 65;
   const descOk    = metaDesc.length  <= 160;
   return (
@@ -31,7 +33,9 @@ function SeoPreview({ title, description, slug }: { title: string; description: 
       </div>
       <p className="text-[11px] text-green-700 mb-0.5 font-medium truncate">{url}</p>
       <p className={`text-[16px] font-medium mb-1 truncate ${titleOk ? "text-blue-700" : "text-red-600"}`}>{metaTitle}</p>
-      <p className={`text-[13px] leading-relaxed ${descOk ? "text-slate-600" : "text-red-500"}`}>{metaDesc.slice(0, 160)}{metaDesc.length > 160 ? "…" : ""}</p>
+      <p className={`text-[13px] leading-relaxed ${descOk ? "text-slate-600" : "text-red-500"}`}>
+        {metaDesc.slice(0, 160)}{metaDesc.length > 160 ? "…" : ""}
+      </p>
       <div className="flex gap-4 mt-2 text-[10px]">
         <span className={titleOk ? "text-green-600" : "text-red-500"}>Title: {metaTitle.length}/65</span>
         <span className={descOk  ? "text-green-600" : "text-red-500"}>Meta desc: {metaDesc.length}/160</span>
@@ -75,9 +79,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
 }
 
 function HeroPositionPicker({ value, onChange, imageUrl }: {
-  value: string;
-  onChange: (v: string) => void;
-  imageUrl?: string;
+  value: string; onChange: (v: string) => void; imageUrl?: string;
 }) {
   const positions = [
     { label: "Top",    value: "center top",    hint: "Sky / treetops" },
@@ -91,9 +93,7 @@ function HeroPositionPicker({ value, onChange, imageUrl }: {
     <div className="space-y-3">
       {imageUrl && (
         <div className="rounded-xl overflow-hidden border border-slate-200 relative" style={{ height: 130 }}>
-          <img src={imageUrl} alt="Hero crop preview"
-            className="w-full h-full object-cover transition-all duration-300"
-            style={{ objectPosition: value }} />
+          <img src={imageUrl} alt="Hero crop preview" className="w-full h-full object-cover transition-all duration-300" style={{ objectPosition: value }} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between">
             <p className="text-white text-[11px] font-semibold">Live preview</p>
@@ -104,9 +104,7 @@ function HeroPositionPicker({ value, onChange, imageUrl }: {
       <div className="grid grid-cols-3 gap-2">
         {positions.map((p) => (
           <button key={p.value} type="button" onClick={() => onChange(p.value)}
-            className={`rounded-xl border p-2.5 text-left transition-all ${
-              value === p.value ? "border-[#0c7b93] bg-[#E0F7F4] text-[#085C52]" : "border-slate-200 bg-white text-slate-600 hover:border-[#0c7b93]"
-            }`}>
+            className={`rounded-xl border p-2.5 text-left transition-all ${value === p.value ? "border-[#0c7b93] bg-[#E0F7F4] text-[#085C52]" : "border-slate-200 bg-white text-slate-600 hover:border-[#0c7b93]"}`}>
             <div className="text-[12px] font-bold">{p.label}</div>
             <div className="text-[10px] opacity-60 mt-0.5">{p.hint}</div>
           </button>
@@ -161,8 +159,7 @@ function AiSeoButton({ title, description, category, onDone }: {
 }
 
 function EnhanceDescriptionButton({ title, description, category, onDone }: {
-  title: string; description: string; category: string;
-  onDone: (enhanced: string) => void;
+  title: string; description: string; category: string; onDone: (enhanced: string) => void;
 }) {
   const [state,  setState]  = useState<"idle" | "loading" | "done" | "error">("idle");
   const [errMsg, setErrMsg] = useState("");
@@ -197,7 +194,7 @@ function EnhanceDescriptionButton({ title, description, category, onDone }: {
 
 function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
   item?: Attraction | null;
-  onSave:    (f: AttractionForm & { hero_position: string; photos: Photo[] }) => Promise<void>;
+  onSave:    (f: AttractionForm & { hero_position: string; photos: Photo[]; meta_description: string; description_html: string }) => Promise<void>;
   onDelete?: () => Promise<void>;
   onCancel:  () => void;
 }) {
@@ -221,16 +218,14 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
     } : EMPTY_FORM
   );
 
-  // ── Photos state — loads existing photos or falls back to legacy image_url ──
-  const [photos, setPhotos] = useState<Photo[]>(
+  const [photos,          setPhotos]          = useState<Photo[]>(
     (item as any)?.photos?.length
       ? (item as any).photos
-      : item?.image_url
-        ? [{ url: item.image_url, alt: item.title }]
-        : []
+      : item?.image_url ? [{ url: item.image_url, alt: item.title }] : []
   );
-
-  const [heroPosition, setHeroPosition] = useState<string>((item as any)?.hero_position ?? "center center");
+  const [heroPosition,    setHeroPosition]    = useState<string>((item as any)?.hero_position ?? "center center");
+  const [metaDescription, setMetaDescription] = useState<string>((item as any)?.meta_description ?? "");
+  const [descriptionHtml, setDescriptionHtml] = useState<string>((item as any)?.description_html ?? "");
   const [saving,    setSaving]    = useState(false);
   const [deleting,  setDeleting]  = useState(false);
   const [wordCount, setWordCount] = useState(form.description.split(/\s+/).filter(Boolean).length);
@@ -242,14 +237,13 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
 
   function handlePhotosChange(p: Photo[]) {
     setPhotos(p);
-    // Keep legacy image_url in sync with first photo for backwards compatibility
     set("image_url", p[0]?.url ?? "");
   }
 
   async function handleSave() {
     if (!form.title.trim()) return;
     setSaving(true);
-    try { await onSave({ ...form, hero_position: heroPosition, photos }); }
+    try { await onSave({ ...form, hero_position: heroPosition, photos, meta_description: metaDescription, description_html: descriptionHtml }); }
     finally { setSaving(false); }
   }
 
@@ -288,7 +282,7 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className={lbl} style={{ marginBottom: 0 }}>
-              <div className="flex items-center gap-1.5"><AlignLeft className="w-3 h-3" /> Description</div>
+              <div className="flex items-center gap-1.5"><AlignLeft className="w-3 h-3" /> Full description (shown on page)</div>
             </label>
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-slate-400">{wordCount} words</span>
@@ -297,8 +291,8 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
           </div>
           <textarea className={input + " resize-y"} rows={6} value={form.description}
             onChange={(e) => set("description", e.target.value)}
-            placeholder="Write anything — a few words or several paragraphs. Hit '✨ Rewrite description' and AI will turn it into polished, SEO-friendly travel content." />
-          <p className="text-[10px] text-slate-400 mt-1">💡 Rough notes or full paragraphs — AI rewrites into 2–3 engaging, SEO-friendly paragraphs.</p>
+            placeholder="Write anything — a few words or several paragraphs. Hit '✨ Rewrite description' and AI will turn it into polished travel content." />
+          <p className="text-[10px] text-slate-400 mt-1">💡 This is the full text shown on the attraction page. Can be as long as you want.</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -352,34 +346,18 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
         </div>
       </div>
 
-      {/* ── Photos — multi-upload with swipe gallery preview ── */}
+      {/* ── Photos ── */}
       <div className={card}>
         <div className="flex items-center gap-2">
           <ImageIcon className="w-4 h-4 text-slate-400" />
           <h2 className="text-[14px] font-semibold text-slate-700">Photos</h2>
         </div>
-
-        <MultiPhotoUpload
-          photos={photos}
-          title={form.title}
-          category={form.category}
-          onChange={handlePhotosChange}
-        />
-
-        {/* Hero crop position — only shows when at least 1 photo uploaded */}
+        <MultiPhotoUpload photos={photos} title={form.title} category={form.category} onChange={handlePhotosChange} />
         {photos.length > 0 && (
           <div>
-            <label className={lbl}>
-              <div className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Hero crop position</div>
-            </label>
-            <p className="text-[11px] text-slate-400 mb-2">
-              Click a position — preview updates live. Adjusts how the first photo crops in the hero banner.
-            </p>
-            <HeroPositionPicker
-              value={heroPosition}
-              onChange={setHeroPosition}
-              imageUrl={photos[0]?.url}
-            />
+            <label className={lbl}><div className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Hero crop position</div></label>
+            <p className="text-[11px] text-slate-400 mb-2">Click a position — preview updates live.</p>
+            <HeroPositionPicker value={heroPosition} onChange={setHeroPosition} imageUrl={photos[0]?.url} />
           </div>
         )}
       </div>
@@ -389,8 +367,12 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2"><Globe className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">SEO</h2></div>
           <AiSeoButton title={form.title} description={form.description} category={form.category}
-            onDone={(tags) => set("seo_tags", Array.from(new Set([...form.seo_tags, ...tags])))} />
+            onDone={(tags, metaDesc) => {
+              set("seo_tags", Array.from(new Set([...form.seo_tags, ...tags])));
+              if (metaDesc) setMetaDescription(metaDesc.slice(0, 160));
+            }} />
         </div>
+
         <div>
           <label className={lbl}>URL slug</label>
           <div className="flex items-center gap-2">
@@ -398,12 +380,38 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
             <input className={input} value={form.slug} onChange={(e) => set("slug", slugify(e.target.value))} placeholder="auto-generated from title" />
           </div>
         </div>
+
+        {/* ── Meta description — separate from full description ── */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className={lbl} style={{ marginBottom: 0 }}>
+              Google meta description
+            </label>
+            <span className={`text-[10px] font-semibold ${metaDescription.length > 160 ? "text-red-500" : metaDescription.length > 140 ? "text-amber-500" : "text-green-600"}`}>
+              {metaDescription.length}/160
+            </span>
+          </div>
+          <textarea
+            className={input + " resize-none"}
+            rows={3}
+            maxLength={160}
+            value={metaDescription}
+            onChange={(e) => setMetaDescription(e.target.value)}
+            placeholder="Short 1-2 sentence summary shown in Google search results. Max 160 characters. Hit 'Auto-generate SEO' to fill automatically."
+          />
+          <p className="text-[10px] text-slate-400 mt-1">
+            This is what Google shows under your page title in search results. Keep it under 160 chars and make it enticing.
+          </p>
+        </div>
+
         <div>
           <label className={lbl}><div className="flex items-center gap-1.5"><Tag className="w-3 h-3" /> SEO keyword tags</div></label>
           <p className="text-[11px] text-slate-400 mb-2">3–6 phrases tourists search on Google. Hit "Auto-generate SEO" above to fill automatically.</p>
           <TagInput tags={form.seo_tags} onChange={(t) => set("seo_tags", t)} />
         </div>
-        <SeoPreview title={form.title} description={form.description} slug={form.slug} />
+
+        {/* Google preview uses meta_description now */}
+        <SeoPreview title={form.title} metaDescription={metaDescription} slug={form.slug} />
       </div>
 
       {/* ── Actions ── */}
@@ -436,25 +444,27 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
 
   const filtered = search.trim() ? items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase())) : items;
 
-  async function handleSave(form: AttractionForm & { hero_position: string; photos: Photo[] }) {
+  async function handleSave(form: AttractionForm & { hero_position: string; photos: Photo[]; meta_description: string; description_html: string }) {
     const body = {
       ...(editing && editing !== "new" ? { id: (editing as Attraction).id } : {}),
-      title:          form.title,
-      slug:           form.slug,
-      description:    form.description,
-      image_url:      form.image_url      || null,
-      sort_order:     form.sort_order,
-      is_published:   form.is_published,
-      category:       form.category,
-      cover_gradient: form.cover_gradient,
-      cover_emoji:    form.cover_emoji,
-      is_live:        form.is_live,
-      is_featured:    form.is_featured,
-      read_minutes:   form.read_minutes,
-      seo_tags:       form.seo_tags,
-      type:           form.type,
-      hero_position:  form.hero_position,
-      photos:         form.photos,        // ← saves all 3 photos
+      title:            form.title,
+      slug:             form.slug,
+      description:      form.description,
+      description_html: form.description_html,
+      meta_description: form.meta_description,
+      image_url:        form.image_url      || null,
+      sort_order:       form.sort_order,
+      is_published:     form.is_published,
+      category:         form.category,
+      cover_gradient:   form.cover_gradient,
+      cover_emoji:      form.cover_emoji,
+      is_live:          form.is_live,
+      is_featured:      form.is_featured,
+      read_minutes:     form.read_minutes,
+      seo_tags:         form.seo_tags,
+      type:             form.type,
+      hero_position:    form.hero_position,
+      photos:           form.photos,
     };
     const res  = await fetch("/api/admin/attractions/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
