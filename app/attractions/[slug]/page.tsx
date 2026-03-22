@@ -157,29 +157,75 @@ export default async function AttractionDetailPage({
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "TouristAttraction",
+  "@type": ["TouristAttraction", "LocalBusiness"],
   "name": item.title,
-  "description": (item as any).meta_description || item.description?.slice(0, 200) || `Discover ${item.title} on Siargao Island.`,
+  "description": (item as any).meta_description
+    || item.description?.slice(0, 200)
+    || `Discover ${item.title} on Siargao Island, Philippines.`,
   "url": `https://www.travelasiargao.com/attractions/${item.slug}`,
-  "image": photos[0]?.url ?? undefined,
+  "image": photos[0]?.url
+    ? {
+        "@type": "ImageObject",
+        "url": photos[0].url,
+        "description": photos[0].alt || item.title,
+      }
+    : undefined,
   "touristType": categoryLabel,
   "isAccessibleForFree": true,
   "inLanguage": "en-PH",
-  "location": {
+
+  // ── Fixes "non-critical" warnings in Rich Results Test ──
+  "telephone": "+639XXXXXXXXX",          // ← replace with your real number
+  "priceRange": "₱₱",
+  "currenciesAccepted": "PHP",
+  "paymentAccepted": "Cash, GCash",
+  "openingHours": "Mo-Su 06:00-18:00",   // ← adjust if needed
+
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "General Luna",
+    "addressLocality": "Siargao Island",
+    "addressRegion": "Surigao del Norte",
+    "postalCode": "8419",
+    "addressCountry": "PH",
+  },
+
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude":  "9.8482",
+    "longitude": "126.0458",
+  },
+
+  "containedInPlace": {
     "@type": "Place",
-    "name": `${item.title}, Siargao Island`,
+    "name": "Siargao Island",
     "address": {
       "@type": "PostalAddress",
-      "addressLocality": "Siargao Island",
       "addressRegion": "Surigao del Norte",
-      "addressCountry": "PH"
-    }
+      "addressCountry": "PH",
+    },
   },
+
   "provider": {
     "@type": "TravelAgency",
     "name": "Travela Siargao",
-    "url": "https://www.travelasiargao.com"
+    "url": "https://www.travelasiargao.com",
+    "telephone": "+639502778440",        // ← same real number here
+    "email": "support@travelasiargao.com", // ← replace with your email
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "General Luna",
+      "addressLocality": "Siargao Island",
+      "addressRegion": "Surigao del Norte",
+      "addressCountry": "PH",
+    },
   },
+
+  "sameAs": [
+    "https://www.facebook.com/travelasiargao",    // ← replace with real FB page
+    "https://www.instagram.com/travelasiargao",   // ← replace with real IG
+  ],
+
   ...(item.seo_tags?.length ? { "keywords": item.seo_tags.join(", ") } : {}),
 };
 

@@ -2,99 +2,94 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
     const { title, description, category, mode } = await req.json();
 
-    if (!title?.trim()) {
-      return NextResponse.json({ error: "Title is required" }, { status: 400 });
-    }
-
-    // ── Mode: enhance — rewrites/improves the existing description ──
+    // ── Mode: enhance — rewrites description in storytelling + practical style ──
     if (mode === "enhance") {
-      const prompt = `You are a professional travel writer and SEO expert for Travela Siargao (travelasiargao.com), a ferry booking and travel platform for Siargao Island, Philippines.
-
-Enhance and rewrite this attraction description to make it SEO-friendly, engaging, and informative for tourists planning a trip to Siargao:
-
-Attraction: ${title}
-Category: ${category || "attraction"}
-Current description: ${description || "(empty — write from scratch based on the title)"}
-
-Rules:
-- Write in a warm, inviting travel writing style
-- Naturally include "Siargao" and "Siargao Island" 
-- Include practical info tourists want: what to expect, best time to visit, what makes it unique
-- Be specific and vivid — no generic filler
-- Length: 3-5 paragraphs, 150-400 words
-- Do NOT use markdown headers or bullet points — pure flowing paragraphs only
-- Do NOT start with the attraction name as the first word
-- End with a subtle call to action encouraging visitors to book their ferry
-
-Return ONLY the enhanced description text. No JSON, no labels, no markdown.`;
-
-      const message = await anthropic.messages.create({
+      const msg = await client.messages.create({
         model:      "claude-sonnet-4-20250514",
-        max_tokens: 800,
-        messages:   [{ role: "user", content: prompt }],
+        max_tokens: 1000,
+        messages: [{
+          role: "user",
+          content: `You are writing content for travelasiargao.com, a local Siargao Island travel website run by someone who lives on the island.
+
+Rewrite this attraction description for "${title}" (category: ${category}).
+
+Original notes: ${description || "(no notes provided — write from general knowledge about this Siargao attraction)"}
+
+Writing style rules:
+- Mix personal storytelling WITH practical travel info — like a local friend who has actually been there giving you the real story
+- Start with a vivid moment or sensory detail that pulls the reader in (e.g. "The first time you see Cloud 9 at sunrise...")
+- Include at least one practical tip (best time to visit, what to bring, how to get there, cost)
+- Warm, conversational, genuine — NOT a formal travel brochure
+- First-person perspective or "you" perspective is great
+- Reference Siargao naturally — this is for people who are already planning to visit
+- Length: 4-5 paragraphs, around 200-280 words total
+- Do NOT use headers or bullet points — flowing paragraphs only
+- End with something that makes the reader feel they absolutely must go
+
+Return ONLY the rewritten description text. No intro, no label, no quotes around it.`,
+        }],
       });
 
-      const text = message.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
-        .join("").trim();
-
-      return NextResponse.json({ description: text });
+      const text = msg.content.find((b) => b.type === "text")?.text ?? "";
+      return NextResponse.json({ description: text.trim() });
     }
 
-    // ── Mode: seo (default) — generates tags + short meta description ──
-    const prompt = `You are an SEO expert for Travela Siargao (travelasiargao.com), a Philippine travel and ferry booking website for Siargao Island.
+    // ── Mode: seo — generates keyword tags + short meta description ──────────
+    if (mode === "seo") {
+      const msg = await client.messages.create({
+        model:      "claude-sonnet-4-20250514",
+        max_tokens: 500,
+        messages: [{
+          role: "user",
+          content: `You are an SEO expert for travelasiargao.com, a Siargao Island travel website in the Philippines.
 
-Generate SEO content for this Siargao Island attraction:
-- Title: ${title}
-- Category: ${category || "attraction"}
-- Description: ${description || "(none provided yet)"}
+Generate SEO data for the attraction: "${title}" (category: ${category})
+Context: ${description?.slice(0, 300) || "Siargao Island tourist attraction"}
 
-Return ONLY valid JSON with NO markdown, NO backticks, NO explanation:
+Return ONLY valid JSON in this exact format, nothing else:
 {
-  "tags": ["keyword 1", "keyword 2", "keyword 3", "keyword 4", "keyword 5", "keyword 6"],
-  "description": "2-3 sentence meta description optimized for Google (max 155 chars total)"
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6"],
+  "description": "One or two sentences max, 120-155 characters total, written to make someone click in Google search results. Mention Siargao and be specific about what makes this place special."
 }
 
 Rules for tags:
-- Phrases tourists actually search on Google
-- Include location: "siargao", "siargao island", "philippines"  
-- Include year where relevant: "siargao 2026"
-- Mix 2-word and 4-5 word long-tail keywords
-- All lowercase
-- Examples: "siargao tourist spots", "cloud 9 surf break siargao", "island hopping siargao philippines"
+- 6 tags total
+- Mix of: location-based ("siargao island"), activity-based ("surfing in siargao"), question-based ("best beaches siargao"), year-based ("siargao 2026")
+- Phrases real tourists type into Google
+- Lowercase only
 
-Rules for meta description:
-- Max 155 characters total
-- Include "Siargao" naturally
-- Mention what makes it special
-- No markdown, no quotes`;
+Rules for description:
+- MAXIMUM 155 characters — count carefully
+- Specific and enticing — not generic
+- Must mention Siargao`,
+        }],
+      });
 
-    const message = await anthropic.messages.create({
-      model:      "claude-sonnet-4-20250514",
-      max_tokens: 400,
-      messages:   [{ role: "user", content: prompt }],
-    });
+      const raw  = msg.content.find((b) => b.type === "text")?.text ?? "{}";
+      const clean = raw.replace(/```json|```/g, "").trim();
 
-    const text  = message.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { type: "text"; text: string }).text)
-      .join("");
-    const clean = text.replace(/```json|```/g, "").trim();
-    const data  = JSON.parse(clean);
+      try {
+        const parsed = JSON.parse(clean);
+        // Hard cap meta description at 155 chars
+        if (parsed.description && parsed.description.length > 155) {
+          parsed.description = parsed.description.slice(0, 152) + "...";
+        }
+        return NextResponse.json(parsed);
+      } catch {
+        return NextResponse.json({ tags: [], description: "" });
+      }
+    }
 
-    return NextResponse.json({
-      tags:        data.tags        ?? [],
-      description: data.description ?? "",
-    });
-  } catch (err) {
+    return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
+
+  } catch (err: any) {
     console.error("[generate-seo]", err);
-    return NextResponse.json({ error: "Generation failed" }, { status: 500 });
+    return NextResponse.json({ error: err?.message ?? "Server error" }, { status: 500 });
   }
 }
