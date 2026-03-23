@@ -24,11 +24,11 @@ Original notes: ${description || "(no notes provided — write from general know
 Writing style rules:
 - Mix personal storytelling WITH practical travel info — like a local friend who has actually been there giving you the real story
 - Start with a vivid moment or sensory detail that pulls the reader in (e.g. "The first time you see Cloud 9 at sunrise...")
-- Include at least one practical tip (best time to visit, what to bring, how to get there, cost)
+- Include at least one practical tip (best time to visit, what to bring, how to get there via travel and tour and vehicle rentals , dont mention cost)
 - Warm, conversational, genuine — NOT a formal travel brochure
-- First-person perspective or "you" perspective is great
+- First-person perspective or "you" perspective is great humble and relatable and engaging or enticing
 - Reference Siargao naturally — this is for people who are already planning to visit
-- Length: 2-3 paragraphs, around 120-180 words total
+- Length: 1-3 paragraphs, around 120-155 words total
 - Do NOT use headers or bullet points — flowing paragraphs only
 - End with something that makes the reader feel they absolutely must go
 
