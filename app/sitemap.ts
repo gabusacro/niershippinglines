@@ -6,19 +6,19 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.travelasiargao.
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
-  // ── Static pages ──────────────────────────────────────────────────────────
   const staticPages: MetadataRoute.Sitemap = [
-    { url: baseUrl,                              lastModified: new Date(), changeFrequency: "daily",   priority: 1.0 },
-    { url: `${baseUrl}${ROUTES.schedule}`,       lastModified: new Date(), changeFrequency: "daily",   priority: 0.9 },
-    { url: `${baseUrl}${ROUTES.book}`,           lastModified: new Date(), changeFrequency: "daily",   priority: 0.9 },
-    { url: `${baseUrl}/tours`,                   lastModified: new Date(), changeFrequency: "weekly",  priority: 0.8 },
-    { url: `${baseUrl}${ROUTES.attractions}`,    lastModified: new Date(), changeFrequency: "weekly",  priority: 0.8 },
-    { url: `${baseUrl}${ROUTES.weather}`,        lastModified: new Date(), changeFrequency: "daily",   priority: 0.5 },
-    { url: `${baseUrl}${ROUTES.terms}`,          lastModified: new Date(), changeFrequency: "monthly", priority: 0.3 },
-    { url: `${baseUrl}${ROUTES.privacy}`,        lastModified: new Date(), changeFrequency: "monthly", priority: 0.3 },
+    { url: baseUrl,                           lastModified: new Date(), changeFrequency: "daily",   priority: 1.0 },
+    { url: `${baseUrl}${ROUTES.schedule}`,    lastModified: new Date(), changeFrequency: "daily",   priority: 0.9 },
+    { url: `${baseUrl}${ROUTES.book}`,        lastModified: new Date(), changeFrequency: "daily",   priority: 0.9 },
+    { url: `${baseUrl}/tours`,                lastModified: new Date(), changeFrequency: "weekly",  priority: 0.8 },
+    { url: `${baseUrl}${ROUTES.attractions}`, lastModified: new Date(), changeFrequency: "weekly",  priority: 0.8 },
+    { url: `${baseUrl}/faq`,                  lastModified: new Date(), changeFrequency: "weekly",  priority: 0.8 },
+    { url: `${baseUrl}${ROUTES.weather}`,     lastModified: new Date(), changeFrequency: "daily",   priority: 0.5 },
+    { url: `${baseUrl}${ROUTES.terms}`,       lastModified: new Date(), changeFrequency: "monthly", priority: 0.3 },
+    { url: `${baseUrl}${ROUTES.privacy}`,     lastModified: new Date(), changeFrequency: "monthly", priority: 0.3 },
   ];
 
-  // ── Dynamic attraction pages — auto-updates when you add new ones ─────────
+  // Dynamic attraction pages
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,7 +40,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     return [...staticPages, ...attractionPages];
   } catch {
-    // If DB fails, still return static pages
     return staticPages;
   }
 }
