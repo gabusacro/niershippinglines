@@ -26,31 +26,46 @@ export async function updateSession(request: NextRequest) {
   // Get current logged-in user
   const { data: { user } } = await supabase.auth.getUser();
 
-  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
-  const isLoginPage  = request.nextUrl.pathname === "/login";
+  const path         = request.nextUrl.pathname;
+  const isAdminUI    = path.startsWith("/admin");
+  const isAdminApi   = path.startsWith("/api/admin");
+  const isLoginPage  = path === "/login";
 
-  if (isAdminRoute) {
-    // Not logged in at all → go to login
+  // ── Protect /admin pages + /api/admin endpoints ───────────────────────────
+  if (isAdminUI || isAdminApi) {
+
+    // Not logged in at all
     if (!user) {
+      if (isAdminApi) {
+        // Block API calls with 401 — don't redirect API routes
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      // Redirect UI to login, preserving the page they wanted
       const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("next", request.nextUrl.pathname);
+      loginUrl.searchParams.set("next", path);
       return NextResponse.redirect(loginUrl);
     }
 
-    // Logged in — check if role is admin in profiles table
+    // Logged in — check role in profiles table
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
 
-    // Not an admin → kick back to passenger dashboard
-    if (!profile || profile.role !== "admin") {
+    const isAdmin = profile?.role === "admin";
+
+    if (!isAdmin) {
+      if (isAdminApi) {
+        // Block API call with 403 Forbidden
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      // Passenger/investor/crew → send to their dashboard
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
-  // Already logged in as admin and visiting /login → send straight to admin
+  // ── Already logged-in admin visiting /login → skip to admin ──────────────
   if (isLoginPage && user) {
     const { data: profile } = await supabase
       .from("profiles")
