@@ -336,6 +336,49 @@ function AiSeoButton({ title, description, category, onDone }: {
   );
 }
 
+
+function AiTitleButton({ title, description, category, onDone }: {
+  title: string; description: string; category: string; onDone: (v: string) => void;
+}) {
+  const [state,  setState]  = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [errMsg, setErrMsg] = useState("");
+  async function run() {
+    setState("loading"); setErrMsg("");
+    try {
+      const res = await fetch("/api/admin/attractions/generate-seo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title, description, category,
+          mode: "title",   // we'll add this mode below
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { setErrMsg(getAiErrorMessage(data)); setState("error"); setTimeout(() => setState("idle"), 8000); return; }
+      if (data.title) { onDone(data.title); setState("done"); setTimeout(() => setState("idle"), 3000); }
+    } catch { setErrMsg("Network error."); setState("error"); setTimeout(() => setState("idle"), 5000); }
+  }
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button type="button" onClick={run} disabled={state === "loading"}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all border ${
+          state === "done"  ? "bg-green-50 text-green-700 border-green-200" :
+          state === "error" ? "bg-red-50 text-red-600 border-red-200" :
+          "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+        } disabled:opacity-50`}>
+        {state === "loading" ? <Loader2 className="w-3 h-3 animate-spin" /> : state === "done" ? <Check className="w-3 h-3" /> : state === "error" ? <span>✕</span> : <Sparkles className="w-3 h-3" />}
+        {state === "done" ? "Generated!" : state === "loading" ? "Generating…" : state === "error" ? "Failed" : "AI title"}
+      </button>
+      {state === "error" && errMsg && <p className="text-[10px] text-red-500 max-w-xs text-right">{errMsg}</p>}
+    </div>
+  );
+}
+
+
+
+
+
+
+
 // ─── Item form panel ──────────────────────────────────────────────────────────
 function ItemFormPanel({
   item, onSave, onDelete, onCancel,
@@ -448,10 +491,27 @@ function ItemFormPanel({
       <div className={card}>
         <div className="flex items-center gap-2"><AlignLeft className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">Content</h2></div>
 
-        <div>
-          <label className={lbl}>Title *</label>
-          <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Cloud 9 Surfing Beach" />
-        </div>
+
+
+<div>
+  <div className="flex items-center justify-between mb-1.5">
+    <label className={lbl} style={{ marginBottom: 0 }}>Title *</label>
+    <AiTitleButton
+      title={title}
+      description={description}
+      category={type}
+      onDone={setTitle}
+    />
+  </div>
+  <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Cloud 9 Surfing Beach" />
+</div>
+
+
+
+
+
+
+
 
         <div className="grid grid-cols-2 gap-3">
           <div>

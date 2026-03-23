@@ -300,8 +300,6 @@ function CardLarge({ item, cover, onClick }: { item: DiscoverItem; cover: string
       {item.type === "partner" && (
         <span className="absolute right-3 top-3 z-10 rounded border border-white/30 bg-black/30 px-2 py-0.5 text-[10px] text-white/80 backdrop-blur-sm">Partner Ad</span>
       )}
-
-      {/* Photo count badge */}
       {photoCount > 1 && (
         <span className="absolute right-3 bottom-14 z-10 flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm">
           📸 {photoCount}
@@ -316,7 +314,8 @@ function CardLarge({ item, cover, onClick }: { item: DiscoverItem; cover: string
 
       <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-5">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-white/70">{item.tag}</p>
-        <p className="mt-0.5 text-xl font-bold leading-snug text-white drop-shadow">{item.title}</p>
+        {/* ✅ BIGGER TITLE — was text-xl, now text-2xl sm:text-3xl font-black */}
+        <p className="mt-0.5 text-2xl sm:text-3xl font-black leading-tight text-white drop-shadow uppercase tracking-tight">{item.title}</p>
         <p className="mt-1 text-xs text-white/55">
           {item.video_url
             ? "▶ Tap to watch"
@@ -360,8 +359,10 @@ function CardSmall({ item, cover, onClick }: { item: DiscoverItem; cover: string
 
       <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/75 to-transparent p-2.5">
         <p className="text-[9px] font-semibold uppercase tracking-wider text-white/65">{item.tag}</p>
-        <p className="mt-0.5 line-clamp-2 text-xs font-bold leading-snug text-white drop-shadow">{item.title}</p>
+        {/* ✅ BIGGER TITLE — was text-xs, now text-sm font-black uppercase */}
+        <p className="mt-0.5 line-clamp-2 text-sm font-black leading-snug text-white drop-shadow uppercase">{item.title}</p>
       </div>
     </button>
   );
 }
+

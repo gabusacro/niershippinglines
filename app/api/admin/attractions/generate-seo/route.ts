@@ -41,6 +41,44 @@ Return ONLY the rewritten description text. No intro, no label, no quotes around
     }
 
     // ── Mode: seo — generates keyword tags + short meta description ──────────
+ 
+ 
+ 
+
+        if (mode === "title") {
+          const msg = await client.messages.create({
+            model:      "claude-sonnet-4-20250514",
+            max_tokens: 100,
+            messages: [{
+              role: "user",
+              content: `Generate a short, catchy title for a Siargao Island discover item.
+        Type: ${category}
+        Current title: ${title || "(none)"}
+        Description: ${description?.slice(0, 200) || "(none)"}
+
+        Rules:
+        - Max 6 words
+        - Specific to Siargao — mention the place name if known
+        - Engaging and descriptive
+        - No quotes, no punctuation at end
+        - Examples: "Cloud 9 Surf Break", "Naked Island Paradise", "Maasin River Adventure"
+
+        Return ONLY the title text, nothing else.`,
+            }],
+          });
+          const text = msg.content.find((b) => b.type === "text")?.text ?? "";
+          return NextResponse.json({ title: text.trim() });
+        }
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
     if (mode === "seo") {
       const msg = await client.messages.create({
         model:      "claude-sonnet-4-20250514",
