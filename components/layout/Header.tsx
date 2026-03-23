@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { APP_NAME, ROUTES } from "@/lib/constants";
 import { useToast } from "@/components/ui/ActionToast";
+import { Boat } from "@/components/icons";
 import { OfficialTime } from "@/components/ui/OfficialTime";
 import { createClient } from "@/lib/supabase/client";
 
@@ -123,7 +124,7 @@ export function Header({ siteName }: HeaderProps = {}) {
             <Link href={ROUTES.home} className={desktopLink(pathname === ROUTES.home)}>Home</Link>
           )}
 
-          {/* ✅ Amber/orange standout button — matches View Schedule style */}
+          {/* ✅ Amber Book A Trip with Boat icon */}
           {showBookATrip && (
             <Link href={ROUTES.book}
               className="min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-white transition-all duration-200 touch-target active:scale-[0.97] shadow-sm"
@@ -131,7 +132,8 @@ export function Header({ siteName }: HeaderProps = {}) {
               onMouseEnter={(e) => (e.currentTarget.style.background = "#D97706")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "#F59E0B")}
             >
-              🚢 Book A Trip
+              <Boat className="w-4 h-4 shrink-0" />
+              Book A Trip
             </Link>
           )}
 
@@ -217,13 +219,14 @@ export function Header({ siteName }: HeaderProps = {}) {
               </li>
             )}
 
-            {/* ✅ Amber button in mobile drawer too */}
+            {/* ✅ Amber Book A Trip with Boat icon — mobile */}
             {showBookATrip && (
               <li>
                 <Link href={ROUTES.book} onClick={() => setMenuOpen(false)}
                   className="flex min-h-[48px] items-center gap-2 rounded-2xl px-4 font-bold text-white transition-all duration-200 touch-target active:scale-[0.99]"
                   style={{ background: "#F59E0B" }}>
-                  🚢 Book A Trip
+                  <Boat className="w-4 h-4 shrink-0" />
+                  Book A Trip
                 </Link>
               </li>
             )}
