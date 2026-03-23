@@ -12,7 +12,11 @@ export function Footer({ siteName }: FooterProps = {}) {
         <div className="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <p className="text-xs text-white/90 sm:text-sm">
-              {displayName}. Booking, ticketing &amp; ferry schedules.
+
+
+              {displayName} &copy; {new Date().getFullYear()} 
+
+
             </p>
             <span className="hidden text-white/50 sm:inline">·</span>
             <Link
