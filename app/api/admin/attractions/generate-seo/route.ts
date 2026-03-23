@@ -28,7 +28,7 @@ Writing style rules:
 - Warm, conversational, genuine — NOT a formal travel brochure
 - First-person perspective or "you" perspective is great
 - Reference Siargao naturally — this is for people who are already planning to visit
-- Length: 4-5 paragraphs, around 200-280 words total
+- Length: 2-3 paragraphs, around 120-180 words total
 - Do NOT use headers or bullet points — flowing paragraphs only
 - End with something that makes the reader feel they absolutely must go
 

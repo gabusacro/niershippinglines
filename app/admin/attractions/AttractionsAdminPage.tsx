@@ -534,7 +534,7 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
                     {item.is_live       && <span className="shrink-0 text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-semibold">Live</span>}
                     {!item.is_published && <span className="shrink-0 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-semibold">Draft</span>}
                   </div>
-                  <p className="text-[11px] text-slate-400 capitalize">
+                  <p suppressHydrationWarning className="text-[11px] text-slate-400 capitalize">
                     {item.type} · {item.category ?? "–"} · {new Date(item.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
                   </p>
                 </div>

@@ -45,7 +45,7 @@ export default async function RootLayout({
 }>) {
   const branding = await getSiteBranding();
   return (
-    <html lang="en" className={nunito.variable} data-scroll-behavior="smooth">
+    <html lang="en" className={nunito.variable} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         {/* Google AdSense — plain script tag to avoid Next.js data-nscript conflict */}
         <script
