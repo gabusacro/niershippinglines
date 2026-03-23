@@ -41,7 +41,6 @@ function ScheduleLinkMobile({ pathname, onClick }: { pathname: string; onClick?:
   );
 }
 
-// ── Shared nav link styles ────────────────────────────────────────────────────
 function desktopLink(active: boolean) {
   return `min-h-[44px] flex items-center px-3 py-2 rounded-xl transition-all duration-200 touch-target ${
     active ? "text-white bg-white/20" : "text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98]"
@@ -96,7 +95,7 @@ export function Header({ siteName }: HeaderProps = {}) {
     router.push(ROUTES.home);
   }
 
-  const showBookATrip  = !user;
+  const showBookATrip   = !user;
   const showPublicLinks = !role || role === "passenger";
 
   return (
@@ -124,8 +123,16 @@ export function Header({ siteName }: HeaderProps = {}) {
             <Link href={ROUTES.home} className={desktopLink(pathname === ROUTES.home)}>Home</Link>
           )}
 
+          {/* ✅ Amber/orange standout button — matches View Schedule style */}
           {showBookATrip && (
-            <Link href={ROUTES.book} className={desktopLink(pathname === ROUTES.book)}>Book A Trip</Link>
+            <Link href={ROUTES.book}
+              className="min-h-[44px] flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-white transition-all duration-200 touch-target active:scale-[0.97] shadow-sm"
+              style={{ background: "#F59E0B" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#D97706")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "#F59E0B")}
+            >
+              🚢 Book A Trip
+            </Link>
           )}
 
           {showPublicLinks && (
@@ -136,12 +143,10 @@ export function Header({ siteName }: HeaderProps = {}) {
             <Link href="/tours" className={desktopLink(pathname === "/tours")}>Tours</Link>
           )}
 
-          {/* ✅ FAQ link — public only */}
           {showPublicLinks && (
             <Link href="/faq" className={desktopLink(pathname === "/faq")}>FAQ</Link>
           )}
 
-          {/* ✅ Parking link — public only */}
           {showPublicLinks && (
             <Link href="/parking" className={desktopLink(pathname === "/parking")}>Parking</Link>
           )}
@@ -212,10 +217,13 @@ export function Header({ siteName }: HeaderProps = {}) {
               </li>
             )}
 
+            {/* ✅ Amber button in mobile drawer too */}
             {showBookATrip && (
               <li>
-                <Link href={ROUTES.book} onClick={() => setMenuOpen(false)} className={mobileLink(pathname === ROUTES.book)}>
-                  Book A Trip
+                <Link href={ROUTES.book} onClick={() => setMenuOpen(false)}
+                  className="flex min-h-[48px] items-center gap-2 rounded-2xl px-4 font-bold text-white transition-all duration-200 touch-target active:scale-[0.99]"
+                  style={{ background: "#F59E0B" }}>
+                  🚢 Book A Trip
                 </Link>
               </li>
             )}
@@ -236,7 +244,6 @@ export function Header({ siteName }: HeaderProps = {}) {
               </li>
             )}
 
-            {/* ✅ FAQ link — public only */}
             {showPublicLinks && (
               <li>
                 <Link href="/faq" onClick={() => setMenuOpen(false)} className={mobileLink(pathname === "/faq")}>
@@ -245,7 +252,6 @@ export function Header({ siteName }: HeaderProps = {}) {
               </li>
             )}
 
-            {/* ✅ Parking link — public only */}
             {showPublicLinks && (
               <li>
                 <Link href="/parking" onClick={() => setMenuOpen(false)} className={mobileLink(pathname === "/parking")}>

@@ -179,9 +179,9 @@ function UrgencySection({ lots }: { lots: ParkingLot[] }) {
         {pctFull >= 50 && pctFull < 70 && <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/20 border border-amber-400/40 px-3 py-1 mb-4"><span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse inline-block" /><span className="text-xs font-bold text-amber-200 uppercase tracking-wide">Slots filling up — book now</span></div>}
         {pctFull < 50 && <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-1 mb-4"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /><span className="text-xs font-bold text-emerald-200 uppercase tracking-wide">Slots available now</span></div>}
         <h2 className="text-2xl font-black text-white leading-tight mb-3">Don&apos;t get stuck parking<br /><span style={{ color: "#7dd3fc" }}>far from the port.</span></h2>
-        <p className="text-white/80 text-sm leading-relaxed mb-5 max-w-lg">Submit booking with docs and GCash — admin approves and locks your slot. <strong className="text-white">Slot only confirmed after approval.</strong></p>
+        <p className="text-white/80 text-sm leading-relaxed mb-5 max-w-lg">Submit booking with docs and GCash — wait for approval and locks your slot. <strong className="text-white">Slot only confirmed after approval.</strong></p>
         <div className="grid sm:grid-cols-3 gap-3 mb-5">
-          {[{ icon: "📋", title: "Submit everything", desc: "Vehicle docs, ID photo, and GCash — all in one form." }, { icon: "✅", title: "Admin confirms", desc: "We verify docs and payment. You get a reference number." }, { icon: "🚶", title: "Walk to the port", desc: "Our lots are 100–300 meters from the port." }].map(p => (
+          {[{ icon: "📋", title: "Submit everything", desc: "Vehicle docs, ID photo, and GCash — all in one form." }, { icon: "✅", title: "Wait Confirmation", desc: "We verify docs and payment. You get a reference number." }, { icon: "🚶", title: "Walk to the port", desc: "Our lots are 100–300 meters from the port." }].map(p => (
             <div key={p.title} className="rounded-xl bg-white/10 border border-white/20 p-4">
               <div className="text-2xl mb-2">{p.icon}</div>
               <p className="text-sm font-bold text-white mb-1">{p.title}</p>
@@ -343,7 +343,7 @@ function BookingModal({ lot, settings, onClose }: { lot: ParkingLot; settings: S
               <p className="text-xs text-[#0f766e] mb-1">Your reference number</p>
               <span className="font-mono text-xl font-black text-[#0c7b93]">{reference}</span>
             </div>
-            <p className="mt-4 text-sm text-gray-600 max-w-xs mx-auto">Admin will review your documents and payment. Your slot is <strong>not yet locked</strong> until approved.</p>
+            <p className="mt-4 text-sm text-gray-600 max-w-xs mx-auto">We will review your documents and payment. Your slot is <strong>not yet locked</strong> until approved.</p>
             <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-4 text-left text-sm text-amber-800">
               <p className="font-semibold mb-2">📋 Bring on arrival:</p>
               <ul className="text-xs space-y-1">
@@ -404,7 +404,7 @@ function BookingModal({ lot, settings, onClose }: { lot: ParkingLot; settings: S
                 <div className="flex justify-between pt-2 border-t-2 border-teal-200"><span className="font-black text-[#134e4a]">Total Paid</span><span className="font-black text-xl text-[#0c7b93]">{peso(total)}</span></div>
               </div>
             </div>
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">⚠️ Slot is <strong>not locked</strong> until admin confirms.</div>
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">⚠️ Slot is <strong>not locked</strong> until you received confirmation.</div>
             {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
             <div className="flex gap-3">
               <button onClick={() => setStep("payment")} className="flex-1 rounded-xl border-2 border-teal-200 px-4 py-3 text-sm font-semibold text-[#134e4a] hover:bg-teal-50">← Back</button>
@@ -657,7 +657,7 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-white/60">Travela Siargao</p>
               <h1 className="text-3xl sm:text-4xl font-black text-white mt-1">Pay Parking</h1>
-              <p className="text-white/80 text-sm mt-2 max-w-md">Safe, monitored parking near Dapa Port. Submit docs + GCash — admin confirms your slot.</p>
+              <p className="text-white/80 text-sm mt-2 max-w-md">Safe, monitored parking near Dapa Port. Submit docs + GCash — wait confirmation for your slot.</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">₱250/day</span>
                 <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">Up to {settings.maxDays} days</span>
@@ -679,7 +679,7 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
         <div>
           <h2 className="text-xl font-black text-[#134e4a] mb-5">How It Works</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[{ emoji: "📋", title: "Fill the Form", desc: "Pick lot, vehicle type, and dates. Upload OR/CR and ID photo." }, { emoji: "💸", title: "Pay via GCash", desc: "Send exact amount and upload your screenshot — all in one form." }, { emoji: "✅", title: "Admin Approves", desc: "We verify your documents and payment. Slot locked only after approval." }, { emoji: "🔑", title: "Arrive & Park", desc: "Show your reference number and original docs to crew on arrival." }].map((s, idx) => (
+            {[{ emoji: "📋", title: "Fill the Form", desc: "Pick lot, vehicle type, and dates. Upload OR/CR and ID photo." }, { emoji: "💸", title: "Pay via GCash", desc: "Send exact amount and upload your screenshot — all in one form." }, { emoji: "✅", title: "Approval", desc: "We verify your documents and payment. Slot locked only after approval." }, { emoji: "🔑", title: "Arrive & Park", desc: "Show your reference number and original docs to crew on arrival." }].map((s, idx) => (
               <div key={idx} className="rounded-2xl bg-white border-2 border-teal-100 p-5 relative overflow-hidden">
                 <div className="absolute top-3 right-3 text-5xl font-black opacity-[0.04] text-[#0c7b93]">{idx + 1}</div>
                 <div className="text-3xl mb-3">{s.emoji}</div>
@@ -705,7 +705,7 @@ export default function ParkingLotsClient({ lots, settings }: Props) {
           <h2 className="text-base font-bold text-gray-700 mb-3">⚠️ Parking Policy</h2>
           <ul className="space-y-2 text-sm text-gray-600">
             <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Maximum duration is <strong>{settings.maxDays} days</strong>.</li>
-            <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Slot is only locked after admin confirms your payment and documents.</li>
+            <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Slot is only locked after confirmed payment and documents.</li>
             <li className="flex items-start gap-2"><span className="text-teal-500 shrink-0">•</span>Rate is locked at booking time once confirmed. No refunds after confirmation.</li>
             <li className="flex items-start gap-2"><span className="text-amber-500 shrink-0">•</span>Overstay requires settlement before vehicle exit.</li>
           </ul>
