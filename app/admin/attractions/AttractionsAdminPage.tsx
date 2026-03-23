@@ -5,8 +5,9 @@ import {
   Upload, Image as ImageIcon, Sparkles, Search, Plus,
   ChevronRight, Tag, Clock, MapPin, FileText, Globe,
   Wand2, Check, Loader2, Trash2, Save, ArrowLeft, Eye, AlignLeft,
+  LayoutDashboard, AlertCircle, CheckCircle2, AlertTriangle, BarChart3,
 } from "lucide-react";
-
+import { RichDescriptionEditor } from "@/components/attractions/RichDescriptionEditor";
 import type { Attraction, AttractionForm } from "@/lib/attractions/types";
 import { MultiPhotoUpload } from "@/components/attractions/MultiPhotoUpload";
 import { EMPTY_FORM, GRADIENTS, CATEGORIES } from "@/lib/attractions/types";
@@ -14,11 +15,136 @@ import { AdsAdminPage } from "./AdsAdminPage";
 
 type Photo = { url: string; alt: string };
 
+// ── SEO health checker ────────────────────────────────────────────────────────
+type SeoHealth = {
+  score:   number;           // 0-100
+  status:  "good" | "warn" | "poor";
+  missing: string[];
+  passed:  string[];
+};
+
+function getSeoHealth(item: Attraction): SeoHealth {
+  const missing: string[] = [];
+  const passed:  string[] = [];
+
+  // Photo
+  const hasPhoto = !!(item.image_url || (item as any).photos?.length);
+  hasPhoto ? passed.push("Photo") : missing.push("Photo");
+
+  // Description length
+  const wordCount = item.description?.split(/\s+/).filter(Boolean).length ?? 0;
+  wordCount >= 80
+    ? passed.push("Description")
+    : missing.push(wordCount > 0 ? `Description too short (${wordCount} words)` : "Description");
+
+  // Meta description
+  const hasMeta = !!((item as any).meta_description?.trim());
+  hasMeta ? passed.push("Meta description") : missing.push("Meta description");
+
+  // SEO tags
+  const tagCount = item.seo_tags?.length ?? 0;
+  tagCount >= 3
+    ? passed.push("SEO tags")
+    : missing.push(tagCount > 0 ? `Need more tags (${tagCount}/3)` : "SEO tags");
+
+  // Published
+  item.is_published ? passed.push("Published") : missing.push("Not published");
+
+  const score  = Math.round((passed.length / 5) * 100);
+  const status = score === 100 ? "good" : score >= 60 ? "warn" : "poor";
+
+  return { score, status, missing, passed };
+}
+
 function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim().replace(/\s+/g, "-").slice(0, 60);
 }
 
-// ── SEO preview uses meta_description, not full description ──────────────────
+// ── SEO badge ─────────────────────────────────────────────────────────────────
+function SeoBadge({ health }: { health: SeoHealth }) {
+  const cfg = {
+    good: { bg: "#DCFCE7", text: "#166534", border: "#BBF7D0", label: "SEO Ready", icon: <CheckCircle2 className="w-3 h-3" /> },
+    warn: { bg: "#FEF9C3", text: "#854D0E", border: "#FDE047", label: "Needs Work",  icon: <AlertTriangle  className="w-3 h-3" /> },
+    poor: { bg: "#FEE2E2", text: "#991B1B", border: "#FCA5A5", label: "Missing SEO", icon: <AlertCircle    className="w-3 h-3" /> },
+  }[health.status];
+
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}`,
+      fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999,
+      textTransform: "uppercase", letterSpacing: "0.05em",
+    }}>
+      {cfg.icon}{cfg.label} {health.score}%
+    </span>
+  );
+}
+
+// ── Dashboard header ──────────────────────────────────────────────────────────
+function DashboardHeader({ items }: { items: Attraction[] }) {
+  const healths  = items.map(getSeoHealth);
+  const good     = healths.filter((h) => h.status === "good").length;
+  const warn     = healths.filter((h) => h.status === "warn").length;
+  const poor     = healths.filter((h) => h.status === "poor").length;
+  const avgScore = healths.length
+    ? Math.round(healths.reduce((s, h) => s + h.score, 0) / healths.length)
+    : 0;
+  const published = items.filter((i) => i.is_published).length;
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 mb-5">
+      {/* Title */}
+      <div className="flex items-center gap-3 mb-4">
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg,#085C52,#0c7b93)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <LayoutDashboard className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: "#111827", lineHeight: 1.2 }}>Attractions Dashboard</h1>
+          <p style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>Manage content · Monitor SEO health · Publish</p>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-4 gap-3 mb-4">
+        {[
+          { label: "Total",      value: items.length,  color: "#0c7b93", bg: "#E0F7F4" },
+          { label: "Published",  value: published,     color: "#085C52", bg: "#DCFCE7" },
+          { label: "SEO ready",  value: good,          color: "#166534", bg: "#DCFCE7" },
+          { label: "Avg SEO",    value: `${avgScore}%`,color: avgScore >= 80 ? "#166534" : avgScore >= 50 ? "#854D0E" : "#991B1B",
+            bg: avgScore >= 80 ? "#DCFCE7" : avgScore >= 50 ? "#FEF9C3" : "#FEE2E2" },
+        ].map((s) => (
+          <div key={s.label} style={{ background: s.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: s.color, opacity: 0.7, marginTop: 3, textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* SEO health bar */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <p style={{ fontSize: 11, fontWeight: 600, color: "#6B7280" }}>SEO health overview</p>
+          <p style={{ fontSize: 11, color: "#9CA3AF" }}>{good} ready · {warn} need work · {poor} missing SEO</p>
+        </div>
+        <div style={{ height: 8, borderRadius: 999, background: "#F1F5F9", overflow: "hidden", display: "flex" }}>
+          {good > 0 && <div style={{ flex: good, background: "#22C55E", transition: "flex 0.5s ease" }} />}
+          {warn > 0 && <div style={{ flex: warn, background: "#EAB308", transition: "flex 0.5s ease" }} />}
+          {poor > 0 && <div style={{ flex: poor, background: "#EF4444", transition: "flex 0.5s ease" }} />}
+          {items.length === 0 && <div style={{ flex: 1, background: "#E2E8F0" }} />}
+        </div>
+        <div className="flex items-center gap-4 mt-1.5">
+          {[["#22C55E","Ready"],["#EAB308","Needs work"],["#EF4444","Missing SEO"]].map(([c,l]) => (
+            <div key={l} className="flex items-center gap-1">
+              <div style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />
+              <span style={{ fontSize: 10, color: "#9CA3AF" }}>{l}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SeoPreview({ title, metaDescription, slug }: { title: string; metaDescription: string; slug: string }) {
   const url       = `travelasiargao.com/attractions/${slug || slugify(title) || "attraction-name"}`;
   const metaTitle = title ? `${title} — Siargao Island | Travela Siargao` : "Title | Travela Siargao";
@@ -217,7 +343,6 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
       sort_order:     item.sort_order     ?? 0,
     } : EMPTY_FORM
   );
-
   const [photos,          setPhotos]          = useState<Photo[]>(
     (item as any)?.photos?.length
       ? (item as any).photos
@@ -258,19 +383,53 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
   const lbl   = "block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5";
   const card  = "rounded-2xl border border-slate-100 bg-white p-5 space-y-4";
 
+  // Live SEO health for this item being edited
+  const liveHealth = getSeoHealth({
+    ...form,
+    id: (item as any)?.id ?? "",
+    created_at: (item as any)?.created_at ?? "",
+    updated_at: (item as any)?.updated_at ?? "",
+    image_url: photos[0]?.url ?? form.image_url,
+    meta_description: metaDescription,
+  } as any);
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[20px] font-semibold text-slate-900">{item ? "Edit attraction" : "Add attraction"}</h1>
-          <p className="text-[13px] text-slate-400 mt-0.5">Shows on the public Explore & Discover page.</p>
+          <div className="flex items-center gap-2 mb-0.5">
+            <h1 className="text-[20px] font-semibold text-slate-900">{item ? "Edit attraction" : "Add attraction"}</h1>
+            {item && <SeoBadge health={liveHealth} />}
+          </div>
+          <p className="text-[13px] text-slate-400">Shows on the public Explore & Discover page.</p>
         </div>
         <button onClick={onCancel} className="flex items-center gap-1.5 text-[13px] text-slate-400 hover:text-slate-600">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
       </div>
 
-      {/* ── Content ── */}
+      {/* Live SEO checklist */}
+      {item && (
+        <div className={`rounded-xl border p-3 ${liveHealth.status === "good" ? "border-green-200 bg-green-50" : liveHealth.status === "warn" ? "border-amber-200 bg-amber-50" : "border-red-200 bg-red-50"}`}>
+          <p style={{ fontSize: 11, fontWeight: 700, marginBottom: 6, color: liveHealth.status === "good" ? "#166534" : liveHealth.status === "warn" ? "#854D0E" : "#991B1B" }}>
+            SEO health — {liveHealth.score}%
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {liveHealth.passed.map((p) => (
+              <span key={p} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "#DCFCE7", color: "#166534", border: "1px solid #BBF7D0" }}>
+                <Check className="w-2.5 h-2.5" />{p}
+              </span>
+            ))}
+            {liveHealth.missing.map((m) => (
+              <span key={m} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 999, background: "#FEE2E2", color: "#991B1B", border: "1px solid #FCA5A5" }}>
+                <AlertCircle className="w-2.5 h-2.5" />{m}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
       <div className={card}>
         <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">Content</h2></div>
         <div>
@@ -285,14 +444,14 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
               <div className="flex items-center gap-1.5"><AlignLeft className="w-3 h-3" /> Full description (shown on page)</div>
             </label>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-400">{wordCount} words</span>
+              <span className={`text-[10px] font-semibold ${wordCount >= 80 ? "text-green-600" : "text-amber-500"}`}>{wordCount} words {wordCount >= 80 ? "✓" : "(need 80+)"}</span>
               <EnhanceDescriptionButton title={form.title} description={form.description} category={form.category} onDone={(v) => set("description", v)} />
             </div>
           </div>
           <textarea className={input + " resize-y"} rows={6} value={form.description}
             onChange={(e) => set("description", e.target.value)}
-            placeholder="Write anything — a few words or several paragraphs. Hit '✨ Rewrite description' and AI will turn it into polished travel content." />
-          <p className="text-[10px] text-slate-400 mt-1">💡 This is the full text shown on the attraction page. Can be as long as you want.</p>
+            placeholder="Write anything — hit '✨ Rewrite description' to enhance with AI." />
+          <p className="text-[10px] text-slate-400 mt-1">💡 Rough notes or full paragraphs — AI rewrites into 2–3 engaging, SEO-friendly paragraphs.</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -346,12 +505,9 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
         </div>
       </div>
 
-      {/* ── Photos ── */}
+      {/* Photos */}
       <div className={card}>
-        <div className="flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-slate-400" />
-          <h2 className="text-[14px] font-semibold text-slate-700">Photos</h2>
-        </div>
+        <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">Photos</h2></div>
         <MultiPhotoUpload photos={photos} title={form.title} category={form.category} onChange={handlePhotosChange} />
         {photos.length > 0 && (
           <div>
@@ -362,7 +518,7 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
         )}
       </div>
 
-      {/* ── SEO ── */}
+      {/* SEO */}
       <div className={card}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2"><Globe className="w-4 h-4 text-slate-400" /><h2 className="text-[14px] font-semibold text-slate-700">SEO</h2></div>
@@ -372,7 +528,6 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
               if (metaDesc) setMetaDescription(metaDesc.slice(0, 160));
             }} />
         </div>
-
         <div>
           <label className={lbl}>URL slug</label>
           <div className="flex items-center gap-2">
@@ -380,41 +535,26 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
             <input className={input} value={form.slug} onChange={(e) => set("slug", slugify(e.target.value))} placeholder="auto-generated from title" />
           </div>
         </div>
-
-        {/* ── Meta description — separate from full description ── */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className={lbl} style={{ marginBottom: 0 }}>
-              Google meta description
-            </label>
-            <span className={`text-[10px] font-semibold ${metaDescription.length > 160 ? "text-red-500" : metaDescription.length > 140 ? "text-amber-500" : "text-green-600"}`}>
-              {metaDescription.length}/160
+            <label className={lbl} style={{ marginBottom: 0 }}>Google meta description</label>
+            <span className={`text-[10px] font-semibold ${metaDescription.length > 160 ? "text-red-500" : metaDescription.length > 0 ? "text-green-600" : "text-slate-400"}`}>
+              {metaDescription.length}/160 {metaDescription.length > 0 && metaDescription.length <= 160 ? "✓" : ""}
             </span>
           </div>
-          <textarea
-            className={input + " resize-none"}
-            rows={3}
-            maxLength={160}
-            value={metaDescription}
+          <textarea className={input + " resize-none"} rows={3} maxLength={160} value={metaDescription}
             onChange={(e) => setMetaDescription(e.target.value)}
-            placeholder="Short 1-2 sentence summary shown in Google search results. Max 160 characters. Hit 'Auto-generate SEO' to fill automatically."
-          />
-          <p className="text-[10px] text-slate-400 mt-1">
-            This is what Google shows under your page title in search results. Keep it under 160 chars and make it enticing.
-          </p>
+            placeholder="Short summary for Google search results. Max 160 chars. Hit 'Auto-generate SEO' to fill automatically." />
         </div>
-
         <div>
           <label className={lbl}><div className="flex items-center gap-1.5"><Tag className="w-3 h-3" /> SEO keyword tags</div></label>
-          <p className="text-[11px] text-slate-400 mb-2">3–6 phrases tourists search on Google. Hit "Auto-generate SEO" above to fill automatically.</p>
+          <p className="text-[11px] text-slate-400 mb-2">3–6 phrases tourists search on Google.</p>
           <TagInput tags={form.seo_tags} onChange={(t) => set("seo_tags", t)} />
         </div>
-
-        {/* Google preview uses meta_description now */}
         <SeoPreview title={form.title} metaDescription={metaDescription} slug={form.slug} />
       </div>
 
-      {/* ── Actions ── */}
+      {/* Actions */}
       <div className="flex items-center gap-3 pt-2">
         {item && onDelete && (
           <button type="button" onClick={handleDelete} disabled={deleting}
@@ -441,30 +581,23 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
   const [items,   setItems]   = useState<Attraction[]>(initialItems);
   const [editing, setEditing] = useState<Attraction | null | "new">(null);
   const [search,  setSearch]  = useState("");
+  const [filter,  setFilter]  = useState<"all" | "good" | "warn" | "poor">("all");
 
-  const filtered = search.trim() ? items.filter((i) => i.title.toLowerCase().includes(search.toLowerCase())) : items;
+  const filtered = items
+    .filter((i) => !search.trim() || i.title.toLowerCase().includes(search.toLowerCase()))
+    .filter((i) => filter === "all" || getSeoHealth(i).status === filter);
 
   async function handleSave(form: AttractionForm & { hero_position: string; photos: Photo[]; meta_description: string; description_html: string }) {
     const body = {
       ...(editing && editing !== "new" ? { id: (editing as Attraction).id } : {}),
-      title:            form.title,
-      slug:             form.slug,
-      description:      form.description,
-      description_html: form.description_html,
-      meta_description: form.meta_description,
-      image_url:        form.image_url      || null,
-      sort_order:       form.sort_order,
-      is_published:     form.is_published,
-      category:         form.category,
-      cover_gradient:   form.cover_gradient,
-      cover_emoji:      form.cover_emoji,
-      is_live:          form.is_live,
-      is_featured:      form.is_featured,
-      read_minutes:     form.read_minutes,
-      seo_tags:         form.seo_tags,
-      type:             form.type,
-      hero_position:    form.hero_position,
-      photos:           form.photos,
+      title: form.title, slug: form.slug, description: form.description,
+      description_html: form.description_html, meta_description: form.meta_description,
+      image_url: form.image_url || null, sort_order: form.sort_order,
+      is_published: form.is_published, category: form.category,
+      cover_gradient: form.cover_gradient, cover_emoji: form.cover_emoji,
+      is_live: form.is_live, is_featured: form.is_featured,
+      read_minutes: form.read_minutes, seo_tags: form.seo_tags,
+      type: form.type, hero_position: form.hero_position, photos: form.photos,
     };
     const res  = await fetch("/api/admin/attractions/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
@@ -490,19 +623,12 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-[20px] font-semibold text-slate-900">Attractions & Ads</h1>
-          <p className="text-[13px] text-slate-400 mt-0.5">{items.length} attractions · Explore & Discover page</p>
-        </div>
-        {tab === "attractions" && (
-          <button onClick={() => setEditing("new")}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#085C52] text-white text-[13px] font-semibold rounded-xl hover:bg-[#0c7b93] transition-colors">
-            <Plus className="w-4 h-4" /> Add attraction
-          </button>
-        )}
-      </div>
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-5">
+
+      {/* Dashboard header */}
+      <DashboardHeader items={items} />
+
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-4">
         <button onClick={() => setTab("attractions")}
           className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[13px] font-semibold transition-all ${tab === "attractions" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
           <MapPin className="w-4 h-4" /> Attractions
@@ -512,38 +638,89 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
           <Sparkles className="w-4 h-4" /> Ad slots
         </button>
       </div>
+
       {tab === "attractions" && (
         <>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search attractions…"
-              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:border-[#0c7b93] bg-white" />
+          {/* Search + filter + add */}
+          <div className="flex gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search attractions…"
+                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:border-[#0c7b93] bg-white" />
+            </div>
+            {/* SEO filter */}
+            <select value={filter} onChange={(e) => setFilter(e.target.value as any)}
+              className="border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] bg-white focus:outline-none focus:border-[#0c7b93] text-slate-600">
+              <option value="all">All SEO</option>
+              <option value="good">✓ Ready</option>
+              <option value="warn">⚠ Needs work</option>
+              <option value="poor">✕ Missing SEO</option>
+            </select>
+            <button onClick={() => setEditing("new")}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-[#085C52] text-white text-[13px] font-semibold rounded-xl hover:bg-[#0c7b93] transition-colors whitespace-nowrap">
+              <Plus className="w-4 h-4" /> Add
+            </button>
           </div>
+
           <div className="space-y-2">
             {filtered.length === 0 && <div className="py-12 text-center text-slate-400 text-[13px]">No attractions found.</div>}
-            {filtered.map((item) => (
-              <div key={item.id} onClick={() => setEditing(item)}
-                className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-white hover:border-[#0c7b93] cursor-pointer transition-colors group">
-                <div className={`w-14 h-10 rounded-lg overflow-hidden shrink-0 bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#0c7b93]"} flex items-center justify-center text-lg`}>
-                  {item.image_url ? <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" /> : item.cover_emoji ?? "🌴"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-[13px] font-semibold text-slate-800 truncate">{item.title}</p>
-                    {item.is_featured   && <span className="shrink-0 text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-semibold">Featured</span>}
-                    {item.is_live       && <span className="shrink-0 text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-semibold">Live</span>}
-                    {!item.is_published && <span className="shrink-0 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-semibold">Draft</span>}
+            {filtered.map((item) => {
+              const health = getSeoHealth(item);
+              return (
+                <div key={item.id} onClick={() => setEditing(item)}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-white hover:border-[#0c7b93] cursor-pointer transition-colors group">
+                  {/* Thumbnail */}
+                  <div className={`w-14 h-10 rounded-lg overflow-hidden shrink-0 bg-gradient-to-br ${item.cover_gradient ?? "from-[#085C52] to-[#0c7b93]"} flex items-center justify-center text-lg`}>
+                    {item.image_url ? <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" /> : item.cover_emoji ?? "🌴"}
                   </div>
-                  <p suppressHydrationWarning className="text-[11px] text-slate-400 capitalize">
-                    {item.type} · {item.category ?? "–"} · {new Date(item.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
-                  </p>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <p className="text-[13px] font-semibold text-slate-800 truncate">{item.title}</p>
+                      {/* Status badges */}
+                      {item.is_featured   && <span className="shrink-0 text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-semibold">Featured</span>}
+                      {item.is_live       && <span className="shrink-0 text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-semibold">Live</span>}
+                      {!item.is_published && <span className="shrink-0 text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-semibold">Draft</span>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-[11px] text-slate-400 capitalize">
+                        {item.type} · {item.category ?? "–"}
+                      </p>
+                      {/* SEO health badge */}
+                      <SeoBadge health={health} />
+                    </div>
+                    {/* Missing items hint */}
+                    {health.missing.length > 0 && (
+                      <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                        Missing: {health.missing.join(" · ")}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* SEO score ring */}
+                  <div className="shrink-0 flex flex-col items-center gap-0.5 mr-1">
+                    <div style={{
+                      width: 32, height: 32, borderRadius: "50%",
+                      background: `conic-gradient(${health.status === "good" ? "#22C55E" : health.status === "warn" ? "#EAB308" : "#EF4444"} ${health.score * 3.6}deg, #F1F5F9 0deg)`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <div style={{ width: 22, height: 22, borderRadius: "50%", background: "white", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: 8, fontWeight: 800, color: health.status === "good" ? "#166534" : health.status === "warn" ? "#854D0E" : "#991B1B" }}>
+                          {health.score}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#0c7b93] shrink-0" />
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#0c7b93] shrink-0" />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
+
       {tab === "ads" && <AdsAdminPage initialAds={[]} />}
     </div>
   );
