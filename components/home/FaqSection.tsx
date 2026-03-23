@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { FaqItem } from "@/lib/home/get-faqs";
 
 export function FaqSection({ faqs }: { faqs: FaqItem[] }) {
-  const [open, setOpen] = useState<string | null>(null);
+  const [open,    setOpen]    = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   if (!faqs || faqs.length === 0) return null;
+
+  const PREVIEW_COUNT = 3;
+  const visible = showAll ? faqs : faqs.slice(0, PREVIEW_COUNT);
+  const hasMore  = faqs.length > PREVIEW_COUNT;
 
   return (
     <section className="border-t border-teal-200/50 bg-white py-10 sm:py-14">
@@ -16,7 +22,7 @@ export function FaqSection({ faqs }: { faqs: FaqItem[] }) {
         <p className="mt-1 text-sm font-semibold text-[#0f766e]">Everything you need to know before you sail</p>
 
         <div className="mt-6 flex flex-col gap-3 max-w-3xl">
-          {faqs.map((faq) => {
+          {visible.map((faq) => {
             const isOpen = open === faq.id;
             return (
               <div
@@ -45,6 +51,26 @@ export function FaqSection({ faqs }: { faqs: FaqItem[] }) {
               </div>
             );
           })}
+        </div>
+
+        {/* Load more / show less + View all link */}
+        <div className="mt-5 flex items-center gap-4 max-w-3xl">
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => { setShowAll((s) => !s); if (showAll) setOpen(null); }}
+              className="flex items-center gap-2 text-sm font-bold text-[#0c7b93] hover:text-[#085C52] transition-colors"
+            >
+              <span className={`text-lg font-light transition-transform duration-200 ${showAll ? "rotate-45 inline-block" : ""}`}>＋</span>
+              {showAll ? "Show less" : `Show ${faqs.length - PREVIEW_COUNT} more questions`}
+            </button>
+          )}
+          <Link
+            href="/faq"
+            className="ml-auto text-sm font-bold text-[#0c7b93] hover:text-[#085C52] transition-colors flex items-center gap-1"
+          >
+            View all FAQs →
+          </Link>
         </div>
       </div>
     </section>
