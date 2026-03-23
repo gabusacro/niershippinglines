@@ -133,16 +133,16 @@ export function Header({ siteName }: HeaderProps = {}) {
               onMouseLeave={(e) => (e.currentTarget.style.background = "#F59E0B")}
             >
               <Boat className="w-4 h-4 shrink-0" />
-              Book A Trip
+              BOOK NOW
             </Link>
           )}
 
           {showPublicLinks && (
-            <Link href={ROUTES.attractions} className={desktopLink(pathname === ROUTES.attractions)}>Attractions</Link>
+            <Link href={ROUTES.attractions} className={desktopLink(pathname === ROUTES.attractions)}>ATTRACTIONS</Link>
           )}
 
           {showPublicLinks && (
-            <Link href="/tours" className={desktopLink(pathname === "/tours")}>Tours</Link>
+            <Link href="/tours" className={desktopLink(pathname === "/tours")}>TOURS</Link>
           )}
 
           {showPublicLinks && (
@@ -150,14 +150,14 @@ export function Header({ siteName }: HeaderProps = {}) {
           )}
 
           {showPublicLinks && (
-            <Link href="/parking" className={desktopLink(pathname === "/parking")}>Parking</Link>
+            <Link href="/parking" className={desktopLink(pathname === "/parking")}>PARKING</Link>
           )}
 
           {user ? (
             <>
               {role && ["crew", "captain", "ticket_booth", "admin"].includes(role) && (
                 <Link href={ROUTES.crewScan} className={desktopLink(pathname === ROUTES.crewScan)}>
-                  Scan ticket
+                  SCAN TICKET
                 </Link>
               )}
               <Link href={ROUTES.dashboard}
@@ -171,16 +171,16 @@ export function Header({ siteName }: HeaderProps = {}) {
                     {(user as any)?.email?.[0]?.toUpperCase() ?? "?"}
                   </div>
                 )}
-                Dashboard
+                DASHBOARD
               </Link>
               <button type="button" onClick={handleSignOut}
                 className="min-h-[44px] flex items-center px-3 py-2 rounded-xl text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.98] transition-all duration-200 touch-target">
-                Sign out
+                SIGN OUT
               </button>
             </>
           ) : (
             <Link href={ROUTES.login} className={desktopLink(pathname === ROUTES.login)}>
-              Login / Sign up
+              LOGIN / SIGN UP
             </Link>
           )}
         </nav>
@@ -214,7 +214,7 @@ export function Header({ siteName }: HeaderProps = {}) {
             {showPublicLinks && (
               <li>
                 <Link href={ROUTES.home} onClick={() => setMenuOpen(false)} className={mobileLink(pathname === ROUTES.home)}>
-                  Home
+                  HOME
                 </Link>
               </li>
             )}
@@ -226,7 +226,7 @@ export function Header({ siteName }: HeaderProps = {}) {
                   className="flex min-h-[48px] items-center gap-2 rounded-2xl px-4 font-bold text-white transition-all duration-200 touch-target active:scale-[0.99]"
                   style={{ background: "#F59E0B" }}>
                   <Boat className="w-4 h-4 shrink-0" />
-                  Book A Trip
+                  BOOK NOW
                 </Link>
               </li>
             )}
@@ -234,7 +234,7 @@ export function Header({ siteName }: HeaderProps = {}) {
             {showPublicLinks && (
               <li>
                 <Link href={ROUTES.attractions} onClick={() => setMenuOpen(false)} className={mobileLink(pathname === ROUTES.attractions)}>
-                  Attractions
+                  ATTRACTIONS
                 </Link>
               </li>
             )}
@@ -242,7 +242,7 @@ export function Header({ siteName }: HeaderProps = {}) {
             {showPublicLinks && (
               <li>
                 <Link href="/tours" onClick={() => setMenuOpen(false)} className={mobileLink(pathname === "/tours")}>
-                  Tours
+                  TOURS
                 </Link>
               </li>
             )}
@@ -258,7 +258,7 @@ export function Header({ siteName }: HeaderProps = {}) {
             {showPublicLinks && (
               <li>
                 <Link href="/parking" onClick={() => setMenuOpen(false)} className={mobileLink(pathname === "/parking")}>
-                  Parking
+                  PARKING
                 </Link>
               </li>
             )}
@@ -268,7 +268,7 @@ export function Header({ siteName }: HeaderProps = {}) {
                 {role && ["crew", "captain", "ticket_booth", "admin"].includes(role) && (
                   <li>
                     <Link href={ROUTES.crewScan} onClick={() => setMenuOpen(false)} className={mobileLink(pathname === ROUTES.crewScan)}>
-                      Scan ticket
+                      SCAN TICKET
                     </Link>
                   </li>
                 )}
@@ -284,20 +284,20 @@ export function Header({ siteName }: HeaderProps = {}) {
                         {(user as any)?.email?.[0]?.toUpperCase() ?? "?"}
                       </div>
                     )}
-                    Dashboard
+                    DASHBOARD
                   </Link>
                 </li>
                 <li>
                   <button type="button" onClick={() => { handleSignOut(); }}
                     className="flex min-h-[48px] w-full items-center rounded-2xl px-4 text-white font-medium transition-all duration-200 touch-target active:scale-[0.99] hover:bg-white/10 active:bg-white/15 text-left">
-                    Sign out
+                    SIGN OUT
                   </button>
                 </li>
               </>
             ) : (
               <li>
                 <Link href={ROUTES.login} onClick={() => setMenuOpen(false)} className={mobileLink(pathname === ROUTES.login)}>
-                  Login / Sign up
+                  LOGIN / SIGN UP
                 </Link>
               </li>
             )}
