@@ -14,6 +14,7 @@ import { getFaqs } from "@/lib/home/get-faqs";
 import { getTodayInManila } from "@/lib/admin/ph-time";
 import { getFeeSettings } from "@/lib/get-fee-settings";
 import { TripCheckerForm } from "@/components/home/TripCheckerForm";
+import ParallaxScript from "@/components/home/ParallaxScript";
 import {
   Ship,
   Calendar,
@@ -418,25 +419,8 @@ export default async function HomePage() {
       </section>
 
       {/* Parallax scroll script — purely visual, no data involvement */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              var heroBg = document.getElementById('heroBg');
-              if (!heroBg) return;
-              window.addEventListener('scroll', function() {
-                var s = window.pageYOffset;
-                heroBg.style.transform = 'translateY(' + (s * 0.32) + 'px) scale(1.12)';
-              }, { passive: true });
-            })();
-
-            /* keyframe for floating particles */
-            var style = document.createElement('style');
-            style.textContent = '@keyframes floatUp { 0% { transform: translateY(110vh) scale(0.2); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 0.5; } 100% { transform: translateY(-10vh) scale(1); opacity: 0; } }';
-            document.head.appendChild(style);
-          `,
-        }}
-      />
+      
+      <ParallaxScript />
     </div>
   );
 }
