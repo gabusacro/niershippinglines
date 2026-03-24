@@ -23,8 +23,26 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: branding.site_name, template: `%s | ${branding.site_name}` },
     description: siteDescription,
     icons: { icon: "/favicon.png" },
-    keywords: ["ferry", "Siargao", "Surigao", "Dinagat", "boat", "tickets", "schedule", branding.site_name, "Philippines"],
-    openGraph: { title: branding.site_name, description: siteDescription, type: "website", locale: "en_PH" },
+    keywords: ["ferry", "Siargao", "Surigao", "Dinagat", 
+      "boat", "tickets", "schedule", branding.site_name, "Philippines"],
+
+
+ openGraph: {
+  title: branding.site_name,
+  description: siteDescription,
+  type: "website",
+  locale: "en_PH",
+  images: [                              
+    {
+      url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png",
+      width: 1200,
+      height: 630,
+      alt: "Travela Siargao – Ferry Booking to Siargao Island",
+    },
+  ],
+},
+
+
     twitter: { card: "summary_large_image", title: branding.site_name, description: siteDescription },
     robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
     alternates: { canonical: process.env.NEXT_PUBLIC_APP_URL ?? undefined },

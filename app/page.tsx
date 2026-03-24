@@ -53,17 +53,30 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Travela Siargao | Ferry Booking — Siargao Island",
     description:
-      "Daily ferry trips to Siargao Island. Book online in 2 minutes, pay via GCash, get instant e-ticket.",
+      "Daily ferry trips to Siargao Island. Book online in 2 minutes, pay ONLINE, get instant e-ticket.",
     url: "https://www.travelasiargao.com",
     siteName: "Travela Siargao",
     type: "website",
     locale: "en_PH",
+
+
+  images: [                              // 👈 ADD THIS
+    {
+      url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png",
+      width: 1200,
+      height: 630,
+      alt: "Travela Siargao – Ferry Booking to Siargao Island",
+    },
+  ],
+
+
   },
   twitter: {
     card: "summary_large_image",
     title: "Travela Siargao | Ferry Booking",
     description:
-      "Book your ferry to Siargao Island. Daily trips, real-time seats, GCash payment.",
+      "Book your ferry to Siargao Island. Daily trips, real-time seats, ONLINE payment.",
+        images: ["https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png"],
   },
   alternates: {
     canonical: "https://www.travelasiargao.com",
