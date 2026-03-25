@@ -87,14 +87,16 @@ export function Header({ siteName }: HeaderProps = {}) {
     return () => subscription.unsubscribe();
   }, []);
 
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setMenuOpen(false);
-    toast.showSuccess("Signed out successfully");
-    router.refresh();
-    router.push(ROUTES.home);
-  }
+async function handleSignOut() {
+  const supabase = createClient();
+  await supabase.auth.signOut();
+  setMenuOpen(false);
+  setUser(null);        // ← clear user state immediately
+  setRole(null);        // ← clear role immediately  
+  setAvatarUrl(null);   // ← clear avatar immediately
+  toast.showSuccess("Signed out successfully");
+  window.location.href = ROUTES.home;  // ← hard redirect, clears everything
+}
 
   const showBookATrip   = !user;
   const showPublicLinks = !role || role === "passenger";
