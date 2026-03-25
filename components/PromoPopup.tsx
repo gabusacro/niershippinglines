@@ -39,7 +39,7 @@ export default function PromoPopup() {
 
     async function load() {
       try {
-        const res = await fetch("/api/admin/promo-popup", {
+        const res = await fetch("/api/promo-popup", {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache" },
         });
