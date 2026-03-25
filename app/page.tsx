@@ -51,16 +51,14 @@ export const metadata: Metadata = {
     "siargao island ferry schedule",
   ],
   openGraph: {
-    title: "Travela Siargao | Ferry Booking — Siargao Island",
-    description:
-      "Daily ferry trips to Siargao Island. Book online in 2 minutes, pay ONLINE, get instant e-ticket.",
-    url: "https://www.travelasiargao.com",
-    siteName: "Travela Siargao",
-    type: "website",
-    locale: "en_PH",
-
-
-  images: [                              // 👈 ADD THIS
+  title: "Travela Siargao | Ferry Booking — Siargao Island",
+  description:
+    "Daily ferry trips to Siargao Island. Book online in 2 minutes, pay ONLINE, get instant e-ticket.",
+  url: "https://www.travelasiargao.com",
+  siteName: "Travela Siargao",
+  type: "website",
+  locale: "en_PH",
+  images: [
     {
       url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png",
       width: 1200,
@@ -68,9 +66,7 @@ export const metadata: Metadata = {
       alt: "Travela Siargao – Ferry Booking to Siargao Island",
     },
   ],
-
-
-  },
+},
   twitter: {
     card: "summary_large_image",
     title: "Travela Siargao | Ferry Booking",
