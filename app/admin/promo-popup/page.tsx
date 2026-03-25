@@ -222,7 +222,7 @@ export default function PromoPopupPage() {
       localStorage.removeItem("travela_promo_seen_at");
       localStorage.removeItem("travela_promo_ver");
     } catch {}
-    window.open("/", "_blank");
+ 
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────

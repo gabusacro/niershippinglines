@@ -288,7 +288,7 @@ export function ExploreDiscoverPage({ items }: { items: Attraction[] }) {
 
   function handleClick(item: Attraction) {
     if (item.type === "video") { setActiveVideo(item); return; }
-    window.open(`/attractions/${item.slug}`, "_self");
+   window.location.href = `/attractions/${item.slug}`;
   }
 
   const WRAP = "mx-auto max-w-6xl px-4 sm:px-6";
