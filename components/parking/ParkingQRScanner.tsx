@@ -1,129 +1,221 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
 
-interface Props {
-  onScan: (reference: string) => void;
+type ParkingQRScannerProps = {
+  onScan: (ref: string) => void;
   onClose: () => void;
-}
+};
 
-export default function ParkingQRScanner({ onScan, onClose }: Props) {
-  const videoRef  = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const animRef   = useRef<number>(0);
-  const [error, setError]   = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
+export default function ParkingQRScanner({ onScan, onClose }: ParkingQRScannerProps) {
+  const [scanning,  setScanning]  = useState(false);
+  const [starting,  setStarting]  = useState(false);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+  const [manualRef, setManualRef] = useState("");
+  const scannerRef  = useRef<Html5Qrcode | null>(null);
 
+  // ── Start the camera scanner ───────────────────────────────────────────────
+  const initScanner = useCallback(() => {
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        // immediately release the test stream — Html5Qrcode will open its own
+        stream.getTracks().forEach((t) => t.stop());
+
+        const qrboxSize = Math.min(260, typeof window !== "undefined" ? window.innerWidth - 48 : 240);
+        const html5QrCode = new Html5Qrcode("parking-qr-reader");
+        scannerRef.current = html5QrCode;
+
+        html5QrCode
+          .start(
+            { facingMode: "environment" },
+            { fps: 4, qrbox: { width: qrboxSize, height: qrboxSize }, aspectRatio: 1.0 },
+            (decodedText) => {
+              html5QrCode.stop().catch(() => {});
+              setScanning(false);
+              setStarting(false);
+              // Accept any QR that looks like a parking reference or is long enough
+              onScan(decodedText.trim());
+            },
+            () => {} // ignore intermediate scan errors
+          )
+          .then(() => {
+            setStarting(false);
+            setScanning(true);
+          })
+          .catch((err: unknown) => {
+            setStarting(false);
+            setScanning(false);
+            scannerRef.current = null;
+            const msg = err instanceof Error ? err.message : String(err);
+            setError("Camera error: " + msg + " — Try allowing camera in browser settings.");
+          });
+      })
+      .catch((err: unknown) => {
+        setStarting(false);
+        setScanning(false);
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/denied|not allowed|permission/i.test(msg)) {
+          setError("Camera permission denied. Tap the camera icon in your browser address bar and allow access, then try again.");
+        } else {
+          setError("Could not access camera: " + msg);
+        }
+      });
+  }, [onScan]);
+
+  // ── Wait 2 animation frames before mounting Html5Qrcode (same as vessel scanner) ──
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js";
-    script.onload = () => { setLoaded(true); startCamera(); };
-    script.onerror = () => setError("Failed to load scanner. Please type the reference manually.");
-    document.head.appendChild(script);
+    if (!starting) return;
+    const r1 = requestAnimationFrame(() => {
+      const r2 = requestAnimationFrame(() => {
+        initScanner();
+      });
+      return () => cancelAnimationFrame(r2);
+    });
+    return () => cancelAnimationFrame(r1);
+  }, [starting, initScanner]);
 
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-        });
-        streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      } catch {
-        setError("Camera permission denied. Please allow camera access or type the reference manually.");
-      }
-    }
-
-    return () => {
-      cancelAnimationFrame(animRef.current);
-      streamRef.current?.getTracks().forEach(t => t.stop());
-      try { document.head.removeChild(script); } catch {}
-    };
+  const startScan = useCallback(() => {
+    setError(null);
+    setStarting(true);
   }, []);
 
-  useEffect(() => {
-    if (!loaded) return;
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-
-    function tick() {
-      const video = videoRef.current;
-      // @ts-ignore
-      const jsQR = window.jsQR;
-      if (video && video.readyState === video.HAVE_ENOUGH_DATA && jsQR && ctx) {
-        canvas.width  = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-        if (code?.data?.trim()) {
-          streamRef.current?.getTracks().forEach(t => t.stop());
-          cancelAnimationFrame(animRef.current);
-          onScan(code.data.trim());
-          return;
-        }
-      }
-      animRef.current = requestAnimationFrame(tick);
+  const stopScan = useCallback(() => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().catch(() => {});
+      scannerRef.current = null;
     }
-    animRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [loaded, onScan]);
+    setScanning(false);
+    setStarting(false);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => stopScan(), [stopScan]);
+
+  // ── Manual reference submission ────────────────────────────────────────────
+  function handleManualSubmit() {
+    const val = manualRef.trim().toUpperCase();
+    if (!val) return;
+    setManualRef("");
+    onScan(val);
+  }
 
   return (
-    <div className="fixed inset-0 z-[999] flex flex-col bg-black">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3" style={{ background: "rgba(0,0,0,0.85)" }}>
-        <p className="text-white font-bold text-sm">📷 Scan Parking QR Code</p>
-        <button onClick={onClose}
-          className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 text-xl font-bold">
-          ×
-        </button>
-      </div>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) { stopScan(); onClose(); } }}
+    >
+      <div className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col">
 
-      {/* Camera feed */}
-      <div className="flex-1 relative overflow-hidden">
-        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-
-        {/* Scan frame */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="relative w-60 h-60">
-            <div className="absolute inset-0 border-2 border-white/20 rounded-2xl" />
-            {/* Corner accents */}
-            {([["top-0 left-0","rounded-tl-xl border-t-4 border-l-4"],["top-0 right-0","rounded-tr-xl border-t-4 border-r-4"],["bottom-0 left-0","rounded-bl-xl border-b-4 border-l-4"],["bottom-0 right-0","rounded-br-xl border-b-4 border-r-4"]] as [string,string][]).map(([pos, cls], i) => (
-              <div key={i} className={`absolute ${pos} w-8 h-8 border-[#0c7b93] ${cls}`} />
-            ))}
-            {/* Animated scan line */}
-            <div className="absolute left-0 right-0 h-0.5 bg-[#0c7b93] opacity-80 rounded-full"
-              style={{ animation: "scanline 1.8s ease-in-out infinite" }} />
+        {/* Header */}
+        <div
+          className="px-5 py-4 shrink-0 flex items-center justify-between"
+          style={{ background: "linear-gradient(135deg,#064e3b,#0c7b93)" }}
+        >
+          <div>
+            <p className="text-xs text-white/60 font-bold uppercase">Parking</p>
+            <h2 className="text-lg font-black text-white">🔍 Scan Parking QR</h2>
           </div>
+          <button
+            onClick={() => { stopScan(); onClose(); }}
+            className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 text-xl"
+          >
+            ×
+          </button>
         </div>
 
-        {/* Error message */}
-        {error && (
-          <div className="absolute bottom-6 left-4 right-4 rounded-xl bg-red-500/90 px-4 py-3 text-sm text-white font-semibold text-center">
-            {error}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+          {/* Error banner */}
+          {error && (
+            <div className="rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-semibold">
+              {error}
+            </div>
+          )}
+
+          {/* Scan button */}
+          {!scanning && !starting && (
+            <button
+              type="button"
+              onClick={startScan}
+              disabled={loading}
+              className="w-full min-h-[52px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#085f72] disabled:opacity-50 transition-colors"
+            >
+              {loading ? "Looking up…" : "📷 Open Camera & Scan QR"}
+            </button>
+          )}
+
+          {/* Starting state */}
+          {starting && (
+            <div className="flex items-center justify-center rounded-xl border-2 border-teal-200 bg-teal-50 py-8">
+              <p className="text-sm text-[#0f766e] animate-pulse">Starting camera…</p>
+            </div>
+          )}
+
+          {/* Camera view — only mount div when scanning/starting so Html5Qrcode gets real dimensions */}
+          {(scanning || starting) && (
+            <div className="space-y-3">
+              <div
+                id="parking-qr-reader"
+                className="w-full overflow-hidden rounded-xl border-2 border-teal-300"
+                style={{ minHeight: 300 }}
+              />
+              {scanning && (
+                <button
+                  type="button"
+                  onClick={stopScan}
+                  className="w-full rounded-xl border-2 border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Stop scanning
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Loading */}
+          {loading && !scanning && (
+            <div className="flex items-center justify-center rounded-xl border-2 border-teal-100 bg-teal-50 py-6">
+              <p className="text-sm text-[#0f766e] animate-pulse">Looking up booking…</p>
+            </div>
+          )}
+
+          {/* Manual entry */}
+          <div className="rounded-xl border-2 border-teal-100 bg-teal-50/50 p-4">
+            <p className="text-xs font-bold text-[#0f766e] uppercase tracking-wide mb-2">
+              Or Enter Reference Manually
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualRef}
+                onChange={(e) => setManualRef(e.target.value.toUpperCase())}
+                placeholder="e.g. TRV-PRK-YCXANB"
+                className="flex-1 rounded-xl border-2 border-teal-200 bg-white px-3 py-2.5 text-sm text-[#134e4a] placeholder:text-gray-400 focus:border-[#0c7b93] focus:outline-none uppercase"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                onKeyDown={(e) => { if (e.key === "Enter") handleManualSubmit(); }}
+              />
+              <button
+                type="button"
+                onClick={handleManualSubmit}
+                disabled={loading || !manualRef.trim()}
+                className="rounded-xl bg-[#0c7b93] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#085f72] disabled:opacity-50 transition-colors"
+              >
+                Search
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-[#0f766e]/60">
+              Press Enter or tap Search. Works with parking reference numbers.
+            </p>
           </div>
-        )}
 
-        {/* Loading spinner */}
-        {!loaded && !error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-            <div className="w-10 h-10 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-          </div>
-        )}
+        </div>
       </div>
-
-      <div className="px-4 py-4 text-center" style={{ background: "rgba(0,0,0,0.85)" }}>
-        <p className="text-white/70 text-xs">Point camera at passenger's QR code</p>
-        <p className="text-white/40 text-xs mt-1">Or close and type the reference number manually</p>
-      </div>
-
-      <style>{`
-        @keyframes scanline {
-          0%   { top: 10%; }
-          50%  { top: 85%; }
-          100% { top: 10%; }
-        }
-      `}</style>
     </div>
   );
 }
