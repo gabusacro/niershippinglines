@@ -287,8 +287,9 @@ export default function ParkingCrewDashboard() {
       let startDate = today, endDate = today;
       if (period === "week")  { const r = getWeekRange();  startDate = r.start; endDate = r.end; }
       if (period === "month") { const r = getMonthRange(); startDate = r.start; endDate = r.end; }
-      const params = new URLSearchParams({ start: startDate, end: endDate });
-      if (search.trim()) params.set("search", search.trim());
+const params = new URLSearchParams({ start: startDate, end: endDate });
+params.set("include_active", "true"); // always show confirmed/checked_in
+if (search.trim()) params.set("search", search.trim());
       const [bRes, lRes] = await Promise.all([
         fetch(`/api/parking/crew/bookings?${params}`),
         fetch("/api/parking/crew/lot"),

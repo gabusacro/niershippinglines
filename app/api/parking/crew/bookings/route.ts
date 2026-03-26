@@ -42,8 +42,9 @@ export async function GET(request: NextRequest) {
     .from("parking_reservations")
     .select("id, reference, status, park_date_start, park_date_end, total_days, vehicle_count, vehicles, customer_full_name, lot_snapshot_name, checked_in_at, checked_out_at, created_at")
     .in("lot_id", lotIds)
-    .not("status", "in", '("cancelled")')
-    .or(`park_date_start.lte.${end},park_date_end.gte.${start}`)
+    .not("status", "in", '("cancelled","completed")')
+    // Show bookings that overlap the selected date range OR are active (confirmed/checked_in/overstay)
+    .or(`park_date_start.lte.${end},park_date_end.gte.${start},status.in.(confirmed,checked_in,overstay)`)
     .order("park_date_start", { ascending: true });
 
   if (search.trim()) {

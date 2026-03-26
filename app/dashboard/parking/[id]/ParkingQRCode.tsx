@@ -44,19 +44,21 @@ export default function ParkingQRCode({ reference, status }: Props) {
   }, [reference, showQR]);
 
   function handleDownload() {
-    setDownloading(true);
-    try {
-      // QRCode renders a canvas as first child of the container div
-      const qrCanvas = containerRef.current?.querySelector("canvas");
-      if (!qrCanvas) return;
+  setDownloading(true);
+  try {
+    const qrCanvas = containerRef.current?.querySelector("canvas");
+    if (!qrCanvas) { setDownloading(false); return; }
 
-      const final = document.createElement("canvas");
-      final.width = 300;
-      final.height = 360;
-      const ctx = final.getContext("2d")!;
+    const final = document.createElement("canvas");
+    final.width = 300;
+    final.height = 360;
+    const ctx = final.getContext("2d")!;
 
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, 300, 360);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, 300, 360);
+
+    // Wait for the QR canvas to be fully painted before copying
+    setTimeout(() => {
       ctx.drawImage(qrCanvas, 40, 20, 220, 220);
 
       ctx.fillStyle = "#134e4a";
@@ -73,10 +75,12 @@ export default function ParkingQRCode({ reference, status }: Props) {
       link.download = `parking-qr-${reference}.png`;
       link.href = final.toDataURL("image/png");
       link.click();
-    } finally {
       setDownloading(false);
-    }
+    }, 100);
+  } catch {
+    setDownloading(false);
   }
+}
 
   if (!showQR) return null;
 
