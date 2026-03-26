@@ -21,10 +21,17 @@ export async function GET(request: NextRequest) {
 
   // Verify owner owns this lot (skip for admin)
   if (role === "parking_owner") {
-    const { data: lot } = await supabase.from("parking_lots").select("owner_id").eq("id", lot_id).maybeSingle();
-    if (lot?.owner_id !== user.id) return NextResponse.json({ error: "You do not own this lot." }, { status: 403 });
+    const { data: lot } = await supabase
+      .from("parking_lots")
+      .select("owner_id")
+      .eq("id", lot_id)
+      .maybeSingle();
+    if (lot?.owner_id !== user.id)
+      return NextResponse.json({ error: "You do not own this lot." }, { status: 403 });
   }
 
+  // FIX 1: Removed the broken foreign key join on checked_in_by_fkey
+  // which was causing the 500 error. We fetch checked_in_by as a plain id instead.
   let query = supabase
     .from("parking_reservations")
     .select(`
@@ -33,18 +40,28 @@ export async function GET(request: NextRequest) {
       vehicle_count, vehicles,
       customer_full_name,
       parking_fee_cents, commission_cents,
-      checked_in_at, checked_out_at,
-      checked_in_by:profiles!checked_in_by_fkey(full_name)
+      checked_in_at, checked_out_at, checked_in_by
     `)
     .eq("lot_id", lot_id)
+    .not("status", "in", '("cancelled")')
     .order("park_date_start", { ascending: false });
 
-  if (start) query = query.gte("park_date_start", start);
-  if (end)   query = query.lte("park_date_start", end);
+  // FIX 2: Always include active bookings (confirmed/checked_in/overstay/pending)
+  // regardless of date range — same logic as the crew bookings fix.
+  if (start && end) {
+    query = query.or(
+      `and(park_date_start.lte.${end},park_date_end.gte.${start}),status.in.(confirmed,checked_in,overstay,pending_payment)`
+    );
+  }
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  if (error) {
+    console.error("[owner/bookings] query error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // FIX 3: Since we removed the broken join, map the data cleanly.
   const bookings = (data ?? []).map((b: {
     id: string; reference: string; status: string;
     park_date_start: string; park_date_end: string; total_days: number;
@@ -52,11 +69,11 @@ export async function GET(request: NextRequest) {
     customer_full_name: string;
     parking_fee_cents: number; commission_cents: number;
     checked_in_at: string | null; checked_out_at: string | null;
-    checked_in_by: { full_name: string } | { full_name: string }[] | null;
-  }) => {
-    const checkedInBy = Array.isArray(b.checked_in_by) ? b.checked_in_by[0] : b.checked_in_by;
-    return { ...b, checked_in_by_name: (checkedInBy as { full_name?: string } | null)?.full_name ?? null };
-  });
+    checked_in_by: string | null;
+  }) => ({
+    ...b,
+    checked_in_by_name: null,
+  }));
 
   return NextResponse.json({ bookings });
 }
