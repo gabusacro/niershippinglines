@@ -21,6 +21,12 @@ type Booking = {
   parking_fee_cents: number; commission_cents: number;
   checked_in_at: string | null; checked_out_at: string | null; checked_in_by_name: string | null;
 };
+type PendingExtension = {
+  id: string; reference: string; reservation_id: string;
+  reservation_reference: string; customer_full_name: string;
+  additional_days: number; new_end_date: string;
+  total_amount_cents: number; payment_status: string; created_at: string;
+};
 
 interface Props {
   ownerId: string; ownerName: string; ownerEmail: string; avatarUrl: string | null;
@@ -47,7 +53,10 @@ function getRange(period: string) {
     return { start: s.toISOString().split("T")[0], end: e.toISOString().split("T")[0] };
   }
   const d = new Date();
-  return { start: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0], end: new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split("T")[0] };
+  return {
+    start: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0],
+    end:   new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split("T")[0],
+  };
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -59,12 +68,13 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, avatarUrl, lot, crew, availability }: Props) {
-  const [period, setPeriod]       = useState<"today"|"week"|"month">("today");
-  const [bookings, setBookings]   = useState<Booking[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [showScanner, setShowScanner] = useState(false);
-  const [scanMsg, setScanMsg]     = useState<string | null>(null);
-  const [tab, setTab]             = useState<"bookings"|"crew"|"revenue">("bookings");
+  const [period, setPeriod]                     = useState<"today"|"week"|"month">("today");
+  const [bookings, setBookings]                 = useState<Booking[]>([]);
+  const [pendingExtensions, setPendingExtensions] = useState<PendingExtension[]>([]);
+  const [loading, setLoading]                   = useState(true);
+  const [showScanner, setShowScanner]           = useState(false);
+  const [scanMsg, setScanMsg]                   = useState<string | null>(null);
+  const [tab, setTab]                           = useState<"bookings"|"crew"|"revenue">("bookings");
 
   const totalCar  = lot?.total_slots_car        ?? 0;
   const totalMoto = lot?.total_slots_motorcycle ?? 0;
@@ -82,7 +92,11 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
     try {
       const { start, end } = getRange(period);
       const res = await fetch(`/api/parking/owner/bookings?lot_id=${lot.id}&start=${start}&end=${end}`);
-      if (res.ok) { const d = await res.json(); setBookings(d.bookings ?? []); }
+      if (res.ok) {
+        const d = await res.json();
+        setBookings(d.bookings ?? []);
+        setPendingExtensions(d.pendingExtensions ?? []);
+      }
     } finally { setLoading(false); }
   }, [lot, period]);
 
@@ -94,13 +108,15 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
     try {
       const res = await fetch(`/api/admin/parking/checkin-lookup?q=${encodeURIComponent(ref)}`);
       const d = await res.json();
-      if (d?.id) { setScanMsg(`✅ Found: ${d.customer_full_name} — ${d.reference} (${d.status.replace("_"," ")})`); }
-      else { setScanMsg(`No booking found for: ${ref}`); }
+      if (d?.id) {
+        setScanMsg(`✅ Found: ${d.customer_full_name} — ${d.reference} (${d.status.replace("_"," ")})`);
+      } else {
+        setScanMsg(`No booking found for: ${ref}`);
+      }
     } catch { setScanMsg("Network error."); }
     setTimeout(() => setScanMsg(null), 5000);
   }
 
-  // Revenue calculations — owner sees parking_fee minus commission only
   const totalRevenue    = bookings.filter(b => ["confirmed","checked_in","overstay","completed"].includes(b.status)).reduce((s, b) => s + (b.parking_fee_cents ?? 0), 0);
   const totalCommission = bookings.filter(b => ["confirmed","checked_in","overstay","completed"].includes(b.status)).reduce((s, b) => s + (b.commission_cents ?? 0), 0);
   const netRevenue      = totalRevenue - totalCommission;
@@ -116,7 +132,6 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
       <div style={{ background: "linear-gradient(135deg,#064e3b 0%,#0c7b93 100%)" }}>
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
           <div className="flex items-start gap-4 flex-wrap">
-            {/* Avatar */}
             <div className="shrink-0">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={ownerName} className="w-16 h-16 rounded-2xl object-cover border-2 border-white/30 shadow-lg" />
@@ -134,15 +149,17 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
             </div>
           </div>
 
-          {/* Quick action buttons */}
           <div className="mt-5 flex flex-wrap gap-2">
-            <button onClick={() => setShowScanner(true)} className="rounded-xl bg-white/20 px-4 py-2 text-sm font-bold text-white hover:bg-white/30 transition-colors">
+            <button onClick={() => setShowScanner(true)}
+              className="rounded-xl bg-white/20 px-4 py-2 text-sm font-bold text-white hover:bg-white/30 transition-colors">
               📷 Scan QR
             </button>
-            <Link href="/account" className="rounded-xl border border-white/30 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition-colors">
+            <Link href="/account"
+              className="rounded-xl border border-white/30 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition-colors">
               👤 My Account
             </Link>
-            <Link href="/dashboard/parking-crew" className="rounded-xl border border-white/30 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition-colors">
+            <Link href="/dashboard/parking-crew"
+              className="rounded-xl border border-white/30 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/10 transition-colors">
               🚘 Check-in View
             </Link>
           </div>
@@ -161,10 +178,43 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
           <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-8 text-center">
             <div className="text-4xl mb-3">⚠️</div>
             <h2 className="font-black text-amber-900 text-lg">No lot assigned yet</h2>
-            <p className="text-sm text-amber-700 mt-2">Ask your admin to assign a parking lot to your account before you can use this dashboard.</p>
+            <p className="text-sm text-amber-700 mt-2">Ask your admin to assign a parking lot to your account.</p>
           </div>
         ) : (
           <>
+            {/* ── PENDING EXTENSIONS BANNER ─────────────────────────────────── */}
+            {pendingExtensions.length > 0 && (
+              <div className="rounded-2xl border-2 border-purple-200 bg-purple-50 overflow-hidden">
+                <div className="px-5 py-3 bg-purple-100 border-b border-purple-200">
+                  <h2 className="text-sm font-black text-purple-900">
+                    📅 Pending Extend Stay Payments ({pendingExtensions.length})
+                  </h2>
+                  <p className="text-xs text-purple-700 mt-0.5">
+                    These passengers have paid to extend their stay. Admin must approve on their end.
+                  </p>
+                </div>
+                <div className="divide-y divide-purple-100">
+                  {pendingExtensions.map((ext) => (
+                    <div key={ext.id} className="px-5 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-mono text-xs font-black text-purple-700">{ext.reference}</p>
+                          <p className="text-xs text-purple-600">for booking {ext.reservation_reference}</p>
+                          <p className="text-sm font-semibold text-[#134e4a] mt-0.5">{ext.customer_full_name}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            +{ext.additional_days} day{ext.additional_days > 1 ? "s" : ""} · New end: {fmt(ext.new_end_date)} · {peso(ext.total_amount_cents)}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-1 text-xs font-bold text-amber-800">
+                          ⏳ Pending
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Live capacity */}
             <div className="rounded-2xl border-2 border-teal-100 bg-white p-5">
               <div className="flex items-center justify-between mb-4">
@@ -183,13 +233,18 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
                 ))}
               </div>
               <div className="w-full h-2.5 rounded-full bg-gray-100 overflow-hidden">
-                <div className={`h-2.5 rounded-full transition-all ${pctFull >= 80 ? "bg-red-400" : pctFull >= 50 ? "bg-amber-400" : "bg-emerald-400"}`} style={{ width: `${pctFull}%` }} />
+                <div className={`h-2.5 rounded-full transition-all ${pctFull >= 80 ? "bg-red-400" : pctFull >= 50 ? "bg-amber-400" : "bg-emerald-400"}`}
+                  style={{ width: `${pctFull}%` }} />
               </div>
             </div>
 
             {/* Stats row */}
             <div className="grid grid-cols-3 gap-3">
-              {[{label:"Checked In",val:checkedIn,color:"text-blue-600",bg:"bg-blue-50 border-blue-200"},{label:"Pending",val:pending,color:"text-amber-600",bg:"bg-amber-50 border-amber-200"},{label:"Net Revenue",val:peso(netRevenue),color:"text-emerald-600",bg:"bg-emerald-50 border-emerald-200"}].map(s => (
+              {[
+                { label: "Checked In", val: checkedIn,        color: "text-blue-600",    bg: "bg-blue-50 border-blue-200"    },
+                { label: "Pending",    val: pending,           color: "text-amber-600",   bg: "bg-amber-50 border-amber-200"  },
+                { label: "Net Revenue",val: peso(netRevenue),  color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
+              ].map(s => (
                 <div key={s.label} className={`rounded-2xl border-2 ${s.bg} p-4 text-center`}>
                   <p className={`text-xl font-black ${s.color}`}>{s.val}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
@@ -209,7 +264,8 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
               <div className="space-y-3">
                 <div className="flex gap-2 flex-wrap">
                   {(["today","week","month"] as const).map(p => (
-                    <button key={p} onClick={() => setPeriod(p)} className={`rounded-full px-4 py-1.5 text-xs font-bold border transition-all ${period === p ? "bg-[#0c7b93] text-white border-[#0c7b93]" : "bg-white text-[#134e4a] border-teal-200 hover:border-[#0c7b93]"}`}>
+                    <button key={p} onClick={() => setPeriod(p)}
+                      className={`rounded-full px-4 py-1.5 text-xs font-bold border transition-all ${period === p ? "bg-[#0c7b93] text-white border-[#0c7b93]" : "bg-white text-[#134e4a] border-teal-200 hover:border-[#0c7b93]"}`}>
                       {p.charAt(0).toUpperCase() + p.slice(1)}
                     </button>
                   ))}
@@ -224,7 +280,9 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div>
                           <span className="font-mono font-black text-[#0c7b93] text-sm">{b.reference}</span>
-                          <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${STATUS_BADGE[b.status] ?? "bg-gray-100 text-gray-600"}`}>{b.status.replace("_"," ")}</span>
+                          <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${STATUS_BADGE[b.status] ?? "bg-gray-100 text-gray-600"}`}>
+                            {b.status.replace("_"," ")}
+                          </span>
                         </div>
                         <span className="text-sm font-bold text-[#134e4a]">{peso((b.parking_fee_cents ?? 0) - (b.commission_cents ?? 0))}</span>
                       </div>
@@ -232,11 +290,16 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
                       <p className="text-xs text-gray-400">{fmt(b.park_date_start)} → {fmt(b.park_date_end)}</p>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {b.vehicles?.map((v, i) => (
-                          <span key={i} className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{v.vehicle_type === "car" ? "🚗" : v.vehicle_type === "motorcycle" ? "🏍️" : "🚐"} {v.plate_number}</span>
+                          <span key={i} className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                            {v.vehicle_type === "car" ? "🚗" : v.vehicle_type === "motorcycle" ? "🏍️" : "🚐"} {v.plate_number}
+                          </span>
                         ))}
                       </div>
                       {b.checked_in_at && (
-                        <p className="text-xs text-blue-600 mt-1">✅ Checked in {new Date(b.checked_in_at).toLocaleTimeString("en-PH",{hour:"2-digit",minute:"2-digit"})}{b.checked_in_by_name ? ` by ${b.checked_in_by_name}` : ""}</p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          ✅ Checked in {new Date(b.checked_in_at).toLocaleTimeString("en-PH",{hour:"2-digit",minute:"2-digit"})}
+                          {b.checked_in_by_name ? ` by ${b.checked_in_by_name}` : ""}
+                        </p>
                       )}
                     </div>
                   ))
@@ -278,7 +341,8 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
               <div className="space-y-3">
                 <div className="flex gap-2 flex-wrap">
                   {(["today","week","month"] as const).map(p => (
-                    <button key={p} onClick={() => setPeriod(p)} className={`rounded-full px-4 py-1.5 text-xs font-bold border transition-all ${period === p ? "bg-[#0c7b93] text-white border-[#0c7b93]" : "bg-white text-[#134e4a] border-teal-200 hover:border-[#0c7b93]"}`}>
+                    <button key={p} onClick={() => setPeriod(p)}
+                      className={`rounded-full px-4 py-1.5 text-xs font-bold border transition-all ${period === p ? "bg-[#0c7b93] text-white border-[#0c7b93]" : "bg-white text-[#134e4a] border-teal-200 hover:border-[#0c7b93]"}`}>
                       {p.charAt(0).toUpperCase() + p.slice(1)}
                     </button>
                   ))}
@@ -287,9 +351,9 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
                   <h3 className="text-sm font-black text-[#134e4a]">Revenue Breakdown</h3>
                   <p className="text-xs text-gray-400">Only confirmed/checked-in/completed bookings are counted.</p>
                   {[
-                    { label: "Gross parking fees", val: totalRevenue, note: "Before commission" },
+                    { label: "Gross parking fees", val: totalRevenue,    note: "Before commission" },
                     { label: "Commission deducted", val: -totalCommission, note: "Platform commission" },
-                    { label: "Your net revenue", val: netRevenue, note: "What you keep", bold: true },
+                    { label: "Your net revenue",    val: netRevenue,     note: "What you keep", bold: true },
                   ].map(r => (
                     <div key={r.label} className={`flex justify-between items-center py-2.5 border-b border-teal-50 last:border-0 ${r.bold ? "font-black" : ""}`}>
                       <div>
@@ -302,11 +366,9 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
                     </div>
                   ))}
                   <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-                    ℹ️ Platform fee and processing fee are not shown here — those go to Travela Siargao directly.
+                    ℹ️ Platform fee and processing fee go to Travela Siargao directly.
                   </div>
                 </div>
-
-                {/* Per booking breakdown */}
                 <div className="space-y-2">
                   {bookings.filter(b => ["confirmed","checked_in","overstay","completed"].includes(b.status)).map(b => (
                     <div key={b.id} className="rounded-xl border border-teal-100 bg-white px-4 py-3 flex justify-between items-center">

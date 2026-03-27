@@ -30,8 +30,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "You do not own this lot." }, { status: 403 });
   }
 
-  // FIX 1: Removed the broken foreign key join on checked_in_by_fkey
-  // which was causing the 500 error. We fetch checked_in_by as a plain id instead.
+  // ── 1. Fetch bookings ──────────────────────────────────────────────────────
   let query = supabase
     .from("parking_reservations")
     .select(`
@@ -46,34 +45,75 @@ export async function GET(request: NextRequest) {
     .not("status", "in", '("cancelled")')
     .order("park_date_start", { ascending: false });
 
-  // FIX 2: Always include active bookings (confirmed/checked_in/overstay/pending)
-  // regardless of date range — same logic as the crew bookings fix.
+  // Always show active bookings regardless of date range
   if (start && end) {
     query = query.or(
       `and(park_date_start.lte.${end},park_date_end.gte.${start}),status.in.(confirmed,checked_in,overstay,pending_payment)`
     );
   }
 
-  const { data, error } = await query;
-
+  const { data: reservations, error } = await query;
   if (error) {
     console.error("[owner/bookings] query error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // FIX 3: Since we removed the broken join, map the data cleanly.
-  const bookings = (data ?? []).map((b: {
-    id: string; reference: string; status: string;
-    park_date_start: string; park_date_end: string; total_days: number;
-    vehicle_count: number; vehicles: unknown;
-    customer_full_name: string;
-    parking_fee_cents: number; commission_cents: number;
-    checked_in_at: string | null; checked_out_at: string | null;
-    checked_in_by: string | null;
-  }) => ({
+  const bookings = (reservations ?? []).map((b) => ({
     ...b,
     checked_in_by_name: null,
   }));
 
-  return NextResponse.json({ bookings });
+  // ── 2. Fetch pending extensions for this lot ───────────────────────────────
+  // Get reservation IDs for this lot so we can filter extensions
+  const { data: allLotReservations } = await supabase
+    .from("parking_reservations")
+    .select("id, reference")
+    .eq("lot_id", lot_id);
+
+  const lotReservationIds = (allLotReservations ?? []).map((r) => r.id);
+
+  let pendingExtensions: {
+    id: string;
+    reference: string;
+    reservation_id: string;
+    reservation_reference: string;
+    customer_full_name: string;
+    additional_days: number;
+    new_end_date: string;
+    total_amount_cents: number;
+    payment_status: string;
+    created_at: string;
+  }[] = [];
+
+  if (lotReservationIds.length > 0) {
+    const { data: extensions } = await supabase
+      .from("parking_extensions")
+      .select(`
+        id, reference, reservation_id,
+        additional_days, new_end_date,
+        total_amount_cents, payment_status, created_at,
+        reservation:parking_reservations(reference, customer_full_name)
+      `)
+      .in("reservation_id", lotReservationIds)
+      .eq("payment_status", "pending")
+      .order("created_at", { ascending: false });
+
+    pendingExtensions = (extensions ?? []).map((e) => {
+      const res = Array.isArray(e.reservation) ? e.reservation[0] : e.reservation;
+      return {
+        id: e.id,
+        reference: e.reference,
+        reservation_id: e.reservation_id,
+        reservation_reference: (res as { reference?: string })?.reference ?? "",
+        customer_full_name: (res as { customer_full_name?: string })?.customer_full_name ?? "",
+        additional_days: e.additional_days,
+        new_end_date: e.new_end_date,
+        total_amount_cents: e.total_amount_cents,
+        payment_status: e.payment_status,
+        created_at: e.created_at,
+      };
+    });
+  }
+
+  return NextResponse.json({ bookings, pendingExtensions });
 }
