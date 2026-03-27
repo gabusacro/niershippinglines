@@ -106,7 +106,7 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
     setShowScanner(false);
     setScanMsg(`🔍 Looking up ${ref}…`);
     try {
-      const res = await fetch(`/api/admin/parking/checkin-lookup?q=${encodeURIComponent(ref)}`);
+      const res = await fetch(`/api/parking/lookup?q=${encodeURIComponent(ref)}`);
       const d = await res.json();
       if (d?.id) {
         setScanMsg(`✅ Found: ${d.customer_full_name} — ${d.reference} (${d.status.replace("_"," ")})`);

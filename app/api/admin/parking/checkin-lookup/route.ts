@@ -2,8 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { NextRequest, NextResponse } from "next/server";
 
-// This route is accessible by parking_owner and parking_crew
-// (avoids the /api/admin/* path which may be blocked by middleware/vercel for non-admins)
 export async function GET(request: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient();
 
-  // Search by reference
+  // Search by reference first
   const { data: byRef } = await supabase
     .from("parking_reservations")
     .select("id, reference, status, park_date_start, park_date_end, vehicle_count, vehicles, customer_full_name, lot_snapshot_name, checked_in_at, checked_out_at")
@@ -28,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   if (byRef) return NextResponse.json(byRef);
 
-  // Search by plate number
+  // Search by plate number in vehicles JSONB
   const { data: byPlate } = await supabase
     .from("parking_reservations")
     .select("id, reference, status, park_date_start, park_date_end, vehicle_count, vehicles, customer_full_name, lot_snapshot_name, checked_in_at, checked_out_at")
