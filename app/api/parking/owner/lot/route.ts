@@ -2,32 +2,40 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { NextRequest, NextResponse } from "next/server";
 
-// Allows parking_owner to update their own lot's slots, rates, and settings
+// ── POST: Update Lot ─────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const role = user.role as string;
-  if (!["admin", "parking_owner"].includes(role))
+  if (!["admin", "parking_owner"].includes(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   let body: Record<string, unknown>;
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
 
-  if (!body.id) return NextResponse.json({ error: "lot id required." }, { status: 400 });
+  if (!body.id) {
+    return NextResponse.json({ error: "lot id required." }, { status: 400 });
+  }
 
   const supabase = await createClient();
 
-  // Verify owner owns this lot
+  // 🔒 Verify ownership
   if (role === "parking_owner") {
     const { data: lot } = await supabase
       .from("parking_lots")
       .select("owner_id")
       .eq("id", body.id as string)
       .maybeSingle();
-    if (lot?.owner_id !== user.id)
+
+    if (!lot || lot.owner_id !== user.id) {
       return NextResponse.json({ error: "You do not own this lot." }, { status: 403 });
+    }
   }
 
   const { error } = await supabase
@@ -53,4 +61,45 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+// ── GET: Fetch Lot ─────────────────────────────────────────────
+export async function GET(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const role = user.role as string;
+  if (!["admin", "parking_owner"].includes(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json({ error: "lot id required." }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+
+  const { data: lot, error } = await supabase
+    .from("parking_lots")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!lot) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // 🔒 Verify ownership
+  if (role === "parking_owner" && lot.owner_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  return NextResponse.json({ lot });
 }
