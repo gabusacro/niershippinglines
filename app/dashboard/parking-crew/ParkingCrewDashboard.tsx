@@ -2,9 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Html5Qrcode } from "html5-qrcode";
+import dynamic from "next/dynamic";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Dynamic import fixes the Next.js SSR crash ────────────────────────────────
+const ParkingQRScannerModal = dynamic(
+  () => import("@/components/parking/ParkingQRScanner"),
+  { ssr: false }
+);
+
 type Booking = {
   id: string; reference: string; status: string;
   park_date_start: string; park_date_end: string; total_days: number;
@@ -16,7 +21,6 @@ type Booking = {
 type LotInfo = { id: string; name: string; total_slots_car: number; total_slots_motorcycle: number; total_slots_van: number };
 type AvailInfo = { booked_car: number; booked_motorcycle: number; booked_van: number };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const VEHICLE_EMOJI: Record<string, string> = { car: "🚗", motorcycle: "🏍️", van: "🚐" };
 const STATUS_BADGE: Record<string, string> = {
   pending_payment: "bg-amber-100 text-amber-800",
@@ -62,128 +66,6 @@ async function compressToWebP(file: File): Promise<File> {
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(file); }; img.src = url;
   });
-}
-
-// ── QR Scanner Modal (Html5Qrcode — same as vessel scanner) ──────────────────
-function ParkingQRScannerModal({ onScan, onClose }: { onScan: (ref: string) => void; onClose: () => void }) {
-  const [scanning,  setScanning]  = useState(false);
-  const [starting,  setStarting]  = useState(false);
-  const [error,     setError]     = useState<string | null>(null);
-  const [manualRef, setManualRef] = useState("");
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-
-  const initScanner = useCallback(() => {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then((stream) => {
-        stream.getTracks().forEach((t) => t.stop());
-        const qrboxSize = Math.min(260, typeof window !== "undefined" ? window.innerWidth - 48 : 240);
-        const html5QrCode = new Html5Qrcode("crew-parking-qr-reader");
-        scannerRef.current = html5QrCode;
-        html5QrCode
-          .start(
-            { facingMode: "environment" },
-            { fps: 4, qrbox: { width: qrboxSize, height: qrboxSize }, aspectRatio: 1.0 },
-            (decodedText) => {
-              html5QrCode.stop().catch(() => {});
-              setScanning(false); setStarting(false);
-              onScan(decodedText.trim());
-            },
-            () => {}
-          )
-          .then(() => { setStarting(false); setScanning(true); })
-          .catch((err: unknown) => {
-            setStarting(false); setScanning(false); scannerRef.current = null;
-            setError("Camera error: " + (err instanceof Error ? err.message : String(err)));
-          });
-      })
-      .catch((err: unknown) => {
-        setStarting(false); setScanning(false);
-        const msg = err instanceof Error ? err.message : String(err);
-        setError(/denied|not allowed|permission/i.test(msg)
-          ? "Camera permission denied. Allow camera access in your browser, then try again."
-          : "Could not access camera: " + msg);
-      });
-  }, [onScan]);
-
-  useEffect(() => {
-    if (!starting) return;
-    const r1 = requestAnimationFrame(() => {
-      const r2 = requestAnimationFrame(() => { initScanner(); });
-      return () => cancelAnimationFrame(r2);
-    });
-    return () => cancelAnimationFrame(r1);
-  }, [starting, initScanner]);
-
-  const startScan = useCallback(() => { setError(null); setStarting(true); }, []);
-  const stopScan = useCallback(() => {
-    if (scannerRef.current) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; }
-    setScanning(false); setStarting(false);
-  }, []);
-  useEffect(() => () => stopScan(), [stopScan]);
-
-  function handleManualSubmit() {
-    const val = manualRef.trim().toUpperCase();
-    if (!val) return;
-    setManualRef(""); stopScan(); onScan(val);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-      style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) { stopScan(); onClose(); } }}>
-      <div className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col">
-        <div className="px-5 py-4 shrink-0 flex items-center justify-between"
-          style={{ background: "linear-gradient(135deg,#064e3b,#0c7b93)" }}>
-          <div>
-            <p className="text-xs text-white/60 font-bold uppercase">Parking Crew</p>
-            <h2 className="text-lg font-black text-white">🔍 Scan Parking QR</h2>
-          </div>
-          <button onClick={() => { stopScan(); onClose(); }}
-            className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 text-xl">×</button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {error && <div className="rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-semibold">{error}</div>}
-          {!scanning && !starting && (
-            <button type="button" onClick={startScan}
-              className="w-full min-h-[52px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#085f72] transition-colors">
-              📷 Open Camera &amp; Scan QR
-            </button>
-          )}
-          {starting && (
-            <div className="flex items-center justify-center rounded-xl border-2 border-teal-200 bg-teal-50 py-8">
-              <p className="text-sm text-[#0f766e] animate-pulse">Starting camera…</p>
-            </div>
-          )}
-          {(scanning || starting) && (
-            <div className="space-y-3">
-              <div id="crew-parking-qr-reader" className="w-full overflow-hidden rounded-xl border-2 border-teal-300" style={{ minHeight: 300 }} />
-              {scanning && (
-                <button type="button" onClick={stopScan}
-                  className="w-full rounded-xl border-2 border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                  Stop scanning
-                </button>
-              )}
-            </div>
-          )}
-          <div className="rounded-xl border-2 border-teal-100 bg-teal-50/50 p-4">
-            <p className="text-xs font-bold text-[#0f766e] uppercase tracking-wide mb-2">Or Enter Reference Manually</p>
-            <div className="flex gap-2">
-              <input type="text" value={manualRef} onChange={(e) => setManualRef(e.target.value.toUpperCase())}
-                placeholder="e.g. TRV-PRK-YCXANB"
-                className="flex-1 rounded-xl border-2 border-teal-200 bg-white px-3 py-2.5 text-sm text-[#134e4a] placeholder:text-gray-400 focus:border-[#0c7b93] focus:outline-none uppercase"
-                autoComplete="off" autoCapitalize="characters" spellCheck={false}
-                onKeyDown={(e) => { if (e.key === "Enter") handleManualSubmit(); }} />
-              <button type="button" onClick={handleManualSubmit} disabled={!manualRef.trim()}
-                className="rounded-xl bg-[#0c7b93] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#085f72] disabled:opacity-50 transition-colors">
-                Search
-              </button>
-            </div>
-            <p className="mt-1.5 text-xs text-[#0f766e]/60">Press Enter or tap Search. Works with parking references and plate numbers.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── Cash Walk-in Modal ────────────────────────────────────────────────────────
@@ -269,10 +151,10 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
   onCheckIn: (id: string) => void; onCheckOut: (id: string) => void;
   actionLoading: boolean; actionMsg: string | null;
 }) {
-  const [photoFile, setPhotoFile]       = useState<File | null>(null);
-  const [photoLabel, setPhotoLabel]     = useState("arrival");
-  const [photoNotes, setPhotoNotes]     = useState("");
-  const [photoPlate, setPhotoPlate]     = useState(selected.vehicles?.[0]?.plate_number ?? "");
+  const [photoFile, setPhotoFile]               = useState<File | null>(null);
+  const [photoLabel, setPhotoLabel]             = useState("arrival");
+  const [photoNotes, setPhotoNotes]             = useState("");
+  const [photoPlate, setPhotoPlate]             = useState(selected.vehicles?.[0]?.plate_number ?? "");
   const [photoCompressing, setPhotoCompressing] = useState(false);
   const [photoUploading, setPhotoUploading]     = useState(false);
   const [photoSuccess, setPhotoSuccess]         = useState(false);
@@ -312,8 +194,6 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
       style={{ backgroundColor: "rgba(0,0,0,0.65)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
-
-        {/* Modal header */}
         <div className="px-5 py-4 shrink-0 flex items-start justify-between" style={{ background: "linear-gradient(135deg,#064e3b,#0c7b93)" }}>
           <div>
             <p className="text-xs text-white/60 font-bold uppercase">Booking Detail</p>
@@ -327,10 +207,7 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
             <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 text-xl">×</button>
           </div>
         </div>
-
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-
-          {/* Dates */}
           <div className="grid grid-cols-2 gap-3 text-sm rounded-xl bg-teal-50 border border-teal-200 p-4">
             <div><p className="text-xs text-gray-400 mb-0.5">Check-in date</p><p className="font-semibold text-[#134e4a]">{formatDate(selected.park_date_start)}</p></div>
             <div><p className="text-xs text-gray-400 mb-0.5">Check-out date</p><p className="font-semibold text-[#134e4a]">{formatDate(selected.park_date_end)}</p></div>
@@ -340,8 +217,6 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
               </div>
             )}
           </div>
-
-          {/* Vehicles */}
           <div className="space-y-2">
             {selected.vehicles?.map((v, i) => (
               <div key={i} className="rounded-xl border border-teal-100 bg-white px-3 py-2.5 flex items-center gap-3">
@@ -353,15 +228,11 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
               </div>
             ))}
           </div>
-
-          {/* Action message */}
           {actionMsg && (
             <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${actionMsg.startsWith("✅") ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
               {actionMsg}
             </div>
           )}
-
-          {/* Check in/out buttons */}
           {selected.status === "confirmed" && !selected.checked_in_at && (
             <button onClick={() => onCheckIn(selected.id)} disabled={actionLoading}
               className="w-full rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#085f72] disabled:opacity-50 transition-colors">
@@ -377,7 +248,7 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
           {selected.status === "overstay" && (
             <div className="space-y-2">
               <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-800 font-semibold">
-                ⚠️ Overstay detected — collect additional payment before checkout
+                ⚠️ Overstay — collect additional payment before checkout
               </div>
               <button onClick={() => onCheckOut(selected.id)} disabled={actionLoading}
                 className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-colors">
@@ -385,12 +256,10 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
               </button>
             </div>
           )}
-
-          {/* Photo upload */}
           <div className="rounded-xl border-2 border-teal-100 p-4 space-y-3">
             <h3 className="text-sm font-black text-[#134e4a]">📸 Upload Condition Photo</h3>
-            {photoSuccess && <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 font-semibold">✅ Photo uploaded successfully!</div>}
-            {photoErr   && <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">{photoErr}</div>}
+            {photoSuccess && <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 font-semibold">✅ Photo uploaded!</div>}
+            {photoErr    && <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">{photoErr}</div>}
             <div>
               <label className={labelCls}>Vehicle Plate</label>
               <select value={photoPlate} onChange={e => setPhotoPlate(e.target.value)} className={inputCls}>
@@ -411,11 +280,7 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
               <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} capture="environment" />
               <button type="button" onClick={() => photoRef.current?.click()} disabled={photoCompressing}
                 className={`w-full rounded-xl border-2 px-3 py-2.5 text-sm font-semibold flex items-center gap-2 ${photoCompressing ? "border-teal-200 bg-teal-50 text-teal-500 cursor-wait" : photoFile ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-dashed border-teal-200 bg-white text-[#0f766e] hover:border-[#0c7b93]"}`}>
-                {photoCompressing
-                  ? <><span className="animate-spin">⏳</span><span className="text-xs">Compressing…</span></>
-                  : photoFile
-                  ? <><span className="text-emerald-500 shrink-0">✓</span><span className="truncate text-xs flex-1">{photoFile.name}</span><span className="text-xs text-emerald-600 shrink-0">Change</span></>
-                  : <><span>📸</span><span className="text-xs">Take or upload photo</span></>}
+                {photoCompressing ? <><span className="animate-spin">⏳</span><span className="text-xs">Compressing…</span></> : photoFile ? <><span className="text-emerald-500 shrink-0">✓</span><span className="truncate text-xs flex-1">{photoFile.name}</span><span className="text-xs text-emerald-600 shrink-0">Change</span></> : <><span>📸</span><span className="text-xs">Take or upload photo</span></>}
               </button>
             </div>
             <button onClick={handlePhotoUpload} disabled={!photoFile || photoUploading || !photoPlate}
@@ -423,7 +288,6 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
               {photoUploading ? "Uploading…" : "Upload Photo"}
             </button>
           </div>
-
         </div>
       </div>
     </div>
@@ -432,18 +296,18 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function ParkingCrewDashboard() {
-  const [period, setPeriod]       = useState<"today"|"week"|"month">("today");
-  const [search, setSearch]       = useState("");
-  const [bookings, setBookings]   = useState<Booking[]>([]);
-  const [lot, setLot]             = useState<LotInfo | null>(null);
-  const [avail, setAvail]         = useState<AvailInfo | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [selected, setSelected]   = useState<Booking | null>(null);
+  const [period, setPeriod]             = useState<"today"|"week"|"month">("today");
+  const [search, setSearch]             = useState("");
+  const [bookings, setBookings]         = useState<Booking[]>([]);
+  const [lot, setLot]                   = useState<LotInfo | null>(null);
+  const [avail, setAvail]               = useState<AvailInfo | null>(null);
+  const [loading, setLoading]           = useState(true);
+  const [selected, setSelected]         = useState<Booking | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [actionMsg, setActionMsg] = useState<string | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
-  const [showWalkIn, setShowWalkIn]   = useState(false);
-  const [scanMsg, setScanMsg]         = useState<string | null>(null);
+  const [actionMsg, setActionMsg]       = useState<string | null>(null);
+  const [showScanner, setShowScanner]   = useState(false);
+  const [showWalkIn, setShowWalkIn]     = useState(false);
+  const [scanMsg, setScanMsg]           = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -473,7 +337,6 @@ export default function ParkingCrewDashboard() {
       if (!res.ok) { setActionMsg(data.error ?? "Check-in failed."); return; }
       setActionMsg("✅ Vehicle checked in successfully.");
       await fetchData();
-      // Update the selected booking in-place so the modal reflects new status
       setSelected(prev => prev ? { ...prev, status: "checked_in", checked_in_at: new Date().toISOString() } : null);
     } catch { setActionMsg("Network error."); }
     finally { setActionLoading(false); }
@@ -485,7 +348,7 @@ export default function ParkingCrewDashboard() {
       const res = await fetch("/api/parking/crew/checkin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ booking_id: bookingId, action: "check_out" }) });
       const data = await res.json();
       if (!res.ok) { setActionMsg(data.error ?? "Check-out failed."); return; }
-      setActionMsg("✅ Vehicle checked out successfully.");
+      setActionMsg("✅ Vehicle checked out.");
       await fetchData(); setSelected(null);
     } catch { setActionMsg("Network error."); }
     finally { setActionLoading(false); }
@@ -495,7 +358,6 @@ export default function ParkingCrewDashboard() {
     setShowScanner(false);
     setScanMsg(`🔍 Looking up ${ref}…`);
     try {
-      // Uses /api/parking/lookup — NOT /api/admin/ to avoid 403
       const res = await fetch(`/api/parking/lookup?q=${encodeURIComponent(ref)}`);
       const data = await res.json();
       if (data && data.id) {
@@ -508,7 +370,6 @@ export default function ParkingCrewDashboard() {
     setTimeout(() => setScanMsg(null), 5000);
   }
 
-  // Capacity
   const totalCar  = lot?.total_slots_car        ?? 0;
   const totalMoto = lot?.total_slots_motorcycle ?? 0;
   const totalVan  = lot?.total_slots_van        ?? 0;
@@ -518,14 +379,11 @@ export default function ParkingCrewDashboard() {
   const totalAll  = totalCar + totalMoto + totalVan;
   const occupied  = totalAll - (availCar + availMoto + availVan);
   const pctFull   = totalAll > 0 ? Math.round((occupied / totalAll) * 100) : 0;
-
   const checkedIn = bookings.filter(b => b.status === "checked_in").length;
   const pending   = bookings.filter(b => b.status === "pending_payment").length;
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f8f6f0" }}>
-
-      {/* Header */}
       <div style={{ background: "linear-gradient(135deg,#064e3b 0%,#0c7b93 100%)" }}>
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
           <p className="text-xs font-bold uppercase tracking-widest text-white/60">Parking Crew</p>
@@ -556,8 +414,6 @@ export default function ParkingCrewDashboard() {
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 space-y-6">
-
-        {/* Live capacity */}
         {lot && (
           <div className="rounded-2xl border-2 border-teal-100 bg-white p-5">
             <div className="flex items-center justify-between mb-4">
@@ -581,7 +437,6 @@ export default function ParkingCrewDashboard() {
           </div>
         )}
 
-        {/* Stats row */}
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: "Checked In", val: checkedIn, color: "text-blue-600",  bg: "bg-blue-50 border-blue-200"  },
@@ -594,7 +449,6 @@ export default function ParkingCrewDashboard() {
           ))}
         </div>
 
-        {/* Period + search */}
         <div className="flex flex-wrap gap-2 items-center">
           {(["today", "week", "month"] as const).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
@@ -607,7 +461,6 @@ export default function ParkingCrewDashboard() {
             className="flex-1 min-w-[180px] rounded-xl border-2 border-teal-100 bg-white px-3 py-1.5 text-sm text-[#134e4a] focus:border-[#0c7b93] focus:outline-none" />
         </div>
 
-        {/* Bookings list */}
         {loading ? (
           <div className="text-center py-12"><div className="text-4xl animate-pulse mb-3">🚘</div><p className="text-sm text-[#0f766e]">Loading…</p></div>
         ) : bookings.length === 0 ? (
@@ -618,8 +471,7 @@ export default function ParkingCrewDashboard() {
         ) : (
           <div className="space-y-3">
             {bookings.map(b => (
-              <button key={b.id}
-                onClick={() => { setSelected(b); setActionMsg(null); }}
+              <button key={b.id} onClick={() => { setSelected(b); setActionMsg(null); }}
                 className="w-full text-left rounded-2xl border-2 border-teal-100 bg-white p-4 hover:border-[#0c7b93] hover:shadow-md transition-all group">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div>
@@ -650,7 +502,6 @@ export default function ParkingCrewDashboard() {
         )}
       </div>
 
-      {/* Modals */}
       {selected && (
         <BookingDetailModal
           selected={selected}
@@ -661,7 +512,9 @@ export default function ParkingCrewDashboard() {
           actionMsg={actionMsg}
         />
       )}
-      {showScanner && <ParkingQRScannerModal onScan={handleQRScan} onClose={() => setShowScanner(false)} />}
+      {showScanner && (
+        <ParkingQRScannerModal onScan={handleQRScan} onClose={() => setShowScanner(false)} />
+      )}
       {showWalkIn && lot && (
         <CashWalkInModal lotId={lot.id} lotName={lot.name} onClose={() => setShowWalkIn(false)} onSuccess={fetchData} />
       )}

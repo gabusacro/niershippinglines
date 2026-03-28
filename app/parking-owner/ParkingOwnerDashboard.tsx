@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import ParkingQRScanner from "@/components/parking/ParkingQRScanner";
+import dynamic from "next/dynamic";
+
+// ── Dynamic import fixes the Next.js SSR crash for ParkingQRScanner ──────────
+const ParkingQRScanner = dynamic(
+  () => import("@/components/parking/ParkingQRScanner"),
+  { ssr: false }
+);
 
 type Lot = {
   id: string; name: string; address: string; distance_from_port: string | null;
@@ -68,20 +74,21 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, avatarUrl, lot, crew, availability }: Props) {
-  const [period, setPeriod]                     = useState<"today"|"week"|"month">("today");
-  const [bookings, setBookings]                 = useState<Booking[]>([]);
+  const [period, setPeriod]                       = useState<"today"|"week"|"month">("today");
+  const [bookings, setBookings]                   = useState<Booking[]>([]);
   const [pendingExtensions, setPendingExtensions] = useState<PendingExtension[]>([]);
-  const [loading, setLoading]                   = useState(true);
-  const [showScanner, setShowScanner]           = useState(false);
-  const [scanMsg, setScanMsg]                   = useState<string | null>(null);
-  const [tab, setTab]                           = useState<"bookings"|"crew"|"revenue">("bookings");
+  const [loading, setLoading]                     = useState(true);
+  const [showScanner, setShowScanner]             = useState(false);
+  const [scanMsg, setScanMsg]                     = useState<string | null>(null);
+  const [tab, setTab]                             = useState<"bookings"|"crew"|"revenue">("bookings");
+  const [extLoading, setExtLoading]               = useState<string | null>(null); // extension_id being processed
 
-  const totalCar  = lot?.total_slots_car        ?? 0;
-  const totalMoto = lot?.total_slots_motorcycle ?? 0;
-  const totalVan  = lot?.total_slots_van        ?? 0;
-  const availCar  = totalCar  - (availability.booked_car        ?? 0);
-  const availMoto = totalMoto - (availability.booked_motorcycle ?? 0);
-  const availVan  = totalVan  - (availability.booked_van        ?? 0);
+  const totalCar   = lot?.total_slots_car        ?? 0;
+  const totalMoto  = lot?.total_slots_motorcycle ?? 0;
+  const totalVan   = lot?.total_slots_van        ?? 0;
+  const availCar   = totalCar  - (availability.booked_car        ?? 0);
+  const availMoto  = totalMoto - (availability.booked_motorcycle ?? 0);
+  const availVan   = totalVan  - (availability.booked_van        ?? 0);
   const totalSlots = totalCar + totalMoto + totalVan;
   const occupied   = (availability.booked_car ?? 0) + (availability.booked_motorcycle ?? 0) + (availability.booked_van ?? 0);
   const pctFull    = totalSlots > 0 ? Math.round((occupied / totalSlots) * 100) : 0;
@@ -102,6 +109,22 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
+  async function handleExtensionAction(extensionId: string, action: "approve" | "reject") {
+    setExtLoading(extensionId);
+    try {
+      const res = await fetch("/api/parking/owner/extensions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extension_id: extensionId, action }),
+      });
+      if (res.ok) {
+        // Remove from list immediately
+        setPendingExtensions(prev => prev.filter(e => e.id !== extensionId));
+        await fetchBookings();
+      }
+    } finally { setExtLoading(null); }
+  }
+
   async function handleQRScan(ref: string) {
     setShowScanner(false);
     setScanMsg(`🔍 Looking up ${ref}…`);
@@ -111,9 +134,9 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
       if (d?.id) {
         setScanMsg(`✅ Found: ${d.customer_full_name} — ${d.reference} (${d.status.replace("_"," ")})`);
       } else {
-        setScanMsg(`No booking found for: ${ref}`);
+        setScanMsg(`❌ No booking found for: ${ref}`);
       }
-    } catch { setScanMsg("Network error."); }
+    } catch { setScanMsg("❌ Network error."); }
     setTimeout(() => setScanMsg(null), 5000);
   }
 
@@ -128,7 +151,7 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f8f6f0" }}>
 
-      {/* Hero header */}
+      {/* Header */}
       <div style={{ background: "linear-gradient(135deg,#064e3b 0%,#0c7b93 100%)" }}>
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
           <div className="flex items-start gap-4 flex-wrap">
@@ -148,7 +171,6 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
               {lot && <p className="mt-1 text-sm font-semibold text-white/80">🅿️ {lot.name}</p>}
             </div>
           </div>
-
           <div className="mt-5 flex flex-wrap gap-2">
             <button onClick={() => setShowScanner(true)}
               className="rounded-xl bg-white/20 px-4 py-2 text-sm font-bold text-white hover:bg-white/30 transition-colors">
@@ -163,7 +185,6 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
               🚘 Check-in View
             </Link>
           </div>
-
           {scanMsg && (
             <div className="mt-3 rounded-xl bg-white/15 px-4 py-2.5 text-sm text-white font-semibold">
               {scanMsg}
@@ -182,7 +203,7 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
           </div>
         ) : (
           <>
-            {/* ── PENDING EXTENSIONS BANNER ─────────────────────────────────── */}
+            {/* ── PENDING EXTENSIONS ────────────────────────────────────────── */}
             {pendingExtensions.length > 0 && (
               <div className="rounded-2xl border-2 border-purple-200 bg-purple-50 overflow-hidden">
                 <div className="px-5 py-3 bg-purple-100 border-b border-purple-200">
@@ -190,13 +211,13 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
                     📅 Pending Extend Stay Payments ({pendingExtensions.length})
                   </h2>
                   <p className="text-xs text-purple-700 mt-0.5">
-                    These passengers have paid to extend their stay. Admin must approve on their end.
+                    Verify GCash payment then approve or reject each extension.
                   </p>
                 </div>
                 <div className="divide-y divide-purple-100">
                   {pendingExtensions.map((ext) => (
                     <div key={ext.id} className="px-5 py-4">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
                         <div>
                           <p className="font-mono text-xs font-black text-purple-700">{ext.reference}</p>
                           <p className="text-xs text-purple-600">for booking {ext.reservation_reference}</p>
@@ -205,9 +226,20 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
                             +{ext.additional_days} day{ext.additional_days > 1 ? "s" : ""} · New end: {fmt(ext.new_end_date)} · {peso(ext.total_amount_cents)}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-1 text-xs font-bold text-amber-800">
-                          ⏳ Pending
-                        </span>
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            onClick={() => handleExtensionAction(ext.id, "reject")}
+                            disabled={extLoading === ext.id}
+                            className="rounded-xl border-2 border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                            {extLoading === ext.id ? "…" : "Reject"}
+                          </button>
+                          <button
+                            onClick={() => handleExtensionAction(ext.id, "approve")}
+                            disabled={extLoading === ext.id}
+                            className="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50 transition-colors">
+                            {extLoading === ext.id ? "…" : "Approve"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -238,12 +270,12 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
               </div>
             </div>
 
-            {/* Stats row */}
+            {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Checked In", val: checkedIn,        color: "text-blue-600",    bg: "bg-blue-50 border-blue-200"    },
-                { label: "Pending",    val: pending,           color: "text-amber-600",   bg: "bg-amber-50 border-amber-200"  },
-                { label: "Net Revenue",val: peso(netRevenue),  color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
+                { label: "Checked In", val: checkedIn,       color: "text-blue-600",    bg: "bg-blue-50 border-blue-200"       },
+                { label: "Pending",    val: pending,          color: "text-amber-600",   bg: "bg-amber-50 border-amber-200"     },
+                { label: "Net Revenue",val: peso(netRevenue), color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
               ].map(s => (
                 <div key={s.label} className={`rounded-2xl border-2 ${s.bg} p-4 text-center`}>
                   <p className={`text-xl font-black ${s.color}`}>{s.val}</p>
@@ -351,9 +383,9 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
                   <h3 className="text-sm font-black text-[#134e4a]">Revenue Breakdown</h3>
                   <p className="text-xs text-gray-400">Only confirmed/checked-in/completed bookings are counted.</p>
                   {[
-                    { label: "Gross parking fees", val: totalRevenue,    note: "Before commission" },
-                    { label: "Commission deducted", val: -totalCommission, note: "Platform commission" },
-                    { label: "Your net revenue",    val: netRevenue,     note: "What you keep", bold: true },
+                    { label: "Gross parking fees",  val: totalRevenue,     note: "Before commission" },
+                    { label: "Commission deducted",  val: -totalCommission, note: "Platform commission" },
+                    { label: "Your net revenue",     val: netRevenue,       note: "What you keep", bold: true },
                   ].map(r => (
                     <div key={r.label} className={`flex justify-between items-center py-2.5 border-b border-teal-50 last:border-0 ${r.bold ? "font-black" : ""}`}>
                       <div>
@@ -389,7 +421,9 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
         )}
       </div>
 
-      {showScanner && <ParkingQRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />}
+      {showScanner && (
+        <ParkingQRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />
+      )}
     </div>
   );
 }

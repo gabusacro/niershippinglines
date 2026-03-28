@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
 
 type Props = {
   onScan: (ref: string) => void;
@@ -13,52 +12,57 @@ export default function ParkingQRScanner({ onScan, onClose }: Props) {
   const [starting,  setStarting]  = useState(false);
   const [error,     setError]     = useState<string | null>(null);
   const [manualRef, setManualRef] = useState("");
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scannerRef = useRef<any>(null);
 
-  // ── Init camera — identical pattern to CrewTicketScanner ──────────────────
+  // ── Dynamically import Html5Qrcode only in browser — fixes Next.js SSR crash
   const initScanner = useCallback(() => {
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment" } })
-      .then((stream) => {
-        stream.getTracks().forEach((t) => t.stop()); // release test stream
-        const qrboxSize = Math.min(260, typeof window !== "undefined" ? window.innerWidth - 48 : 240);
-        const html5QrCode = new Html5Qrcode("parking-qr-reader");
-        scannerRef.current = html5QrCode;
+    import("html5-qrcode").then(({ Html5Qrcode }) => {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" } })
+        .then((stream) => {
+          stream.getTracks().forEach((t) => t.stop());
+          const qrboxSize = Math.min(260, typeof window !== "undefined" ? window.innerWidth - 48 : 240);
+          const html5QrCode = new Html5Qrcode("parking-qr-reader");
+          scannerRef.current = html5QrCode;
 
-        html5QrCode
-          .start(
-            { facingMode: "environment" },
-            { fps: 4, qrbox: { width: qrboxSize, height: qrboxSize }, aspectRatio: 1.0 },
-            (decodedText) => {
-              html5QrCode.stop().catch(() => {});
-              setScanning(false);
+          html5QrCode
+            .start(
+              { facingMode: "environment" },
+              { fps: 4, qrbox: { width: qrboxSize, height: qrboxSize }, aspectRatio: 1.0 },
+              (decodedText: string) => {
+                html5QrCode.stop().catch(() => {});
+                setScanning(false);
+                setStarting(false);
+                onScan(decodedText.trim());
+              },
+              () => {}
+            )
+            .then(() => { setStarting(false); setScanning(true); })
+            .catch((err: unknown) => {
               setStarting(false);
-              onScan(decodedText.trim());
-            },
-            () => {}
-          )
-          .then(() => { setStarting(false); setScanning(true); })
-          .catch((err: unknown) => {
-            setStarting(false);
-            setScanning(false);
-            scannerRef.current = null;
-            const msg = err instanceof Error ? err.message : String(err);
-            setError("Camera error: " + msg);
-          });
-      })
-      .catch((err: unknown) => {
-        setStarting(false);
-        setScanning(false);
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/denied|not allowed|permission/i.test(msg)) {
-          setError("Camera permission denied. Tap the camera icon in your browser address bar, allow access, then try again.");
-        } else {
-          setError("Could not access camera: " + msg);
-        }
-      });
+              setScanning(false);
+              scannerRef.current = null;
+              setError("Camera error: " + (err instanceof Error ? err.message : String(err)));
+            });
+        })
+        .catch((err: unknown) => {
+          setStarting(false);
+          setScanning(false);
+          const msg = err instanceof Error ? err.message : String(err);
+          if (/denied|not allowed|permission/i.test(msg)) {
+            setError("Camera permission denied. Allow camera access in your browser, then try again.");
+          } else {
+            setError("Could not access camera: " + msg);
+          }
+        });
+    }).catch(() => {
+      setStarting(false);
+      setError("Scanner library failed to load. Please refresh and try again.");
+    });
   }, [onScan]);
 
-  // ── Same double-rAF trick as vessel scanner so the div is mounted first ───
+  // ── Double rAF so the div is mounted before Html5Qrcode tries to attach ──
   useEffect(() => {
     if (!starting) return;
     const r1 = requestAnimationFrame(() => {
@@ -71,7 +75,10 @@ export default function ParkingQRScanner({ onScan, onClose }: Props) {
   const startScan = useCallback(() => { setError(null); setStarting(true); }, []);
 
   const stopScan = useCallback(() => {
-    if (scannerRef.current) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; }
+    if (scannerRef.current) {
+      scannerRef.current.stop().catch(() => {});
+      scannerRef.current = null;
+    }
     setScanning(false);
     setStarting(false);
   }, []);
@@ -109,14 +116,12 @@ export default function ParkingQRScanner({ onScan, onClose }: Props) {
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
-          {/* Error */}
           {error && (
             <div className="rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-semibold">
               {error}
             </div>
           )}
 
-          {/* Scan button */}
           {!scanning && !starting && (
             <button type="button" onClick={startScan}
               className="w-full min-h-[52px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#085f72] transition-colors">
@@ -124,14 +129,12 @@ export default function ParkingQRScanner({ onScan, onClose }: Props) {
             </button>
           )}
 
-          {/* Starting */}
           {starting && (
             <div className="flex items-center justify-center rounded-xl border-2 border-teal-200 bg-teal-50 py-8">
               <p className="text-sm text-[#0f766e] animate-pulse">Starting camera…</p>
             </div>
           )}
 
-          {/* Camera view */}
           {(scanning || starting) && (
             <div className="space-y-3">
               <div id="parking-qr-reader"
