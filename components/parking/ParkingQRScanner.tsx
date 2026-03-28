@@ -75,13 +75,18 @@ export default function ParkingQRScanner({ onScan, onClose }: Props) {
   const startScan = useCallback(() => { setError(null); setStarting(true); }, []);
 
   const stopScan = useCallback(() => {
-    if (scannerRef.current) {
+  if (scannerRef.current) {
+    // Only call stop() if the scanner actually started — prevents the console error
+    try {
       scannerRef.current.stop().catch(() => {});
-      scannerRef.current = null;
+    } catch {
+      // ignore — scanner was not running
     }
-    setScanning(false);
-    setStarting(false);
-  }, []);
+    scannerRef.current = null;
+  }
+  setScanning(false);
+  setStarting(false);
+}, []);
 
   useEffect(() => () => stopScan(), [stopScan]);
 
