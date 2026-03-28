@@ -82,6 +82,7 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
   const [scanMsg, setScanMsg]                     = useState<string | null>(null);
   const [tab, setTab]                             = useState<"bookings"|"crew"|"revenue">("bookings");
   const [extLoading, setExtLoading]               = useState<string | null>(null); // extension_id being processed
+  const [selected, setSelected] = useState<Booking | null>(null);
 
   const totalCar   = lot?.total_slots_car        ?? 0;
   const totalMoto  = lot?.total_slots_motorcycle ?? 0;
@@ -132,8 +133,9 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
       const res = await fetch(`/api/parking/lookup?q=${encodeURIComponent(ref)}`);
       const d = await res.json();
       if (d?.id) {
-        setScanMsg(`✅ Found: ${d.customer_full_name} — ${d.reference} (${d.status.replace("_"," ")})`);
-      } else {
+  setSelected(d); // 🔥 THIS makes it open details
+  setScanMsg(null);
+} else {
         setScanMsg(`❌ No booking found for: ${ref}`);
       }
     } catch { setScanMsg("❌ Network error."); }
@@ -424,6 +426,35 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
       {showScanner && (
         <ParkingQRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />
       )}
+
+{selected && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div className="bg-white rounded-2xl p-5 max-w-md w-full">
+      <h2 className="font-bold text-lg mb-2">{selected.reference}</h2>
+      <p className="text-sm">{selected.customer_full_name}</p>
+      <p className="text-xs text-gray-500">
+        {fmt(selected.park_date_start)} → {fmt(selected.park_date_end)}
+      </p>
+
+      <div className="mt-3 space-y-1">
+        {selected.vehicles?.map((v, i) => (
+          <div key={i} className="text-xs">
+            {v.vehicle_type} — {v.plate_number}
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={() => setSelected(null)}
+        className="mt-4 w-full bg-[#0c7b93] text-white rounded-xl py-2"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 }
