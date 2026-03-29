@@ -371,8 +371,7 @@ function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => 
 }
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
-export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, avatarUrl, lot: initialLot, crew, availability }: Props) {
-  const [lot, setLot] = useState(initialLot);
+export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, avatarUrl, lot, crew, availability }: Props) {
   const [period, setPeriod]                       = useState<"today"|"week"|"month">("today");
   const [bookings, setBookings]                   = useState<Booking[]>([]);
   const [pendingExtensions, setPendingExtensions] = useState<PendingExtension[]>([]);
@@ -408,17 +407,6 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
       }
     } finally { setLoading(false); }
   }, [lot, period]);
-
-  const fetchLot = useCallback(async () => {
-  if (!lot?.id) return;
-  try {
-    const res = await fetch(`/api/parking/owner/lot?id=${lot.id}`);
-    if (res.ok) {
-      const d = await res.json();
-      setLot(d.lot);
-    }
-  } catch {}
-}, [lot?.id]);
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
@@ -716,12 +704,9 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
             )}
 
             {/* Manage Lot tab */}
-            {tab === "lot" && lot && (
-  <ManageLotTab lot={lot} onSaved={() => {
-    fetchLot();
-    fetchBookings();
-  }} />
-)}
+            {tab === "lot" && (
+              <ManageLotTab lot={lot} onSaved={fetchBookings} />
+            )}
           </>
         )}
       </div>
