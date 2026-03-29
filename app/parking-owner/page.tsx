@@ -14,12 +14,12 @@ export default async function ParkingOwnerPage() {
   const supabase = await createClient();
 
   // Get their assigned lot
-  const { data: lot } = await supabase
-    .from("parking_lots")
-    .select("id, name, address, distance_from_port, total_slots_car, total_slots_motorcycle, total_slots_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents, is_active, is_24hrs")
-    .eq("owner_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
+const { data: lot } = await supabase
+  .from("parking_lots")
+  .select("id, name, address, distance_from_port, total_slots_car, total_slots_motorcycle, total_slots_van, accepts_car, accepts_motorcycle, accepts_van, car_rate_cents, motorcycle_rate_cents, van_rate_cents, is_active, is_24hrs")
+  .eq("owner_id", user.id)
+  .eq("is_active", true)
+  .maybeSingle();
 
   // Get crew assigned to their lot
   const crew = lot ? await supabase
