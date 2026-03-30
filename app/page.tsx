@@ -349,8 +349,8 @@ export default async function HomePage() {
             </section>
 
             {/* Smooth fade into white for Discover section */}
-            <div className="relative z-10 h-16"
-              style={{ background: "linear-gradient(to bottom, transparent, white)" }} />
+<div className="relative z-10 h-32"
+  style={{ background: "linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.3) 40%, white 100%)" }} />
           </div>
         </div>
         {/* End BG2 wrapper */}
@@ -359,9 +359,9 @@ export default async function HomePage() {
       {/* End page wrapper */}
 
       {/* ⑦ DISCOVER SIARGAO */}
-      <div className="bg-white">
-        <DiscoverSiargaoPublic items={discoverItems} />
-      </div>
+<div className="bg-white -mt-1">
+  <DiscoverSiargaoPublic items={discoverItems} />
+</div>
 
       <div className="leading-[0] bg-white">
         <svg viewBox="0 0 1440 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" className="w-full block">
