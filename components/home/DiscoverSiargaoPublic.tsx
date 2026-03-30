@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import type { DiscoverItem } from "@/lib/dashboard/get-discover-items";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -22,28 +22,8 @@ function isDirectVideo(url: string) {
   return /\.(mp4|webm|mov|ogg)(\?|$)/i.test(url);
 }
 
-// Detects whether an image URL is portrait or landscape
-function useImageOrientation(url: string | null): "portrait" | "landscape" {
-  const [orientation, setOrientation] = useState<"portrait" | "landscape">("landscape");
-  useEffect(() => {
-    if (!url) return;
-    const img = new Image();
-    img.onload = () => {
-      setOrientation(img.naturalHeight > img.naturalWidth ? "portrait" : "landscape");
-    };
-    img.src = url;
-  }, [url]);
-  return orientation;
-}
-
-const ASPECT_CLASSES = {
-  landscape: "aspect-video",
-  portrait: "aspect-[3/4]",
-  square: "aspect-square",
-};
-
-// ─── Expanded card overlay ────────────────────────────────────────────────────
-function ExpandedCard({
+// ─── Fullscreen Video / Content Modal ────────────────────────────────────────
+function FullscreenModal({
   item,
   onClose,
 }: {
@@ -57,13 +37,14 @@ function ExpandedCard({
   const embedUrl = item.video_url ? toEmbedUrl(item.video_url) : null;
   const isDirect = item.video_url ? isDirectVideo(item.video_url) : false;
   const desc = item.tag ?? "";
-  const isLong = desc.length > 120;
-  const displayDesc = isLong && !showFull ? desc.slice(0, 120) + "…" : desc;
+  const isLong = desc.length > 160;
+  const displayDesc = isLong && !showFull ? desc.slice(0, 160) + "…" : desc;
 
-  // Detect orientation from cover image
-  const orientation = useImageOrientation(cover);
-  const aspectClass = orientation === "portrait" ? ASPECT_CLASSES.portrait : ASPECT_CLASSES.landscape;
-  const isPortrait = orientation === "portrait";
+  // Lock body scroll
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -72,105 +53,106 @@ function ExpandedCard({
   }, [onClose]);
 
   return (
-    // Portrait centers with max-w, landscape goes full width
-    <div className={`mx-auto ${isPortrait ? "max-w-xs" : "w-full"}`}>
+    /* Backdrop */
+    <div
+      className="fixed inset-0 z-[999] flex items-center justify-center p-4 sm:p-8"
+      style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(6px)", animation: "fadeIn 0.2s ease both" }}
+      onClick={onClose}
+    >
+      {/* Modal box — stops propagation so clicking inside doesn't close */}
       <div
-        className={`relative overflow-hidden rounded-2xl shadow-2xl ring-2 ring-[#0c7b93]/60 ${aspectClass} w-full`}
-        style={{ animation: "expandCard 0.38s cubic-bezier(0.34,1.56,0.64,1) both" }}
+        className="relative w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl"
+        style={{ animation: "slideUp 0.3s cubic-bezier(0.34,1.4,0.64,1) both", maxHeight: "90vh" }}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Background photo / video */}
-        {hasVideo && embedUrl ? (
-          <div className="absolute inset-0">
-            <iframe src={embedUrl} className="h-full w-full" allow="autoplay; fullscreen" allowFullScreen title={item.title} />
-          </div>
-        ) : hasVideo && isDirect ? (
-          <video src={item.video_url!} className="absolute inset-0 h-full w-full object-cover" autoPlay loop poster={cover ?? undefined} />
-        ) : cover ? (
-          <img src={cover} alt={item.title} className="absolute inset-0 h-full w-full object-cover" style={{ animation: "slowZoom 8s ease-out both" }} />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-[#085C52] to-[#0c7b93]" />
-        )}
-
-        {/* Dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/10" />
-
-        {/* Close button */}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
-          className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/80 transition-all text-sm font-bold"
-        >
-          ×
-        </button>
-
-        {/* Photo strip if multiple */}
-        {item.photos.length > 1 && (
-          <div className="absolute top-3 left-3 z-20 flex gap-1.5">
-            {item.photos.slice(0, 5).map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setPhotoIndex(i); }}
-                className={`h-1.5 rounded-full transition-all ${i === photoIndex ? "w-6 bg-white" : "w-1.5 bg-white/40 hover:bg-white/70"}`}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Content overlay at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 p-4 sm:p-5">
-          {item.is_featured && item.type !== "partner" && (
-            <span className="mb-1.5 inline-block rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-white">
-              ✨ Featured
-            </span>
-          )}
-          {item.type === "partner" && (
-            <span className="mb-1.5 inline-block rounded border border-white/20 bg-black/30 px-2 py-0.5 text-[9px] text-white/60 backdrop-blur-sm">
-              Sponsored
-            </span>
+        {/* ── Media area ── */}
+        <div className="relative w-full" style={{ aspectRatio: hasVideo ? "16/9" : "16/9" }}>
+          {hasVideo && embedUrl ? (
+            <iframe
+              src={embedUrl}
+              className="absolute inset-0 h-full w-full"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+              title={item.title}
+            />
+          ) : hasVideo && isDirect ? (
+            <video
+              src={item.video_url!}
+              className="absolute inset-0 h-full w-full object-cover"
+              autoPlay
+              controls
+              poster={cover ?? undefined}
+            />
+          ) : cover ? (
+            <img
+              src={cover}
+              alt={item.title}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-[#085C52] to-[#0c7b93]" />
           )}
 
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-0.5">
-            {item.type === "attraction" ? "🗺️ Attraction" : item.type === "video" ? "🎬 Video" : "🤝 Partner"}
-          </p>
-          <h3 className="text-lg font-black text-white leading-tight mb-2 drop-shadow-lg">
-            {item.title}
-          </h3>
-
-          {/* Description */}
-          {desc && (
-            <div className="mb-3">
-              <p className="text-sm font-semibold text-white/85 leading-relaxed">
-                {displayDesc}
-                {isLong && !showFull && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setShowFull(true); }}
-                    className="ml-1 text-[#5de0d0] font-bold hover:underline text-xs"
-                  >
-                    read more
-                  </button>
-                )}
-                {isLong && showFull && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setShowFull(false); }}
-                    className="ml-1 text-[#5de0d0] font-bold hover:underline text-xs"
-                  >
-                    show less
-                  </button>
-                )}
-              </p>
+          {/* Photo dots */}
+          {item.photos.length > 1 && !hasVideo && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+              {item.photos.slice(0, 6).map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setPhotoIndex(i)}
+                  className={`h-1.5 rounded-full transition-all ${i === photoIndex ? "w-6 bg-white" : "w-1.5 bg-white/40 hover:bg-white/70"}`}
+                />
+              ))}
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          {/* Close button — top right */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-black/90 transition-all text-lg font-bold shadow-lg"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* ── Info panel below media ── */}
+        <div className="px-5 py-4 sm:px-6 sm:py-5" style={{ background: "rgba(5,20,15,0.97)" }}>
+          {/* Badge row */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className="text-[10px] font-black uppercase tracking-widest text-[#4dd9c0]">
+              {item.type === "attraction" ? "🗺️ Attraction" : item.type === "video" ? "🎬 Video Tour" : "🤝 Partner"}
+            </span>
+            {item.is_featured && item.type !== "partner" && (
+              <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-white">✨ Featured</span>
+            )}
+          </div>
+
+          <h3 className="text-lg sm:text-xl font-black text-white leading-tight mb-2">{item.title}</h3>
+
+          {desc && (
+            <p className="text-sm text-white/70 font-semibold leading-relaxed mb-3">
+              {displayDesc}
+              {isLong && (
+                <button
+                  type="button"
+                  onClick={() => setShowFull((s) => !s)}
+                  className="ml-1 text-[#4dd9c0] font-bold hover:underline text-xs"
+                >
+                  {showFull ? "show less" : "read more"}
+                </button>
+              )}
+            </p>
+          )}
+
+          <div className="flex items-center gap-3">
             {item.href ? (
               <a
                 href={item.href}
                 target={item.href.startsWith("http") ? "_blank" : undefined}
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#0c7b93] px-4 py-2 text-xs font-black text-white hover:bg-[#0f766e] transition-colors shadow-lg"
               >
                 Learn more →
@@ -178,16 +160,13 @@ function ExpandedCard({
             ) : (
               <a
                 href="/book"
-                onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#0c7b93] px-4 py-2 text-xs font-black text-white hover:bg-[#0f766e] transition-colors shadow-lg"
               >
                 🚢 Book your trip →
               </a>
             )}
             {item.photos.length > 1 && !hasVideo && (
-              <span className="text-xs text-white/50 font-semibold">
-                📸 {item.photos.length} photos
-              </span>
+              <span className="text-xs text-white/40 font-semibold">📸 {item.photos.length} photos</span>
             )}
           </div>
         </div>
@@ -196,8 +175,69 @@ function ExpandedCard({
   );
 }
 
-// ─── Regular card ─────────────────────────────────────────────────────────────
-function AttractionCard({
+// ─── Featured hero card (big card — top of grid like photo 3) ─────────────────
+function FeaturedCard({
+  item,
+  onPlay,
+}: {
+  item: DiscoverItem;
+  onPlay: () => void;
+}) {
+  const cover = item.photos[0]?.url ?? null;
+  const hasVideo = !!item.video_url;
+
+  return (
+    <button
+      type="button"
+      onClick={onPlay}
+      className="group relative w-full overflow-hidden rounded-2xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4dd9c0]"
+      style={{ aspectRatio: "16/9" }}
+      aria-label={`Play ${item.title}`}
+    >
+      {/* Cover image */}
+      {cover ? (
+        <img
+          src={cover}
+          alt={item.title}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-[#085C52] to-[#0c7b93]" />
+      )}
+
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/10" />
+
+      {/* Featured badge */}
+      {item.is_featured && (
+        <span className="absolute left-4 top-4 z-10 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">
+          ✨ FEATURED
+        </span>
+      )}
+
+      {/* Play button */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border-2 border-white/40 text-white text-2xl shadow-2xl transition-all duration-300 group-hover:scale-110 group-hover:bg-white/30">
+          {hasVideo ? "▶" : "+"}
+        </span>
+      </div>
+
+      {/* Bottom info */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#4dd9c0] mb-1">
+          {item.type === "video" ? "🎬 VIDEO TOUR" : "🗺️ ATTRACTION"}
+        </p>
+        <h3 className="text-xl sm:text-2xl font-black text-white leading-tight drop-shadow-lg">
+          {item.title}
+        </h3>
+        <p className="mt-1 text-xs text-white/60 font-semibold">▶ Tap to watch</p>
+      </div>
+    </button>
+  );
+}
+
+// ─── Small grid card ──────────────────────────────────────────────────────────
+function GridCard({
   item,
   onClick,
 }: {
@@ -211,50 +251,43 @@ function AttractionCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl shadow-md cursor-pointer aspect-[3/4] w-full transition-all duration-300 hover:shadow-xl hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0c7b93]`}
+      className="group relative overflow-hidden rounded-xl cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4dd9c0] transition-transform duration-200 hover:scale-[1.02]"
+      style={{ aspectRatio: "4/3" }}
+      aria-label={`Open ${item.title}`}
     >
-      {/* Photo */}
       {cover ? (
         <img
           src={cover}
           alt={item.title}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-[#085C52] to-[#0c7b93] flex items-center justify-center">
-          <span className="text-4xl opacity-30">
-            {item.type === "video" ? "🎬" : item.type === "attraction" ? "🗺️" : "🤝"}
-          </span>
+          <span className="text-3xl opacity-30">{item.type === "video" ? "🎬" : "🗺️"}</span>
         </div>
       )}
 
-      {/* Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
 
-      {/* Hover hint */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white text-xl shadow-xl">
+      {/* Play circle on hover */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm border border-white/30 text-white text-base shadow-xl">
           {hasVideo ? "▶" : "+"}
         </span>
       </div>
 
-      {/* Badges */}
+      {/* Type badge */}
+      <span className="absolute left-2 top-2 z-10 rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-white/80"
+        style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}>
+        {item.type === "video" ? "🎬 VIDEO" : item.type === "attraction" ? "🗺️ ATTRACTION" : "🤝 PARTNER"}
+      </span>
+
       {item.is_featured && item.type !== "partner" && (
-        <span className="absolute left-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white shadow">✨</span>
-      )}
-      {item.type === "partner" && (
-        <span className="absolute right-2 top-2 rounded border border-white/20 bg-black/40 px-1.5 py-0.5 text-[9px] text-white/70 backdrop-blur-sm">Ad</span>
-      )}
-      {item.photos.length > 1 && (
-        <span className="absolute right-2 top-2 rounded-full bg-black/40 px-1.5 py-0.5 text-[9px] font-semibold text-white backdrop-blur-sm">📸{item.photos.length}</span>
+        <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-1.5 py-0.5 text-[8px] font-black text-white">✨</span>
       )}
 
-      {/* Bottom info */}
-      <div className="absolute bottom-0 left-0 right-0 p-3">
-        <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 truncate">
-          {item.type === "attraction" ? "🗺️" : item.type === "video" ? "🎬" : "🤝"} {item.type}
-        </p>
-        <p className="mt-0.5 line-clamp-2 text-sm font-black leading-tight text-white drop-shadow">
+      <div className="absolute bottom-0 left-0 right-0 p-2.5">
+        <p className="line-clamp-2 text-xs font-black leading-tight text-white drop-shadow">
           {item.title}
         </p>
       </div>
@@ -266,10 +299,10 @@ function AttractionCard({
 type Filter = "all" | "video" | "attraction" | "partner";
 
 export function DiscoverSiargaoPublic({ items }: { items: DiscoverItem[] }) {
-  const [filter, setFilter] = useState<Filter>("all");
-  const [search, setSearch] = useState("");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [filter, setFilter]       = useState<Filter>("all");
+  const [search, setSearch]       = useState("");
+  const [modalItem, setModalItem] = useState<DiscoverItem | null>(null);
+  const searchRef                 = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     let list = items;
@@ -283,148 +316,117 @@ export function DiscoverSiargaoPublic({ items }: { items: DiscoverItem[] }) {
     return list;
   }, [items, filter, search]);
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setExpandedId(null); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, []);
+  // Featured item = first featured video, or just first item
+  const featuredItem = filtered.find((i) => i.is_featured && i.type === "video") ?? filtered[0] ?? null;
+  const gridItems    = featuredItem ? filtered.filter((i) => i.id !== featuredItem.id) : filtered;
 
   const counts = {
-    all: items.length,
+    all:        items.length,
     attraction: items.filter((i) => i.type === "attraction").length,
-    video: items.filter((i) => i.type === "video").length,
-    partner: items.filter((i) => i.type === "partner").length,
+    video:      items.filter((i) => i.type === "video").length,
+    partner:    items.filter((i) => i.type === "partner").length,
   };
 
-  return (
-    <section className="border-t border-teal-200/50 bg-[#f0fdfa] py-12 sm:py-16">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  const openModal  = useCallback((item: DiscoverItem) => setModalItem(item), []);
+  const closeModal = useCallback(() => setModalItem(null), []);
 
-        {/* ── Hero header ── */}
-        <div className="relative mb-10 overflow-hidden rounded-3xl bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]">
-          <div className="absolute inset-0 opacity-10"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 30 Q15 15 30 30 Q45 45 60 30' stroke='white' stroke-width='2' fill='none'/%3E%3C/svg%3E")`,
-              backgroundSize: "60px 60px",
-            }}
-          />
-          <div className="relative px-6 py-10 sm:py-14 text-center">
-            <p className="text-xs font-black uppercase tracking-[0.3em] text-white/60 mb-2">
+  return (
+    <>
+      {/* ── Fullscreen modal ── */}
+      {modalItem && <FullscreenModal item={modalItem} onClose={closeModal} />}
+
+      <section className="py-12 sm:py-16" aria-label="Discover Siargao — Island Guide">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+
+          {/* ── Section header — transparent, dark text on dark bg ── */}
+          <div className="mb-8">
+            <p className="text-[0.62rem] font-black uppercase tracking-[0.28em] text-[#4dd9c0] mb-1">
               🌴 Island Guide
             </p>
-            <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-2">
-              Explore Siargao
+            <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight">
+              Discover Siargao
             </h2>
-            <p className="text-white/70 font-semibold text-sm sm:text-lg max-w-md mx-auto">
-              What to see and do on the island.{" "}
-              <span className="text-white/90">Tap any card to explore.</span>
+            <p className="mt-1 text-sm font-semibold text-white/55">
+              Curated places, travel videos &amp; featured partners
             </p>
           </div>
-        </div>
 
-        {/* ── Search bar ── */}
-        <div className="mb-6 flex flex-col items-center gap-4">
-          <div className="relative w-full max-w-xl">
-            <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-[#0c7b93] via-[#1AB5A3] to-[#085C52] opacity-40 blur-sm" />
-            <div className="relative flex items-center rounded-2xl bg-white border border-teal-200 shadow-lg overflow-hidden">
-              <span className="pl-4 text-xl">🔍</span>
+          {/* ── Filter tabs — glass style ── */}
+          <div className="mb-6 flex flex-wrap items-center gap-2">
+            {(["all", "video", "attraction", "partner"] as Filter[]).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={`rounded-full px-4 py-1.5 text-xs font-black uppercase tracking-wide transition-all ${
+                  filter === f
+                    ? "bg-[#4dd9c0] text-[#0a3d35] shadow-md shadow-[#4dd9c0]/25"
+                    : "bg-white/8 border border-white/15 text-white/65 hover:bg-white/15 hover:text-white"
+                }`}
+              >
+                {f === "all"        ? `All (${counts.all})`
+                 : f === "video"     ? `🎬 Videos (${counts.video})`
+                 : f === "attraction"? `🗺️ Attractions (${counts.attraction})`
+                 :                    `🤝 Partners (${counts.partner})`}
+              </button>
+            ))}
+
+            {/* Search — inline right side */}
+            <div className="ml-auto flex items-center gap-2 rounded-full px-3 py-1.5 text-xs border border-white/15 bg-white/8 hover:bg-white/12 transition-colors">
+              <span className="text-white/50">🔍</span>
               <input
                 ref={searchRef}
                 type="text"
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setExpandedId(null); }}
-                placeholder="Search beaches, surf spots, attractions…"
-                className="flex-1 bg-transparent px-3 py-3.5 text-sm font-semibold text-[#134e4a] placeholder:text-[#0f766e]/40 outline-none"
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search…"
+                className="bg-transparent text-white text-xs font-semibold placeholder:text-white/30 outline-none w-28 sm:w-40"
               />
               {search && (
-                <button
-                  type="button"
-                  onClick={() => { setSearch(""); searchRef.current?.focus(); }}
-                  className="pr-4 text-[#0f766e]/50 hover:text-[#0c7b93] transition-colors font-bold"
-                >
-                  ×
-                </button>
+                <button type="button" onClick={() => { setSearch(""); searchRef.current?.focus(); }} className="text-white/40 hover:text-white font-bold">×</button>
               )}
-              <div className="w-px h-6 bg-teal-100 mx-1" />
-              <span className="pr-4 text-xs font-bold text-[#0f766e]/50">
-                {filtered.length} spot{filtered.length !== 1 ? "s" : ""}
-              </span>
+              <span className="text-white/30 font-bold text-[10px]">{filtered.length}</span>
             </div>
           </div>
 
-          {/* Filter pills */}
-          <div className="flex flex-wrap justify-center gap-2">
-            {(["all", "attraction", "video", "partner"] as Filter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => { setFilter(f); setExpandedId(null); }}
-                className={`rounded-full px-4 py-1.5 text-xs font-black uppercase tracking-wide transition-all ${
-                  filter === f
-                    ? "bg-[#0c7b93] text-white shadow-md"
-                    : "bg-white border border-teal-200 text-[#0f766e] hover:border-[#0c7b93] hover:text-[#0c7b93]"
-                }`}
-              >
-                {f === "all" ? `All (${counts.all})`
-                  : f === "attraction" ? `🗺️ Places (${counts.attraction})`
-                  : f === "video" ? `🎬 Videos (${counts.video})`
-                  : `🤝 Partners (${counts.partner})`}
-              </button>
-            ))}
-          </div>
+          {/* ── Content ── */}
+          {filtered.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 py-16 text-center" style={{ background: "rgba(255,255,255,0.04)" }}>
+              <p className="text-4xl mb-3">🌊</p>
+              <p className="text-sm font-semibold text-white/50">No results found. Try a different search.</p>
+            </div>
+          ) : (
+            <div>
+              {/* Featured big card */}
+              {featuredItem && (
+                <div className="mb-3">
+                  <FeaturedCard item={featuredItem} onPlay={() => openModal(featuredItem)} />
+                </div>
+              )}
+
+              {/* Grid of remaining cards — 2 cols mobile, 4 cols desktop like photo 3 */}
+              {gridItems.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {gridItems.map((item) => (
+                    <GridCard key={item.id} item={item} onClick={() => openModal(item)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Bottom promo line */}
+          <p className="mt-6 text-center text-xs text-white/30 font-semibold">
+            Want to feature your Siargao business here?{" "}
+            <a href="/contact" className="text-[#4dd9c0] font-bold hover:underline">Contact us</a>
+          </p>
         </div>
 
-        {/* ── Cards grid ── */}
-        {filtered.length === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-teal-200 bg-teal-50/50 py-16 text-center">
-            <p className="text-4xl mb-3">🌊</p>
-            <p className="text-sm font-semibold text-[#0f766e]">No results found. Try a different search.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-            {filtered.map((item) => {
-              const isExpanded = expandedId === item.id;
-
-              if (isExpanded) {
-                return (
-                  <div key={item.id} style={{ gridColumn: "1 / -1" }}>
-                    <ExpandedCard
-                      item={item}
-                      onClose={() => setExpandedId(null)}
-                    />
-                  </div>
-                );
-              }
-
-              return (
-                <AttractionCard
-                  key={item.id}
-                  item={item}
-                  onClick={() => setExpandedId(item.id)}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {filtered.length > 0 && search && (
-          <p className="mt-4 text-center text-xs text-[#0f766e]/50 font-semibold">
-            Showing {filtered.length} result{filtered.length !== 1 ? "s" : ""} for "{search}"
-          </p>
-        )}
-
-      </div>
-
-      <style>{`
-        @keyframes expandCard {
-          0%   { transform: scale(0.85); opacity: 0; }
-          100% { transform: scale(1);    opacity: 1; }
-        }
-        @keyframes slowZoom {
-          0%   { transform: scale(1); }
-          100% { transform: scale(1.08); }
-        }
-      `}</style>
-    </section>
+        <style>{`
+          @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes slideUp { from { opacity: 0; transform: translateY(32px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        `}</style>
+      </section>
+    </>
   );
 }
