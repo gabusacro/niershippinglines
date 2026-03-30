@@ -26,6 +26,14 @@ import {
   Clock,
   Compass,
   ArrowRight,
+  MapPin,
+  Waves,
+  Camera,
+  Star,
+  ParkingCircle,
+  Shield,
+  CheckCircle,
+  Navigation,
 } from "lucide-react";
 
 // ─── metadata (unchanged) ────────────────────────────────────────────────────
@@ -51,28 +59,28 @@ export const metadata: Metadata = {
     "siargao island ferry schedule",
   ],
   openGraph: {
-  title: "Travela Siargao | Ferry Booking — Siargao Island",
-  description:
-    "Daily ferry trips to Siargao Island. Book online in 2 minutes, pay ONLINE, get instant e-ticket.",
-  url: "https://www.travelasiargao.com",
-  siteName: "Travela Siargao",
-  type: "website",
-  locale: "en_PH",
-  images: [
-    {
-      url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png",
-      width: 1200,
-      height: 630,
-      alt: "Travela Siargao – Ferry Booking to Siargao Island",
-    },
-  ],
-},
+    title: "Travela Siargao | Ferry Booking — Siargao Island",
+    description:
+      "Daily ferry trips to Siargao Island. Book online in 2 minutes, pay ONLINE, get instant e-ticket.",
+    url: "https://www.travelasiargao.com",
+    siteName: "Travela Siargao",
+    type: "website",
+    locale: "en_PH",
+    images: [
+      {
+        url: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png",
+        width: 1200,
+        height: 630,
+        alt: "Travela Siargao – Ferry Booking to Siargao Island",
+      },
+    ],
+  },
   twitter: {
     card: "summary_large_image",
     title: "Travela Siargao | Ferry Booking",
     description:
       "Book your ferry to Siargao Island. Daily trips, real-time seats, ONLINE payment.",
-        images: ["https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png"],
+    images: ["https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png"],
   },
   alternates: {
     canonical: "https://www.travelasiargao.com",
@@ -83,7 +91,6 @@ export const dynamic = "force-dynamic";
 
 // ─── page ────────────────────────────────────────────────────────────────────
 export default async function HomePage() {
-  // ✅ ALL Supabase fetches are untouched
   const today = getTodayInManila();
 
   const [branding, discoverItems, schedule, announcements, faqs, fees] =
@@ -100,11 +107,9 @@ export default async function HomePage() {
     <div className="min-h-[calc(100vh-8rem)] overflow-x-hidden">
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          ① HERO — parallax bg + glass trip-checker
+          ① HERO
          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="relative min-h-screen flex flex-col justify-end overflow-hidden">
-
-        {/* Parallax background — your Supabase image URL */}
         <div
           className="absolute inset-0 scale-110 will-change-transform"
           id="heroBg"
@@ -113,14 +118,10 @@ export default async function HomePage() {
               "url('https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Discover%20Siargao%20Contents/background%20travela%20siargao.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center",
-            backgroundColor: "#0d4a45", // fallback if image is slow
+            backgroundColor: "#0d4a45",
           }}
         />
-
-        {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0d4a45]/40 via-[#085C52]/20 to-[#134e4a]/95" />
-
-        {/* Floating particles — purely decorative */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-[2]" aria-hidden="true">
           {[
             { w: 5, l: 12, d: 9, delay: 0 },
@@ -144,11 +145,7 @@ export default async function HomePage() {
             />
           ))}
         </div>
-
-        {/* Hero content */}
         <div className="relative z-10 w-full max-w-3xl mx-auto px-4 sm:px-6 text-center pt-28 pb-0">
-
-          {/* Service badges */}
           <div className="flex flex-wrap justify-center gap-2 mb-5 animate-[fadeUp_0.8s_ease_0.2s_both]">
             <span className="inline-flex items-center gap-1.5 border border-[#f59e0b]/50 bg-[#f59e0b]/10 rounded-full px-3 py-1 text-[0.6rem] font-extrabold uppercase tracking-widest text-[#fbbf24]">
               <Ship size={10} /> Daily Ferry
@@ -169,18 +166,12 @@ export default async function HomePage() {
               Dinagat
             </span>
           </div>
-
-          {/* Title — uses branding from Supabase */}
           <h1 className="font-['Lora',serif] text-[clamp(2.8rem,8vw,5.5rem)] font-semibold text-white leading-[1.05] animate-[fadeUp_0.9s_ease_0.4s_both]">
             {branding.site_name}
           </h1>
-
-          {/* Sub — updated copy */}
           <p className="mt-3 text-[clamp(0.85rem,2vw,1rem)] font-bold text-white/70 tracking-wide animate-[fadeUp_0.8s_ease_0.62s_both]">
             Surigao ↔ Dapa &nbsp;·&nbsp; Siargao ↔ Dinagat &nbsp;·&nbsp; Book in Minutes
           </p>
-
-          {/* CTA buttons */}
           <div className="mt-6 flex flex-wrap gap-3 justify-center animate-[fadeUp_0.8s_ease_0.8s_both]">
             <Link
               href={ROUTES.book}
@@ -195,8 +186,6 @@ export default async function HomePage() {
               <Calendar size={18} /> View Schedule
             </a>
           </div>
-
-          {/* ✅ TripCheckerForm — your real component, untouched */}
           <div className="mt-6 animate-[fadeUp_0.8s_ease_1s_both]">
             <TripCheckerForm
               routes={schedule
@@ -215,40 +204,23 @@ export default async function HomePage() {
             />
           </div>
         </div>
-
-        {/* Wave transition into cream section */}
         <div className="relative z-10 mt-10 leading-[0]">
-          <svg
-            viewBox="0 0 1440 90"
-            preserveAspectRatio="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-full block"
-          >
-            <path
-              d="M0,45 C180,90 360,0 540,45 C720,90 900,10 1080,50 C1260,88 1380,20 1440,45 L1440,90 L0,90 Z"
-              fill="#fef9e7"
-            />
+          <svg viewBox="0 0 1440 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" className="w-full block">
+            <path d="M0,45 C180,90 360,0 540,45 C720,90 900,10 1080,50 C1260,88 1380,20 1440,45 L1440,90 L0,90 Z" fill="#fef9e7" />
           </svg>
         </div>
       </section>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          ② SCHEDULE — your real ScheduleSectionClient
+          ② SCHEDULE
          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="bg-[#fef9e7]">
-        {/* Wave into white */}
         <div className="leading-[0]">
           <svg viewBox="0 0 1440 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" className="w-full block">
             <path d="M0,30 C360,60 720,0 1080,30 C1260,45 1380,15 1440,30 L1440,60 L0,60 Z" fill="white" />
           </svg>
         </div>
-        {/* ✅ Real schedule component */}
-        <ScheduleSectionClient
-          schedule={schedule}
-          announcements={announcements}
-          today={today}
-        />
-        {/* Wave back to cream */}
+        <ScheduleSectionClient schedule={schedule} announcements={announcements} today={today} />
         <div className="leading-[0] bg-white">
           <svg viewBox="0 0 1440 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" className="w-full block">
             <path d="M0,20 C300,60 600,0 900,35 C1100,55 1300,10 1440,30 L1440,60 L0,60 Z" fill="#fef9e7" />
@@ -261,7 +233,6 @@ export default async function HomePage() {
          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="bg-[#fef9e7] py-12 sm:py-16">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
-
           <p className="flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.22em] text-[#0c7b93]">
             <Zap size={13} /> Simple process
           </p>
@@ -271,8 +242,6 @@ export default async function HomePage() {
           <p className="mt-1 text-sm font-bold text-[#0f766e]">
             No queuing. Book from anywhere, anytime.
           </p>
-
-          {/* Steps */}
           <div className="mt-8 grid sm:grid-cols-3 gap-0">
             {[
               { emoji: "🗓️", num: "1", title: "Pick your trip", desc: "Choose route, date & number of passengers" },
@@ -294,8 +263,6 @@ export default async function HomePage() {
               </div>
             ))}
           </div>
-
-          {/* Print notice */}
           <div className="mt-6 flex gap-3 rounded-2xl border-2 border-amber-200 bg-amber-50 px-5 py-4">
             <Printer size={20} className="text-amber-600 shrink-0 mt-0.5" />
             <div>
@@ -304,14 +271,11 @@ export default async function HomePage() {
               </p>
               <p className="mt-1 text-xs font-bold text-amber-800 leading-relaxed">
                 Your QR code e-ticket will be scanned at boarding. You can print it or show on
-                your phone. Note: a separate{" "}
-                <strong>gate pass fee</strong> is collected at the port and is{" "}
+                your phone. Note: a separate <strong>gate pass fee</strong> is collected at the port and is{" "}
                 <strong>not included</strong> in your ferry fare.
               </p>
             </div>
           </div>
-
-          {/* Discounts — uses real fee data from Supabase */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-[#f59e0b] to-[#fbbf24] px-5 py-4">
             <div>
               <h3 className="font-black text-[#134e4a] text-lg">Discounts for all ages</h3>
@@ -344,7 +308,200 @@ export default async function HomePage() {
       </section>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          ④ WEATHER — your real WeatherWidget
+          ④ TRAVEL & TOURS — new section
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="leading-[0] bg-[#fef9e7]">
+        <svg viewBox="0 0 1440 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" className="w-full block">
+          <path d="M0,30 C360,0 720,60 1080,20 C1260,5 1380,45 1440,30 L1440,60 L0,60 Z" fill="#0a3d35" />
+        </svg>
+      </div>
+
+      <section className="relative overflow-hidden">
+        {/* Background image with overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "url('https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/discover-media/travelasiargao%20(1).webp')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0a3d35]/92 via-[#0a3d35]/80 to-[#0c7b93]/75" />
+
+        <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 py-16 sm:py-24">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+
+            {/* Left — text content */}
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#f59e0b]/40 bg-[#f59e0b]/15 px-3 py-1 mb-4">
+                <Map size={13} className="text-[#fbbf24]" />
+                <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.2em] text-[#fbbf24]">Travel &amp; Tours</span>
+              </div>
+
+              <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-black text-white leading-[1.1]">
+                Explore Siargao<br />
+                <span className="text-[#4dd9c0]">Your Way</span>
+              </h2>
+
+              <p className="mt-4 text-white/75 font-semibold leading-relaxed text-sm sm:text-base">
+                From the legendary surf breaks of Cloud 9 to the pristine shores of Naked Island —
+                discover Siargao&apos;s best spots with our curated tours and island experiences.
+              </p>
+
+              {/* Feature list */}
+              <div className="mt-6 space-y-3">
+                {[
+                  { icon: Waves,      text: "Island hopping — Naked, Daku & Guyam Islands" },
+                  { icon: Camera,     text: "Surfing lessons at Cloud 9" },
+                  { icon: Navigation, text: "Magpupungko Rock Pools & Sugba Lagoon" },
+                  { icon: Star,       text: "Custom tour packages for groups & families" },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#4dd9c0]/20 border border-[#4dd9c0]/30 flex items-center justify-center">
+                      <item.icon size={14} className="text-[#4dd9c0]" />
+                    </div>
+                    <span className="text-sm font-semibold text-white/85">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href="/tours"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-[#f59e0b] px-6 py-3 text-sm font-extrabold text-[#134e4a] shadow-lg shadow-[#f59e0b]/30 hover:bg-[#fbbf24] transition-all duration-200 hover:-translate-y-0.5"
+                >
+                  <Map size={16} /> Explore Tours
+                </Link>
+                <Link
+                  href="/attractions"
+                  className="inline-flex items-center gap-2 rounded-2xl border-2 border-white/25 bg-white/10 px-6 py-3 text-sm font-extrabold text-white hover:bg-white/20 transition-all duration-200 hover:-translate-y-0.5"
+                >
+                  <Camera size={16} /> See Attractions
+                </Link>
+              </div>
+            </div>
+
+            {/* Right — highlight cards */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { emoji: "🏄", title: "Surfing", desc: "Cloud 9 & beginner breaks", color: "from-[#0c7b93]/60 to-[#0c7b93]/30" },
+                { emoji: "🏝️", title: "Island Hopping", desc: "Naked, Daku & Guyam", color: "from-[#f59e0b]/60 to-[#f59e0b]/30" },
+                { emoji: "🌊", title: "Lagoon Tours", desc: "Sugba & hidden spots", color: "from-[#4dd9c0]/40 to-[#4dd9c0]/20" },
+                { emoji: "🐠", title: "Snorkeling", desc: "Coral reefs & marine life", color: "from-[#085C52]/70 to-[#085C52]/40" },
+              ].map((card, i) => (
+                <div
+                  key={i}
+                  className={`rounded-2xl bg-gradient-to-br ${card.color} border border-white/15 p-4 backdrop-blur-sm hover:scale-[1.02] transition-transform cursor-pointer`}
+                >
+                  <div className="text-2xl mb-2">{card.emoji}</div>
+                  <h3 className="font-black text-white text-sm">{card.title}</h3>
+                  <p className="text-xs text-white/65 font-semibold mt-0.5">{card.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          ⑤ PAY PARKING — new section
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section className="relative overflow-hidden">
+        {/* Background image with overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "url('https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/discover-media/travelasiargao%20(2).webp')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-bl from-[#0c3547]/93 via-[#0c3547]/82 to-[#0c7b93]/70" />
+
+        <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 py-16 sm:py-24">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+
+            {/* Left — highlight cards (reversed order on mobile) */}
+            <div className="grid grid-cols-2 gap-3 order-2 lg:order-1">
+              {[
+                { emoji: "🚗", title: "Cars", desc: "Secure daily parking slots", color: "from-[#0c7b93]/60 to-[#0c7b93]/30" },
+                { emoji: "🏍️", title: "Motorcycles", desc: "Dedicated bike spaces", color: "from-[#4dd9c0]/40 to-[#4dd9c0]/20" },
+                { emoji: "🚐", title: "Vans", desc: "Spacious van parking", color: "from-[#f59e0b]/60 to-[#f59e0b]/30" },
+                { emoji: "📱", title: "Book Online", desc: "GCash payment, instant slot", color: "from-[#085C52]/70 to-[#085C52]/40" },
+              ].map((card, i) => (
+                <div
+                  key={i}
+                  className={`rounded-2xl bg-gradient-to-br ${card.color} border border-white/15 p-4 backdrop-blur-sm hover:scale-[1.02] transition-transform cursor-pointer`}
+                >
+                  <div className="text-2xl mb-2">{card.emoji}</div>
+                  <h3 className="font-black text-white text-sm">{card.title}</h3>
+                  <p className="text-xs text-white/65 font-semibold mt-0.5">{card.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Right — text content */}
+            <div className="order-1 lg:order-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#4dd9c0]/40 bg-[#4dd9c0]/15 px-3 py-1 mb-4">
+                <ParkingCircle size={13} className="text-[#4dd9c0]" />
+                <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.2em] text-[#4dd9c0]">Pay Parking</span>
+              </div>
+
+              <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-black text-white leading-[1.1]">
+                Worry-Free Parking<br />
+                <span className="text-[#4dd9c0]">Near Dapa Port</span>
+              </h2>
+
+              <p className="mt-4 text-white/75 font-semibold leading-relaxed text-sm sm:text-base">
+                Leave your vehicle in a safe, managed parking lot near the port.
+                Book your slot online before you travel — no more last-minute scrambles for parking.
+              </p>
+
+              {/* Feature list */}
+              <div className="mt-6 space-y-3">
+                {[
+                  { icon: Shield,       text: "Secure, guarded parking lots near Dapa Port" },
+                  { icon: CheckCircle,  text: "Book your slot online via GCash — confirmed instantly" },
+                  { icon: Car,          text: "Cars, motorcycles & vans accommodated" },
+                  { icon: Clock,        text: "Flexible daily rates — short or extended stays" },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#4dd9c0]/20 border border-[#4dd9c0]/30 flex items-center justify-center">
+                      <item.icon size={14} className="text-[#4dd9c0]" />
+                    </div>
+                    <span className="text-sm font-semibold text-white/85">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href="/parking"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-[#4dd9c0] px-6 py-3 text-sm font-extrabold text-[#0a3d35] shadow-lg shadow-[#4dd9c0]/30 hover:bg-[#6ee7d8] transition-all duration-200 hover:-translate-y-0.5"
+                >
+                  <ParkingCircle size={16} /> Reserve a Slot
+                </Link>
+                <Link
+                  href="/parking"
+                  className="inline-flex items-center gap-2 rounded-2xl border-2 border-white/25 bg-white/10 px-6 py-3 text-sm font-extrabold text-white hover:bg-white/20 transition-all duration-200 hover:-translate-y-0.5"
+                >
+                  <MapPin size={16} /> View Lots &amp; Rates
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Wave back to cream */}
+      <div className="leading-[0]" style={{ backgroundColor: "#fef9e7" }}>
+        <svg viewBox="0 0 1440 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" className="w-full block">
+          <path d="M0,20 C240,55 480,0 720,35 C960,60 1200,10 1440,30 L1440,0 L0,0 Z" fill="#0c3547" />
+        </svg>
+      </div>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          ⑥ WEATHER
          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="bg-[#fef9e7] border-t border-teal-200/40 py-10 sm:py-12">
         <div className="mx-auto max-w-2xl px-4 sm:px-6 text-center">
@@ -354,13 +511,9 @@ export default async function HomePage() {
           <h2 className="text-xl font-black text-[#134e4a] mb-4">
             Today&apos;s weather
           </h2>
-          {/* ✅ Real weather widget */}
           <WeatherWidget />
           <p className="mt-3 text-sm font-bold text-[#0f766e]">
-            <Link
-              href={ROUTES.weather}
-              className="font-extrabold text-[#0c7b93] hover:underline"
-            >
+            <Link href={ROUTES.weather} className="font-extrabold text-[#0c7b93] hover:underline">
               Full weather forecast →
             </Link>
           </p>
@@ -375,10 +528,9 @@ export default async function HomePage() {
       </div>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          ⑤ DISCOVER SIARGAO — your real component
+          ⑦ DISCOVER SIARGAO
          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="bg-white">
-        {/* ✅ Real discover component */}
         <DiscoverSiargaoPublic items={discoverItems} />
       </div>
 
@@ -390,15 +542,14 @@ export default async function HomePage() {
       </div>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          ⑥ FAQ — your real FaqSection
+          ⑧ FAQ
          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="bg-[#fef9e7]">
-        {/* ✅ Real FAQ component */}
         <FaqSection faqs={faqs} />
       </div>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          ⑦ FOOTER CTA
+          ⑨ FOOTER CTA
          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section className="bg-[#fef9e7] border-t border-teal-200/40 py-12 sm:py-16">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
@@ -427,8 +578,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Parallax scroll script — purely visual, no data involvement */}
-      
       <ParallaxScript />
     </div>
   );
