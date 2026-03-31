@@ -110,7 +110,7 @@ async function compressToWebP(file: File): Promise<File> {
 // ── Signed URL helper (reuses admin endpoint — already allows owner/crew) ────
 async function getSignedUrl(path: string): Promise<string | null> {
   try {
-    const res = await fetch(`/api/admin/parking/signed-url?path=${encodeURIComponent(path)}`);
+    const res = await fetch(`/api/parking/signed-url?path=${encodeURIComponent(path)}`);
     const data = await res.json();
     return data.url ?? null;
   } catch { return null; }
