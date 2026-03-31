@@ -39,8 +39,12 @@ export async function GET(request: NextRequest) {
       vehicle_count, vehicles,
       customer_full_name,
       parking_fee_cents, commission_cents,
+      total_amount_cents, owner_receivable_cents,
+      payment_proof_path, gcash_transaction_reference,
       checked_in_at, checked_out_at, checked_in_by
     `)
+
+    
     .eq("lot_id", lot_id)
     .not("status", "in", '("cancelled")')
     .order("park_date_start", { ascending: false });

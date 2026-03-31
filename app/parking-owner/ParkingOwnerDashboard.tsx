@@ -31,11 +31,12 @@ type Booking = {
   }[];
   customer_full_name: string;
   parking_fee_cents: number; commission_cents: number;
+  total_amount_cents?: number | null;
+  owner_receivable_cents?: number | null;
   checked_in_at: string | null; checked_out_at: string | null; checked_in_by_name: string | null;
   payment_proof_path: string | null;
   gcash_transaction_reference: string | null;
 };
-
 
 type PendingExtension = {
   id: string; reference: string; reservation_id: string;
@@ -106,8 +107,7 @@ async function compressToWebP(file: File): Promise<File> {
   });
 }
 
-// ── Booking Detail Modal ──────────────────────────────────────────────────────
-// ── Signed URL helper (reuses admin endpoint — already allows owner/crew) ────
+// ── Signed URL helper ─────────────────────────────────────────────────────────
 async function getSignedUrl(path: string): Promise<string | null> {
   try {
     const res = await fetch(`/api/parking/signed-url?path=${encodeURIComponent(path)}`);
@@ -133,31 +133,25 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
   const [photoErr, setPhotoErr]                 = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
-  // Payment doc signed URLs
-  const [photoUrls, setPhotoUrls]       = useState<Record<string, string>>({});
-  const [urlsLoading, setUrlsLoading]   = useState(true);
-
-  // Approve/reject state
-  const [confirming, setConfirming]     = useState<"approve" | "reject" | null>(null);
+  const [photoUrls, setPhotoUrls]           = useState<Record<string, string>>({});
+  const [urlsLoading, setUrlsLoading]       = useState(true);
+  const [confirming, setConfirming]         = useState<"approve" | "reject" | null>(null);
   const [approveLoading, setApproveLoading] = useState(false);
-  const [approveMsg, setApproveMsg]     = useState<string | null>(null);
-  const [approveErr, setApproveErr]     = useState<string | null>(null);
+  const [approveMsg, setApproveMsg]         = useState<string | null>(null);
+  const [approveErr, setApproveErr]         = useState<string | null>(null);
 
   const inputCls = "w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2.5 text-[#134e4a] text-sm focus:border-[#0c7b93] focus:outline-none";
   const labelCls = "text-xs font-semibold text-[#134e4a] block mb-1";
 
-  // Fetch signed URLs for OR/CR, ID photos, and GCash screenshot
   useEffect(() => {
     async function loadUrls() {
       setUrlsLoading(true);
       const paths: Record<string, string> = {};
-
       selected.vehicles?.forEach(v => {
         if (v.or_cr_path)    paths[`orcr_${v.plate_number}`]    = v.or_cr_path;
         if (v.id_photo_path) paths[`idphoto_${v.plate_number}`] = v.id_photo_path;
       });
       if (selected.payment_proof_path) paths["gcash"] = selected.payment_proof_path;
-
       const results = await Promise.all(
         Object.entries(paths).map(async ([key, path]) => {
           const url = await getSignedUrl(path);
@@ -215,8 +209,8 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
     finally { setApproveLoading(false); }
   }
 
-  const isPending  = selected.status === "pending_payment";
-  const hasProof   = !!selected.payment_proof_path;
+  const isPending = selected.status === "pending_payment";
+  const hasProof  = !!selected.payment_proof_path;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
@@ -264,7 +258,6 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
                   <span className="font-mono font-bold text-[#134e4a]">{v.plate_number}</span>
                   {v.make_model && <span className="text-xs text-gray-400">{v.make_model}{v.color ? ` · ${v.color}` : ""}</span>}
                 </div>
-                {/* OR/CR and ID doc links */}
                 <div className="flex flex-wrap gap-2 mt-2">
                   {urlsLoading ? (
                     <span className="text-xs text-gray-400 animate-pulse">Loading documents…</span>
@@ -293,10 +286,28 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
             ))}
           </div>
 
-          {/* GCash Payment */}
+          {/* Payment */}
           <div className="rounded-xl border-2 border-teal-200 overflow-hidden">
             <div className="bg-teal-50 px-4 py-2 text-xs font-bold text-[#134e4a] uppercase">Payment</div>
-            <div className="px-4 py-3">
+            <div className="px-4 py-3 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total paid by customer</span>
+                <span className="font-bold text-[#134e4a]">
+                  {selected.total_amount_cents != null
+                    ? `₱${(selected.total_amount_cents / 100).toLocaleString("en-PH")}`
+                    : "—"}
+                </span>
+              </div>
+              {selected.owner_receivable_cents != null && (
+                <div className="flex justify-between pt-1 border-t border-teal-100">
+                  <span className="font-semibold text-[#134e4a]">Your receivable</span>
+                  <span className="font-black text-emerald-600">
+                    ₱{(selected.owner_receivable_cents / 100).toLocaleString("en-PH")}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="px-4 pb-3">
               {hasProof ? (
                 <div className="space-y-2">
                   <div className="rounded-xl bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">
@@ -471,10 +482,10 @@ function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => 
     motorcycle_rate_cents: lot.motorcycle_rate_cents ?? 0,
     van_rate_cents:        lot.van_rate_cents ?? 0,
   });
-  const [is24hrs, setIs24hrs]   = useState(lot.is_24hrs);
-  const [saving, setSaving]     = useState(false);
-  const [msg, setMsg]           = useState<string | null>(null);
-  const [isError, setIsError]   = useState(false);
+  const [is24hrs, setIs24hrs] = useState(lot.is_24hrs);
+  const [saving, setSaving]   = useState(false);
+  const [msg, setMsg]         = useState<string | null>(null);
+  const [isError, setIsError] = useState(false);
 
   const inputCls = "w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2.5 text-[#134e4a] text-sm focus:border-[#0c7b93] focus:outline-none";
   const labelCls = "text-xs font-semibold text-[#134e4a] block mb-1";
@@ -486,9 +497,7 @@ function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: lot.id,
-          ...slots,
-          ...accepts,
+          id: lot.id, ...slots, ...accepts,
           car_rate_cents:        accepts.accepts_car        ? rates.car_rate_cents        : null,
           motorcycle_rate_cents: accepts.accepts_motorcycle ? rates.motorcycle_rate_cents : null,
           van_rate_cents:        accepts.accepts_van        ? rates.van_rate_cents        : null,
@@ -497,22 +506,16 @@ function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => 
       });
       const d = await res.json();
       if (!res.ok) { setMsg(d.error ?? "Save failed."); setIsError(true); return; }
-      setMsg("✅ Lot settings saved successfully!");
-      setIsError(false);
-      onSaved();
+      setMsg("✅ Lot settings saved successfully!"); setIsError(false); onSaved();
     } catch { setMsg("Network error."); setIsError(true); }
     finally { setSaving(false); }
   }
 
   return (
     <div className="space-y-5">
-
-      {/* Info banner */}
       <div className="rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-xs text-teal-700">
         ℹ️ Changes to slot counts and rates take effect immediately for new bookings. Active bookings are not affected.
       </div>
-
-      {/* Operating hours */}
       <div className="rounded-2xl border-2 border-teal-100 bg-white p-5 space-y-3">
         <h3 className="text-sm font-black text-[#134e4a]">⏰ Operating Hours</h3>
         <label className="flex items-center gap-3 cursor-pointer">
@@ -523,8 +526,6 @@ function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => 
           <span className="text-sm font-semibold text-[#134e4a]">Open 24 hours</span>
         </label>
       </div>
-
-      {/* Vehicle slots & rates */}
       {[
         { type: "car",        emoji: "🚗", label: "Cars",        acceptKey: "accepts_car"        as const, slotKey: "total_slots_car"        as const, rateKey: "car_rate_cents"        as const },
         { type: "motorcycle", emoji: "🏍️", label: "Motorcycles", acceptKey: "accepts_motorcycle" as const, slotKey: "total_slots_motorcycle" as const, rateKey: "motorcycle_rate_cents" as const },
@@ -541,20 +542,17 @@ function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => 
               <span className="text-xs font-semibold text-gray-500">{accepts[v.acceptKey] ? "Accepting" : "Not accepting"}</span>
             </label>
           </div>
-
           {accepts[v.acceptKey] && (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Total Slots</label>
-                <input type="number" min={0} max={500}
-                  value={slots[v.slotKey]}
+                <input type="number" min={0} max={500} value={slots[v.slotKey]}
                   onChange={e => setSlots(s => ({ ...s, [v.slotKey]: parseInt(e.target.value) || 0 }))}
                   className={inputCls} />
               </div>
               <div>
                 <label className={labelCls}>Rate per day (₱)</label>
-                <input type="number" min={0}
-                  value={(rates[v.rateKey] / 100).toFixed(0)}
+                <input type="number" min={0} value={(rates[v.rateKey] / 100).toFixed(0)}
                   onChange={e => setRates(r => ({ ...r, [v.rateKey]: Math.round(parseFloat(e.target.value) * 100) || 0 }))}
                   className={inputCls} />
               </div>
@@ -562,14 +560,11 @@ function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => 
           )}
         </div>
       ))}
-
-      {/* Save message */}
       {msg && (
         <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${isError ? "bg-red-50 border border-red-200 text-red-700" : "bg-emerald-50 border border-emerald-200 text-emerald-800"}`}>
           {msg}
         </div>
       )}
-
       <button onClick={handleSave} disabled={saving}
         className="w-full rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#085f72] disabled:opacity-50 transition-colors">
         {saving ? "Saving…" : "💾 Save Lot Settings"}
@@ -703,7 +698,6 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 space-y-6">
-
         {!lot ? (
           <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-8 text-center">
             <div className="text-4xl mb-3">⚠️</div>
@@ -912,22 +906,18 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
             )}
 
             {/* Manage Lot tab */}
-            {tab === "lot" && (
-              <ManageLotTab lot={lot} onSaved={fetchBookings} />
-            )}
+            {tab === "lot" && <ManageLotTab lot={lot} onSaved={fetchBookings} />}
           </>
         )}
       </div>
 
       {selected && (
-
-
-<BookingDetailModal
-  selected={selected} onClose={() => setSelected(null)}
-  onCheckIn={handleCheckIn} onCheckOut={handleCheckOut}
-  actionLoading={actionLoading} actionMsg={actionMsg}
-  onRefresh={fetchBookings}
-/>
+        <BookingDetailModal
+          selected={selected} onClose={() => setSelected(null)}
+          onCheckIn={handleCheckIn} onCheckOut={handleCheckOut}
+          actionLoading={actionLoading} actionMsg={actionMsg}
+          onRefresh={fetchBookings}
+        />
       )}
       {showScanner && (
         <ParkingQRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />

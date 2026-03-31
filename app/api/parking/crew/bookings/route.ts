@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("parking_reservations")
-    .select("id, reference, status, park_date_start, park_date_end, total_days, vehicle_count, vehicles, customer_full_name, lot_snapshot_name, checked_in_at, checked_out_at, created_at")
+    .select("id, reference, status, park_date_start, park_date_end, total_days, vehicle_count, vehicles, customer_full_name, lot_snapshot_name, checked_in_at, checked_out_at, created_at, payment_proof_path, gcash_transaction_reference, total_amount_cents")
     .in("lot_id", lotIds)
     .not("status", "in", '("cancelled","completed")')
     // Show bookings that overlap the selected date range OR are active (confirmed/checked_in/overstay)
