@@ -43,7 +43,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   return {
     id: user.id,
     email: user.email ?? null,
-    role: (profile?.role as AppRole) ?? "passenger",
+    role: (profile?.role ?? "passenger") as AppRole,
     fullName: profile?.full_name?.trim() || metaFullName || null,
     salutation: profile?.salutation?.trim() || metaSalutation || null,
     address: profile?.address ?? null,
