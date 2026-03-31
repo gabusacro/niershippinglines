@@ -24,11 +24,19 @@ type Booking = {
   id: string; reference: string; status: string;
   park_date_start: string; park_date_end: string; total_days: number;
   vehicle_count: number;
-  vehicles: { vehicle_type: string; plate_number: string; make_model?: string | null; color?: string | null }[];
+  vehicles: {
+    vehicle_type: string; plate_number: string;
+    make_model?: string | null; color?: string | null;
+    or_cr_path?: string | null; id_photo_path?: string | null;
+  }[];
   customer_full_name: string;
   parking_fee_cents: number; commission_cents: number;
   checked_in_at: string | null; checked_out_at: string | null; checked_in_by_name: string | null;
+  payment_proof_path: string | null;
+  gcash_transaction_reference: string | null;
 };
+
+
 type PendingExtension = {
   id: string; reference: string; reservation_id: string;
   reservation_reference: string; customer_full_name: string;
@@ -99,10 +107,21 @@ async function compressToWebP(file: File): Promise<File> {
 }
 
 // ── Booking Detail Modal ──────────────────────────────────────────────────────
-function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLoading, actionMsg }: {
+// ── Signed URL helper (reuses admin endpoint — already allows owner/crew) ────
+async function getSignedUrl(path: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/admin/parking/signed-url?path=${encodeURIComponent(path)}`);
+    const data = await res.json();
+    return data.url ?? null;
+  } catch { return null; }
+}
+
+// ── Booking Detail Modal ──────────────────────────────────────────────────────
+function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLoading, actionMsg, onRefresh }: {
   selected: Booking; onClose: () => void;
   onCheckIn: (id: string) => void; onCheckOut: (id: string) => void;
   actionLoading: boolean; actionMsg: string | null;
+  onRefresh: () => void;
 }) {
   const [photoFile, setPhotoFile]               = useState<File | null>(null);
   const [photoLabel, setPhotoLabel]             = useState("arrival");
@@ -114,8 +133,44 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
   const [photoErr, setPhotoErr]                 = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
+  // Payment doc signed URLs
+  const [photoUrls, setPhotoUrls]       = useState<Record<string, string>>({});
+  const [urlsLoading, setUrlsLoading]   = useState(true);
+
+  // Approve/reject state
+  const [confirming, setConfirming]     = useState<"approve" | "reject" | null>(null);
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [approveMsg, setApproveMsg]     = useState<string | null>(null);
+  const [approveErr, setApproveErr]     = useState<string | null>(null);
+
   const inputCls = "w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2.5 text-[#134e4a] text-sm focus:border-[#0c7b93] focus:outline-none";
   const labelCls = "text-xs font-semibold text-[#134e4a] block mb-1";
+
+  // Fetch signed URLs for OR/CR, ID photos, and GCash screenshot
+  useEffect(() => {
+    async function loadUrls() {
+      setUrlsLoading(true);
+      const paths: Record<string, string> = {};
+
+      selected.vehicles?.forEach(v => {
+        if (v.or_cr_path)    paths[`orcr_${v.plate_number}`]    = v.or_cr_path;
+        if (v.id_photo_path) paths[`idphoto_${v.plate_number}`] = v.id_photo_path;
+      });
+      if (selected.payment_proof_path) paths["gcash"] = selected.payment_proof_path;
+
+      const results = await Promise.all(
+        Object.entries(paths).map(async ([key, path]) => {
+          const url = await getSignedUrl(path);
+          return [key, url] as [string, string | null];
+        })
+      );
+      const map: Record<string, string> = {};
+      results.forEach(([key, url]) => { if (url) map[key] = url; });
+      setPhotoUrls(map);
+      setUrlsLoading(false);
+    }
+    loadUrls();
+  }, [selected]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.files?.[0]; if (!raw) return;
@@ -142,13 +197,35 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
     finally { setPhotoUploading(false); }
   }
 
+  async function handleApproveAction(action: "approve" | "reject") {
+    setApproveLoading(true); setApproveErr(null); setApproveMsg(null);
+    try {
+      const res = await fetch("/api/parking/owner/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reservation_id: selected.id, action }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setApproveErr(data.error ?? "Action failed."); return; }
+      setApproveMsg(action === "approve" ? "✅ Booking approved & payment confirmed!" : "✅ Booking rejected.");
+      setConfirming(null);
+      onRefresh();
+      setTimeout(() => onClose(), 1500);
+    } catch { setApproveErr("Network error."); }
+    finally { setApproveLoading(false); }
+  }
+
+  const isPending  = selected.status === "pending_payment";
+  const hasProof   = !!selected.payment_proof_path;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ backgroundColor: "rgba(0,0,0,0.65)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
-        <div className="px-5 py-4 shrink-0 flex items-start justify-between"
-          style={{ background: "linear-gradient(135deg,#064e3b,#0c7b93)" }}>
+
+        {/* Header */}
+        <div className="px-5 py-4 shrink-0 flex items-start justify-between" style={{ background: "linear-gradient(135deg,#064e3b,#0c7b93)" }}>
           <div>
             <p className="text-xs text-white/60 font-bold uppercase">Booking Detail</p>
             <h2 className="text-lg font-black text-white font-mono">{selected.reference}</h2>
@@ -161,27 +238,153 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
             <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 text-xl">×</button>
           </div>
         </div>
+
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+          {/* Dates */}
           <div className="grid grid-cols-2 gap-3 text-sm rounded-xl bg-teal-50 border border-teal-200 p-4">
-            <div><p className="text-xs text-gray-400 mb-0.5">Check-in date</p><p className="font-semibold text-[#134e4a]">{fmt(selected.park_date_start)}</p></div>
-            <div><p className="text-xs text-gray-400 mb-0.5">Check-out date</p><p className="font-semibold text-[#134e4a]">{fmt(selected.park_date_end)}</p></div>
+            <div><p className="text-xs text-gray-400 mb-0.5">Check-in date</p><p className="font-semibold text-[#134e4a]">{selected.park_date_start}</p></div>
+            <div><p className="text-xs text-gray-400 mb-0.5">Check-out date</p><p className="font-semibold text-[#134e4a]">{selected.park_date_end}</p></div>
             {selected.checked_in_at && (
               <div className="col-span-2 border-t border-teal-100 pt-2">
                 <p className="text-xs text-blue-600">✅ Checked in at {new Date(selected.checked_in_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}</p>
               </div>
             )}
           </div>
-          <div className="space-y-2">
+
+          {/* Vehicles + docs */}
+          <div className="rounded-xl border-2 border-teal-100 overflow-hidden">
+            <div className="bg-teal-50 px-4 py-2 text-xs font-bold text-[#134e4a] uppercase">
+              {selected.vehicles?.length ?? 0} Vehicle{(selected.vehicles?.length ?? 0) > 1 ? "s" : ""}
+            </div>
             {selected.vehicles?.map((v, i) => (
-              <div key={i} className="rounded-xl border border-teal-100 bg-white px-3 py-2.5 flex items-center gap-3">
-                <span className="text-2xl">{VEHICLE_EMOJI[v.vehicle_type] ?? "🚗"}</span>
-                <div>
-                  <p className="font-mono font-bold text-[#134e4a]">{v.plate_number}</p>
-                  {v.make_model && <p className="text-xs text-gray-400">{v.make_model}{v.color ? ` · ${v.color}` : ""}</p>}
+              <div key={i} className="px-4 py-3 border-b border-teal-50 last:border-0">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-xl">{VEHICLE_EMOJI[v.vehicle_type] ?? "🚗"}</span>
+                  <span className="font-mono font-bold text-[#134e4a]">{v.plate_number}</span>
+                  {v.make_model && <span className="text-xs text-gray-400">{v.make_model}{v.color ? ` · ${v.color}` : ""}</span>}
+                </div>
+                {/* OR/CR and ID doc links */}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {urlsLoading ? (
+                    <span className="text-xs text-gray-400 animate-pulse">Loading documents…</span>
+                  ) : (
+                    <>
+                      {photoUrls[`orcr_${v.plate_number}`] ? (
+                        <a href={photoUrls[`orcr_${v.plate_number}`]} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors">
+                          📄 View OR/CR Photo ↗
+                        </a>
+                      ) : (
+                        <span className="text-xs text-red-500">⚠ No OR/CR photo</span>
+                      )}
+                      {photoUrls[`idphoto_${v.plate_number}`] ? (
+                        <a href={photoUrls[`idphoto_${v.plate_number}`]} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
+                          🪪 View ID Photo ↗
+                        </a>
+                      ) : (
+                        <span className="text-xs text-red-500">⚠ No ID photo</span>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             ))}
           </div>
+
+          {/* GCash Payment */}
+          <div className="rounded-xl border-2 border-teal-200 overflow-hidden">
+            <div className="bg-teal-50 px-4 py-2 text-xs font-bold text-[#134e4a] uppercase">Payment</div>
+            <div className="px-4 py-3">
+              {hasProof ? (
+                <div className="space-y-2">
+                  <div className="rounded-xl bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">
+                    📱 GCash screenshot submitted
+                    {selected.gcash_transaction_reference && (
+                      <span className="ml-2 font-mono font-bold">Ref: {selected.gcash_transaction_reference}</span>
+                    )}
+                  </div>
+                  {urlsLoading ? (
+                    <span className="text-xs text-gray-400 animate-pulse">Loading screenshot…</span>
+                  ) : photoUrls["gcash"] ? (
+                    <a href={photoUrls["gcash"]} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
+                      📸 View GCash Screenshot ↗
+                    </a>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+                  ⚠ No GCash screenshot uploaded yet
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Approve / Reject for pending_payment */}
+          {isPending && (
+            <div className="space-y-3">
+              {approveMsg && (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm font-semibold text-emerald-800">
+                  {approveMsg}
+                </div>
+              )}
+              {approveErr && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                  {approveErr}
+                </div>
+              )}
+              {confirming === "approve" && (
+                <div className="rounded-xl bg-emerald-50 border-2 border-emerald-200 p-4">
+                  <p className="text-sm font-semibold text-emerald-800 mb-3">Confirm approval? This will lock the slot and mark payment as confirmed.</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setConfirming(null)} disabled={approveLoading}
+                      className="flex-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                      Cancel
+                    </button>
+                    <button onClick={() => handleApproveAction("approve")} disabled={approveLoading}
+                      className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                      {approveLoading ? "Approving…" : "Yes, Approve"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {confirming === "reject" && (
+                <div className="rounded-xl bg-red-50 border-2 border-red-200 p-4">
+                  <p className="text-sm font-semibold text-red-800 mb-1">Confirm rejection?</p>
+                  <p className="text-xs text-red-700 mb-3">Booking will be cancelled.</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setConfirming(null)} disabled={approveLoading}
+                      className="flex-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                      Cancel
+                    </button>
+                    <button onClick={() => handleApproveAction("reject")} disabled={approveLoading}
+                      className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-colors">
+                      {approveLoading ? "Rejecting…" : "Yes, Reject"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {!confirming && (
+                <div className="flex gap-3">
+                  <button onClick={() => setConfirming("reject")} disabled={approveLoading}
+                    className="flex-1 rounded-xl border-2 border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                    ✕ Reject Booking
+                  </button>
+                  <button onClick={() => setConfirming("approve")} disabled={approveLoading || !hasProof}
+                    className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                    ✓ Approve & Confirm
+                  </button>
+                </div>
+              )}
+              {!hasProof && (
+                <p className="text-xs text-amber-700 text-center">⚠ Cannot approve — no GCash screenshot uploaded yet</p>
+              )}
+            </div>
+          )}
+
+          {/* Check in / out actions */}
           {actionMsg && (
             <div className={`rounded-xl px-4 py-3 text-sm font-semibold ${actionMsg.startsWith("✅") ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
               {actionMsg}
@@ -201,13 +404,17 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
           )}
           {selected.status === "overstay" && (
             <div className="space-y-2">
-              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-800 font-semibold">⚠️ Overstay — collect additional payment before checkout</div>
+              <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-800 font-semibold">
+                ⚠️ Overstay — collect additional payment before checkout
+              </div>
               <button onClick={() => onCheckOut(selected.id)} disabled={actionLoading}
                 className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-colors">
                 {actionLoading ? "Processing…" : "🏁 Check Out (Overstay)"}
               </button>
             </div>
           )}
+
+          {/* Upload condition photo */}
           <div className="rounded-xl border-2 border-teal-100 p-4 space-y-3">
             <h3 className="text-sm font-black text-[#134e4a]">📸 Upload Condition Photo</h3>
             {photoSuccess && <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 font-semibold">✅ Photo uploaded!</div>}
@@ -240,6 +447,7 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
               {photoUploading ? "Uploading…" : "Upload Photo"}
             </button>
           </div>
+
         </div>
       </div>
     </div>
@@ -712,11 +920,14 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
       </div>
 
       {selected && (
-        <BookingDetailModal
-          selected={selected} onClose={() => setSelected(null)}
-          onCheckIn={handleCheckIn} onCheckOut={handleCheckOut}
-          actionLoading={actionLoading} actionMsg={actionMsg}
-        />
+
+
+<BookingDetailModal
+  selected={selected} onClose={() => setSelected(null)}
+  onCheckIn={handleCheckIn} onCheckOut={handleCheckOut}
+  actionLoading={actionLoading} actionMsg={actionMsg}
+  onRefresh={fetchBookings}
+/>
       )}
       {showScanner && (
         <ParkingQRScanner onScan={handleQRScan} onClose={() => setShowScanner(false)} />
