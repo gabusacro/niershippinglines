@@ -6,6 +6,10 @@ export async function GET(request: NextRequest) {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+// TEMP DEBUG — remove after fixing
+  console.log("[signed-url] user.id:", user.id, "user.role:", user.role);
+
+  
   const allowedRoles = ["admin", "parking_owner", "parking_crew"];
   if (!allowedRoles.includes(user.role as string))
     return NextResponse.json({ error: "Access denied." }, { status: 403 });
