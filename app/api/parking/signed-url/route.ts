@@ -8,12 +8,7 @@ export async function GET(request: NextRequest) {
 
   const allowedRoles = ["admin", "parking_owner", "parking_crew"];
   if (!allowedRoles.includes(user.role as string))
-    return NextResponse.json({ 
-      error: "Access denied.", 
-      role: user.role,
-      id: user.id,
-      allowed: allowedRoles
-    }, { status: 403 });
+    return NextResponse.json({ error: "Access denied.", role: user.role }, { status: 403 });
 
   const path = request.nextUrl.searchParams.get("path");
   if (!path) return NextResponse.json({ error: "path is required." }, { status: 400 });
