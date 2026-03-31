@@ -4,26 +4,26 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Unauthorized", reason: "no_user" }, { status: 401 });
 
-// TEMP DEBUG — remove after fixing
-  console.log("[signed-url] user.id:", user.id, "user.role:", user.role);
-
-  
   const allowedRoles = ["admin", "parking_owner", "parking_crew"];
   if (!allowedRoles.includes(user.role as string))
-    return NextResponse.json({ error: "Access denied." }, { status: 403 });
+    return NextResponse.json({ 
+      error: "Access denied.", 
+      role: user.role,
+      id: user.id,
+      allowed: allowedRoles
+    }, { status: 403 });
 
   const path = request.nextUrl.searchParams.get("path");
   if (!path) return NextResponse.json({ error: "path is required." }, { status: 400 });
 
-  // Determine bucket from path prefix
   const bucket = path.startsWith("parking-photos/") ? "parking-photos" : "parking-docs";
 
   const supabase = await createClient();
   const { data, error } = await supabase.storage
     .from(bucket)
-    .createSignedUrl(path, 3600); // 1 hour
+    .createSignedUrl(path, 3600);
 
   if (error || !data?.signedUrl)
     return NextResponse.json({ error: "Could not generate preview URL." }, { status: 500 });
