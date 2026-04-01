@@ -31,6 +31,8 @@ type Booking = {
   }[];
   customer_full_name: string;
   parking_fee_cents: number; commission_cents: number;
+  platform_fee_cents?: number | null;
+  processing_fee_cents?: number | null;
   total_amount_cents?: number | null;
   owner_receivable_cents?: number | null;
   checked_in_at: string | null; checked_out_at: string | null; checked_in_by_name: string | null;
@@ -287,26 +289,36 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
           </div>
 
           {/* Payment */}
-          <div className="rounded-xl border-2 border-teal-200 overflow-hidden">
-            <div className="bg-teal-50 px-4 py-2 text-xs font-bold text-[#134e4a] uppercase">Payment</div>
-            <div className="px-4 py-3 space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total paid by customer</span>
-                <span className="font-bold text-[#134e4a]">
-                  {selected.total_amount_cents != null
-                    ? `₱${(selected.total_amount_cents / 100).toLocaleString("en-PH")}`
-                    : "—"}
-                </span>
-              </div>
-              {selected.owner_receivable_cents != null && (
-                <div className="flex justify-between pt-1 border-t border-teal-100">
-                  <span className="font-semibold text-[#134e4a]">Your receivable</span>
-                  <span className="font-black text-emerald-600">
-                    ₱{(selected.owner_receivable_cents / 100).toLocaleString("en-PH")}
-                  </span>
-                </div>
-              )}
-            </div>
+          <div className="px-4 py-3 space-y-1.5 text-sm">
+  <div className="flex justify-between">
+    <span className="text-gray-500">Parking fee</span>
+    <span className="font-semibold text-[#134e4a]">
+      {selected.parking_fee_cents != null ? `₱${(selected.parking_fee_cents / 100).toLocaleString("en-PH")}` : "—"}
+    </span>
+  </div>
+  <div className="flex justify-between text-xs text-gray-400">
+    <span>Platform service fee</span>
+    <span>{selected.platform_fee_cents != null ? `₱${(selected.platform_fee_cents / 100).toLocaleString("en-PH")}` : "—"}</span>
+  </div>
+  <div className="flex justify-between text-xs text-gray-400">
+    <span>Payment processing fee</span>
+    <span>{selected.processing_fee_cents != null ? `₱${(selected.processing_fee_cents / 100).toLocaleString("en-PH")}` : "—"}</span>
+  </div>
+  <div className="flex justify-between pt-2 border-t-2 border-teal-100">
+    <span className="font-black text-[#134e4a]">Total paid by customer</span>
+    <span className="font-black text-[#0c7b93]">
+      {selected.total_amount_cents != null ? `₱${(selected.total_amount_cents / 100).toLocaleString("en-PH")}` : "—"}
+    </span>
+  </div>
+  {selected.owner_receivable_cents != null && (
+    <div className="flex justify-between pt-1 border-t border-teal-100">
+      <span className="font-semibold text-[#134e4a]">Your receivable</span>
+      <span className="font-black text-emerald-600">
+        ₱{(selected.owner_receivable_cents / 100).toLocaleString("en-PH")}
+      </span>
+    </div>
+  )}
+</div>
             <div className="px-4 pb-3">
               {hasProof ? (
                 <div className="space-y-2">
@@ -461,7 +473,7 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
 
         </div>
       </div>
-    </div>
+ 
   );
 }
 

@@ -38,8 +38,9 @@ export async function GET(request: NextRequest) {
       park_date_start, park_date_end, total_days,
       vehicle_count, vehicles,
       customer_full_name,
-      parking_fee_cents, commission_cents,
-      total_amount_cents, owner_receivable_cents,
+parking_fee_cents, commission_cents,
+platform_fee_cents, processing_fee_cents,
+total_amount_cents, owner_receivable_cents,
       payment_proof_path, gcash_transaction_reference,
       checked_in_at, checked_out_at, checked_in_by
     `)
