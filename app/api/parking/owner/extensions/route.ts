@@ -56,14 +56,25 @@ export async function POST(request: NextRequest) {
     }).eq("id", extension_id);
 
     // Update the reservation end date to the new extended date
-    await supabase.from("parking_reservations")
-      .update({ park_date_end: ext.new_end_date, updated_at: now })
-      .eq("id", ext.reservation_id);
+    // Get current reservation to calculate new total days
+const { data: currentRes } = await supabase
+  .from("parking_reservations")
+  .select("park_date_start")
+  .eq("id", ext.reservation_id)
+  .maybeSingle();
+
+const startDate = new Date(currentRes?.park_date_start ?? ext.new_end_date);
+const endDate = new Date(ext.new_end_date);
+const newTotalDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+await supabase.from("parking_reservations")
+  .update({ park_date_end: ext.new_end_date, total_days: newTotalDays, updated_at: now })
+  .eq("id", ext.reservation_id);
 
     await supabase.from("parking_reservation_logs").insert({
 
 
-      
+
       reservation_id: ext.reservation_id,
       event_type:     "extension_approved",
       performed_by:   user.id,
