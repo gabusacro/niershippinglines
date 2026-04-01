@@ -103,21 +103,21 @@ total_amount_cents, owner_receivable_cents,
       .eq("payment_status", "pending")
       .order("created_at", { ascending: false });
 
-    pendingExtensions = (extensions ?? []).map((e) => {
-      const res = Array.isArray(e.reservation) ? e.reservation[0] : e.reservation;
-      return {
-        id: e.id,
-        reference: e.reference,
-        reservation_id: e.reservation_id,
-        reservation_reference: (res as { reference?: string })?.reference ?? "",
-        customer_full_name: (res as { customer_full_name?: string })?.customer_full_name ?? "",
-        additional_days: e.additional_days,
-        new_end_date: e.new_end_date,
-        total_amount_cents: e.total_amount_cents,
-        payment_status: e.payment_status,
-        created_at: e.created_at,
-      };
-    });
+ pendingExtensions = (extensions ?? []).map((e) => {
+  const res = Array.isArray(e.reservation) ? e.reservation[0] : e.reservation;
+  return {
+    id: e.id,
+    reference: e.reference,
+    reservation_id: e.reservation_id,
+    reservation_reference: (res as { reference?: string })?.reference ?? "",
+    customer_full_name: (res as { customer_full_name?: string })?.customer_full_name ?? "",
+    additional_days: e.additional_days,
+    new_end_date: e.new_end_date,
+    total_amount_cents: e.total_amount_cents,
+    payment_status: e.payment_status,
+    created_at: e.created_at,
+  };
+});
   }
 
   return NextResponse.json({ bookings, pendingExtensions });
