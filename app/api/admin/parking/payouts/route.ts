@@ -29,35 +29,49 @@ export async function GET(request: NextRequest) {
     .not("payment_method", "eq", "cash")
     .order("created_at", { ascending: false });
 
-  if (lot_id) resQuery = resQuery.eq("lot_id", lot_id);
+  if (lot_id && lot_id !== "all") {
+  resQuery = resQuery.eq("lot_id", lot_id);
+}
 
   const { data: reservations, error: resErr } = await resQuery;
   if (resErr) return NextResponse.json({ error: resErr.message }, { status: 500 });
 
   // Fetch all paid extensions for this lot
-  let extQuery = supabase
-    .from("parking_extensions")
-    .select(`
-      id, reference, reservation_id,
-      additional_days, new_end_date,
-      parking_fee_cents, platform_fee_cents,
-      processing_fee_cents, owner_receivable_cents,
-      total_amount_cents, payment_method, paid_at,
-      reservation:parking_reservations(
-        customer_full_name, lot_id,
-        lot:parking_lots(owner_id, name)
-      )
-    `)
-    .eq("payment_status", "paid")
-    .order("created_at", { ascending: false });
+let extQuery = supabase
+  .from("parking_extensions")
+  .select(`
+    id, reference, reservation_id,
+    additional_days, new_end_date,
+    parking_fee_cents, platform_fee_cents,
+    processing_fee_cents, owner_receivable_cents,
+    total_amount_cents, paid_at,
+    reservation:parking_reservations!inner(
+      customer_full_name, lot_id,
+      lot:parking_lots(owner_id, name)
+    )
+  `)
+  .eq("payment_status", "paid")
+  .order("created_at", { ascending: false });
+
+
+  if (lot_id && lot_id !== "all") {
+  extQuery = extQuery.eq("reservation.lot_id", lot_id);
+}
+
+
 
   const { data: extensions, error: extErr } = await extQuery;
   if (extErr) return NextResponse.json({ error: extErr.message }, { status: 500 });
 
   // Fetch existing payouts
-  const { data: payouts } = await supabase
-    .from("parking_payouts")
-    .select("reservation_id, extension_id, payout_status, payment_reference, paid_at");
+  const { data: payouts, error: payoutsErr } = await supabase
+  .from("parking_payouts")
+  .select("reservation_id, extension_id, payout_status, payment_reference, paid_at");
+
+if (payoutsErr) {
+  console.error("[parking payouts] fetch payouts error:", payoutsErr);
+  return NextResponse.json({ error: payoutsErr.message }, { status: 500 });
+}
 
   const paidReservationIds = new Set((payouts ?? []).filter(p => p.reservation_id && p.payout_status === "paid").map(p => p.reservation_id));
   const paidExtensionIds   = new Set((payouts ?? []).filter(p => p.extension_id   && p.payout_status === "paid").map(p => p.extension_id));
@@ -114,7 +128,10 @@ export async function GET(request: NextRequest) {
   ];
 
   // Filter by lot_id if provided
-  const filtered = lot_id ? items.filter(i => i.lot_id === lot_id) : items;
+  const filtered =
+  lot_id && lot_id !== "all"
+    ? items.filter(i => i.lot_id === lot_id)
+    : items;
 
   return NextResponse.json({ items: filtered });
 }
@@ -165,7 +182,7 @@ export async function POST(request: NextRequest) {
   } else {
     const { data: e } = await supabase
       .from("parking_extensions")
-      .select("id, reference, parking_fee_cents, platform_fee_cents, processing_fee_cents, owner_receivable_cents, reservation:parking_reservations(lot_id, lot:parking_lots(owner_id))")
+      .select("id, reference, parking_fee_cents, platform_fee_cents, processing_fee_cents, owner_receivable_cents, reservation:parking_reservations!inner(lot_id, lot:parking_lots(owner_id))")
       .eq("id", id)
       .maybeSingle();
     if (!e) return NextResponse.json({ error: "Extension not found." }, { status: 404 });
@@ -184,23 +201,48 @@ export async function POST(request: NextRequest) {
   if (!ownerId) return NextResponse.json({ error: "Could not determine lot owner." }, { status: 400 });
 
   // Check if already paid
-  const existingQuery = supabase.from("parking_payouts").select("id");
-  if (type === "reservation") existingQuery.eq("reservation_id", id);
-  else existingQuery.eq("extension_id", id);
-  const { data: existing } = await existingQuery.maybeSingle();
+  let existingQuery = supabase
+  .from("parking_payouts")
+  .select("id");
+
+if (type === "reservation") {
+  existingQuery = existingQuery.eq("reservation_id", id);
+} else {
+  existingQuery = existingQuery.eq("extension_id", id);
+}
+
+const { data: existing, error: existingErr } = await existingQuery.maybeSingle();
+
+if (existingErr) {
+  console.error("[parking payouts] existing query error:", existingErr);
+  return NextResponse.json({ error: existingErr.message }, { status: 500 });
+}
 
   if (existing) {
-    // Update existing
-    await supabase.from("parking_payouts")
-      .update({ payout_status: "paid", payment_reference: payment_reference.trim(), payment_notes: payment_notes?.trim() ?? null, paid_at: now, paid_by: user.id, updated_at: now })
-      .eq("id", existing.id);
-  } else {
-    // Insert new
-    await supabase.from("parking_payouts").insert({
+  const { error: updateErr } = await supabase
+    .from("parking_payouts")
+    .update({
+      payout_status: "paid",
+      payment_reference: payment_reference.trim(),
+      payment_notes: payment_notes?.trim() ?? null,
+      paid_at: now,
+      paid_by: user.id,
+      updated_at: now,
+    })
+    .eq("id", existing.id);
+
+  if (updateErr) {
+    console.error("[parking payouts] update error:", updateErr);
+    return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  }
+} else {
+  const { error: insertErr } = await supabase
+    .from("parking_payouts")
+    .insert({
       lot_id: lotId,
       owner_id: ownerId,
       reservation_id: type === "reservation" ? id : null,
-      extension_id:   type === "extension"   ? id : null,
+      extension_id: type === "extension" ? id : null,
       reference,
       transaction_type: type,
       parking_fee_cents: parkingFeeCents,
@@ -214,7 +256,12 @@ export async function POST(request: NextRequest) {
       paid_at: now,
       paid_by: user.id,
     });
+
+  if (insertErr) {
+    console.error("[parking payouts] insert error:", insertErr);
+    return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }
+}
 
   return NextResponse.json({ ok: true });
 }
@@ -231,10 +278,28 @@ export async function DELETE(request: NextRequest) {
   if (!type || !id) return NextResponse.json({ error: "type and id required." }, { status: 400 });
 
   const supabase = await createClient();
-  const query = supabase.from("parking_payouts").update({ payout_status: "pending", paid_at: null, paid_by: null, payment_reference: null, updated_at: new Date().toISOString() });
-  if (type === "reservation") query.eq("reservation_id", id);
-  else query.eq("extension_id", id);
-  await query;
+  let query = supabase
+  .from("parking_payouts")
+  .update({
+    payout_status: "pending",
+    paid_at: null,
+    paid_by: null,
+    payment_reference: null,
+    payment_notes: null,
+    updated_at: new Date().toISOString(),
+  });
+  if (type === "reservation") {
+  query = query.eq("reservation_id", id);
+} else {
+  query = query.eq("extension_id", id);
+}
+
+const { error: deleteErr } = await query;
+
+if (deleteErr) {
+  console.error("[parking payouts] delete error:", deleteErr);
+  return NextResponse.json({ error: deleteErr.message }, { status: 500 });
+}
 
   return NextResponse.json({ ok: true });
 }

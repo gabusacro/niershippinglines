@@ -81,6 +81,7 @@ async function getSignedUrl(path: string, isAdmin = true): Promise<string | null
     const data = await res.json();
     return data.url ?? null;
   } catch { return null; }
+  
 }
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
@@ -90,6 +91,7 @@ function ReservationDetail({ r, onClose, onAction, onRefresh }: {
   onAction: (id: string, action: string, notes?: string) => Promise<void>;
   onRefresh: () => void;
 }) {
+  
   const [notes, setNotes]             = useState(r.admin_notes ?? "");
   const [acting, setActing]           = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
