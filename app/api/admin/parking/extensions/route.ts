@@ -38,14 +38,22 @@ export async function POST(request: NextRequest) {
   if (!ext) return NextResponse.json({ error: "Extension not found." }, { status: 404 });
 
   if (action === "approve") {
+    const now = new Date().toISOString();
     await supabase.from("parking_extensions").update({
       payment_status:       "paid",
       payment_verified_by:  user.id,
-      payment_verified_at:  new Date().toISOString(),
-      paid_at:              new Date().toISOString(),
+      payment_verified_at:  now,
+      paid_at:              now,
     }).eq("id", extension_id);
 
+    // Update the reservation end date to the new extended date
+    await supabase.from("parking_reservations")
+      .update({ park_date_end: ext.new_end_date, updated_at: now })
+      .eq("id", ext.reservation_id);
+
     await supabase.from("parking_reservation_logs").insert({
+
+      
       reservation_id: ext.reservation_id,
       event_type:     "extension_approved",
       performed_by:   user.id,
