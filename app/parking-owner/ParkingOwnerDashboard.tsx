@@ -45,6 +45,7 @@ type PendingExtension = {
   reservation_reference: string; customer_full_name: string;
   additional_days: number; new_end_date: string;
   total_amount_cents: number; payment_status: string; created_at: string;
+  payment_proof_path: string | null;
 };
 
 interface Props {
@@ -734,6 +735,20 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
                           <p className="text-xs text-purple-600">for booking {ext.reservation_reference}</p>
                           <p className="text-sm font-semibold text-[#134e4a] mt-0.5">{ext.customer_full_name}</p>
                           <p className="text-xs text-gray-500 mt-0.5">+{ext.additional_days} day{ext.additional_days > 1 ? "s" : ""} · New end: {fmt(ext.new_end_date)} · {peso(ext.total_amount_cents)}</p>
+
+{ext.payment_proof_path && (
+  <a href="#" onClick={async (e) => {
+    e.preventDefault();
+    const res = await fetch(`/api/parking/signed-url?path=${encodeURIComponent(ext.payment_proof_path!)}`);
+    const data = await res.json();
+    if (data.url) window.open(data.url, "_blank");
+  }}
+    className="inline-flex items-center gap-1 mt-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
+    📸 View GCash Screenshot ↗
+  </a>
+)}
+
+
                         </div>
                         <div className="flex gap-2 shrink-0">
                           <button onClick={() => handleExtensionAction(ext.id, "reject")} disabled={extLoading === ext.id}

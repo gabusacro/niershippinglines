@@ -360,7 +360,17 @@ export default function AdminParkingReservationsPage() {
                       <span className="text-xs text-gray-400 ml-2">for booking {res?.reference}</span>
                       <p className="text-sm text-gray-700">{res?.customer_full_name} · {res?.lot_snapshot_name}</p>
                       <p className="text-xs text-gray-400">+{ext.additional_days} days · New end: {ext.new_end_date} · ₱{(ext.total_amount_cents/100).toLocaleString()}</p>
-                      {ext.payment_proof_path && <p className="text-xs text-emerald-600 mt-0.5">✓ GCash screenshot uploaded</p>}
+                      {ext.payment_proof_path && (
+  <a href="#" onClick={async (e) => {
+    e.preventDefault();
+    const res = await fetch(`/api/admin/parking/signed-url?path=${encodeURIComponent(ext.payment_proof_path!)}`);
+    const data = await res.json();
+    if (data.url) window.open(data.url, "_blank");
+  }}
+    className="inline-flex items-center gap-1 mt-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
+    📸 View GCash Screenshot ↗
+  </a>
+)}
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => handleExtensionAction(ext.id, "reject")} disabled={extActing === ext.id}

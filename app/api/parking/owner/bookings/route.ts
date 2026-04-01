@@ -97,6 +97,7 @@ total_amount_cents, owner_receivable_cents,
         id, reference, reservation_id,
         additional_days, new_end_date,
         total_amount_cents, payment_status, created_at,
+        payment_proof_path,
         reservation:parking_reservations(reference, customer_full_name)
       `)
       .in("reservation_id", lotReservationIds)
@@ -116,6 +117,7 @@ total_amount_cents, owner_receivable_cents,
     total_amount_cents: e.total_amount_cents,
     payment_status: e.payment_status,
     created_at: e.created_at,
+    payment_proof_path: e.payment_proof_path ?? null,
   };
 });
   }
