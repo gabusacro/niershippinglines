@@ -40,6 +40,23 @@ type Booking = {
   gcash_transaction_reference: string | null;
 };
 
+type PayoutItem = {
+  id: string;
+  type: "reservation" | "extension";
+  reference: string;
+  customer_full_name: string;
+  date: string;
+  days: number;
+  parking_fee_cents: number;
+  platform_fee_cents: number;
+  processing_fee_cents: number;
+  total_amount_cents: number;
+  owner_receivable_cents: number;
+  payout_status: "pending" | "paid";
+  payment_reference: string | null;
+  paid_at: string | null;
+};
+
 type PendingExtension = {
   id: string; reference: string; reservation_id: string;
   reservation_reference: string; customer_full_name: string;
@@ -478,6 +495,93 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
   );
 }
 
+
+// ── Payouts Tab ───────────────────────────────────────────────────────────────
+function PayoutsTab({ payouts, pendingCents, paidCents, loading }: {
+  payouts: PayoutItem[];
+  pendingCents: number;
+  paidCents: number;
+  loading: boolean;
+}) {
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function fmt(iso: string) {
+    const d = new Date(iso);
+    return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+  }
+  function pesoFmt(cents: number) {
+    return `₱${((cents ?? 0) / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
+  }
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-center">
+          <p className="text-xl font-black text-red-700">{pesoFmt(pendingCents)}</p>
+          <p className="text-xs text-red-600 mt-0.5">Pending from Admin</p>
+        </div>
+        <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4 text-center">
+          <p className="text-xl font-black text-emerald-700">{pesoFmt(paidCents)}</p>
+          <p className="text-xs text-emerald-600 mt-0.5">Already Received</p>
+        </div>
+      </div>
+      <div className="rounded-xl bg-teal-50 border border-teal-100 px-4 py-3 text-xs text-teal-700">
+        ℹ️ GCash payments are collected by Travela Siargao then remitted to you after deducting platform and processing fees. Cash walk-ins go directly to you.
+      </div>
+      {loading ? (
+        <div className="text-center py-10"><div className="text-3xl animate-pulse mb-3">💸</div><p className="text-sm text-gray-400">Loading…</p></div>
+      ) : payouts.length === 0 ? (
+        <div className="rounded-2xl border-2 border-teal-100 bg-white p-8 text-center">
+          <p className="text-sm text-gray-400">No transactions yet</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {payouts.map(item => (
+            <div key={`${item.type}-${item.id}`}
+              className={`rounded-2xl border-2 bg-white p-4 ${item.payout_status === "paid" ? "border-emerald-100" : "border-amber-100"}`}>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs font-black text-[#0c7b93]">{item.reference}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.type === "extension" ? "bg-purple-100 text-purple-800" : "bg-teal-100 text-teal-800"}`}>
+                      {item.type === "extension" ? "Extension" : "Booking"}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.payout_status === "paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                      {item.payout_status === "paid" ? "✓ Received" : "⏳ Pending"}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-[#134e4a] mt-0.5">{item.customer_full_name}</p>
+                  <p className="text-xs text-gray-400">{fmt(item.date)} · {item.days} day{item.days !== 1 ? "s" : ""}</p>
+                  {item.payout_status === "paid" && item.payment_reference && (
+                    <p className="text-xs text-emerald-700 mt-0.5">✓ Ref: {item.payment_reference}</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={`font-black text-base ${item.payout_status === "paid" ? "text-emerald-600" : "text-amber-600"}`}>
+                    {pesoFmt(item.owner_receivable_cents)}
+                  </p>
+                  <p className="text-xs text-gray-400">your share</p>
+                </div>
+              </div>
+              <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs space-y-0.5">
+                <div className="flex justify-between text-gray-500">
+                  <span>Customer paid</span><span>{pesoFmt(item.total_amount_cents)}</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Platform + processing fees</span>
+                  <span>-{pesoFmt((item.platform_fee_cents ?? 0) + (item.processing_fee_cents ?? 0))}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-emerald-700 border-t border-gray-200 pt-1">
+                  <span>Your receivable</span><span>{pesoFmt(item.owner_receivable_cents)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // ── Manage Lot Tab ────────────────────────────────────────────────────────────
 function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => void }) {
   const [slots, setSlots] = useState({
@@ -594,11 +698,23 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
   const [loading, setLoading]                     = useState(true);
   const [showScanner, setShowScanner]             = useState(false);
   const [scanMsg, setScanMsg]                     = useState<string | null>(null);
-  const [tab, setTab]                             = useState<"bookings"|"crew"|"revenue"|"lot">("bookings");
+ const [tab, setTab] = useState<"bookings"|"crew"|"revenue"|"lot"|"payouts">("bookings");
   const [extLoading, setExtLoading]               = useState<string | null>(null);
   const [selected, setSelected]                   = useState<Booking | null>(null);
+
+  
   const [actionLoading, setActionLoading]         = useState(false);
   const [actionMsg, setActionMsg]                 = useState<string | null>(null);
+
+
+
+const [payouts, setPayouts]                     = useState<PayoutItem[]>([]);
+  const [payoutsPendingCents, setPayoutsPendingCents] = useState(0);
+  const [payoutsPaidCents, setPayoutsPaidCents]   = useState(0);
+  const [payoutsLoading, setPayoutsLoading]       = useState(false);
+
+
+
 
   const totalCar   = lot?.total_slots_car        ?? 0;
   const totalMoto  = lot?.total_slots_motorcycle ?? 0;
@@ -609,6 +725,27 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
   const totalSlots = totalCar + totalMoto + totalVan;
   const occupied   = (availability.booked_car ?? 0) + (availability.booked_motorcycle ?? 0) + (availability.booked_van ?? 0);
   const pctFull    = totalSlots > 0 ? Math.round((occupied / totalSlots) * 100) : 0;
+
+
+
+const fetchPayouts = useCallback(async () => {
+    setPayoutsLoading(true);
+    try {
+      const res = await fetch("/api/parking/owner/payouts");
+      if (res.ok) {
+        const d = await res.json();
+        setPayouts(d.payouts ?? []);
+        setPayoutsPendingCents(d.pending_cents ?? 0);
+        setPayoutsPaidCents(d.paid_cents ?? 0);
+      }
+    } finally { setPayoutsLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchPayouts(); }, [fetchPayouts]);
+
+
+
+
 
   const fetchBookings = useCallback(async () => {
     if (!lot) return;
@@ -809,6 +946,13 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
               <button onClick={() => setTab("crew")}     className={tabCls("crew")}>👷 Crew ({crew.length})</button>
               <button onClick={() => setTab("revenue")}  className={tabCls("revenue")}>💰 Revenue</button>
               <button onClick={() => setTab("lot")}      className={tabCls("lot")}>🅿️ Manage Lot</button>
+              <button onClick={() => setTab("payouts")} className={tabCls("payouts")}>💸 Payouts</button>
+
+
+
+
+
+
             </div>
 
             {/* Bookings tab */}
@@ -934,6 +1078,21 @@ export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, 
 
             {/* Manage Lot tab */}
             {tab === "lot" && <ManageLotTab lot={lot} onSaved={fetchBookings} />}
+
+
+{/* Payouts tab */}
+{tab === "payouts" && (
+  <PayoutsTab
+    payouts={payouts}
+    pendingCents={payoutsPendingCents}
+    paidCents={payoutsPaidCents}
+    loading={payoutsLoading}
+  />
+)}
+
+
+
+
           </>
         )}
       </div>
