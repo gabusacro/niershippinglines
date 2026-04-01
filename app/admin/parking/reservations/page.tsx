@@ -12,24 +12,40 @@ type Vehicle = {
 
 type Reservation = {
   id: string; reference: string; status: string; payment_status: string;
+  payment_method: string | null;
   payment_proof_path: string | null; gcash_transaction_reference: string | null;
   park_date_start: string; park_date_end: string; total_days: number;
   vehicle_count: number; vehicles: Vehicle[];
   total_amount_cents: number; parking_fee_cents: number;
   platform_fee_cents: number; processing_fee_cents: number;
+  owner_receivable_cents: number; commission_cents: number;
   lot_snapshot_name: string | null; lot_snapshot_distance: string | null;
   customer_full_name: string; customer_email: string; customer_mobile: string | null;
   admin_notes: string | null; created_at: string;
   overstay_days: number; overstay_fee_cents: number;
 };
 
+type Extension = {
+  id: string; reference: string; reservation_id: string;
+  additional_days: number; new_end_date: string;
+  total_amount_cents: number; parking_fee_cents: number;
+  platform_fee_cents: number; processing_fee_cents: number;
+  owner_receivable_cents: number;
+  payment_proof_path: string | null;
+  payment_status: string;
+  reservation: {
+    reference: string; customer_full_name: string;
+    lot_snapshot_name: string | null;
+  };
+};
+
 const STATUS_TABS = [
-  { value: "pending_payment", label: "Pending",   color: "bg-amber-100 text-amber-800 border-amber-300"    },
-  { value: "confirmed",       label: "Confirmed", color: "bg-emerald-100 text-emerald-800 border-emerald-300" },
-  { value: "checked_in",      label: "Checked In",color: "bg-blue-100 text-blue-800 border-blue-300"       },
-  { value: "overstay",        label: "Overstay",  color: "bg-red-100 text-red-800 border-red-300"          },
-  { value: "completed",       label: "Completed", color: "bg-gray-100 text-gray-600 border-gray-300"       },
-  { value: "all",             label: "All",       color: "bg-gray-100 text-gray-700 border-gray-300"       },
+  { value: "pending_payment", label: "Pending",    color: "bg-amber-100 text-amber-800 border-amber-300"       },
+  { value: "confirmed",       label: "Confirmed",  color: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+  { value: "checked_in",      label: "Checked In", color: "bg-blue-100 text-blue-800 border-blue-300"          },
+  { value: "overstay",        label: "Overstay",   color: "bg-red-100 text-red-800 border-red-300"             },
+  { value: "completed",       label: "Completed",  color: "bg-gray-100 text-gray-600 border-gray-300"          },
+  { value: "all",             label: "All",        color: "bg-gray-100 text-gray-700 border-gray-300"          },
 ];
 
 const STATUS_BADGE: Record<string, string> = {
@@ -43,13 +59,13 @@ const STATUS_BADGE: Record<string, string> = {
 
 const VEHICLE_EMOJI: Record<string, string> = { car: "🚗", motorcycle: "🏍️", van: "🚐" };
 const TYPE_BADGE: Record<string, string> = {
-  car: "bg-emerald-50 text-emerald-800 border border-emerald-200",
+  car:        "bg-emerald-50 text-emerald-800 border border-emerald-200",
   motorcycle: "bg-amber-50 text-amber-800 border border-amber-200",
-  van: "bg-blue-50 text-blue-800 border border-blue-200",
+  van:        "bg-blue-50 text-blue-800 border border-blue-200",
 };
 
 function peso(cents: number) {
-  return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
+  return `₱${((cents ?? 0) / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
 }
 function formatDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
@@ -58,29 +74,42 @@ function formatDateTime(d: string) {
   return new Date(d).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Manila" });
 }
 
-// ── Signed URL preview ────────────────────────────────────────────────────────
-async function getSignedUrl(path: string): Promise<string | null> {
+async function getSignedUrl(path: string, isAdmin = true): Promise<string | null> {
   try {
-    const res = await fetch(`/api/admin/parking/signed-url?path=${encodeURIComponent(path)}`);
+    const endpoint = isAdmin ? "/api/admin/parking/signed-url" : "/api/parking/signed-url";
+    const res = await fetch(`${endpoint}?path=${encodeURIComponent(path)}`);
     const data = await res.json();
     return data.url ?? null;
   } catch { return null; }
 }
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
-function ReservationDetail({ r, onClose, onAction }: {
+function ReservationDetail({ r, onClose, onAction, onRefresh }: {
   r: Reservation;
   onClose: () => void;
   onAction: (id: string, action: string, notes?: string) => Promise<void>;
+  onRefresh: () => void;
 }) {
-  const [notes, setNotes]           = useState(r.admin_notes ?? "");
-  const [acting, setActing]         = useState(false);
+  const [notes, setNotes]             = useState(r.admin_notes ?? "");
+  const [acting, setActing]           = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<"approve" | "reject" | null>(null);
-  const [photoUrls, setPhotoUrls]   = useState<Record<string, string>>({});
+  const [confirming, setConfirming]   = useState<"approve" | "reject" | null>(null);
+  const [photoUrls, setPhotoUrls]     = useState<Record<string, string>>({});
 
-  // Fetch signed URLs for docs
+  // Remit to owner state
+  const [remitOpen, setRemitOpen]     = useState(false);
+  const [remitRef, setRemitRef]       = useState("");
+  const [remitNotes, setRemitNotes]   = useState("");
+  const [remitSaving, setRemitSaving] = useState(false);
+  const [remitMsg, setRemitMsg]       = useState<string | null>(null);
+  const [remitStatus, setRemitStatus] = useState<"pending" | "paid">("pending");
+
+  // Extensions for this reservation
+  const [extensions, setExtensions]   = useState<Extension[]>([]);
+  const [extUrls, setExtUrls]         = useState<Record<string, string>>({});
+
   useEffect(() => {
+    // Fetch signed URLs for vehicle docs and main GCash
     const paths: Record<string, string> = {};
     r.vehicles.forEach(v => {
       if (v.or_cr_path)    paths[`orcr_${v.plate_number}`]    = v.or_cr_path;
@@ -98,6 +127,37 @@ function ReservationDetail({ r, onClose, onAction }: {
       results.forEach(([key, url]) => { if (url) map[key] = url; });
       setPhotoUrls(map);
     });
+
+    // Fetch extensions for this reservation
+    fetch(`/api/admin/parking/extensions?reservation_id=${r.id}`)
+      .then(res => res.json())
+      .then(async (data: Extension[]) => {
+        const exts = Array.isArray(data) ? data : [];
+        setExtensions(exts);
+        // Fetch extension GCash screenshots
+        const extPathEntries = exts
+          .filter(e => e.payment_proof_path)
+          .map(e => [`ext_gcash_${e.id}`, e.payment_proof_path!] as [string, string]);
+        const extUrlResults = await Promise.all(
+          extPathEntries.map(async ([key, path]) => {
+            const url = await getSignedUrl(path);
+            return [key, url] as [string, string | null];
+          })
+        );
+        const extMap: Record<string, string> = {};
+        extUrlResults.forEach(([key, url]) => { if (url) extMap[key] = url; });
+        setExtUrls(extMap);
+      })
+      .catch(() => {});
+
+    // Check remit status
+    fetch(`/api/admin/parking/payouts?lot_id=all`)
+      .then(res => res.json())
+      .then(data => {
+        const item = (data.items ?? []).find((i: { id: string; payout_status: string }) => i.id === r.id);
+        if (item) setRemitStatus(item.payout_status);
+      })
+      .catch(() => {});
   }, [r]);
 
   async function doAction(action: string) {
@@ -110,8 +170,45 @@ function ReservationDetail({ r, onClose, onAction }: {
     } finally { setActing(false); setConfirming(null); }
   }
 
-  const isPending   = r.status === "pending_payment";
-  const hasProof    = !!r.payment_proof_path;
+  async function handleRemit() {
+    if (!remitRef.trim()) { setRemitMsg("Payment reference is required."); return; }
+    setRemitSaving(true); setRemitMsg(null);
+    try {
+      const res = await fetch("/api/admin/parking/payouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "reservation",
+          id: r.id,
+          payment_reference: remitRef.trim(),
+          payment_notes: remitNotes.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setRemitMsg(data.error ?? "Failed."); return; }
+      setRemitStatus("paid");
+      setRemitOpen(false);
+      setRemitMsg(null);
+      onRefresh();
+    } catch { setRemitMsg("Network error."); }
+    finally { setRemitSaving(false); }
+  }
+
+  async function handleUnremit() {
+    if (!confirm("Revert remittance to pending?")) return;
+    setRemitSaving(true);
+    try {
+      await fetch(`/api/admin/parking/payouts?type=reservation&id=${r.id}`, { method: "DELETE" });
+      setRemitStatus("pending");
+      onRefresh();
+    } catch {} finally { setRemitSaving(false); }
+  }
+
+  const isPending = r.status === "pending_payment";
+  const hasProof  = !!r.payment_proof_path;
+  const isRemittable = ["confirmed", "checked_in", "overstay", "completed"].includes(r.status) && r.payment_method !== "cash";
+
+  const inputCls = "w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2.5 text-[#134e4a] text-sm focus:border-[#0c7b93] focus:outline-none";
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto"
@@ -159,7 +256,6 @@ function ReservationDetail({ r, onClose, onAction }: {
                   <div><span className="text-gray-400">OR/CR: </span>{v.or_cr_number}</div>
                   <div><span className="text-gray-400">ID: </span>{v.driver_id_type} · {v.driver_id_number}</div>
                 </div>
-                {/* Doc links */}
                 <div className="flex flex-wrap gap-2">
                   {photoUrls[`orcr_${v.plate_number}`] && (
                     <a href={photoUrls[`orcr_${v.plate_number}`]} target="_blank" rel="noopener noreferrer"
@@ -182,12 +278,24 @@ function ReservationDetail({ r, onClose, onAction }: {
 
           {/* Payment */}
           <div className="rounded-xl border-2 border-teal-200 overflow-hidden">
-            <div className="bg-teal-50 px-4 py-2 text-xs font-bold text-[#134e4a] uppercase">Payment</div>
+            <div className="bg-teal-50 px-4 py-2 text-xs font-bold text-[#134e4a] uppercase">Payment — Original Booking</div>
             <div className="px-4 py-3 space-y-1.5 text-sm">
               <div className="flex justify-between"><span className="text-gray-600">Parking fee</span><span className="font-semibold">{peso(r.parking_fee_cents)}</span></div>
-              <div className="flex justify-between text-xs text-gray-400"><span>Platform fee</span><span>{peso(r.platform_fee_cents)}</span></div>
-              <div className="flex justify-between text-xs text-gray-400"><span>Processing fee</span><span>{peso(r.processing_fee_cents)}</span></div>
-              <div className="flex justify-between pt-2 border-t-2 border-teal-200"><span className="font-black text-[#134e4a]">Total</span><span className="font-black text-lg text-[#0c7b93]">{peso(r.total_amount_cents)}</span></div>
+              {(r.commission_cents ?? 0) > 0 && (
+                <div className="flex justify-between text-xs text-red-400"><span>Commission (Travela)</span><span>-{peso(r.commission_cents)}</span></div>
+              )}
+              <div className="flex justify-between text-xs text-gray-400"><span>Platform fee (Travela)</span><span>{peso(r.platform_fee_cents)}</span></div>
+              <div className="flex justify-between text-xs text-gray-400"><span>Processing fee (Travela)</span><span>{peso(r.processing_fee_cents)}</span></div>
+              <div className="flex justify-between pt-2 border-t-2 border-teal-200">
+                <span className="font-black text-[#134e4a]">Total paid by customer</span>
+                <span className="font-black text-lg text-[#0c7b93]">{peso(r.total_amount_cents)}</span>
+              </div>
+              {(r.owner_receivable_cents ?? 0) > 0 && (
+                <div className="flex justify-between pt-1 border-t border-teal-100">
+                  <span className="font-semibold text-emerald-700">Owner receivable</span>
+                  <span className="font-black text-emerald-700">{peso(r.owner_receivable_cents)}</span>
+                </div>
+              )}
             </div>
             {/* GCash proof */}
             <div className="px-4 pb-4">
@@ -210,6 +318,98 @@ function ReservationDetail({ r, onClose, onAction }: {
             </div>
           </div>
 
+          {/* Extensions */}
+          {extensions.length > 0 && (
+            <div className="rounded-xl border-2 border-purple-200 overflow-hidden">
+              <div className="bg-purple-50 px-4 py-2 text-xs font-bold text-purple-800 uppercase">
+                Extend Stay ({extensions.length})
+              </div>
+              {extensions.map((ext, i) => (
+                <div key={ext.id} className={`px-4 py-3 border-b border-purple-50 last:border-0 ${i % 2 === 0 ? "bg-white" : "bg-purple-50/20"}`}>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="font-mono text-xs font-black text-purple-700">{ext.reference}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ext.payment_status === "paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                      {ext.payment_status === "paid" ? "✓ Paid" : "Pending"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">+{ext.additional_days} days · New end: {formatDate(ext.new_end_date)}</p>
+                  {/* Extension fee breakdown */}
+                  <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs space-y-0.5 mb-2">
+                    <div className="flex justify-between text-gray-500"><span>Parking fee (extension)</span><span>{peso(ext.parking_fee_cents)}</span></div>
+                    <div className="flex justify-between text-gray-400"><span>Platform fee (Travela)</span><span>{peso(ext.platform_fee_cents)}</span></div>
+                    <div className="flex justify-between text-gray-400"><span>Processing fee (Travela)</span><span>{peso(ext.processing_fee_cents)}</span></div>
+                    <div className="flex justify-between font-bold text-[#0c7b93] border-t border-gray-200 pt-1"><span>Customer paid</span><span>{peso(ext.total_amount_cents)}</span></div>
+                    <div className="flex justify-between font-bold text-emerald-700"><span>Owner receivable</span><span>{peso(ext.owner_receivable_cents)}</span></div>
+                  </div>
+                  {/* Extension GCash screenshot */}
+                  {ext.payment_proof_path && extUrls[`ext_gcash_${ext.id}`] && (
+                    <a href={extUrls[`ext_gcash_${ext.id}`]} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
+                      📸 View Extension GCash Screenshot ↗
+                    </a>
+                  )}
+                  {ext.payment_proof_path && !extUrls[`ext_gcash_${ext.id}`] && (
+                    <span className="text-xs text-gray-400 animate-pulse">Loading screenshot…</span>
+                  )}
+                  {!ext.payment_proof_path && (
+                    <span className="text-xs text-red-500">⚠ No GCash screenshot for extension</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Remit to Owner */}
+          {isRemittable && (
+            <div className={`rounded-xl border-2 overflow-hidden ${remitStatus === "paid" ? "border-emerald-200" : "border-amber-200"}`}>
+              <div className={`px-4 py-2 text-xs font-bold uppercase ${remitStatus === "paid" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+                💸 Owner Remittance
+              </div>
+              <div className="px-4 py-3">
+                {remitStatus === "paid" ? (
+                  <div className="space-y-2">
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 font-semibold">
+                      ✅ Payment remitted to owner
+                    </div>
+                    <button onClick={handleUnremit} disabled={remitSaving}
+                      className="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                      ↩ Revert to pending
+                    </button>
+                  </div>
+                ) : remitOpen ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">Enter the GCash/bank reference number for the transfer of <span className="font-bold text-emerald-700">{peso(r.owner_receivable_cents)}</span> to the lot owner.</p>
+                    <input type="text" placeholder="GCash / Bank reference number *"
+                      value={remitRef} onChange={e => setRemitRef(e.target.value)}
+                      className={inputCls} />
+                    <input type="text" placeholder="Notes (optional)"
+                      value={remitNotes} onChange={e => setRemitNotes(e.target.value)}
+                      className={inputCls} />
+                    {remitMsg && <p className="text-xs text-red-600">{remitMsg}</p>}
+                    <div className="flex gap-2">
+                      <button onClick={() => setRemitOpen(false)}
+                        className="flex-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                        Cancel
+                      </button>
+                      <button onClick={handleRemit} disabled={remitSaving}
+                        className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                        {remitSaving ? "Saving…" : "✓ Confirm Remittance"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">Owner receivable: <span className="font-bold text-emerald-700">{peso(r.owner_receivable_cents)}</span></p>
+                    <button onClick={() => setRemitOpen(true)}
+                      className="w-full rounded-xl bg-[#0c7b93] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#085f72] transition-colors">
+                      💸 Mark as Remitted to Owner
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Admin notes */}
           <div>
             <label className="text-xs font-bold text-[#134e4a] uppercase tracking-wide block mb-2">Admin Notes</label>
@@ -224,7 +424,7 @@ function ReservationDetail({ r, onClose, onAction }: {
 
           {actionError && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{actionError}</div>}
 
-          {/* Actions */}
+          {/* Approve / Reject Actions */}
           {isPending && (
             <div className="space-y-3">
               {confirming === "approve" && (
@@ -277,15 +477,15 @@ function ReservationDetail({ r, onClose, onAction }: {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AdminParkingReservationsPage() {
-  const [activeTab, setActiveTab]     = useState("pending_payment");
-  const [search, setSearch]           = useState("");
+  const [activeTab, setActiveTab]       = useState("pending_payment");
+  const [search, setSearch]             = useState("");
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [total, setTotal]             = useState(0);
-  const [page, setPage]               = useState(1);
-  const [loading, setLoading]         = useState(true);
-  const [selected, setSelected]       = useState<Reservation | null>(null);
-  const [extensions, setExtensions]   = useState<{id:string;reference:string;reservation_id:string;additional_days:number;new_end_date:string;total_amount_cents:number;payment_proof_path:string|null;reservation:{reference:string;customer_full_name:string;lot_snapshot_name:string|null}}[]>([]);
-  const [extActing, setExtActing]     = useState<string|null>(null);
+  const [total, setTotal]               = useState(0);
+  const [page, setPage]                 = useState(1);
+  const [loading, setLoading]           = useState(true);
+  const [selected, setSelected]         = useState<Reservation | null>(null);
+  const [extensions, setExtensions]     = useState<Extension[]>([]);
+  const [extActing, setExtActing]       = useState<string | null>(null);
 
   const fetchReservations = useCallback(async () => {
     setLoading(true);
@@ -300,11 +500,15 @@ export default function AdminParkingReservationsPage() {
     finally { setLoading(false); }
   }, [activeTab, page, search]);
 
+  const fetchExtensions = useCallback(() => {
+    fetch("/api/admin/parking/extensions")
+      .then(r => r.json())
+      .then(d => setExtensions(Array.isArray(d) ? d : []));
+  }, []);
+
   useEffect(() => { fetchReservations(); }, [fetchReservations]);
   useEffect(() => { setPage(1); }, [activeTab, search]);
-  useEffect(() => {
-    fetch("/api/admin/parking/extensions").then(r => r.json()).then(d => setExtensions(Array.isArray(d) ? d : []));
-  }, []);
+  useEffect(() => { fetchExtensions(); }, [fetchExtensions]);
 
   async function handleAction(id: string, action: string, notes?: string) {
     const res = await fetch("/api/admin/parking/reservations", {
@@ -324,7 +528,7 @@ export default function AdminParkingReservationsPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ extension_id: extId, action }),
       });
-      if (res.ok) setExtensions(e => e.filter(x => x.id !== extId));
+      if (res.ok) { fetchExtensions(); await fetchReservations(); }
     } finally { setExtActing(null); }
   }
 
@@ -338,8 +542,11 @@ export default function AdminParkingReservationsPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-white/60">Admin — Pay Parking</p>
           <h1 className="mt-1 text-2xl font-black text-white">📋 Reservations</h1>
           <p className="text-sm text-white/70 mt-0.5">Review documents, verify GCash payment, approve or reject bookings.</p>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex gap-4 flex-wrap">
             <Link href="/admin/parking" className="text-xs text-white/60 hover:text-white/90">← Back to Parking</Link>
+            <Link href="/admin/parking/payouts" className="text-xs text-white/80 hover:text-white font-semibold bg-white/15 px-3 py-1 rounded-full">
+              💸 Owner Remittances
+            </Link>
           </div>
         </div>
       </div>
@@ -351,40 +558,38 @@ export default function AdminParkingReservationsPage() {
           <div className="mb-6 rounded-2xl border-2 border-purple-200 bg-purple-50 p-5">
             <h2 className="font-bold text-purple-800 mb-3">📅 Pending Extend Stay Payments ({extensions.length})</h2>
             <div className="space-y-2">
-              {extensions.map(ext => {
-                const res = ext.reservation as { reference: string; customer_full_name: string; lot_snapshot_name: string | null };
-                return (
-                  <div key={ext.id} className="rounded-xl bg-white border border-purple-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <span className="font-mono text-sm font-black text-purple-700">{ext.reference}</span>
-                      <span className="text-xs text-gray-400 ml-2">for booking {res?.reference}</span>
-                      <p className="text-sm text-gray-700">{res?.customer_full_name} · {res?.lot_snapshot_name}</p>
-                      <p className="text-xs text-gray-400">+{ext.additional_days} days · New end: {ext.new_end_date} · ₱{(ext.total_amount_cents/100).toLocaleString()}</p>
-                      {ext.payment_proof_path && (
-  <a href="#" onClick={async (e) => {
-    e.preventDefault();
-    const res = await fetch(`/api/admin/parking/signed-url?path=${encodeURIComponent(ext.payment_proof_path!)}`);
-    const data = await res.json();
-    if (data.url) window.open(data.url, "_blank");
-  }}
-    className="inline-flex items-center gap-1 mt-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
-    📸 View GCash Screenshot ↗
-  </a>
-)}
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleExtensionAction(ext.id, "reject")} disabled={extActing === ext.id}
-                        className="rounded-xl border-2 border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50">
-                        Reject
-                      </button>
-                      <button onClick={() => handleExtensionAction(ext.id, "approve")} disabled={extActing === ext.id}
-                        className="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50">
-                        {extActing === ext.id ? "…" : "Approve"}
-                      </button>
-                    </div>
+              {extensions.map(ext => (
+                <div key={ext.id} className="rounded-xl bg-white border border-purple-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <span className="font-mono text-sm font-black text-purple-700">{ext.reference}</span>
+                    <span className="text-xs text-gray-400 ml-2">for booking {ext.reservation?.reference}</span>
+                    <p className="text-sm text-gray-700">{ext.reservation?.customer_full_name} · {ext.reservation?.lot_snapshot_name}</p>
+                    <p className="text-xs text-gray-400">+{ext.additional_days} days · New end: {ext.new_end_date} · {peso(ext.total_amount_cents)}</p>
+                    <p className="text-xs text-emerald-700 mt-0.5">Owner receivable: {peso(ext.owner_receivable_cents)}</p>
+                    {ext.payment_proof_path && (
+                      <a href="#" onClick={async (e) => {
+                        e.preventDefault();
+                        const res = await fetch(`/api/admin/parking/signed-url?path=${encodeURIComponent(ext.payment_proof_path!)}`);
+                        const data = await res.json();
+                        if (data.url) window.open(data.url, "_blank");
+                      }}
+                        className="inline-flex items-center gap-1 mt-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
+                        📸 View GCash Screenshot ↗
+                      </a>
+                    )}
                   </div>
-                );
-              })}
+                  <div className="flex gap-2">
+                    <button onClick={() => handleExtensionAction(ext.id, "reject")} disabled={extActing === ext.id}
+                      className="rounded-xl border-2 border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50">
+                      Reject
+                    </button>
+                    <button onClick={() => handleExtensionAction(ext.id, "approve")} disabled={extActing === ext.id}
+                      className="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50">
+                      {extActing === ext.id ? "…" : "Approve"}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -442,7 +647,6 @@ export default function AdminParkingReservationsPage() {
                       <span>·</span>
                       <span>{r.vehicle_count} vehicle{r.vehicle_count > 1 ? "s" : ""}</span>
                     </div>
-                    {/* Plates preview */}
                     <div className="flex flex-wrap gap-1 mt-1">
                       {r.vehicles?.map((v, i) => (
                         <span key={i} className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
@@ -483,6 +687,7 @@ export default function AdminParkingReservationsPage() {
           r={selected}
           onClose={() => setSelected(null)}
           onAction={handleAction}
+          onRefresh={fetchReservations}
         />
       )}
     </div>

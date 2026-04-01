@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       gcash_transaction_reference, park_date_start, park_date_end,
       total_days, vehicle_count, vehicles, total_amount_cents,
       parking_fee_cents, platform_fee_cents, processing_fee_cents,
+owner_receivable_cents, commission_cents,
       lot_snapshot_name, lot_snapshot_distance,
       customer_full_name, customer_email, customer_mobile,
       admin_notes, created_at, checked_in_at, checked_out_at,
