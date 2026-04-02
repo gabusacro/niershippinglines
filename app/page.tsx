@@ -72,20 +72,50 @@ const structuredData = {
   "@id": "https://www.travelasiargao.com/#travelagency",
   name: "Travela Siargao",
   url: "https://www.travelasiargao.com",
-  image: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png",
+  image: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/logo/01.png",
   description: "Online ferry booking, tours, and parking reservations for Siargao Island, Surigao City, and Dinagat.",
-  telephone: "+63 950 277 8440", // <-- replace with your real number
-  priceRange: "₱₱",
+  telephone: "+63 950 277 8440",
+  email: "support@travelasiargao.com",
+  priceRange: "₱650 - ₱7,500",
+  currenciesAccepted: "PHP",
+  paymentAccepted: "Cash, GCash",
   address: {
     "@type": "PostalAddress",
-    addressLocality: "Borromeo Street, Barangay Taft, Surigao City",
+    streetAddress: "Borromeo Street, Brgy. Taft, Surigao City",
+    addressLocality: "Surigao - Siargao",
     addressRegion: "Surigao del Norte",
-    addressCountry: "PH"
+    postalCode: "8400",
+    addressCountry: {
+      "@type": "Country",
+      name: "PH"
+    }
   },
+  sameAs: [
+    "https://www.facebook.com/travelasiargao",
+    "https://www.instagram.com/travelasiargao"
+  ],
   areaServed: [
-    { "@type": "Place", name: "Siargao Island" },
-    { "@type": "Place", name: "Surigao City" },
-    { "@type": "Place", name: "Dinagat Islands" }
+    {
+      "@type": "Place",
+      name: "Siargao Island",
+      address: {
+        "@type": "PostalAddress",
+        addressRegion: "Surigao del Norte",
+        postalCode: "8419",
+        addressCountry: {
+          "@type": "Country",
+          name: "PH"
+        }
+      }
+    },
+    {
+      "@type": "Place",
+      name: "Surigao City"
+    },
+    {
+      "@type": "Place",
+      name: "Dinagat Islands"
+    }
   ],
   serviceType: [
     "Ferry Booking",
