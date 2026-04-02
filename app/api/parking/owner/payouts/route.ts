@@ -24,7 +24,7 @@ export async function GET() {
   // Get all paid reservations for owner's lots
   const { data: reservations } = await supabase
     .from("parking_reservations")
-    .select("id, reference, customer_full_name, park_date_start, total_days, owner_receivable_cents, parking_fee_cents, platform_fee_cents, processing_fee_cents, total_amount_cents, paid_at")
+    .select("id, reference, customer_full_name, park_date_start, total_days, owner_receivable_cents, parking_fee_cents, commission_cents, platform_fee_cents, processing_fee_cents, total_amount_cents, paid_at")
     .in("lot_id", lotIds)
     .in("status", ["confirmed", "checked_in", "overstay", "completed"])
     .not("payment_method", "eq", "cash");
@@ -58,6 +58,7 @@ export async function GET() {
       platform_fee_cents: r.platform_fee_cents,
       processing_fee_cents: r.processing_fee_cents,
       total_amount_cents: r.total_amount_cents,
+      commission_cents: r.commission_cents,
       owner_receivable_cents: r.owner_receivable_cents,
       payout_status: paidResIds.has(r.id) ? "paid" : "pending",
       payment_reference: payouts?.find(p => p.reservation_id === r.id)?.payment_reference ?? null,

@@ -55,6 +55,7 @@ type PayoutItem = {
   payout_status: "pending" | "paid";
   payment_reference: string | null;
   paid_at: string | null;
+  commission_cents?: number;
 };
 
 type PendingExtension = {
@@ -565,10 +566,20 @@ function PayoutsTab({ payouts, pendingCents, paidCents, loading }: {
                 <div className="flex justify-between text-gray-500">
                   <span>Customer paid</span><span>{pesoFmt(item.total_amount_cents)}</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>Platform + processing fees</span>
-                  <span>-{pesoFmt((item.platform_fee_cents ?? 0) + (item.processing_fee_cents ?? 0))}</span>
-                </div>
+
+                
+    {item.type === "reservation" && ((item as PayoutItem & { commission_cents?: number }).commission_cents ?? 0) > 0 && (
+  <div className="flex justify-between text-red-400">
+    <span>Commission (Travela)</span>
+    <span>-{pesoFmt((item as PayoutItem & { commission_cents?: number }).commission_cents ?? 0)}</span>
+  </div>
+)}
+
+
+<div className="flex justify-between text-gray-400">
+  <span>Platform + processing fees</span>
+  <span>-{pesoFmt((item.platform_fee_cents ?? 0) + (item.processing_fee_cents ?? 0))}</span>
+</div>
                 <div className="flex justify-between font-semibold text-emerald-700 border-t border-gray-200 pt-1">
                   <span>Your receivable</span><span>{pesoFmt(item.owner_receivable_cents)}</span>
                 </div>
@@ -807,9 +818,7 @@ const fetchPayouts = useCallback(async () => {
     } catch { setScanMsg("❌ Network error."); setTimeout(() => setScanMsg(null), 5000); }
   }
 
-  const totalRevenue    = bookings.filter(b => ["confirmed","checked_in","overstay","completed"].includes(b.status)).reduce((s, b) => s + (b.parking_fee_cents ?? 0), 0);
-  const totalCommission = bookings.filter(b => ["confirmed","checked_in","overstay","completed"].includes(b.status)).reduce((s, b) => s + (b.commission_cents ?? 0), 0);
-  const netRevenue      = totalRevenue - totalCommission;
+  const netRevenue = payoutsPaidCents;
   const checkedIn       = bookings.filter(b => b.status === "checked_in").length;
   const pending         = bookings.filter(b => b.status === "pending_payment").length;
 
@@ -931,7 +940,7 @@ const fetchPayouts = useCallback(async () => {
               {[
                 { label: "Checked In", val: checkedIn,       color: "text-blue-600",    bg: "bg-blue-50 border-blue-200"       },
                 { label: "Pending",    val: pending,          color: "text-amber-600",   bg: "bg-amber-50 border-amber-200"     },
-                { label: "Net Revenue",val: peso(netRevenue), color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
+               { label: "Remitted to You", val: peso(netRevenue), color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
               ].map(s => (
                 <div key={s.label} className={`rounded-2xl border-2 ${s.bg} p-4 text-center`}>
                   <p className={`text-xl font-black ${s.color}`}>{s.val}</p>
@@ -1041,9 +1050,9 @@ const fetchPayouts = useCallback(async () => {
                   <h3 className="text-sm font-black text-[#134e4a]">Revenue Breakdown</h3>
                   <p className="text-xs text-gray-400">Only confirmed/checked-in/completed bookings are counted.</p>
                   {[
-                    { label: "Gross parking fees", val: totalRevenue,     note: "Before commission" },
-                    { label: "Commission deducted", val: -totalCommission, note: "Platform commission" },
-                    { label: "Your net revenue",    val: netRevenue,       note: "What you keep", bold: true },
+                 { label: "Total remitted to you", val: payoutsPaidCents,    note: "Already received from admin", bold: true },
+{ label: "Pending remittance",    val: payoutsPendingCents, note: "Awaiting admin transfer" },
+{ label: "Total earnings",        val: payoutsPaidCents + payoutsPendingCents, note: "Paid + pending combined" },
                   ].map(r => (
                     <div key={r.label} className={`flex justify-between items-center py-2.5 border-b border-teal-50 last:border-0 ${r.bold ? "font-black" : ""}`}>
                       <div>
@@ -1060,18 +1069,28 @@ const fetchPayouts = useCallback(async () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  {bookings.filter(b => ["confirmed","checked_in","overstay","completed"].includes(b.status)).map(b => (
-                    <div key={b.id} className="rounded-xl border border-teal-100 bg-white px-4 py-3 flex justify-between items-center">
-                      <div>
-                        <p className="font-mono text-xs font-black text-[#0c7b93]">{b.reference}</p>
-                        <p className="text-xs text-gray-400">{fmt(b.park_date_start)} · {b.vehicle_count} vehicle{b.vehicle_count !== 1 ? "s" : ""}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-emerald-600">{peso((b.parking_fee_cents ?? 0) - (b.commission_cents ?? 0))}</p>
-                        <p className="text-xs text-gray-400">net</p>
-                      </div>
-                    </div>
-                  ))}
+                  {payouts.map(item => (
+  <div key={`${item.type}-${item.id}`} className={`rounded-xl border px-4 py-3 flex justify-between items-center ${item.payout_status === "paid" ? "border-emerald-100 bg-emerald-50/30" : "border-teal-100 bg-white"}`}>
+    <div>
+      <div className="flex items-center gap-2">
+        <p className="font-mono text-xs font-black text-[#0c7b93]">{item.reference}</p>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.type === "extension" ? "bg-purple-100 text-purple-700" : "bg-teal-100 text-teal-700"}`}>
+          {item.type === "extension" ? "Ext" : "Booking"}
+        </span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.payout_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+          {item.payout_status === "paid" ? "✓ Remitted" : "Pending"}
+        </span>
+      </div>
+      <p className="text-xs text-gray-400 mt-0.5">{fmt(item.date)} · {item.days} day{item.days !== 1 ? "s" : ""} · {item.customer_full_name}</p>
+    </div>
+    <div className="text-right">
+      <p className={`text-sm font-bold ${item.payout_status === "paid" ? "text-emerald-600" : "text-amber-500"}`}>
+        {peso(item.owner_receivable_cents)}
+      </p>
+      <p className="text-xs text-gray-400">your share</p>
+    </div>
+  </div>
+))}
                 </div>
               </div>
             )}
