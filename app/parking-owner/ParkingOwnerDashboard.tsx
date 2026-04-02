@@ -20,6 +20,21 @@ type Lot = {
 
 type CrewMember = { id: string; crew_id: string; full_name: string; email: string; avatar_url: string | null };
 type Avail = { booked_car: number; booked_motorcycle: number; booked_van: number };
+
+
+
+type BookingExtension = {
+  id: string; reference: string; reservation_id: string;
+  additional_days: number; new_end_date: string;
+  parking_fee_cents: number; platform_fee_cents: number;
+  processing_fee_cents: number; owner_receivable_cents: number;
+  total_amount_cents: number; payment_status: string;
+  payment_proof_path: string | null;
+};
+
+
+
+
 type Booking = {
   id: string; reference: string; status: string;
   park_date_start: string; park_date_end: string; total_days: number;
@@ -156,6 +171,13 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
 
   const [photoUrls, setPhotoUrls]           = useState<Record<string, string>>({});
   const [urlsLoading, setUrlsLoading]       = useState(true);
+
+
+const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
+  const [extUrls, setExtUrls]               = useState<Record<string, string>>({});
+  const [extPayoutStatus, setExtPayoutStatus] = useState<Record<string, "pending" | "paid">>({});
+
+
   const [confirming, setConfirming]         = useState<"approve" | "reject" | null>(null);
   const [approveLoading, setApproveLoading] = useState(false);
   const [approveMsg, setApproveMsg]         = useState<string | null>(null);
@@ -185,6 +207,47 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
       setUrlsLoading(false);
     }
     loadUrls();
+
+
+
+// Fetch extensions for this booking
+    fetch(`/api/parking/owner/extensions?reservation_id=${selected.id}`)
+      .then(r => r.json())
+      .then(async (exts: BookingExtension[]) => {
+        if (!Array.isArray(exts)) return;
+        setExtensions(exts);
+        // Load extension GCash screenshots
+        const extPathEntries = exts
+          .filter(e => e.payment_proof_path)
+          .map(e => [`ext_gcash_${e.id}`, e.payment_proof_path!] as [string, string]);
+        const results = await Promise.all(
+          extPathEntries.map(async ([key, path]) => {
+            const url = await getSignedUrl(path);
+            return [key, url] as [string, string | null];
+          })
+        );
+        const map: Record<string, string> = {};
+        results.forEach(([key, url]) => { if (url) map[key] = url; });
+        setExtUrls(map);
+      })
+      .catch(() => {});
+
+    // Fetch payout status for extensions
+    fetch("/api/parking/owner/payouts")
+      .then(r => r.json())
+      .then(data => {
+        const statuses: Record<string, "pending" | "paid"> = {};
+        (data.payouts ?? []).filter((p: { type: string }) => p.type === "extension")
+          .forEach((p: { id: string; payout_status: "pending" | "paid" }) => {
+            statuses[p.id] = p.payout_status;
+          });
+        setExtPayoutStatus(statuses);
+      })
+      .catch(() => {});
+
+
+
+    
   }, [selected]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -363,6 +426,64 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
               )}
             </div>
           </div>
+
+
+
+
+{/* Extensions */}
+          {extensions.length > 0 && (
+            <div className="rounded-xl border-2 border-purple-200 overflow-hidden">
+              <div className="bg-purple-50 px-4 py-2 text-xs font-bold text-purple-800 uppercase">
+                Extend Stay ({extensions.length})
+              </div>
+              {extensions.map((ext, i) => (
+                <div key={ext.id} className={`px-4 py-3 border-b border-purple-50 last:border-0 ${i % 2 === 0 ? "bg-white" : "bg-purple-50/20"}`}>
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="font-mono text-xs font-black text-purple-700">{ext.reference}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ext.payment_status === "paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                      {ext.payment_status === "paid" ? "✓ Paid" : "Pending"}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${(extPayoutStatus[ext.id] ?? "pending") === "paid" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                      {(extPayoutStatus[ext.id] ?? "pending") === "paid" ? "✓ Remitted" : "⏳ Pending Remittance"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">+{ext.additional_days} days · New end: {ext.new_end_date}</p>
+                  <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs space-y-0.5 mb-2">
+                    <div className="flex justify-between text-gray-500">
+                      <span>Parking fee (extension)</span><span>₱{(ext.parking_fee_cents / 100).toLocaleString("en-PH")}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-400">
+                      <span>Platform fee (Travela)</span><span>₱{(ext.platform_fee_cents / 100).toLocaleString("en-PH")}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-400">
+                      <span>Processing fee (Travela)</span><span>₱{(ext.processing_fee_cents / 100).toLocaleString("en-PH")}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-[#0c7b93] border-t border-gray-200 pt-1">
+                      <span>Customer paid</span><span>₱{(ext.total_amount_cents / 100).toLocaleString("en-PH")}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-emerald-700">
+                      <span>Your receivable</span><span>₱{(ext.owner_receivable_cents / 100).toLocaleString("en-PH")}</span>
+                    </div>
+                  </div>
+                  {ext.payment_proof_path && extUrls[`ext_gcash_${ext.id}`] && (
+                    <a href={extUrls[`ext_gcash_${ext.id}`]} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
+                      📸 View Extension GCash Screenshot ↗
+                    </a>
+                  )}
+                  {ext.payment_proof_path && !extUrls[`ext_gcash_${ext.id}`] && (
+                    <span className="text-xs text-gray-400 animate-pulse">Loading screenshot…</span>
+                  )}
+                  {!ext.payment_proof_path && (
+                    <span className="text-xs text-red-500">⚠ No GCash screenshot for extension</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+
+
 
           {/* Approve / Reject for pending_payment */}
           {isPending && (

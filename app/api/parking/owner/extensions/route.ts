@@ -2,6 +2,40 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { NextRequest, NextResponse } from "next/server";
 
+
+
+export async function GET(request: NextRequest) {
+  const user = await getAuthUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!["admin", "parking_owner", "parking_crew"].includes(user.role as string))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const reservation_id = request.nextUrl.searchParams.get("reservation_id");
+  if (!reservation_id) return NextResponse.json({ error: "reservation_id required" }, { status: 400 });
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("parking_extensions")
+    .select(`
+      id, reference, reservation_id,
+      additional_days, new_end_date,
+      parking_fee_cents, platform_fee_cents,
+      processing_fee_cents, owner_receivable_cents,
+      total_amount_cents, payment_status,
+      payment_proof_path, created_at
+    `)
+    .eq("reservation_id", reservation_id)
+    .order("created_at", { ascending: true });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data ?? []);
+}
+
+
+
+
+
 // Allows parking_owner (and admin) to approve or reject extension payments
 // for extensions belonging to their lot
 export async function POST(request: NextRequest) {
