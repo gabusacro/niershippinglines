@@ -98,13 +98,21 @@ function ReservationDetail({ r, onClose, onAction, onRefresh }: {
   const [confirming, setConfirming]   = useState<"approve" | "reject" | null>(null);
   const [photoUrls, setPhotoUrls]     = useState<Record<string, string>>({});
 
-  // Remit to owner state
+  // Remit to owner state — booking
   const [remitOpen, setRemitOpen]     = useState(false);
   const [remitRef, setRemitRef]       = useState("");
   const [remitNotes, setRemitNotes]   = useState("");
   const [remitSaving, setRemitSaving] = useState(false);
   const [remitMsg, setRemitMsg]       = useState<string | null>(null);
   const [remitStatus, setRemitStatus] = useState<"pending" | "paid">("pending");
+
+  // Remit to owner state — per extension
+  const [extRemitOpen, setExtRemitOpen]   = useState<string | null>(null);
+  const [extRemitRef, setExtRemitRef]     = useState<Record<string, string>>({});
+  const [extRemitNotes, setExtRemitNotes] = useState<Record<string, string>>({});
+  const [extRemitSaving, setExtRemitSaving] = useState<string | null>(null);
+  const [extRemitMsg, setExtRemitMsg]     = useState<string | null>(null);
+  const [extRemitStatus, setExtRemitStatus] = useState<Record<string, "pending" | "paid">>({});
 
   // Extensions for this reservation
   const [extensions, setExtensions]   = useState<Extension[]>([]);
@@ -152,14 +160,22 @@ function ReservationDetail({ r, onClose, onAction, onRefresh }: {
       })
       .catch(() => {});
 
-    // Check remit status
-    fetch(`/api/admin/parking/payouts?lot_id=all`)
+    // Check remit status for booking and extensions
+    fetch(`/api/admin/parking/payouts`)
       .then(res => res.json())
       .then(data => {
-        const item = (data.items ?? []).find((i: { id: string; payout_status: string }) => i.id === r.id);
-        if (item) setRemitStatus(item.payout_status);
+        const items = data.items ?? [];
+        const bookingItem = items.find((i: { id: string; type: string; payout_status: string }) => i.id === r.id && i.type === "reservation");
+        if (bookingItem) setRemitStatus(bookingItem.payout_status);
+        const extStatuses: Record<string, "pending" | "paid"> = {};
+        items.filter((i: { type: string }) => i.type === "extension").forEach((i: { id: string; payout_status: "pending" | "paid" }) => {
+          extStatuses[i.id] = i.payout_status;
+        });
+        setExtRemitStatus(extStatuses);
       })
       .catch(() => {});
+
+
   }, [r]);
 
   async function doAction(action: string) {
@@ -195,6 +211,45 @@ function ReservationDetail({ r, onClose, onAction, onRefresh }: {
     } catch { setRemitMsg("Network error."); }
     finally { setRemitSaving(false); }
   }
+
+
+
+async function handleExtRemit(extId: string, ownerReceivable: number) {
+    const ref = extRemitRef[extId]?.trim();
+    if (!ref) { setExtRemitMsg("Payment reference is required."); return; }
+    setExtRemitSaving(extId); setExtRemitMsg(null);
+    try {
+      const res = await fetch("/api/admin/parking/payouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "extension",
+          id: extId,
+          payment_reference: ref,
+          payment_notes: extRemitNotes[extId]?.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setExtRemitMsg(data.error ?? "Failed."); return; }
+      setExtRemitStatus(p => ({ ...p, [extId]: "paid" }));
+      setExtRemitOpen(null);
+      setExtRemitMsg(null);
+      onRefresh();
+    } catch { setExtRemitMsg("Network error."); }
+    finally { setExtRemitSaving(null); }
+  }
+
+  async function handleExtUnremit(extId: string) {
+    if (!confirm("Revert extension remittance to pending?")) return;
+    setExtRemitSaving(extId);
+    try {
+      await fetch(`/api/admin/parking/payouts?type=extension&id=${extId}`, { method: "DELETE" });
+      setExtRemitStatus(p => ({ ...p, [extId]: "pending" }));
+      onRefresh();
+    } catch {} finally { setExtRemitSaving(null); }
+  }
+
+
 
   async function handleUnremit() {
     if (!confirm("Revert remittance to pending?")) return;
@@ -356,6 +411,62 @@ function ReservationDetail({ r, onClose, onAction, onRefresh }: {
                   {!ext.payment_proof_path && (
                     <span className="text-xs text-red-500">⚠ No GCash screenshot for extension</span>
                   )}
+
+
+{/* Extension Remit Button */}
+                  {ext.payment_status === "paid" && (
+                    <div className={`mt-3 rounded-xl border-2 overflow-hidden ${(extRemitStatus[ext.id] ?? "pending") === "paid" ? "border-emerald-200" : "border-amber-200"}`}>
+                      <div className={`px-3 py-1.5 text-xs font-bold uppercase ${(extRemitStatus[ext.id] ?? "pending") === "paid" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+                        💸 Extension Remittance — {peso(ext.owner_receivable_cents)}
+                      </div>
+                      <div className="px-3 py-2">
+                        {(extRemitStatus[ext.id] ?? "pending") === "paid" ? (
+                          <div className="space-y-1">
+                            <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 font-semibold">
+                              ✅ Extension payment remitted to owner
+                            </div>
+                            <button onClick={() => handleExtUnremit(ext.id)} disabled={extRemitSaving === ext.id}
+                              className="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                              ↩ Revert to pending
+                            </button>
+                          </div>
+                        ) : extRemitOpen === ext.id ? (
+                          <div className="space-y-2">
+                            <p className="text-xs text-gray-500">Remit <span className="font-bold text-emerald-700">{peso(ext.owner_receivable_cents)}</span> to lot owner for this extension.</p>
+                            <input type="text" placeholder="GCash / Bank reference number *"
+                              value={extRemitRef[ext.id] ?? ""}
+                              onChange={e => setExtRemitRef(p => ({ ...p, [ext.id]: e.target.value }))}
+                              className="w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2 text-[#134e4a] text-xs focus:border-[#0c7b93] focus:outline-none" />
+                            <input type="text" placeholder="Notes (optional)"
+                              value={extRemitNotes[ext.id] ?? ""}
+                              onChange={e => setExtRemitNotes(p => ({ ...p, [ext.id]: e.target.value }))}
+                              className="w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2 text-[#134e4a] text-xs focus:border-[#0c7b93] focus:outline-none" />
+                            {extRemitMsg && <p className="text-xs text-red-600">{extRemitMsg}</p>}
+                            <div className="flex gap-2">
+                              <button onClick={() => setExtRemitOpen(null)}
+                                className="flex-1 rounded-xl border-2 border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                                Cancel
+                              </button>
+                              <button onClick={() => handleExtRemit(ext.id, ext.owner_receivable_cents)} disabled={extRemitSaving === ext.id}
+                                className="flex-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                                {extRemitSaving === ext.id ? "Saving…" : "✓ Confirm"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setExtRemitOpen(ext.id)}
+                            className="w-full rounded-xl bg-[#0c7b93] px-3 py-2 text-xs font-bold text-white hover:bg-[#085f72] transition-colors">
+                            💸 Mark Extension as Remitted
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+
+
+
+
                 </div>
               ))}
             </div>
