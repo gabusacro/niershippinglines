@@ -39,6 +39,86 @@ export const dynamic = "force-dynamic";
 const HERO_BG = "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/Discover%20Siargao%20Contents/background%20travela%20siargao.jpg";
 const BG2 = "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/discover-media/travelasiargao%20(2).webp";
 
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.travelasiargao.com/#organization",
+      name: "Travela Siargao",
+      url: "https://www.travelasiargao.com",
+      logo: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png",
+      sameAs: [
+        "https://www.facebook.com/travelasiargao"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.travelasiargao.com/#website",
+      url: "https://www.travelasiargao.com",
+      name: "Travela Siargao",
+      publisher: {
+        "@id": "https://www.travelasiargao.com/#organization"
+      },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: "https://www.travelasiargao.com/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    },
+    {
+      "@type": "TravelAgency",
+      "@id": "https://www.travelasiargao.com/#travelagency",
+      name: "Travela Siargao",
+      url: "https://www.travelasiargao.com",
+      image: "https://gohrllugnblfzsypapee.supabase.co/storage/v1/object/public/promo-media/promo-popup/banner-1773400190201.png",
+      description: "Online ferry booking, tours, and parking reservations for Siargao Island, Surigao City, and Dinagat.",
+      areaServed: [
+        { "@type": "Place", name: "Siargao Island" },
+        { "@type": "Place", name: "Surigao City" },
+        { "@type": "Place", name: "Dinagat Islands" }
+      ],
+      serviceType: [
+        "Ferry Booking",
+        "Travel and Tours",
+        "Parking Reservation"
+      ]
+    },
+    {
+      "@type": "Service",
+      "@id": "https://www.travelasiargao.com/#ferrybooking",
+      name: "Siargao Ferry Booking",
+      provider: {
+        "@id": "https://www.travelasiargao.com/#travelagency"
+      },
+      areaServed: [
+        { "@type": "Place", name: "Surigao City" },
+        { "@type": "Place", name: "Dapa, Siargao" },
+        { "@type": "Place", name: "Dinagat Islands" }
+      ],
+      description: "Book ferry trips online from Surigao City to Dapa, Siargao and Dinagat with e-ticket and real-time seat availability."
+    },
+    {
+      "@type": "Service",
+      "@id": "https://www.travelasiargao.com/#parking",
+      name: "Port Parking Reservation",
+      provider: {
+        "@id": "https://www.travelasiargao.com/#travelagency"
+      },
+      areaServed: {
+        "@type": "Place",
+        name: "Dapa Port, Siargao"
+      },
+      description: "Reserve parking slots near Dapa Port for cars, motorcycles, and vans."
+    }
+  ]
+};
+
+
+
+
+
 export default async function HomePage() {
   const today = getTodayInManila();
   const [branding, discoverItems, schedule, announcements, faqs, fees] = await Promise.all([
@@ -46,8 +126,12 @@ export default async function HomePage() {
     getActiveAnnouncements(), getFaqs(), getFeeSettings(),
   ]);
 
-  return (
-    <div className="overflow-x-hidden">
+return (
+  <div className="overflow-x-hidden">
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+    />
 
       {/* ══════════════════════════════════════════════
           ① HERO — own background, vertically centered
