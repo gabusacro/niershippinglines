@@ -52,11 +52,12 @@ export async function POST(request: NextRequest) {
 
   const { data: settings } = await supabase
     .from("parking_settings")
-    .select("platform_fee_cents, max_parking_days")
+    .select("platform_fee_cents, processing_fee_cents, max_parking_days")
     .eq("id", 1).maybeSingle();
 
-  const platformFee  = settings?.platform_fee_cents ?? 3500;
-  const maxDays      = settings?.max_parking_days   ?? 45;
+  const platformFee   = settings?.platform_fee_cents   ?? 3500;
+  const processingFee = settings?.processing_fee_cents ?? 3000;
+  const maxDays       = settings?.max_parking_days     ?? 45;
   const newTotalDays = (booking.total_days ?? 0) + additional_days;
 
   if (newTotalDays > maxDays)
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
   const ratePerVehiclePerDay = booking.rate_cents_per_vehicle_per_day ?? 25000;
   const vehicleCount         = booking.vehicle_count ?? 1;
   const parkingFee           = ratePerVehiclePerDay * vehicleCount * additional_days;
-  const totalAmount          = parkingFee + platformFee;
+  const totalAmount          = parkingFee + platformFee + processingFee;
+  const ownerReceivable      = parkingFee;
   const newEndDate           = addDaysToDate(booking.park_date_end, additional_days);
 
   let reference = "";
@@ -88,9 +90,9 @@ export async function POST(request: NextRequest) {
       new_end_date:           newEndDate,
       parking_fee_cents:      parkingFee,
       platform_fee_cents:     platformFee,
-      processing_fee_cents:   0,
+      processing_fee_cents:   processingFee,
       total_amount_cents:     totalAmount,
-      owner_receivable_cents: parkingFee,
+      owner_receivable_cents: ownerReceivable,
       payment_method:         "gcash",
       payment_status:         "pending",
       payment_proof_path:     gcash_proof_path,
