@@ -424,8 +424,14 @@ const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
                   ⚠ No GCash screenshot uploaded yet
                 </div>
               )}
-            </div>
-          </div>
+
+
+
+
+</div>
+
+
+</div>
 
 
 
