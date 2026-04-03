@@ -21,8 +21,6 @@ type Lot = {
 type CrewMember = { id: string; crew_id: string; full_name: string; email: string; avatar_url: string | null };
 type Avail = { booked_car: number; booked_motorcycle: number; booked_van: number };
 
-
-
 type BookingExtension = {
   id: string; reference: string; reservation_id: string;
   additional_days: number; new_end_date: string;
@@ -31,9 +29,6 @@ type BookingExtension = {
   total_amount_cents: number; payment_status: string;
   payment_proof_path: string | null;
 };
-
-
-
 
 type Booking = {
   id: string; reference: string; status: string;
@@ -108,7 +103,7 @@ function fmt(iso: string) {
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
 }
 function peso(cents: number) {
-  return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
+  return `₱${((cents ?? 0) / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
 }
 function getTodayManila() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
@@ -169,19 +164,15 @@ function BookingDetailModal({ selected, onClose, onCheckIn, onCheckOut, actionLo
   const [photoErr, setPhotoErr]                 = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
-  const [photoUrls, setPhotoUrls]           = useState<Record<string, string>>({});
-  const [urlsLoading, setUrlsLoading]       = useState(true);
-
-
-const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
-  const [extUrls, setExtUrls]               = useState<Record<string, string>>({});
-  const [extPayoutStatus, setExtPayoutStatus] = useState<Record<string, "pending" | "paid">>({});
-
-
-  const [confirming, setConfirming]         = useState<"approve" | "reject" | null>(null);
-  const [approveLoading, setApproveLoading] = useState(false);
-  const [approveMsg, setApproveMsg]         = useState<string | null>(null);
-  const [approveErr, setApproveErr]         = useState<string | null>(null);
+  const [photoUrls, setPhotoUrls]               = useState<Record<string, string>>({});
+  const [urlsLoading, setUrlsLoading]           = useState(true);
+  const [extensions, setExtensions]             = useState<BookingExtension[]>([]);
+  const [extUrls, setExtUrls]                   = useState<Record<string, string>>({});
+  const [extPayoutStatus, setExtPayoutStatus]   = useState<Record<string, "pending" | "paid">>({});
+  const [confirming, setConfirming]             = useState<"approve" | "reject" | null>(null);
+  const [approveLoading, setApproveLoading]     = useState(false);
+  const [approveMsg, setApproveMsg]             = useState<string | null>(null);
+  const [approveErr, setApproveErr]             = useState<string | null>(null);
 
   const inputCls = "w-full rounded-xl border-2 border-teal-100 bg-white px-3 py-2.5 text-[#134e4a] text-sm focus:border-[#0c7b93] focus:outline-none";
   const labelCls = "text-xs font-semibold text-[#134e4a] block mb-1";
@@ -208,27 +199,24 @@ const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
     }
     loadUrls();
 
-
-
-// Fetch extensions for this booking
+    // Fetch extensions for this booking
     fetch(`/api/parking/owner/extensions?reservation_id=${selected.id}`)
       .then(r => r.json())
       .then(async (exts: BookingExtension[]) => {
         if (!Array.isArray(exts)) return;
         setExtensions(exts);
-        // Load extension GCash screenshots
         const extPathEntries = exts
           .filter(e => e.payment_proof_path)
           .map(e => [`ext_gcash_${e.id}`, e.payment_proof_path!] as [string, string]);
-        const results = await Promise.all(
+        const extResults = await Promise.all(
           extPathEntries.map(async ([key, path]) => {
             const url = await getSignedUrl(path);
             return [key, url] as [string, string | null];
           })
         );
-        const map: Record<string, string> = {};
-        results.forEach(([key, url]) => { if (url) map[key] = url; });
-        setExtUrls(map);
+        const extMap: Record<string, string> = {};
+        extResults.forEach(([key, url]) => { if (url) extMap[key] = url; });
+        setExtUrls(extMap);
       })
       .catch(() => {});
 
@@ -244,10 +232,6 @@ const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
         setExtPayoutStatus(statuses);
       })
       .catch(() => {});
-
-
-
-    
   }, [selected]);
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -370,37 +354,37 @@ const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
             ))}
           </div>
 
-          {/* Payment */}
-          <div className="px-4 py-3 space-y-1.5 text-sm">
-  <div className="flex justify-between">
-    <span className="text-gray-500">Parking fee</span>
-    <span className="font-semibold text-[#134e4a]">
-      {selected.parking_fee_cents != null ? `₱${(selected.parking_fee_cents / 100).toLocaleString("en-PH")}` : "—"}
-    </span>
-  </div>
-  <div className="flex justify-between text-xs text-gray-400">
-    <span>Platform service fee</span>
-    <span>{selected.platform_fee_cents != null ? `₱${(selected.platform_fee_cents / 100).toLocaleString("en-PH")}` : "—"}</span>
-  </div>
-  <div className="flex justify-between text-xs text-gray-400">
-    <span>Payment processing fee</span>
-    <span>{selected.processing_fee_cents != null ? `₱${(selected.processing_fee_cents / 100).toLocaleString("en-PH")}` : "—"}</span>
-  </div>
-  <div className="flex justify-between pt-2 border-t-2 border-teal-100">
-    <span className="font-black text-[#134e4a]">Total paid by customer</span>
-    <span className="font-black text-[#0c7b93]">
-      {selected.total_amount_cents != null ? `₱${(selected.total_amount_cents / 100).toLocaleString("en-PH")}` : "—"}
-    </span>
-  </div>
-  {selected.owner_receivable_cents != null && (
-    <div className="flex justify-between pt-1 border-t border-teal-100">
-      <span className="font-semibold text-[#134e4a]">Your receivable</span>
-      <span className="font-black text-emerald-600">
-        ₱{(selected.owner_receivable_cents / 100).toLocaleString("en-PH")}
-      </span>
-    </div>
-  )}
-</div>
+          {/* Payment — Original Booking */}
+          <div className="rounded-xl border-2 border-teal-200 overflow-hidden">
+            <div className="bg-teal-50 px-4 py-2 text-xs font-bold text-[#134e4a] uppercase">Payment — Original Booking</div>
+            <div className="px-4 py-3 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Parking fee</span>
+                <span className="font-semibold text-[#134e4a]">
+                  {selected.parking_fee_cents != null ? peso(selected.parking_fee_cents) : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>Platform service fee</span>
+                <span>{selected.platform_fee_cents != null ? peso(selected.platform_fee_cents) : "—"}</span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>Payment processing fee</span>
+                <span>{selected.processing_fee_cents != null ? peso(selected.processing_fee_cents) : "—"}</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t-2 border-teal-100">
+                <span className="font-black text-[#134e4a]">Total paid by customer</span>
+                <span className="font-black text-[#0c7b93]">
+                  {selected.total_amount_cents != null ? peso(selected.total_amount_cents) : "—"}
+                </span>
+              </div>
+              {selected.owner_receivable_cents != null && (
+                <div className="flex justify-between pt-1 border-t border-teal-100">
+                  <span className="font-semibold text-emerald-700">Your receivable</span>
+                  <span className="font-black text-emerald-700">{peso(selected.owner_receivable_cents)}</span>
+                </div>
+              )}
+            </div>
             <div className="px-4 pb-3">
               {hasProof ? (
                 <div className="space-y-2">
@@ -424,19 +408,10 @@ const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
                   ⚠ No GCash screenshot uploaded yet
                 </div>
               )}
+            </div>
+          </div>
 
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-{/* Extensions */}
+          {/* Extensions */}
           {extensions.length > 0 && (
             <div className="rounded-xl border-2 border-purple-200 overflow-hidden">
               <div className="bg-purple-50 px-4 py-2 text-xs font-bold text-purple-800 uppercase">
@@ -456,19 +431,19 @@ const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
                   <p className="text-xs text-gray-500 mb-2">+{ext.additional_days} days · New end: {ext.new_end_date}</p>
                   <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs space-y-0.5 mb-2">
                     <div className="flex justify-between text-gray-500">
-                      <span>Parking fee (extension)</span><span>₱{(ext.parking_fee_cents / 100).toLocaleString("en-PH")}</span>
+                      <span>Parking fee (extension)</span><span>{peso(ext.parking_fee_cents)}</span>
                     </div>
                     <div className="flex justify-between text-gray-400">
-                      <span>Platform fee (Travela)</span><span>₱{(ext.platform_fee_cents / 100).toLocaleString("en-PH")}</span>
+                      <span>Platform fee (Travela)</span><span>{peso(ext.platform_fee_cents)}</span>
                     </div>
                     <div className="flex justify-between text-gray-400">
-                      <span>Processing fee (Travela)</span><span>₱{(ext.processing_fee_cents / 100).toLocaleString("en-PH")}</span>
+                      <span>Processing fee (Travela)</span><span>{peso(ext.processing_fee_cents)}</span>
                     </div>
                     <div className="flex justify-between font-bold text-[#0c7b93] border-t border-gray-200 pt-1">
-                      <span>Customer paid</span><span>₱{(ext.total_amount_cents / 100).toLocaleString("en-PH")}</span>
+                      <span>Customer paid</span><span>{peso(ext.total_amount_cents)}</span>
                     </div>
                     <div className="flex justify-between font-bold text-emerald-700">
-                      <span>Your receivable</span><span>₱{(ext.owner_receivable_cents / 100).toLocaleString("en-PH")}</span>
+                      <span>Your receivable</span><span>{peso(ext.owner_receivable_cents)}</span>
                     </div>
                   </div>
                   {ext.payment_proof_path && extUrls[`ext_gcash_${ext.id}`] && (
@@ -487,9 +462,6 @@ const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
               ))}
             </div>
           )}
-
-
-
 
           {/* Approve / Reject for pending_payment */}
           {isPending && (
@@ -619,10 +591,9 @@ const [extensions, setExtensions]         = useState<BookingExtension[]>([]);
 
         </div>
       </div>
- 
+    </div>
   );
 }
-
 
 // ── Payouts Tab ───────────────────────────────────────────────────────────────
 function PayoutsTab({ payouts, pendingCents, paidCents, loading }: {
@@ -631,13 +602,12 @@ function PayoutsTab({ payouts, pendingCents, paidCents, loading }: {
   paidCents: number;
   loading: boolean;
 }) {
-  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  function fmt(iso: string) {
-    const d = new Date(iso);
-    return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
-  }
   function pesoFmt(cents: number) {
     return `₱${((cents ?? 0) / 100).toLocaleString("en-PH", { minimumFractionDigits: 0 })}`;
+  }
+  function fmtDate(iso: string) {
+    const d = new Date(iso);
+    return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
   }
   return (
     <div className="space-y-4">
@@ -677,7 +647,7 @@ function PayoutsTab({ payouts, pendingCents, paidCents, loading }: {
                     </span>
                   </div>
                   <p className="text-sm font-semibold text-[#134e4a] mt-0.5">{item.customer_full_name}</p>
-                  <p className="text-xs text-gray-400">{fmt(item.date)} · {item.days} day{item.days !== 1 ? "s" : ""}</p>
+                  <p className="text-xs text-gray-400">{fmtDate(item.date)} · {item.days} day{item.days !== 1 ? "s" : ""}</p>
                   {item.payout_status === "paid" && item.payment_reference && (
                     <p className="text-xs text-emerald-700 mt-0.5">✓ Ref: {item.payment_reference}</p>
                   )}
@@ -693,20 +663,16 @@ function PayoutsTab({ payouts, pendingCents, paidCents, loading }: {
                 <div className="flex justify-between text-gray-500">
                   <span>Customer paid</span><span>{pesoFmt(item.total_amount_cents)}</span>
                 </div>
-
-                
-    {item.type === "reservation" && ((item as PayoutItem & { commission_cents?: number }).commission_cents ?? 0) > 0 && (
-  <div className="flex justify-between text-red-400">
-    <span>Commission (Travela)</span>
-    <span>-{pesoFmt((item as PayoutItem & { commission_cents?: number }).commission_cents ?? 0)}</span>
-  </div>
-)}
-
-
-<div className="flex justify-between text-gray-400">
-  <span>Platform + processing fees</span>
-  <span>-{pesoFmt((item.platform_fee_cents ?? 0) + (item.processing_fee_cents ?? 0))}</span>
-</div>
+                {item.type === "reservation" && ((item.commission_cents ?? 0) > 0) && (
+                  <div className="flex justify-between text-red-400">
+                    <span>Commission (Travela)</span>
+                    <span>-{pesoFmt(item.commission_cents ?? 0)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-gray-400">
+                  <span>Platform + processing fees</span>
+                  <span>-{pesoFmt((item.platform_fee_cents ?? 0) + (item.processing_fee_cents ?? 0))}</span>
+                </div>
                 <div className="flex justify-between font-semibold text-emerald-700 border-t border-gray-200 pt-1">
                   <span>Your receivable</span><span>{pesoFmt(item.owner_receivable_cents)}</span>
                 </div>
@@ -718,7 +684,6 @@ function PayoutsTab({ payouts, pendingCents, paidCents, loading }: {
     </div>
   );
 }
-
 
 // ── Manage Lot Tab ────────────────────────────────────────────────────────────
 function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => void }) {
@@ -830,29 +795,21 @@ function ManageLotTab({ lot, onSaved }: { lot: NonNullable<Lot>; onSaved: () => 
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function ParkingOwnerDashboard({ ownerId, ownerName, ownerEmail, avatarUrl, lot, crew, availability }: Props) {
-  const [period, setPeriod]                       = useState<"today"|"week"|"month">("today");
-  const [bookings, setBookings]                   = useState<Booking[]>([]);
-  const [pendingExtensions, setPendingExtensions] = useState<PendingExtension[]>([]);
-  const [loading, setLoading]                     = useState(true);
-  const [showScanner, setShowScanner]             = useState(false);
-  const [scanMsg, setScanMsg]                     = useState<string | null>(null);
- const [tab, setTab] = useState<"bookings"|"crew"|"revenue"|"lot"|"payouts">("bookings");
-  const [extLoading, setExtLoading]               = useState<string | null>(null);
-  const [selected, setSelected]                   = useState<Booking | null>(null);
-
-  
-  const [actionLoading, setActionLoading]         = useState(false);
-  const [actionMsg, setActionMsg]                 = useState<string | null>(null);
-
-
-
-const [payouts, setPayouts]                     = useState<PayoutItem[]>([]);
+  const [period, setPeriod]                           = useState<"today"|"week"|"month">("today");
+  const [bookings, setBookings]                       = useState<Booking[]>([]);
+  const [pendingExtensions, setPendingExtensions]     = useState<PendingExtension[]>([]);
+  const [loading, setLoading]                         = useState(true);
+  const [showScanner, setShowScanner]                 = useState(false);
+  const [scanMsg, setScanMsg]                         = useState<string | null>(null);
+  const [tab, setTab]                                 = useState<"bookings"|"crew"|"revenue"|"lot"|"payouts">("bookings");
+  const [extLoading, setExtLoading]                   = useState<string | null>(null);
+  const [selected, setSelected]                       = useState<Booking | null>(null);
+  const [actionLoading, setActionLoading]             = useState(false);
+  const [actionMsg, setActionMsg]                     = useState<string | null>(null);
+  const [payouts, setPayouts]                         = useState<PayoutItem[]>([]);
   const [payoutsPendingCents, setPayoutsPendingCents] = useState(0);
-  const [payoutsPaidCents, setPayoutsPaidCents]   = useState(0);
-  const [payoutsLoading, setPayoutsLoading]       = useState(false);
-
-
-
+  const [payoutsPaidCents, setPayoutsPaidCents]       = useState(0);
+  const [payoutsLoading, setPayoutsLoading]           = useState(false);
 
   const totalCar   = lot?.total_slots_car        ?? 0;
   const totalMoto  = lot?.total_slots_motorcycle ?? 0;
@@ -864,9 +821,7 @@ const [payouts, setPayouts]                     = useState<PayoutItem[]>([]);
   const occupied   = (availability.booked_car ?? 0) + (availability.booked_motorcycle ?? 0) + (availability.booked_van ?? 0);
   const pctFull    = totalSlots > 0 ? Math.round((occupied / totalSlots) * 100) : 0;
 
-
-
-const fetchPayouts = useCallback(async () => {
+  const fetchPayouts = useCallback(async () => {
     setPayoutsLoading(true);
     try {
       const res = await fetch("/api/parking/owner/payouts");
@@ -880,10 +835,6 @@ const fetchPayouts = useCallback(async () => {
   }, []);
 
   useEffect(() => { fetchPayouts(); }, [fetchPayouts]);
-
-
-
-
 
   const fetchBookings = useCallback(async () => {
     if (!lot) return;
@@ -945,10 +896,9 @@ const fetchPayouts = useCallback(async () => {
     } catch { setScanMsg("❌ Network error."); setTimeout(() => setScanMsg(null), 5000); }
   }
 
-  const netRevenue = payoutsPaidCents;
-  const checkedIn       = bookings.filter(b => b.status === "checked_in").length;
-  const pending         = bookings.filter(b => b.status === "pending_payment").length;
-
+  const netRevenue  = payoutsPaidCents;
+  const checkedIn   = bookings.filter(b => b.status === "checked_in").length;
+  const pending     = bookings.filter(b => b.status === "pending_payment").length;
   const tabCls = (t: string) => `rounded-xl px-4 py-2 text-xs font-bold border transition-all ${tab === t ? "bg-[#0c7b93] text-white border-[#0c7b93]" : "bg-white text-[#134e4a] border-teal-200 hover:border-[#0c7b93]"}`;
 
   return (
@@ -1008,20 +958,17 @@ const fetchPayouts = useCallback(async () => {
                           <p className="text-xs text-purple-600">for booking {ext.reservation_reference}</p>
                           <p className="text-sm font-semibold text-[#134e4a] mt-0.5">{ext.customer_full_name}</p>
                           <p className="text-xs text-gray-500 mt-0.5">+{ext.additional_days} day{ext.additional_days > 1 ? "s" : ""} · New end: {fmt(ext.new_end_date)} · {peso(ext.total_amount_cents)}</p>
-
-{ext.payment_proof_path && (
-  <a href="#" onClick={async (e) => {
-    e.preventDefault();
-    const res = await fetch(`/api/parking/signed-url?path=${encodeURIComponent(ext.payment_proof_path!)}`);
-    const data = await res.json();
-    if (data.url) window.open(data.url, "_blank");
-  }}
-    className="inline-flex items-center gap-1 mt-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
-    📸 View GCash Screenshot ↗
-  </a>
-)}
-
-
+                          {ext.payment_proof_path && (
+                            <a href="#" onClick={async (e) => {
+                              e.preventDefault();
+                              const res = await fetch(`/api/parking/signed-url?path=${encodeURIComponent(ext.payment_proof_path!)}`);
+                              const data = await res.json();
+                              if (data.url) window.open(data.url, "_blank");
+                            }}
+                              className="inline-flex items-center gap-1 mt-1 rounded-lg bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100 transition-colors">
+                              📸 View GCash Screenshot ↗
+                            </a>
+                          )}
                         </div>
                         <div className="flex gap-2 shrink-0">
                           <button onClick={() => handleExtensionAction(ext.id, "reject")} disabled={extLoading === ext.id}
@@ -1065,9 +1012,9 @@ const fetchPayouts = useCallback(async () => {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Checked In", val: checkedIn,       color: "text-blue-600",    bg: "bg-blue-50 border-blue-200"       },
-                { label: "Pending",    val: pending,          color: "text-amber-600",   bg: "bg-amber-50 border-amber-200"     },
-               { label: "Remitted to You", val: peso(netRevenue), color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
+                { label: "Checked In",     val: checkedIn,       color: "text-blue-600",    bg: "bg-blue-50 border-blue-200"       },
+                { label: "Pending",        val: pending,          color: "text-amber-600",   bg: "bg-amber-50 border-amber-200"     },
+                { label: "Remitted to You",val: peso(netRevenue), color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
               ].map(s => (
                 <div key={s.label} className={`rounded-2xl border-2 ${s.bg} p-4 text-center`}>
                   <p className={`text-xl font-black ${s.color}`}>{s.val}</p>
@@ -1082,13 +1029,7 @@ const fetchPayouts = useCallback(async () => {
               <button onClick={() => setTab("crew")}     className={tabCls("crew")}>👷 Crew ({crew.length})</button>
               <button onClick={() => setTab("revenue")}  className={tabCls("revenue")}>💰 Revenue</button>
               <button onClick={() => setTab("lot")}      className={tabCls("lot")}>🅿️ Manage Lot</button>
-              <button onClick={() => setTab("payouts")} className={tabCls("payouts")}>💸 Payouts</button>
-
-
-
-
-
-
+              <button onClick={() => setTab("payouts")}  className={tabCls("payouts")}>💸 Payouts</button>
             </div>
 
             {/* Bookings tab */}
@@ -1165,59 +1106,51 @@ const fetchPayouts = useCallback(async () => {
             {/* Revenue tab */}
             {tab === "revenue" && (
               <div className="space-y-3">
-                <div className="flex gap-2 flex-wrap">
-                  {(["today","week","month"] as const).map(p => (
-                    <button key={p} onClick={() => setPeriod(p)}
-                      className={`rounded-full px-4 py-1.5 text-xs font-bold border transition-all ${period === p ? "bg-[#0c7b93] text-white border-[#0c7b93]" : "bg-white text-[#134e4a] border-teal-200 hover:border-[#0c7b93]"}`}>
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </button>
-                  ))}
-                </div>
                 <div className="rounded-2xl border-2 border-teal-100 bg-white p-5 space-y-3">
                   <h3 className="text-sm font-black text-[#134e4a]">Revenue Breakdown</h3>
-                  <p className="text-xs text-gray-400">Only confirmed/checked-in/completed bookings are counted.</p>
+                  <p className="text-xs text-gray-400">Based on remittances from admin.</p>
                   {[
-                 { label: "Total remitted to you", val: payoutsPaidCents,    note: "Already received from admin", bold: true },
-{ label: "Pending remittance",    val: payoutsPendingCents, note: "Awaiting admin transfer" },
-{ label: "Total earnings",        val: payoutsPaidCents + payoutsPendingCents, note: "Paid + pending combined" },
+                    { label: "Total remitted to you", val: payoutsPaidCents,                    note: "Already received from admin", bold: true },
+                    { label: "Pending remittance",    val: payoutsPendingCents,                  note: "Awaiting admin transfer" },
+                    { label: "Total earnings",        val: payoutsPaidCents + payoutsPendingCents, note: "Paid + pending combined" },
                   ].map(r => (
                     <div key={r.label} className={`flex justify-between items-center py-2.5 border-b border-teal-50 last:border-0 ${r.bold ? "font-black" : ""}`}>
                       <div>
                         <p className={`text-sm ${r.bold ? "text-[#134e4a]" : "text-gray-600"}`}>{r.label}</p>
                         <p className="text-xs text-gray-400">{r.note}</p>
                       </div>
-                      <p className={`text-sm font-bold ${r.val < 0 ? "text-red-600" : r.bold ? "text-emerald-600 text-base" : "text-[#134e4a]"}`}>
-                        {r.val < 0 ? `-${peso(-r.val)}` : peso(r.val)}
+                      <p className={`text-sm font-bold ${r.bold ? "text-emerald-600 text-base" : "text-[#134e4a]"}`}>
+                        {peso(r.val)}
                       </p>
                     </div>
                   ))}
                   <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-                    ℹ️ Platform fee and processing fee go to Travela Siargao directly.
+                    ℹ️ Platform fee, processing fee, and commission go to Travela Siargao directly.
                   </div>
                 </div>
                 <div className="space-y-2">
                   {payouts.map(item => (
-  <div key={`${item.type}-${item.id}`} className={`rounded-xl border px-4 py-3 flex justify-between items-center ${item.payout_status === "paid" ? "border-emerald-100 bg-emerald-50/30" : "border-teal-100 bg-white"}`}>
-    <div>
-      <div className="flex items-center gap-2">
-        <p className="font-mono text-xs font-black text-[#0c7b93]">{item.reference}</p>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.type === "extension" ? "bg-purple-100 text-purple-700" : "bg-teal-100 text-teal-700"}`}>
-          {item.type === "extension" ? "Ext" : "Booking"}
-        </span>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.payout_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-          {item.payout_status === "paid" ? "✓ Remitted" : "Pending"}
-        </span>
-      </div>
-      <p className="text-xs text-gray-400 mt-0.5">{fmt(item.date)} · {item.days} day{item.days !== 1 ? "s" : ""} · {item.customer_full_name}</p>
-    </div>
-    <div className="text-right">
-      <p className={`text-sm font-bold ${item.payout_status === "paid" ? "text-emerald-600" : "text-amber-500"}`}>
-        {peso(item.owner_receivable_cents)}
-      </p>
-      <p className="text-xs text-gray-400">your share</p>
-    </div>
-  </div>
-))}
+                    <div key={`${item.type}-${item.id}`} className={`rounded-xl border px-4 py-3 flex justify-between items-center ${item.payout_status === "paid" ? "border-emerald-100 bg-emerald-50/30" : "border-teal-100 bg-white"}`}>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-mono text-xs font-black text-[#0c7b93]">{item.reference}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.type === "extension" ? "bg-purple-100 text-purple-700" : "bg-teal-100 text-teal-700"}`}>
+                            {item.type === "extension" ? "Ext" : "Booking"}
+                          </span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${item.payout_status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            {item.payout_status === "paid" ? "✓ Remitted" : "Pending"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">{fmt(item.date)} · {item.days} day{item.days !== 1 ? "s" : ""} · {item.customer_full_name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-sm font-bold ${item.payout_status === "paid" ? "text-emerald-600" : "text-amber-500"}`}>
+                          {peso(item.owner_receivable_cents)}
+                        </p>
+                        <p className="text-xs text-gray-400">your share</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1225,20 +1158,15 @@ const fetchPayouts = useCallback(async () => {
             {/* Manage Lot tab */}
             {tab === "lot" && <ManageLotTab lot={lot} onSaved={fetchBookings} />}
 
-
-{/* Payouts tab */}
-{tab === "payouts" && (
-  <PayoutsTab
-    payouts={payouts}
-    pendingCents={payoutsPendingCents}
-    paidCents={payoutsPaidCents}
-    loading={payoutsLoading}
-  />
-)}
-
-
-
-
+            {/* Payouts tab */}
+            {tab === "payouts" && (
+              <PayoutsTab
+                payouts={payouts}
+                pendingCents={payoutsPendingCents}
+                paidCents={payoutsPaidCents}
+                loading={payoutsLoading}
+              />
+            )}
           </>
         )}
       </div>
