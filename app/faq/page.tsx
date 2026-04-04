@@ -88,7 +88,7 @@ export default async function FaqPage() {
       </div>
 
       {/* FAQ accordion — reuses your existing FaqSection component */}
-      <FaqSection faqs={faqs} />
+      <FaqSection faqs={faqs} variant="light" />
 
       {/* Still have questions CTA */}
       <section className="bg-white py-10 border-t border-teal-100">
