@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   // Search by reference first
   const { data: byRef } = await supabase
     .from("parking_reservations")
-    .select("id, reference, status, park_date_start, park_date_end, vehicle_count, vehicles, customer_full_name, lot_snapshot_name, checked_in_at, checked_out_at")
+    .select("id, reference, status, park_date_start, park_date_end, vehicle_count, vehicles, customer_full_name, lot_snapshot_name, checked_in_at, checked_out_at, payment_proof_path, gcash_transaction_reference, parking_fee_cents, commission_cents, platform_fee_cents, processing_fee_cents, total_amount_cents, owner_receivable_cents")
     .ilike("reference", `%${q}%`)
     .not("status", "in", '("cancelled")')
     .limit(1)
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   // Search by plate number in vehicles JSONB
   const { data: byPlate } = await supabase
     .from("parking_reservations")
-    .select("id, reference, status, park_date_start, park_date_end, vehicle_count, vehicles, customer_full_name, lot_snapshot_name, checked_in_at, checked_out_at")
+    .select("id, reference, status, park_date_start, park_date_end, vehicle_count, vehicles, customer_full_name, lot_snapshot_name, checked_in_at, checked_out_at, payment_proof_path, gcash_transaction_reference, parking_fee_cents, commission_cents, platform_fee_cents, processing_fee_cents, total_amount_cents, owner_receivable_cents")
     .not("status", "in", '("cancelled","completed")')
     .order("created_at", { ascending: false })
     .limit(50);
