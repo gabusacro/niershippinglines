@@ -283,6 +283,7 @@ export default async function AttractionDetailPage({
         @keyframes heroZoom { from{transform:scale(1.06)} to{transform:scale(1)} }
         @keyframes fadeUp   { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
         @keyframes ticker   { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+        .left-tag-link:hover { background: #DCFCE7 !important; }
         .hero-zoom  { animation: heroZoom 8s ease forwards }
         .fade-up    { animation: fadeUp 0.6s ease both }
         .fade-up-2  { animation: fadeUp 0.6s ease 0.12s both }
