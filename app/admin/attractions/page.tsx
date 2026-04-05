@@ -1,7 +1,5 @@
-// app/admin/attractions/page.tsx
-// Add this to your existing admin dashboard area
-
 import { getAllAttractionsAdmin } from "@/lib/attractions/get-attractions";
+import { getAllAds } from "@/lib/attractions/get-ads";
 import { AttractionsAdminPage } from "./AttractionsAdminPage";
 
 export const metadata = {
@@ -9,6 +7,9 @@ export const metadata = {
 };
 
 export default async function AdminAttractionsPage() {
-  const items = await getAllAttractionsAdmin();
-  return <AttractionsAdminPage initialItems={items} />;
+  const [items, ads] = await Promise.all([
+    getAllAttractionsAdmin(),
+    getAllAds(),
+  ]);
+  return <AttractionsAdminPage initialItems={items} initialAds={ads} />;
 }

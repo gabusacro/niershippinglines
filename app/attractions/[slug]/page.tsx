@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getAttractionBySlug } from "@/lib/attractions/get-attractions";
-import { getActiveAd } from "@/lib/attractions/get-ads";
+import { getActiveAds } from "@/lib/attractions/get-ads";
 import { getRecentAttractions } from "@/lib/attractions/get-recent-attractions";
 import type { Ad } from "@/lib/attractions/get-ads";
 import type { Attraction } from "@/lib/attractions/types";
@@ -181,11 +181,18 @@ export default async function AttractionDetailPage({
   const { slug } = await Promise.resolve(params);
   if (!slug) notFound();
 
-  const [item, ad, recentItems] = await Promise.all([
-    getAttractionBySlug(slug),
-    getActiveAd("attraction_detail"),
-    getRecentAttractions(slug, 4),
-  ]);
+  // Updated — fetch left and right ads separately
+const [item, ads, recentItems] = await Promise.all([
+  getAttractionBySlug(slug),
+  getActiveAds(["attraction_sidebar_left", "attraction_sidebar_right", "attraction_detail"]),
+  getRecentAttractions(slug, 4),
+]);
+
+
+// Left col gets left ad, falls back to detail ad
+const adLeft  = ads["attraction_sidebar_left"]  ?? ads["attraction_detail"] ?? null;
+// Right col gets right ad, falls back to detail ad
+const adRight = ads["attraction_sidebar_right"] ?? ads["attraction_detail"] ?? null;
   if (!item) notFound();
 
   const categoryLabel = item.category?.replace("-", " ") ?? item.type;
@@ -455,7 +462,7 @@ export default async function AttractionDetailPage({
                     </div>
 
                     {/* Left col ad */}
-                    {ad && <AdSlot ad={ad} variant="sidebar" />}
+                    {adLeft && <AdSlot ad={adLeft} variant="sidebar" />}
                   </div>
 
                   {/* Center col — main content */}
@@ -491,7 +498,8 @@ export default async function AttractionDetailPage({
 
                   {/* Right col — ad + booking CTA + recent */}
                   <div className="col-span-3 hidden lg:block">
-                    {ad && <AdSlot ad={ad} variant="sidebar" />}
+                    {adRight && <AdSlot ad={adRight} variant="sidebar" />}
+
                     <div className="rounded-2xl border border-[#9FE1CB] bg-[#F0FDF8] p-4 mb-4">
                       <p style={{ fontSize: 11, fontWeight: 700, color: "#085C52", marginBottom: 8 }}>Book your Siargao trip</p>
                       <a href="/book" className="flex items-center gap-2 rounded-xl bg-[#085C52] text-white px-3 py-2.5 text-[12px] font-bold mb-2 hover:bg-[#0c7b93] transition-colors" style={{ textDecoration: "none" }}>
@@ -556,7 +564,7 @@ export default async function AttractionDetailPage({
                 </div>
 
                 <div className="shrink-0 w-64 hidden lg:block">
-                  {ad && <AdSlot ad={ad} variant="sidebar" />}
+                  {adRight && <AdSlot ad={adRight} variant="sidebar" />}
                   <div className="rounded-2xl border border-[#9FE1CB] bg-[#F0FDF8] p-4 mb-4">
                     <p style={{ fontSize: 11, fontWeight: 700, color: "#085C52", marginBottom: 8 }}>Book your Siargao trip</p>
                     <a href="/book" className="flex items-center gap-2 rounded-xl bg-[#085C52] text-white px-3 py-2.5 text-[12px] font-bold mb-2 hover:bg-[#0c7b93] transition-colors" style={{ textDecoration: "none" }}>

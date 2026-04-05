@@ -20,16 +20,6 @@ export async function POST(req: NextRequest) {
       description:    body.description    || null,
       adsense_client: body.adsense_client || null,
       adsense_slot:   body.adsense_slot   || null,
-      location_barangay: body.location_barangay ?? null,
-municipality:      body.municipality      ?? null,
-entrance_fee:      body.entrance_fee      ?? null,
-travel_time:       body.travel_time       ?? null,
-best_time:         body.best_time         ?? null,
-what_to_expect:    body.what_to_expect    ?? null,
-must_mention:      body.must_mention      ?? null,
-avoid_mention:     body.avoid_mention     ?? null,
-tips:              body.tips              ?? null,
-ai_tone:           body.ai_tone           ?? "grounded",
     };
 
     const { data, error } = await supabase
@@ -44,8 +34,6 @@ ai_tone:           body.ai_tone           ?? "grounded",
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
-
-
 // app/api/admin/ads/delete/route.ts
 // (put this in a separate file: app/api/admin/ads/delete/route.ts)
 //

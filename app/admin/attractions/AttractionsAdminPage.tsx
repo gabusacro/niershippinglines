@@ -840,7 +840,7 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-export function AttractionsAdminPage({ initialItems }: { initialItems: Attraction[] }) {
+export function AttractionsAdminPage({ initialItems, initialAds = [] }: { initialItems: Attraction[]; initialAds?: any[] }) {
   const [tab, setTab] = useState<"attractions" | "ads">("attractions");
   const [items, setItems] = useState<Attraction[]>(initialItems);
   const [editing, setEditing] = useState<Attraction | null | "new">(null);
@@ -972,7 +972,7 @@ export function AttractionsAdminPage({ initialItems }: { initialItems: Attractio
           </div>
         </>
       )}
-      {tab === "ads" && <AdsAdminPage initialAds={[]} />}
+      {tab === "ads" && <AdsAdminPage initialAds={initialAds} />}
     </div>
   );
 }
