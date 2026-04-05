@@ -423,11 +423,10 @@ export default async function AttractionDetailPage({
                   <div className="col-span-2 hidden lg:block pt-1">
                     <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#6B7280", marginBottom: 12 }}>Category</p>
                     <div className="space-y-1.5 mb-4">
-                      {(item.seo_tags ?? []).map((tag) => (
+                    {(item.seo_tags ?? []).map((tag) => (
                         <a key={tag} href={`/attractions?q=${encodeURIComponent(tag)}`}
-                          style={{ display: "block", padding: "6px 10px", background: "#F0FDF4", border: "1px solid #BBF7D0", color: "#166534", borderRadius: 8, fontSize: 11, fontWeight: 600, textDecoration: "none", transition: "background 0.15s" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "#DCFCE7")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "#F0FDF4")}>
+                          className="left-tag-link"
+                          style={{ display: "block", padding: "6px 10px", background: "#F0FDF4", border: "1px solid #BBF7D0", color: "#166534", borderRadius: 8, fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
                           {tag}
                         </a>
                       ))}
