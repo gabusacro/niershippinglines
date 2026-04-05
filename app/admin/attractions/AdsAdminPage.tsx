@@ -200,8 +200,10 @@ function AdFormPanel({
           <div>
             <label className={label}>Placement</label>
             <select className={input} value={form.placement} onChange={(e) => set("placement", e.target.value)}>
-              <option value="attraction_detail">Attraction detail page</option>
-            </select>
+  <option value="attraction_detail">Attraction detail page (fallback — both columns)</option>
+  <option value="attraction_sidebar_left">Attraction — left column only</option>
+  <option value="attraction_sidebar_right">Attraction — right column only</option>
+</select>
           </div>
         </div>
 
