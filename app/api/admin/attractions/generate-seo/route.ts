@@ -175,6 +175,22 @@ OUTPUT STRUCTURE — use these exact headings:
 <h2>Tips Before You Go</h2>
 <p>[Use tips field. If empty, write 2-3 generic but honest practical tips. No bullet points.]</p>
 
+
+
+// Add this to the full mode prompt, right before "Return ONLY the HTML"
+REQUIRED CTA INJECTIONS — include these naturally in the content as linked anchor tags:
+After mentioning tours: <a href="/tours" style="color:#0c7b93;text-decoration:underline">book a tour</a>
+After mentioning ferry/boat: <a href="/book" style="color:#0c7b93;text-decoration:underline">book a ferry ticket</a>  
+After mentioning parking: <a href="/parking" style="color:#0c7b93;text-decoration:underline">book parking at Dapa Port</a>
+After mentioning weather: <a href="/weather" style="color:#0c7b93;text-decoration:underline">check the weather</a>
+After mentioning other spots: <a href="/attractions" style="color:#0c7b93;text-decoration:underline">see other attractions</a>
+
+Use each link only once. Embed them inside natural sentences — do not add them as standalone lines.
+
+
+
+
+
 Return ONLY the HTML. Nothing else.`,
     }],
   });
