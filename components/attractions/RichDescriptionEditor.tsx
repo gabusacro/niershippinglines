@@ -25,11 +25,20 @@ export function RichDescriptionEditor({
   const savedSelection   = useRef<Range | null>(null);
 
   // Sync initial value
-  useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value || "";
-    }
-  }, []);
+ // Fixed — syncs whenever value changes from outside (e.g. after AI generation)
+const isInternalUpdate = useRef(false);
+
+useEffect(() => {
+  if (!editorRef.current) return;
+  if (isInternalUpdate.current) {
+    isInternalUpdate.current = false;
+    return;
+  }
+  // Only update DOM if value actually changed and came from outside
+  if (editorRef.current.innerHTML !== value) {
+    editorRef.current.innerHTML = value || "";
+  }
+}, [value]);
 
   function saveSelection() {
     const sel = window.getSelection();
@@ -205,7 +214,10 @@ export function RichDescriptionEditor({
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
-        onInput={() => onChange(editorRef.current?.innerHTML ?? "")}
+     onInput={() => {
+  isInternalUpdate.current = true;
+  onChange(editorRef.current?.innerHTML ?? "");
+}}
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
         data-placeholder={placeholder}

@@ -19,6 +19,16 @@ export type Attraction = {
   slug:             string;
   description:      string | null;
   image_url:        string | null;
+  location_barangay?: string | null;
+municipality?:      string | null;
+entrance_fee?:      string | null;
+travel_time?:       string | null;
+best_time?:         string | null;
+what_to_expect?:    string | null;
+must_mention?:      string | null;
+avoid_mention?:     string | null;
+tips?:              string | null;
+ai_tone?:           string | null;
   sort_order:       number;
   is_published:     boolean;
   created_at:       string;
@@ -33,6 +43,7 @@ export type Attraction = {
   type:             AttractionType;
   layout_style:     LayoutStyle | null;
   auto_links:       AutoLink[] | null;
+  
 };
 
 export type AttractionForm = {
@@ -41,6 +52,16 @@ export type AttractionForm = {
   description:    string;
   image_url:      string;
   image_alt:      string;
+  location_barangay: string;
+municipality:      string;
+entrance_fee:      string;
+travel_time:       string;
+best_time:         string;
+what_to_expect:    string;
+must_mention:      string;
+avoid_mention:     string;
+tips:              string;
+ai_tone:           string;
   category:       AttractionCategory;
   cover_gradient: string;
   cover_emoji:    string;
@@ -61,6 +82,16 @@ export const EMPTY_FORM: AttractionForm = {
   description:    "",
   image_url:      "",
   image_alt:      "",
+  location_barangay: "",
+municipality:      "",
+entrance_fee:      "",
+travel_time:       "",
+best_time:         "",
+what_to_expect:    "",
+must_mention:      "",
+avoid_mention:     "",
+tips:              "",
+ai_tone:           "grounded",
   category:       "attractions",
   cover_gradient: "from-[#085C52] to-[#0c7b93]",
   cover_emoji:    "🌴",

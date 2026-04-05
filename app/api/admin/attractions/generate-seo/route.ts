@@ -93,66 +93,98 @@ function applyLayoutStyle(html: string, layoutStyle: string, title: string): str
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, description, category, mode, enableLinks, autoLinks, layoutStyle } = await req.json();
+    const {
+  title, description, category, mode, enableLinks, autoLinks, layoutStyle,
+  municipality, locationBarangay, entranceFee, travelTime,
+  bestTime, whatToExpect, mustMention, avoidMention, tips, aiTone,
+} = await req.json();
     const safeTitle       = cleanPromptContext(title);
     const safeDescription = (description || "").trim();
 
     // ── MODE: full ────────────────────────────────────────────────────────────
-    if (mode === "full") {
-      const msg = await client.messages.create({
-        model:      "claude-sonnet-4-20250514",
-        max_tokens: 1500,
-        messages: [{
-          role: "user",
-          content: `You are an SEO content writer for travelasiargao.com, a Siargao Island ferry booking and travel website.
+if (mode === "full") {
+  const {
+    municipality, locationBarangay, entranceFee, travelTime,
+    bestTime, whatToExpect, mustMention, avoidMention, tips, aiTone,
+  } = await req.json().catch(() => ({}));
 
-Write a complete, rankable attraction page. Return ONLY valid HTML — no markdown, no code fences, no preamble.
+  // Build structured facts block — only include fields that have values
+  const facts = [
+    municipality      ? `Municipality: ${municipality}` : null,
+    locationBarangay  ? `Barangay/Area: ${locationBarangay}` : null,
+    entranceFee       ? `Entrance/environmental fee: ${entranceFee}` : null,
+    travelTime        ? `Travel time from General Luna: ${travelTime}` : null,
+    bestTime          ? `Best time to visit: ${bestTime}` : null,
+    whatToExpect      ? `What visitors do there: ${whatToExpect}` : null,
+    mustMention       ? `Must mention in content: ${mustMention}` : null,
+    avoidMention      ? `Do NOT mention or say: ${avoidMention}` : null,
+    tips              ? `Practical tips: ${tips}` : null,
+    safeDescription   ? `Admin notes: ${safeDescription}` : null,
+  ].filter(Boolean).join("\n");
+
+  const toneInstruction = aiTone === "editorial"
+    ? "Write like a polished magazine travel editor. Clear, structured, engaging."
+    : aiTone === "warm"
+    ? "Write like a friendly local recommending a place to a friend. Warm, honest, approachable."
+    : "Write like a practical local tourism editor. Grounded, factual, useful. Not cinematic. Not emotional.";
+
+  const msg = await client.messages.create({
+    model:      "claude-sonnet-4-20250514",
+    max_tokens: 2000,
+    messages: [{
+      role: "user",
+      content: `You are a controlled content writer for travelasiargao.com, a Siargao Island travel website.
+
+TONE INSTRUCTION:
+${toneInstruction}
+
+STRICT RULES — follow these exactly:
+- Write ONLY from the facts provided below. Do not invent details not in the facts.
+- If a detail is missing, skip it. Do not guess or fill in.
+- Do NOT use poetic or cinematic language like "golden sunlight", "magical", "enchanting", "unforgettable", "breathtaking".
+- Do NOT write emotional storytelling or first-person experience.
+- Do NOT exaggerate. Write what is factually supportable.
+- Mention Siargao Island naturally 2-3 times.
+- Mention that visitors can book their Surigao to Siargao ferry at travelasiargao.com once, in the How to Get There section.
+- Target length: 800 to 1200 words.
+- Return ONLY valid HTML using <h2> and <p> tags. No markdown. No code fences.
 
 ATTRACTION: ${safeTitle}
 CATEGORY: ${category || "attraction"}
-ADMIN NOTES: ${safeDescription || "none"}
 
-OUTPUT FORMAT — use these exact HTML tags:
+FACTS PROVIDED BY ADMIN:
+${facts || "No specific facts provided — write conservatively based on title and category only."}
 
-<h2>What is ${safeTitle}?</h2>
-<p>[2 paragraphs. What it is, where on Siargao Island, why tourists visit. Mention the attraction name, Siargao Island, and nearest municipality naturally.]</p>
+OUTPUT STRUCTURE — use these exact headings:
+
+<h2>What is [attraction name]?</h2>
+<p>[What it is and where it is located. Use only facts given. 2 paragraphs.]</p>
 
 <h2>What to Expect</h2>
-<p>[2 paragraphs. The actual experience. What visitors see, do, feel. Stay grounded — no invented facts beyond what admin notes say.]</p>
+<p>[What visitors actually do there based on whatToExpect field. 2 paragraphs. If not provided, keep this section brief and general.]</p>
 
 <h2>How to Get There</h2>
-<p>[1 paragraph. From Dapa Port or General Luna. Mention that visitors can book their Surigao City to Siargao ferry at travelasiargao.com naturally.]</p>
+<p>[How to reach it from Dapa Port or General Luna. Include travel time if provided. Mention booking ferry at travelasiargao.com naturally.]</p>
 
 <h2>Best Time to Visit</h2>
-<p>[1 paragraph. Time of day, season, tide if applicable.]</p>
+<p>[Use bestTime field if provided. If not, give a general safe answer about dry season.]</p>
+
+<h2>Fees and What to Bring</h2>
+<p>[Use entranceFee if provided. Use tips if provided. List practical info as sentences, not bullets.]</p>
 
 <h2>Tips Before You Go</h2>
-<p>[3-4 practical tips as sentences. What to bring, fees, rules, what to expect.]</p>
+<p>[Use tips field. If empty, write 2-3 generic but honest practical tips. No bullet points.]</p>
 
-RULES:
-- Total 500-700 words
-- Warm, readable, tourism-friendly tone
-- NO invented facts beyond admin notes
-- NO first-person claims
-- NO bullet points — prose only
-- Mention Siargao Island naturally 2-3 times
-- Mention ferry from Surigao City once
-- End tips section with sentence about booking ferry via Travela Siargao
+Return ONLY the HTML. Nothing else.`,
+    }],
+  });
 
-Return ONLY the HTML content. Nothing else.`,
-        }],
-      });
+  let html = extractText(msg.content).replace(/\`\`\`html|\`\`\`/g, "").trim();
+  if (autoLinks?.length) html = applyAutoLinks(html, autoLinks);
+  if (layoutStyle && layoutStyle !== "standard") html = applyLayoutStyle(html, layoutStyle, safeTitle);
 
-      let html = extractText(msg.content);
-      // Clean any accidental markdown
-      html = html.replace(/```html|```/g, "").trim();
-      // Apply auto-links if provided
-      if (autoLinks?.length) html = applyAutoLinks(html, autoLinks);
-      // Apply layout styling
-      if (layoutStyle && layoutStyle !== "standard") html = applyLayoutStyle(html, layoutStyle, safeTitle);
-
-      return NextResponse.json({ fullDescription: html });
-    }
+  return NextResponse.json({ fullDescription: html });
+}
 
     // ── MODE: enhance ─────────────────────────────────────────────────────────
     if (mode === "enhance") {
