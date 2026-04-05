@@ -393,61 +393,108 @@ const jsonLd = {
             </a>
           </div>
 
-          {/* Two column layout */}
-          <div className="flex gap-8 items-start pb-12">
-            <div className="flex-1 min-w-0">
+{/* ── Layout-aware body ── */}
+{(() => {
+  const layout = (item as any).layout_style ?? "standard";
 
-              {/* SEO tags */}
-              {item.seo_tags && item.seo_tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-5">
-                  {item.seo_tags.map((tag) => (
-                    <span key={tag} style={{ padding: "5px 13px", background: "#F0FDF4", border: "1px solid #BBF7D0", color: "#166534", borderRadius: 999, fontSize: 11, fontWeight: 600 }}>{tag}</span>
-                  ))}
-                </div>
-              )}
-
-              {/* Swipe gallery */}
-              {photos.length > 0 && <AttractionGallery photos={photos} title={item.title} />}
-
-              {/* ✅ Rich description with links — falls back to plain text */}
-              {descriptionHtml ? (
-                <div
-                  className="rich-description"
-                  dangerouslySetInnerHTML={{ __html: descriptionHtml }}
-                  style={{ fontSize: 16, color: "#1f2937", lineHeight: 1.85, fontWeight: 400, marginBottom: 36 }}
-                />
-              ) : item.description ? (
-                <p style={{ fontSize: 16, color: "#1f2937", lineHeight: 1.85, fontWeight: 400, marginBottom: 36, whiteSpace: "pre-line" }}>
-                  {item.description}
-                </p>
-              ) : null}
-
-              {/* Ferry CTA */}
-              <div className="rounded-2xl text-center" style={{ background: "linear-gradient(135deg,#085C52 0%,#0c7b93 50%,#1AB5A3 100%)", padding: "36px 24px" }}>
-                <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 8 }}>Ready to visit?</p>
-                <h2 className="font-black text-white" style={{ fontSize: 22, letterSpacing: "-0.02em", marginBottom: 8 }}>Book your ferry to Siargao 🌊</h2>
-                <p style={{ color: "rgba(255,255,255,0.62)", fontSize: 13, fontWeight: 500, marginBottom: 22 }}>Skip the queue — book online in 2 minutes, pay via GCash.</p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <a href="/book" className="inline-flex items-center justify-center gap-2 font-extrabold hover:-translate-y-0.5 transition-all"
-                    style={{ background: "white", color: "#085C52", padding: "12px 28px", borderRadius: 14, fontSize: 14, textDecoration: "none" }}>
-                    🚢 Book a Ferry
-                  </a>
-                  <a href="/tours" className="inline-flex items-center justify-center gap-2 font-bold hover:-translate-y-0.5 transition-all"
-                    style={{ background: "rgba(255,255,255,0.1)", border: "2px solid rgba(255,255,255,0.25)", color: "white", padding: "12px 28px", borderRadius: 14, fontSize: 14, textDecoration: "none" }}>
-                    🌴 Book a Tour
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* Sidebar */}
-            <div className="shrink-0 w-64 hidden lg:block">
-              {ad && <AdSlot ad={ad} />}
-              <SidebarRecent items={recentItems} />
+  if (layout === "magazine") {
+    return (
+      <div className="grid grid-cols-12 gap-6 pb-12">
+        {/* Left col — categories/tags */}
+        <div className="col-span-2 hidden lg:block pt-1">
+          <p style={{ fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",color:"#6B7280",marginBottom:12 }}>Category</p>
+          <div className="space-y-2">
+            {(item.seo_tags??[]).map((tag)=>(
+              <div key={tag} style={{ padding:"6px 10px",background:"#F0FDF4",border:"1px solid #BBF7D0",color:"#166534",borderRadius:8,fontSize:11,fontWeight:600 }}>{tag}</div>
+            ))}
+            <div style={{ padding:"6px 10px",background:"#E0F7F4",border:"1px solid #9FE1CB",color:"#085C52",borderRadius:8,fontSize:11,fontWeight:700,textTransform:"capitalize" }}>
+              {categoryLabel}
             </div>
           </div>
         </div>
+
+        {/* Center col — main content */}
+        <div className="col-span-12 lg:col-span-7 min-w-0">
+          {photos.length > 0 && <AttractionGallery photos={photos} title={item.title} />}
+          {descriptionHtml ? (
+            <div className="rich-description" dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+              style={{ fontSize:16,color:"#1f2937",lineHeight:1.85,fontWeight:400,marginBottom:36 }} />
+          ) : item.description ? (
+            <p style={{ fontSize:16,color:"#1f2937",lineHeight:1.85,fontWeight:400,marginBottom:36,whiteSpace:"pre-line" }}>{item.description}</p>
+          ) : null}
+          {/* Ferry CTA */}
+          <div className="rounded-2xl text-center" style={{ background:"linear-gradient(135deg,#085C52 0%,#0c7b93 50%,#1AB5A3 100%)",padding:"36px 24px" }}>
+            <p style={{ color:"rgba(255,255,255,0.55)",fontSize:11,fontWeight:700,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:8 }}>Ready to visit?</p>
+            <h2 className="font-black text-white" style={{ fontSize:22,letterSpacing:"-0.02em",marginBottom:8 }}>Book your ferry to Siargao 🌊</h2>
+            <p style={{ color:"rgba(255,255,255,0.62)",fontSize:13,fontWeight:500,marginBottom:22 }}>Skip the queue — book online in 2 minutes, pay via GCash.</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a href="/book" className="inline-flex items-center justify-center gap-2 font-extrabold hover:-translate-y-0.5 transition-all"
+                style={{ background:"white",color:"#085C52",padding:"12px 28px",borderRadius:14,fontSize:14,textDecoration:"none" }}>🚢 Book a Ferry</a>
+              <a href="/tours" className="inline-flex items-center justify-center gap-2 font-bold hover:-translate-y-0.5 transition-all"
+                style={{ background:"rgba(255,255,255,0.1)",border:"2px solid rgba(255,255,255,0.25)",color:"white",padding:"12px 28px",borderRadius:14,fontSize:14,textDecoration:"none" }}>🌴 Book a Tour</a>
+            </div>
+          </div>
+        </div>
+
+        {/* Right col — ad + booking CTA */}
+        <div className="col-span-3 hidden lg:block">
+          {ad && <AdSlot ad={ad} />}
+          {/* Booking card */}
+          <div className="rounded-2xl border border-[#9FE1CB] bg-[#F0FDF8] p-4 mb-4">
+            <p style={{ fontSize:11,fontWeight:700,color:"#085C52",marginBottom:8 }}>Book your Siargao trip</p>
+            <a href="/book" className="flex items-center gap-2 rounded-xl bg-[#085C52] text-white px-3 py-2.5 text-[12px] font-bold mb-2 hover:bg-[#0c7b93] transition-colors" style={{ textDecoration:"none" }}>
+              🚢 Ferry — Surigao to Dapa
+            </a>
+            <a href="/tours" className="flex items-center gap-2 rounded-xl border border-[#9FE1CB] bg-white text-[#085C52] px-3 py-2.5 text-[12px] font-bold hover:bg-[#E0F7F4] transition-colors" style={{ textDecoration:"none" }}>
+              🌴 Island tours
+            </a>
+          </div>
+          <SidebarRecent items={recentItems} />
+        </div>
       </div>
+    );
+  }
+
+  // standard / feature / guide — 2-column layout (your existing layout, preserved)
+  return (
+    <div className="flex gap-8 items-start pb-12">
+      <div className="flex-1 min-w-0">
+        {item.seo_tags && item.seo_tags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-5">
+            {item.seo_tags.map((tag)=>(
+              <span key={tag} style={{ padding:"5px 13px",background:"#F0FDF4",border:"1px solid #BBF7D0",color:"#166534",borderRadius:999,fontSize:11,fontWeight:600 }}>{tag}</span>
+            ))}
+          </div>
+        )}
+        {photos.length > 0 && <AttractionGallery photos={photos} title={item.title} />}
+        {descriptionHtml ? (
+          <div className="rich-description" dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+            style={{ fontSize:16,color:"#1f2937",lineHeight:1.85,fontWeight:400,marginBottom:36 }} />
+        ) : item.description ? (
+          <p style={{ fontSize:16,color:"#1f2937",lineHeight:1.85,fontWeight:400,marginBottom:36,whiteSpace:"pre-line" }}>{item.description}</p>
+        ) : null}
+        <div className="rounded-2xl text-center" style={{ background:"linear-gradient(135deg,#085C52 0%,#0c7b93 50%,#1AB5A3 100%)",padding:"36px 24px" }}>
+          <p style={{ color:"rgba(255,255,255,0.55)",fontSize:11,fontWeight:700,letterSpacing:"0.15em",textTransform:"uppercase",marginBottom:8 }}>Ready to visit?</p>
+          <h2 className="font-black text-white" style={{ fontSize:22,letterSpacing:"-0.02em",marginBottom:8 }}>Book your ferry to Siargao 🌊</h2>
+          <p style={{ color:"rgba(255,255,255,0.62)",fontSize:13,fontWeight:500,marginBottom:22 }}>Skip the queue — book online in 2 minutes, pay via GCash.</p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href="/book" className="inline-flex items-center justify-center gap-2 font-extrabold hover:-translate-y-0.5 transition-all"
+              style={{ background:"white",color:"#085C52",padding:"12px 28px",borderRadius:14,fontSize:14,textDecoration:"none" }}>🚢 Book a Ferry</a>
+            <a href="/tours" className="inline-flex items-center justify-center gap-2 font-bold hover:-translate-y-0.5 transition-all"
+              style={{ background:"rgba(255,255,255,0.1)",border:"2px solid rgba(255,255,255,0.25)",color:"white",padding:"12px 28px",borderRadius:14,fontSize:14,textDecoration:"none" }}>🌴 Book a Tour</a>
+          </div>
+        </div>
+      </div>
+      <div className="shrink-0 w-64 hidden lg:block">
+        {ad && <AdSlot ad={ad} />}
+        <SidebarRecent items={recentItems} />
+      </div>
+    </div>
+  );
+})()}
+          </div>
+        </div>
+    
     </>
   );
 }

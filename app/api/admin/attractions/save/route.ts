@@ -1,4 +1,3 @@
-// app/api/admin/attractions/save/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,6 +26,8 @@ export async function POST(req: NextRequest) {
       type:             body.type             ?? "attraction",
       hero_position:    body.hero_position    ?? "center center",
       photos:           body.photos           ?? [],
+      layout_style:     body.layout_style     ?? "standard",
+      auto_links:       body.auto_links       ?? [],
     };
 
     const { data, error } = await supabase

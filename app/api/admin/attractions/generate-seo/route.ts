@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-// -----------------------------
-// Helpers
-// -----------------------------
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 function extractText(content: any): string {
   return content?.find?.((b: any) => b.type === "text")?.text?.trim?.() ?? "";
@@ -17,264 +11,233 @@ function stripCodeFences(text: string) {
   return text.replace(/```json|```/g, "").trim();
 }
 
-/**
- * Cleans rough admin title/note so AI doesn't treat command-like text as final title.
- * Example:
- * "It was an amazing experience on the SOHOTON Foodie Boodle Fight, make short description no food names..."
- * becomes a cleaner context for generation.
- */
 function cleanPromptContext(input?: string) {
   if (!input) return "";
-
-  return input
-    .replace(/\s+/g, " ")
-    .replace(/make short description/gi, "")
-    .replace(/no food names/gi, "")
-    .replace(/just amazing people and food/gi, "")
-    .replace(/write description/gi, "")
-    .trim();
+  return input.replace(/\s+/g, " ").replace(/make short description/gi, "")
+    .replace(/no food names/gi, "").replace(/just amazing people and food/gi, "")
+    .replace(/write description/gi, "").trim();
 }
 
-/**
- * Optional auto-linking support:
- * Converts specific phrases into HTML anchor tags.
- * Only do this if your frontend renders description with HTML safely.
- */
-function autoLinkDescription(text: string) {
-  if (!text) return text;
-
-  const rules = [
-    {
-      phrase: "Siargao Island",
-      url: "https://www.travelasiargao.com/",
-      internal: true,
-    },
-    {
-      phrase: "Sohoton Cove",
-      url: "https://www.travelasiargao.com/attractions/sohoton-cove",
-      internal: true,
-    },
-    {
-      phrase: "Sohoton",
-      url: "https://www.travelasiargao.com/attractions/sohoton-cove",
-      internal: true,
-    },
-  ];
-
-  let output = text;
-
-  for (const rule of rules) {
+function applyAutoLinks(html: string, links: { phrase: string; url: string; type: string; occurrence: string }[]): string {
+  if (!links?.length) return html;
+  let output = html;
+  for (const rule of links) {
+    if (!rule.phrase || !rule.url) continue;
     const escaped = rule.phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const isExternal = rule.type === "external";
+    const href = isExternal
+      ? (rule.url.startsWith("http") ? rule.url : `https://${rule.url}`)
+      : (rule.url.startsWith("/") ? rule.url : `/${rule.url}`);
+    const attrs = isExternal ? ` target="_blank" rel="noopener noreferrer"` : "";
+    const replacement = `<a href="${href}"${attrs} style="color:#0c7b93;text-decoration:underline">$1</a>`;
 
-    // Replace ONLY first occurrence, case-insensitive
-    const regex = new RegExp(`\\b(${escaped})\\b`, "i");
+    if (rule.occurrence === "all") {
+      output = output.replace(new RegExp(`\\b(${escaped})\\b`, "gi"), replacement);
+    } else if (rule.occurrence === "second") {
+      let count = 0;
+      output = output.replace(new RegExp(`\\b(${escaped})\\b`, "gi"), (match, p1) => {
+        count++;
+        return count === 2 ? replacement.replace("$1", p1) : match;
+      });
+    } else {
+      // first occurrence only
+      output = output.replace(new RegExp(`\\b(${escaped})\\b`, "i"), replacement);
+    }
+  }
+  return output;
+}
 
-    output = output.replace(regex, (match) => {
-      return `<a href="${rule.url}" ${
-        rule.internal ? "" : `target="_blank" rel="noopener noreferrer"`
-      }>${match}</a>`;
-    });
+// Wraps content in layout-specific HTML blocks
+function applyLayoutStyle(html: string, layoutStyle: string, title: string): string {
+  if (layoutStyle === "guide") {
+    // Split on h2 tags and rebuild — avoids the /s regex flag
+    const parts = html.split(/(<h2>.*?<\/h2>)/i);
+    return parts.map((part, i) => {
+      const h2Match = part.match(/^<h2>(.*?)<\/h2>$/i);
+      if (h2Match) {
+        const heading = h2Match[1];
+        const nextPart = parts[i + 1] ?? "";
+        const pMatch = nextPart.match(/^(<p>[\s\S]*?<\/p>)/i);
+        const content = pMatch ? pMatch[1] : "";
+        return `<div style="border-left:4px solid #1AB5A3;background:#F0FDF8;border-radius:0 12px 12px 0;padding:16px 20px;margin:24px 0">
+          <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#085C52;margin-bottom:6px">${heading}</p>
+          ${content}
+        </div>`;
+      }
+      // Skip p tags that were already consumed above
+      if (i > 0) {
+        const prevPart = parts[i - 1] ?? "";
+        if (/^<h2>.*?<\/h2>$/i.test(prevPart)) return "";
+      }
+      return part;
+    }).join("");
   }
 
-  return output;
+  if (layoutStyle === "feature") {
+    return html.replace(/(<p>[\s\S]*?<\/p>)/i, `$1
+      <blockquote style="border-left:3px solid #0c7b93;margin:28px 0;padding:16px 24px;font-size:20px;font-weight:700;color:#085C52;font-style:italic;background:#F0F9FF;border-radius:0 12px 12px 0">
+        "${title} is one of Siargao's must-see experiences."
+      </blockquote>`);
+  }
+
+  if (layoutStyle === "magazine") {
+    return html.replace(/<h2>(.*?)<\/h2>/i, `
+      <div style="display:flex;align-items:center;gap:12px;margin:32px 0 16px">
+        <span style="width:32px;height:3px;background:#1AB5A3;border-radius:2px;display:inline-block"></span>
+        <h2 style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.14em;color:#085C52;margin:0">$1</h2>
+      </div>`);
+  }
+
+  return html;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, description, category, mode, enableLinks } = await req.json();
-
-    const safeTitle = cleanPromptContext(title);
+    const { title, description, category, mode, enableLinks, autoLinks, layoutStyle } = await req.json();
+    const safeTitle       = cleanPromptContext(title);
     const safeDescription = (description || "").trim();
 
-    // =========================================================
-    // MODE: enhance
-    // Rewrites attraction description safely + naturally
-    // =========================================================
-    if (mode === "enhance") {
+    // ── MODE: full ────────────────────────────────────────────────────────────
+    if (mode === "full") {
       const msg = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 700,
-        temperature: 0.4,
-        messages: [
-          {
-            role: "user",
-            content: `You are a controlled content rewriter for travelasiargao.com, a Siargao Island travel website.
+        model:      "claude-sonnet-4-20250514",
+        max_tokens: 1500,
+        messages: [{
+          role: "user",
+          content: `You are an SEO content writer for travelasiargao.com, a Siargao Island ferry booking and travel website.
 
-Your job is to rewrite rough attraction notes into a clean, natural, tourism-friendly description.
+Write a complete, rankable attraction page. Return ONLY valid HTML — no markdown, no code fences, no preamble.
 
-IMPORTANT:
-You are NOT allowed to invent facts, scenery, objects, food names, physical setup, emotions, conversations, traditions, or first-hand experiences unless clearly stated in the user's notes.
+ATTRACTION: ${safeTitle}
+CATEGORY: ${category || "attraction"}
+ADMIN NOTES: ${safeDescription || "none"}
 
-You must stay CLOSE to the actual meaning of the input.
+OUTPUT FORMAT — use these exact HTML tags:
 
-ITEM INFO:
-Title / rough idea: ${safeTitle || "(none provided)"}
-Category: ${category || "Attraction"}
-User notes: ${safeDescription || "(no notes provided)"}
+<h2>What is ${safeTitle}?</h2>
+<p>[2 paragraphs. What it is, where on Siargao Island, why tourists visit. Mention the attraction name, Siargao Island, and nearest municipality naturally.]</p>
 
-WRITING RULES:
-- Rewrite ONLY from the meaning of the user's input
-- Do NOT hallucinate or add visual details not clearly implied
-- Do NOT pretend you were there
-- Do NOT use first-person claims like:
-  - "I've seen"
-  - "I've watched"
-  - "I remember"
-  - "locals say"
-  - "you'll never forget"
-- Keep it grounded, simple, warm, and human
-- Focus on what travelers would realistically enjoy:
-  - the people
-  - the experience
-  - the atmosphere
-  - the place's significance in Siargao
-- If food is mentioned but user says "no food names", then mention shared meal / local feast / boodle fight only in general
-- Mention Siargao or Sohoton naturally if relevant
-- No fake poetic storytelling
-- No dramatic brochure language
-- No bullet points
-- No headers
-- 1–2 short paragraphs only
-- Target: 70–120 words
-- Make it feel real, readable, and website-ready
+<h2>What to Expect</h2>
+<p>[2 paragraphs. The actual experience. What visitors see, do, feel. Stay grounded — no invented facts beyond what admin notes say.]</p>
 
-VERY IMPORTANT SAFETY RULE:
-If the user's input is vague, write conservatively.
-It is better to be simple than to invent details.
+<h2>How to Get There</h2>
+<p>[1 paragraph. From Dapa Port or General Luna. Mention that visitors can book their Surigao City to Siargao ferry at travelasiargao.com naturally.]</p>
 
-GOOD OUTPUT EXAMPLE STYLE:
-"Sohoton’s boodle fight is one of those simple but memorable experiences that brings people together after the adventure. Sharing a meal here feels more special because of the atmosphere, the company, and the feeling of enjoying Siargao with others. It’s not just about the food, but about the laughter, stories, and connection that make the moment worth remembering."
+<h2>Best Time to Visit</h2>
+<p>[1 paragraph. Time of day, season, tide if applicable.]</p>
 
-BAD OUTPUT STYLE:
-"The moment you settle down on woven mats..."
-"I've watched countless travelers..."
-"Magical happens..."
-"Legendary feast spread..."
-
-Return ONLY the rewritten description text. No intro. No labels. No quotes.`,
-          },
-        ],
-      });
-
-      let text = extractText(msg.content);
-
-      if (enableLinks) {
-        text = autoLinkDescription(text);
-      }
-
-      return NextResponse.json({ description: text.trim() });
-    }
-
-    // =========================================================
-    // MODE: title
-    // Generates short public-facing title from rough input
-    // =========================================================
-    if (mode === "title") {
-      const msg = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 80,
-        temperature: 0.3,
-        messages: [
-          {
-            role: "user",
-            content: `Generate a SHORT public title for a Siargao attraction/discover page.
-
-INPUT:
-Category: ${category || "Attraction"}
-Current rough title: ${safeTitle || "(none)"}
-Description: ${safeDescription.slice(0, 250) || "(none)"}
+<h2>Tips Before You Go</h2>
+<p>[3-4 practical tips as sentences. What to bring, fees, rules, what to expect.]</p>
 
 RULES:
-- 3 to 7 words only
-- Clean, public-facing title
-- Must NOT sound like an instruction/prompt
-- Remove admin-style wording like "make short description"
-- Specific if place is obvious
-- No quotation marks
-- No emoji
-- No punctuation at the end
-- Natural for website visitors and Google
+- Total 500-700 words
+- Warm, readable, tourism-friendly tone
+- NO invented facts beyond admin notes
+- NO first-person claims
+- NO bullet points — prose only
+- Mention Siargao Island naturally 2-3 times
+- Mention ferry from Surigao City once
+- End tips section with sentence about booking ferry via Travela Siargao
 
-GOOD EXAMPLES:
-- Sohoton Foodie Boodle Fight
-- Shared Lunch at Sohoton
-- Sohoton Group Dining Experience
-- Sohoton Island Food Experience
-
-Return ONLY the title.`,
-          },
-        ],
+Return ONLY the HTML content. Nothing else.`,
+        }],
       });
 
-      const text = extractText(msg.content);
-      return NextResponse.json({ title: text.trim() });
+      let html = extractText(msg.content);
+      // Clean any accidental markdown
+      html = html.replace(/```html|```/g, "").trim();
+      // Apply auto-links if provided
+      if (autoLinks?.length) html = applyAutoLinks(html, autoLinks);
+      // Apply layout styling
+      if (layoutStyle && layoutStyle !== "standard") html = applyLayoutStyle(html, layoutStyle, safeTitle);
+
+      return NextResponse.json({ fullDescription: html });
     }
 
-    // =========================================================
-    // MODE: seo
-    // Generates tags + meta description
-    // =========================================================
+    // ── MODE: enhance ─────────────────────────────────────────────────────────
+    if (mode === "enhance") {
+      const msg = await client.messages.create({
+        model:       "claude-sonnet-4-20250514",
+        max_tokens:  700,
+        messages: [{
+          role: "user",
+          content: `You are a controlled content rewriter for travelasiargao.com.
+
+Rewrite rough attraction notes into clean, natural, tourism-friendly description HTML.
+
+ITEM: ${safeTitle || "(none)"}
+CATEGORY: ${category || "Attraction"}
+NOTES: ${safeDescription || "(none)"}
+
+RULES:
+- Return ONLY HTML paragraphs using <p> tags
+- No invented facts
+- No first-person claims
+- Warm, grounded tone
+- 70-120 words
+- Mention Siargao naturally if relevant
+
+Return ONLY the HTML. No intro. No labels.`,
+        }],
+      });
+
+      let text = extractText(msg.content).replace(/```html|```/g, "").trim();
+      if (enableLinks && autoLinks?.length) text = applyAutoLinks(text, autoLinks);
+      return NextResponse.json({ description: text });
+    }
+
+    // ── MODE: title ───────────────────────────────────────────────────────────
+    if (mode === "title") {
+      const msg = await client.messages.create({
+        model:      "claude-sonnet-4-20250514",
+        max_tokens: 80,
+        messages: [{
+          role: "user",
+          content: `Generate a SHORT public title for a Siargao attraction page.
+Category: ${category || "Attraction"}
+Rough title: ${safeTitle || "(none)"}
+Description: ${safeDescription.slice(0, 250) || "(none)"}
+
+RULES: 3-7 words, clean, public-facing, no quotes, no emoji, no punctuation at end.
+Return ONLY the title.`,
+        }],
+      });
+      return NextResponse.json({ title: extractText(msg.content).trim() });
+    }
+
+    // ── MODE: seo ─────────────────────────────────────────────────────────────
     if (mode === "seo") {
       const msg = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model:      "claude-sonnet-4-20250514",
         max_tokens: 400,
-        temperature: 0.3,
-        messages: [
-          {
-            role: "user",
-            content: `You are an SEO assistant for travelasiargao.com, a Siargao Island travel website.
-
-Generate SEO data for this attraction.
+        messages: [{
+          role: "user",
+          content: `SEO assistant for travelasiargao.com Siargao Island travel website.
 
 INPUT:
 Title: ${safeTitle || "(none)"}
 Category: ${category || "Attraction"}
 Context: ${safeDescription.slice(0, 300) || "Siargao Island tourist attraction"}
 
-Return ONLY valid JSON in this exact format:
+Return ONLY valid JSON:
 {
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6"],
+  "tags": ["tag1","tag2","tag3","tag4","tag5","tag6"],
   "description": "meta description here"
 }
 
-RULES FOR TAGS:
-- Exactly 6 tags
-- Lowercase only
-- Real tourist search phrases
-- Mix of:
-  - location-based
-  - activity-based
-  - attraction-based
-  - year-based if useful
-- No hashtags
-- No duplicate meaning
-
-RULES FOR DESCRIPTION:
-- 120 to 155 characters ONLY
-- Must sound natural in Google search
-- Must mention Siargao or Sohoton if relevant
-- Must be specific
-- Must encourage clicks
-- No keyword stuffing
-- No fake claims
-
+Tags: exactly 6, lowercase, real tourist search phrases, no hashtags.
+Description: 120-155 chars, natural, specific, click-worthy.
 Return ONLY JSON.`,
-          },
-        ],
+        }],
       });
 
-      const raw = extractText(msg.content) || "{}";
-      const clean = stripCodeFences(raw);
-
+      const raw    = extractText(msg.content) || "{}";
+      const clean  = stripCodeFences(raw);
       try {
         const parsed = JSON.parse(clean);
-
-        if (parsed.description && parsed.description.length > 155) {
-          parsed.description = parsed.description.slice(0, 152) + "...";
-        }
-
+        if (parsed.description?.length > 155) parsed.description = parsed.description.slice(0, 152) + "...";
         return NextResponse.json({
-          tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 6) : [],
+          tags:        Array.isArray(parsed.tags) ? parsed.tags.slice(0, 6) : [],
           description: parsed.description || "",
         });
       } catch {
@@ -285,9 +248,6 @@ Return ONLY JSON.`,
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
   } catch (err: any) {
     console.error("[generate-seo]", err);
-    return NextResponse.json(
-      { error: err?.message ?? "Server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err?.message ?? "Server error" }, { status: 500 });
   }
 }
