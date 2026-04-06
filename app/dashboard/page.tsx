@@ -39,7 +39,8 @@ export async function generateMetadata() {
 export const dynamic = "force-dynamic";
 
 function peso(cents: number) {
-  return `₱${(cents / 100).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const amount = Math.round(cents / 100);
+  return `₱${amount.toLocaleString()}`;
 }
 
 // ── Parking bookings fetch ────────────────────────────────────────────────────
