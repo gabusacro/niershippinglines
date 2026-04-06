@@ -99,9 +99,10 @@ export function PassengerActiveTickets({ tickets }: Props) {
           let depLabel = "";
           if (depDate) {
             try {
-              depLabel = new Date(depDate + "T00:00:00+08:00").toLocaleDateString("en-PH", {
-                weekday: "short", month: "short", day: "numeric",
-              });
+              const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const d = new Date(depDate + "T00:00:00+08:00");
+depLabel = `${days[d.getUTCDay()]}, ${months[d.getUTCMonth()]} ${d.getUTCDate()}`;
             } catch { depLabel = depDate; }
           }
           if (depTime) {
