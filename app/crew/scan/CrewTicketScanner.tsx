@@ -22,8 +22,7 @@ type IdVerification = {
   admin_note: string | null;
   is_expired: boolean;
 refund_gcash_reference?: string | null;
-reschedule_fee_paid?: boolean | null;
-reschedule_fee_cents?: number | null;
+
 };
 
 type ScanResult = {
