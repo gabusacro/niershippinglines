@@ -49,7 +49,7 @@ export const GCASH_FEE_CENTS = 1500; // ₱15 per transaction (online/GCash only
 export const ADMIN_FEE_CENTS_PER_PASSENGER = 2000; // ₱20 per passenger
 
 /** Passenger-initiated reschedule (MARINA: P10–10% before departure). */
-export const RESCHEDULE_FEE_PERCENT = 10;
+export const RESCHEDULE_FEE_PERCENT = 15;
 export const RESCHEDULE_GCASH_FEE_CENTS = 1500; // ₱15 GCash transaction fee
 
 /** Important notices shown on booking forms and tickets. */
