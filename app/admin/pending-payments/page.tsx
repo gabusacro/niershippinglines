@@ -9,6 +9,7 @@ import { ResendProofButton } from "@/components/admin/ResendProofButton";
 import { formatTime } from "@/lib/dashboard/format";
 import { getPaymentProofSignedUrl } from "@/lib/admin/payment-proof-url";
 import { PaymentProofViewer } from "@/components/admin/PaymentProofViewer";
+import { ConfirmRescheduleFeeButton } from "./ConfirmRescheduleFeeButton";
 
 export const metadata = {
   title: "Pending Payments",
@@ -62,6 +63,36 @@ export default async function AdminPendingPaymentsPage() {
   }
 
   const list = (bookings ?? []) as Row[];
+
+
+
+                            const { data: pendingReschedules } = await supabase
+                              .from("booking_changes")
+                              .select("id, booking_id, additional_fee_cents, proof_path, proof_uploaded_at, changed_at, booking:bookings!booking_changes_booking_id_fkey(reference, customer_full_name, customer_email, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, trip_snapshot_vessel_name)")
+                              .eq("fee_paid", false)
+                              .not("additional_fee_cents", "is", null)
+                              .order("changed_at", { ascending: false })
+                              .limit(50);
+
+                            const rescheduleList = (pendingReschedules ?? []) as {
+                              id: string;
+                              booking_id: string;
+                              additional_fee_cents: number;
+                              proof_path: string | null;
+                              proof_uploaded_at: string | null;
+                              changed_at: string;
+                              booking: {
+                    reference: string;
+                    customer_full_name: string;
+                    customer_email: string;
+                    trip_snapshot_route_name: string | null;
+                    trip_snapshot_departure_date: string | null;
+                    trip_snapshot_departure_time: string | null;
+                    trip_snapshot_vessel_name: string | null;
+                  }[] | null;
+                            }[];
+
+
   // Resolve profile by email for guest bookings so Warning/Spam can target the account that owns that email
   const guestEmailsSet = new Set(list.filter((b) => !b.created_by && b.customer_email?.trim()).map((b) => b.customer_email!.trim().toLowerCase()));
   const { data: passengerProfiles } = guestEmailsSet.size > 0
@@ -88,6 +119,64 @@ export default async function AdminPendingPaymentsPage() {
       <p className="mt-1 text-sm text-[#0f766e]">
         Bookings waiting for payment. When a walk-in shows their reference (or phone), find them here and confirm to mark as paid (cash or GCash).
       </p>
+
+
+
+                {rescheduleList.length > 0 && (
+                        <div className="mt-6">
+                          <h2 className="text-lg font-bold text-[#134e4a]">Pending Reschedule Payments</h2>
+                          <p className="mt-1 text-sm text-[#0f766e]">Passengers who rescheduled but have not paid the reschedule fee yet.</p>
+                          <div className="mt-3 space-y-4">
+                            {rescheduleList.map((r) => {
+                              const b = r.booking?.[0];
+                              if (!b) return null;
+                              const changedAt = r.changed_at
+                                ? new Date(r.changed_at).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) +
+                                  " at " + new Date(r.changed_at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", hour12: true })
+                                : "—";
+                              return (
+                                <div key={r.id} className="flex flex-col gap-4 rounded-xl border-2 border-orange-200 bg-orange-50/50 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                                  <div>
+                                    <span className="inline-block rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-800 mb-1">Reschedule Fee</span>
+                                    <Link href={`/admin/bookings/${encodeURIComponent(b.reference)}`} className="block font-mono font-bold text-[#0c7b93] hover:underline">
+                                      {b.reference}
+                                    </Link>
+                                    <p className="mt-1 text-sm font-medium text-[#134e4a]">{b.customer_full_name}</p>
+                                    <p className="text-xs text-[#0f766e]">{b.customer_email}</p>
+                                    <p className="mt-1 text-xs text-orange-800">Rescheduled: {changedAt}</p>
+                                    {b.trip_snapshot_route_name && (
+                                      <p className="mt-1 text-sm text-[#134e4a]">
+                                        {b.trip_snapshot_route_name}
+                                        {b.trip_snapshot_vessel_name ? ` · ${b.trip_snapshot_vessel_name}` : ""}
+                                      </p>
+                                    )}
+                                    <p className="mt-1 text-sm font-bold text-orange-900">
+                                      Fee due: ₱{(r.additional_fee_cents / 100).toFixed(0)}
+                                    </p>
+                                    {r.proof_path ? (
+                                      <p className="mt-1 text-xs font-semibold text-teal-700">✓ Payment screenshot uploaded — verify and confirm</p>
+                                    ) : (
+                                      <p className="mt-1 text-xs text-orange-700">No screenshot uploaded yet.</p>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                                    {/* Confirm reschedule fee paid button */}
+                                    <ConfirmRescheduleFeeButton changeId={r.id} reference={b.reference} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+
+
+
+
+
+
+
 
       <div className="mt-6 space-y-4">
         {list.length === 0 ? (
