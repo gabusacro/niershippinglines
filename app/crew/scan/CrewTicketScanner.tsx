@@ -21,6 +21,9 @@ type IdVerification = {
   uploaded_at: string | null;
   admin_note: string | null;
   is_expired: boolean;
+refund_gcash_reference?: string | null;
+reschedule_fee_paid?: boolean | null;
+reschedule_fee_cents?: number | null;
 };
 
 type ScanResult = {
@@ -36,6 +39,8 @@ type ScanResult = {
   refund_status?: string;
   refund_note?: string | null;
   refund_gcash_reference?: string | null;
+  reschedule_fee_paid?: boolean | null;
+  reschedule_fee_cents?: number | null;
   passenger_gender?: string | null;
   passenger_birthdate?: string | null;
   passenger_nationality?: string | null;
@@ -541,6 +546,36 @@ export function CrewTicketScanner() {
               </div>
             )}
           </div>
+
+
+
+
+
+
+          {result.reschedule_fee_cents != null && result.reschedule_fee_cents > 0 && (
+            <div className={`rounded-xl border-2 px-4 py-3 ${
+              result.reschedule_fee_paid
+                ? "border-green-300 bg-green-50"
+                : "border-red-300 bg-red-50"
+            }`}>
+              <p className={`text-sm font-bold ${result.reschedule_fee_paid ? "text-green-800" : "text-red-800"}`}>
+                {result.reschedule_fee_paid
+                  ? "✓ Reschedule Fee Paid"
+                  : "⚠ Reschedule Fee UNPAID"}
+              </p>
+              <p className={`text-xs mt-0.5 ${result.reschedule_fee_paid ? "text-green-700" : "text-red-700"}`}>
+                Fee: ₱{(result.reschedule_fee_cents / 100).toFixed(0)}
+                {!result.reschedule_fee_paid && " — Collect before boarding."}
+              </p>
+            </div>
+          )}
+          
+
+
+
+
+
+
 
           {/* ── ID Verification Panel ─────────────────────────────────────────── */}
           <div>
