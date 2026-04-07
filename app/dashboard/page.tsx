@@ -270,364 +270,389 @@ export default async function DashboardPage({
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
 
-      {isPassenger ? (
-        <div className="space-y-6">
+{isPassenger ? (
+  <div className="space-y-6">
 
-          {/* ── HERO BANNER ── */}
-          <div className="relative overflow-hidden rounded-3xl shadow-2xl"
-            style={{ background: "linear-gradient(135deg, #064e3b 0%, #065f60 30%, #0c7b93 65%, #0891b2 100%)" }}>
-            <div className="pointer-events-none absolute inset-0">
-              <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 120" preserveAspectRatio="none" style={{ opacity: 0.18 }}>
-                <path d="M0,60 C240,100 480,20 720,60 C960,100 1200,20 1440,60 L1440,120 L0,120 Z" fill="white"/>
-              </svg>
-              <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 80" preserveAspectRatio="none" style={{ opacity: 0.10 }}>
-                <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,30 1440,40 L1440,80 L0,80 Z" fill="white"/>
-              </svg>
-              <div className="absolute right-0 top-0 bottom-0 w-48 opacity-[0.06] select-none pointer-events-none overflow-hidden">
-                <svg viewBox="0 0 200 400" className="h-full w-full" fill="white">
-                  <path d="M100,400 L100,150 M100,150 C100,150 60,80 10,60 C60,90 100,150 100,150 M100,150 C100,150 140,70 190,40 C145,75 100,150 100,150 M100,150 C100,150 50,110 20,130 C55,115 100,150 100,150 M100,150 C100,150 150,100 180,110 C148,105 100,150 100,150" stroke="white" strokeWidth="4" fill="none"/>
-                  <circle cx="100" cy="145" r="8" fill="white"/>
+    {/* ── HERO BANNER ── */}
+    <div
+      className="relative overflow-hidden rounded-3xl shadow-xl"
+      style={{ background: "linear-gradient(155deg, #022c3a 0%, #0c4a6e 50%, #0891b2 100%)" }}
+    >
+      {/* Wave decoration */}
+      <svg className="absolute bottom-0 left-0 w-full opacity-[0.12] pointer-events-none" viewBox="0 0 480 50" preserveAspectRatio="none" height="50">
+        <path d="M0,25 C80,45 160,5 240,25 C320,45 400,5 480,25 L480,50 L0,50Z" fill="white"/>
+        <path d="M0,35 C120,50 240,12 360,35 C420,44 460,28 480,35 L480,50 L0,50Z" fill="white" opacity=".5"/>
+      </svg>
+
+      <div className="relative px-6 pt-7 pb-6">
+        <div className="flex items-start gap-4 flex-wrap">
+          {/* Avatar */}
+          <div className="shrink-0 relative">
+            {passengerAvatarUrl ? (
+              <img
+                src={passengerAvatarUrl}
+                alt={displayName ?? "Profile"}
+                className="rounded-2xl object-cover border-2 border-white/25 shadow-lg"
+                style={{ width: 64, height: 64 }}
+              />
+            ) : (
+              <div
+                className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-white/20 shadow-lg"
+                style={{ background: "rgba(255,255,255,0.13)" }}
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                 </svg>
               </div>
-              <div className="absolute top-6 left-1/4 w-2 h-2 rounded-full bg-white opacity-20" />
-              <div className="absolute top-12 left-1/3 w-1 h-1 rounded-full bg-white opacity-15" />
-              <div className="absolute top-4 right-1/3 w-1.5 h-1.5 rounded-full bg-white opacity-20" />
-            </div>
-
-            <div className="relative px-6 pt-7 pb-6">
-              <div className="flex items-start gap-5 flex-wrap">
-                <div className="shrink-0">
-                  {passengerAvatarUrl ? (
-                    <div className="relative">
-                      <img src={passengerAvatarUrl} alt={displayName ?? "Profile"}
-                        className="rounded-2xl object-cover border-2 border-white/30 shadow-lg"
-                        style={{ width: 72, height: 72 }} />
-                      <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-emerald-400 border-2 border-white shadow-sm" />
-                    </div>
-                  ) : (
-                    <div className="flex h-[72px] w-[72px] items-center justify-center rounded-2xl border-2 border-white/20 shadow-lg text-3xl"
-                      style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}>
-                      🧑‍✈️
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.55)" }}>
-                    Passenger Dashboard
-                  </p>
-                  <h1 className="mt-0.5 font-extrabold text-white leading-tight" style={{ fontSize: "clamp(1.25rem, 4vw, 1.75rem)" }}>
-                    {showWelcomeName ? <>Welcome back, {showWelcomeName}! 👋</> : <>Welcome aboard! 👋</>}
-                  </h1>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {loggedInAddress && (
-                      <span className="inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-semibold"
-                        style={{ background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.85)" }}>
-                        📍 {loggedInAddress}
-                      </span>
-                    )}
-                    {!displayName && (
-                      <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
-                        Set your name so we can greet you properly
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {totalTrips > 0 && (
-                  <div className="shrink-0 rounded-2xl border border-white/20 px-5 py-3 text-center"
-                    style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}>
-                    <div className="text-3xl font-black text-white leading-none">{totalTrips}</div>
-                    <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>Active Bookings</div>
-                  </div>
-                )}
-              </div>
-              {displayName ? (
-                <div className="mt-5 border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.15)" }}>
-                  <p className="text-xs font-semibold mb-1.5" style={{ color: "rgba(255,255,255,0.7)" }}>
-                    📋 Address for tickets &amp; Coast Guard manifest
-                  </p>
-                  <SetAddressForm initialAddress={user.address ?? ""} />
-                </div>
-              ) : (
-                <div className="mt-5 border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.15)" }}>
-                  <SetDisplayNameForm />
-                </div>
-              )}
-            </div>
-
-            <div className="relative h-10 overflow-hidden" style={{ background: "linear-gradient(180deg, transparent 0%, rgba(0,60,40,0.4) 100%)" }}>
-              <svg viewBox="0 0 800 40" className="absolute bottom-0 w-full" preserveAspectRatio="none" style={{ opacity: 0.35 }}>
-                <ellipse cx="120" cy="40" rx="80" ry="25" fill="#064e3b"/>
-                <ellipse cx="680" cy="40" rx="100" ry="30" fill="#065f46"/>
-                <path d="M380,28 L370,35 L390,35 Z" fill="white" opacity="0.6"/>
-                <path d="M380,20 L380,28" stroke="white" strokeWidth="1" opacity="0.5"/>
-              </svg>
-            </div>
+            )}
+            <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-emerald-400 border-2 border-[#022c3a]" />
           </div>
 
-          {params.ref ? <ClaimBookingFromRef refParam={params.ref} /> : null}
-          <ClaimGuestBookingsByEmail />
-
-          {/* ── Restriction notices ── */}
-          {passengerRestriction && passengerRestriction.booking_warnings >= 1 && !isBlockedNow(passengerRestriction) && (
-            <div className="rounded-2xl border-2 border-amber-500 bg-amber-50 p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-amber-900">⚠️ Notice about your account</h2>
-              <p className="mt-2 text-sm text-amber-800">
-                We&apos;ve noticed some issues with your recent booking activity. Please ensure you only
-                book when you intend to complete payment. Repeated abuse may result in temporary or
-                permanent restrictions on your account.
-              </p>
-            </div>
-          )}
-          {passengerRestriction && isBlockedNow(passengerRestriction) && (
-            <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-red-900">🚫 Account temporarily restricted</h2>
-              <p className="mt-2 text-sm text-red-800">
-                We noticed unusual activity and have temporarily restricted your account from making new
-                bookings. If you believe this is an error, please contact us at{" "}
-                <a href="mailto:gabu.sacro@gmail.com" className="font-semibold underline">gabu.sacro@gmail.com</a>.
-              </p>
-            </div>
-          )}
-
-          {/* ── Active Tickets ── */}
-          {recentlyConfirmed.length > 0 && (
-            <div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Your Active Tickets</p>
-              <PassengerActiveTickets
-                tickets={recentlyConfirmed.map(b => ({
-                  id: b.id,
-                  reference: b.reference,
-                  trip_snapshot_departure_date: b.trip_snapshot_departure_date ?? null,
-                  trip_snapshot_departure_time: b.trip_snapshot_departure_time ?? null,
-                  trip_snapshot_route_name: b.trip_snapshot_route_name ?? null,
-                  refund_status: b.refund_status ?? null,
-                  passenger_count: b.passenger_count ?? 1,
-                }))}
-              />
-            </div>
-          )}
-
-          {/* ── Ferry Booking Status ── */}
-          {(awaitingPayment.length > 0 || awaitingConfirmation.length > 0 || refundedBookings.length > 0) && (
-            <div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Booking Status</p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {awaitingPayment.length > 0 && (
-                  <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5 shadow-sm">
-                    <div className="mb-3 flex items-center gap-2">
-                      <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.2)]" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-amber-800">⏳ Awaiting Payment</span>
-                    </div>
-                    <ul className="space-y-2">
-                      {awaitingPayment.map(b => {
-                        const routeName = b.trip?.route?.display_name
-                          ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
-                        return (
-                          <li key={b.id}>
-                            <Link href={`/dashboard/bookings/${b.reference}`}
-                              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-4 py-3 shadow-sm transition-all hover:border-amber-400 hover:shadow-md">
-                              <div>
-                                <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
-                                <div className="text-xs text-[#6B8886] mt-0.5">{routeName}</div>
-                              </div>
-                              <div className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</div>
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {GCASH_NUMBER && (
-                      <p className="mt-3 text-xs text-amber-800">
-                        <strong>GCash:</strong> {GCASH_NUMBER} ({GCASH_ACCOUNT_NAME})
-                      </p>
-                    )}
-                    <Link href={ROUTES.myBookings}
-                      className="mt-3 inline-flex items-center gap-1 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-600">
-                      View all bookings →
-                    </Link>
-                  </div>
-                )}
-                {awaitingConfirmation.length > 0 && (
-                  <div className="rounded-2xl border-2 border-teal-200 bg-teal-50 p-5 shadow-sm">
-                    <div className="mb-3 flex items-center gap-2">
-                      <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-teal-500 shadow-[0_0_0_3px_rgba(20,184,166,0.2)]" />
-                      <span className="text-xs font-bold uppercase tracking-widest text-teal-800">🕐 Awaiting Confirmation</span>
-                    </div>
-                    <p className="mb-2 text-xs text-teal-700">Payment proof submitted — waiting for admin to confirm.</p>
-                    <ul className="space-y-2">
-                      {awaitingConfirmation.map(b => {
-                        const routeName = b.trip?.route?.display_name
-                          ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
-                        return (
-                          <li key={b.id}>
-                            <Link href={`/dashboard/bookings/${b.reference}`}
-                              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-sm transition-all hover:border-teal-400 hover:shadow-md">
-                              <div>
-                                <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
-                                <div className="text-xs text-[#6B8886] mt-0.5">{routeName}</div>
-                              </div>
-                              <div className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</div>
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <Link href={ROUTES.myBookings}
-                      className="mt-3 inline-flex items-center gap-1 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700">
-                      View all bookings →
-                    </Link>
-                  </div>
-                )}
-                {refundedBookings.length > 0 && (
-                  <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-5 shadow-sm">
-                    <div className="mb-3 flex items-center gap-2">
-                      <span className="text-xs font-bold uppercase tracking-widest text-slate-600">💸 Recent Refunds</span>
-                    </div>
-                    <ul className="space-y-2">
-                      {refundedBookings.map(b => (
-                        <li key={b.id}>
-                          <Link href={`/dashboard/bookings/${b.reference}`}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all hover:border-slate-400 hover:shadow-md">
-                            <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
-                            <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800">Refunded</span>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+          {/* Name + location */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.45)" }}>
+              Passenger Dashboard
+            </p>
+            <h1 className="mt-1 font-extrabold text-white leading-tight" style={{ fontSize: "clamp(1.15rem,4vw,1.6rem)" }}>
+              {showWelcomeName ? <>Welcome back, {showWelcomeName}!</> : <>Welcome aboard!</>}
+            </h1>
+            {loggedInAddress && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium" style={{ background: "rgba(255,255,255,0.13)", color: "rgba(255,255,255,0.8)" }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                {loggedInAddress}
               </div>
-            </div>
-          )}
-
-          {/* ── Parking Bookings ── */}
-          {pendingParkingBookings.length > 0 && (
-            <div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Parking Bookings</p>
-              <div className="rounded-2xl border-2 border-teal-200 bg-teal-50 p-5 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-teal-500 shadow-[0_0_0_3px_rgba(20,184,166,0.2)]" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-teal-800">🚗 Active Parking Bookings</span>
-                </div>
-                <ul className="space-y-2">
-                  {pendingParkingBookings.map(b => {
-                    const isPending = b.status === "pending_payment";
-                    return (
-                      <li key={b.id}>
-                        <Link href={`/dashboard/parking/${b.id}`}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-sm transition-all hover:border-teal-400 hover:shadow-md">
-                          <div>
-                            <div className="font-mono text-sm font-semibold text-[#0c7b93]">{b.reference}</div>
-                            <div className="text-xs text-[#6B8886] mt-0.5">
-                              {b.lot_snapshot_name ?? "Parking"} · {b.vehicle_count} vehicle{b.vehicle_count !== 1 ? "s" : ""}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                              isPending ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
-                            }`}>
-                              {isPending ? "Pending" : "Confirmed"}
-                            </span>
-                            <span className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</span>
-                          </div>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <Link href="/dashboard/parking"
-                  className="mt-3 inline-flex items-center gap-1 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700">
-                  View all parking bookings →
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {recentlyConfirmed.length > 0 && (
-            <ConfirmationToast
-              items={recentlyConfirmed.map(b => ({ reference: b.reference }))}
-              siteName={branding.site_name}
-            />
-          )}
-
-          {/* ── Quick Actions ── */}
-          <div>
-            <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Quick Actions</p>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <Link href={ROUTES.book}
-                className="group flex flex-col rounded-2xl border-2 border-[#0c7b93] bg-[#0c7b93] p-5 text-white shadow-lg shadow-[#0c7b93]/20 transition-all hover:bg-[#0f766e] hover:shadow-xl hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-xl">🚢</span>
-                <span className="text-lg font-bold">Book a Trip</span>
-                <span className="mt-1 text-xs text-white/75">Siargao ↔ Surigao · Dinagat ↔ Surigao</span>
-              </Link>
-              <Link href={ROUTES.myBookings}
-                className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">🎫</span>
-                <span className="text-lg font-bold">My Bookings</span>
-                <span className="mt-1 text-xs text-[#6B8886]">Your reservations and references</span>
-              </Link>
-              <Link href={ROUTES.schedule}
-                className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">🗓️</span>
-                <span className="text-lg font-bold">View Schedule</span>
-                <span className="mt-1 text-xs text-[#6B8886]">Departure times and routes</span>
-              </Link>
-              <Link href="/parking"
-                className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">🚗</span>
-                <span className="text-lg font-bold">Book Parking</span>
-                <span className="mt-1 text-xs text-[#6B8886]">Near Dapa Port, from ₱250/day</span>
-              </Link>
-              <Link href="/dashboard/parking"
-                className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">🅿️</span>
-                <span className="text-lg font-bold">My Parking</span>
-                <span className="mt-1 text-xs text-[#6B8886]">Your parking bookings</span>
-              </Link>
-              <Link href={ROUTES.account}
-                className="group flex flex-col rounded-2xl border-2 border-teal-200 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-[#0c7b93] hover:shadow-md hover:-translate-y-0.5">
-                <span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4F2] text-xl">👤</span>
-                <span className="text-lg font-bold">My Account</span>
-                <span className="mt-1 text-xs text-[#6B8886]">Profile and password</span>
-              </Link>
-            </div>
+            )}
           </div>
 
-          {/* ── Trip Calendar ── */}
-          <div>
-            <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Scheduled Trips</p>
-            <TripCalendarWrapper
-              loggedInEmail={user.email ?? ""}
-              passengerName={user.fullName ?? ""}
-              loggedInAddress={user.address ?? ""}
-              loggedInGender={user?.gender ?? ""}
-              loggedInBirthdate={user?.birthdate ?? ""}
-              loggedInNationality={user?.nationality ?? ""}
-            />
-          </div>
-
-          <DiscoverSiargao items={discoverItems} />
-
-          <div className="rounded-2xl border-2 border-teal-100 bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="text-2xl">🔍</span>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-[#134e4a] text-sm">Find a Booking by Reference</p>
-                <p className="text-xs text-[#6B8886] mt-0.5">Enter your reference code to retrieve any booking</p>
-              </div>
+          {/* Active bookings badge */}
+          {totalTrips > 0 && (
+            <div
+              className="shrink-0 rounded-2xl border border-white/20 px-5 py-3 text-center"
+              style={{ background: "rgba(255,255,255,0.11)" }}
+            >
+              <div className="text-3xl font-black text-white leading-none">{totalTrips}</div>
+              <div className="mt-1 text-xs font-medium" style={{ color: "rgba(255,255,255,0.55)" }}>Active<br/>Bookings</div>
             </div>
-            <div className="mt-3"><FindBookingByReference /></div>
-          </div>
-
-          <DashboardShareWidget />
-
+          )}
         </div>
 
-      ) : isAdmin ? (
-        <>
-          <h1 className="text-2xl font-bold text-[#134e4a]">Dashboard</h1>
-          <p className="mt-2 text-[#0f766e]">Welcome, {welcomeName || user.email}. Your role: <strong>Admin</strong>.</p>
-        </>
+        {/* Address / name form */}
+        <div className="mt-5 border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.13)" }}>
+          {displayName ? (
+            <>
+              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.6)" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                </svg>
+                Address for tickets &amp; Coast Guard manifest
+              </p>
+              <SetAddressForm initialAddress={user.address ?? ""} />
+            </>
+          ) : (
+            <SetDisplayNameForm />
+          )}
+        </div>
+      </div>
+    </div>
+
+    {params.ref ? <ClaimBookingFromRef refParam={params.ref} /> : null}
+    <ClaimGuestBookingsByEmail />
+
+    {/* ── Restriction notices ── */}
+    {passengerRestriction && passengerRestriction.booking_warnings >= 1 && !isBlockedNow(passengerRestriction) && (
+      <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-5 shadow-sm">
+        <h2 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Notice about your account
+        </h2>
+        <p className="mt-2 text-xs text-amber-800 leading-relaxed">
+          We&apos;ve noticed some issues with your recent booking activity. Please ensure you only book when you intend to complete payment. Repeated abuse may result in restrictions.
+        </p>
+      </div>
+    )}
+    {passengerRestriction && isBlockedNow(passengerRestriction) && (
+      <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-5 shadow-sm">
+        <h2 className="text-sm font-bold text-red-900 flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+          Account temporarily restricted
+        </h2>
+        <p className="mt-2 text-xs text-red-800 leading-relaxed">
+          We noticed unusual activity and have temporarily restricted your account from making new bookings. If you believe this is an error, please contact us at{" "}
+          <a href="mailto:gabu.sacro@gmail.com" className="font-bold underline">gabu.sacro@gmail.com</a>.
+        </p>
+      </div>
+    )}
+
+    {/* ── Active Tickets ── */}
+    {recentlyConfirmed.length > 0 && (
+      <div>
+        <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Your Active Tickets</p>
+        <PassengerActiveTickets
+          tickets={recentlyConfirmed.map(b => ({
+            id: b.id,
+            reference: b.reference,
+            trip_snapshot_departure_date: b.trip_snapshot_departure_date ?? null,
+            trip_snapshot_departure_time: b.trip_snapshot_departure_time ?? null,
+            trip_snapshot_route_name: b.trip_snapshot_route_name ?? null,
+            refund_status: b.refund_status ?? null,
+            passenger_count: b.passenger_count ?? 1,
+          }))}
+        />
+      </div>
+    )}
+
+    {/* ── Ferry Booking Status ── */}
+    {(awaitingPayment.length > 0 || awaitingConfirmation.length > 0 || refundedBookings.length > 0) && (
+      <div>
+        <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Booking Status</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+
+          {/* Awaiting Payment */}
+          {awaitingPayment.length > 0 && (
+            <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.2)]" />
+                <span className="text-xs font-bold uppercase tracking-widest text-amber-800">Awaiting Payment</span>
+              </div>
+              <ul className="space-y-2">
+                {awaitingPayment.map(b => {
+                  const routeName = b.trip?.route?.display_name
+                    ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
+                  return (
+                    <li key={b.id}>
+                      <Link href={`/dashboard/bookings/${b.reference}`}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-4 py-3 shadow-sm transition-all hover:border-amber-400 hover:shadow-md">
+                        <div>
+                          <div className="font-mono text-sm font-bold text-[#0c7b93]">{b.reference}</div>
+                          <div className="text-xs text-[#6B8886] mt-0.5">{routeName}</div>
+                        </div>
+                        <div className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              {GCASH_NUMBER && (
+                <p className="mt-3 text-xs text-amber-800">
+                  <strong>GCash:</strong> {GCASH_NUMBER} ({GCASH_ACCOUNT_NAME})
+                </p>
+              )}
+              <Link href={ROUTES.myBookings}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-600">
+                View all bookings →
+              </Link>
+            </div>
+          )}
+
+          {/* Awaiting Confirmation */}
+          {awaitingConfirmation.length > 0 && (
+            <div className="rounded-2xl border-2 border-teal-200 bg-teal-50 p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-teal-500 shadow-[0_0_0_3px_rgba(20,184,166,0.2)]" />
+                <span className="text-xs font-bold uppercase tracking-widest text-teal-800">Awaiting Confirmation</span>
+              </div>
+              <p className="mb-2 text-xs text-teal-700">Payment proof submitted — waiting for admin to confirm.</p>
+              <ul className="space-y-2">
+                {awaitingConfirmation.map(b => {
+                  const routeName = b.trip?.route?.display_name
+                    ?? [b.trip?.route?.origin, b.trip?.route?.destination].filter(Boolean).join(" → ") ?? "—";
+                  return (
+                    <li key={b.id}>
+                      <Link href={`/dashboard/bookings/${b.reference}`}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-200 bg-white px-4 py-3 shadow-sm transition-all hover:border-teal-400 hover:shadow-md">
+                        <div>
+                          <div className="font-mono text-sm font-bold text-[#0c7b93]">{b.reference}</div>
+                          <div className="text-xs text-[#6B8886] mt-0.5">{routeName}</div>
+                        </div>
+                        <div className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              <Link href={ROUTES.myBookings}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700">
+                View all bookings →
+              </Link>
+            </div>
+          )}
+
+          {/* Refunded */}
+          {refundedBookings.length > 0 && (
+            <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-slate-600">Recent Refunds</span>
+              </div>
+              <ul className="space-y-2">
+                {refundedBookings.map(b => (
+                  <li key={b.id}>
+                    <Link href={`/dashboard/bookings/${b.reference}`}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all hover:border-slate-400 hover:shadow-md">
+                      <div className="font-mono text-sm font-bold text-[#0c7b93]">{b.reference}</div>
+                      <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800">Refunded</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+        </div>
+      </div>
+    )}
+
+    {/* ── Parking Bookings ── */}
+    {pendingParkingBookings.length > 0 && (
+      <div>
+        <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Parking Bookings</p>
+        <div className="rounded-2xl border-2 border-blue-100 bg-blue-50 p-5 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.2)]" />
+            <span className="text-xs font-bold uppercase tracking-widest text-blue-800">Active Parking Bookings</span>
+          </div>
+          <ul className="space-y-2">
+            {pendingParkingBookings.map(b => {
+              const isPending = b.status === "pending_payment";
+              return (
+                <li key={b.id}>
+                  <Link href={`/dashboard/parking/${b.id}`}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-white px-4 py-3 shadow-sm transition-all hover:border-blue-300 hover:shadow-md">
+                    <div>
+                      <div className="font-mono text-sm font-bold text-[#0c7b93]">{b.reference}</div>
+                      <div className="text-xs text-[#6B8886] mt-0.5">
+                        {b.lot_snapshot_name ?? "Parking"} · {b.vehicle_count} vehicle{b.vehicle_count !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                        isPending ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                      }`}>
+                        {isPending ? "Pending" : "Confirmed"}
+                      </span>
+                      <span className="font-bold text-[#134e4a]">{peso(b.total_amount_cents)}</span>
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <Link href="/dashboard/parking"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700">
+            View all parking bookings →
+          </Link>
+        </div>
+      </div>
+    )}
+
+    {recentlyConfirmed.length > 0 && (
+      <ConfirmationToast
+        items={recentlyConfirmed.map(b => ({ reference: b.reference }))}
+        siteName={branding.site_name}
+      />
+    )}
+
+    {/* ── Quick Actions ── */}
+    <div>
+      <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Quick Actions</p>
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
+        {/* Primary — Book a Trip */}
+        <Link href={ROUTES.book}
+          className="col-span-2 sm:col-span-1 group flex flex-col rounded-2xl border-2 border-[#0c4a6e] p-5 text-white shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5"
+          style={{ background: "linear-gradient(145deg,#022c3a,#0c4a6e 55%,#0891b2)" }}>
+          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "rgba(255,255,255,0.14)" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+              <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+            </svg>
+          </span>
+          <span className="text-base font-bold">Book a Trip</span>
+          <span className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>Siargao ↔ Surigao · Dinagat ↔ Surigao</span>
+        </Link>
+
+        {[
+          { href: ROUTES.myBookings, icon: "M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z", title: "My Bookings", sub: "Reservations & references" },
+          { href: ROUTES.schedule, icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", title: "View Schedule", sub: "Departure times & routes" },
+          { href: "/parking", icon: "M1 3h15v13H1zM16 8h4l3 5v3h-7V8zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z", title: "Book Parking", sub: "Near Dapa Port, from ₱250/day" },
+          { href: "/dashboard/parking", icon: "M3 3h18v18H3zM9 9h1.5a1.5 1.5 0 0 1 0 3H9v3M9 9V6", title: "My Parking", sub: "Your parking bookings" },
+          { href: ROUTES.account, icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", title: "My Account", sub: "Profile & password" },
+        ].map(({ href, icon, title, sub }) => (
+          <Link key={href} href={href}
+            className="group flex flex-col rounded-2xl border-2 border-teal-100 bg-white p-5 text-[#134e4a] shadow-sm transition-all hover:border-teal-300 hover:shadow-md hover:-translate-y-0.5">
+            <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d={icon}/>
+              </svg>
+            </span>
+            <span className="text-sm font-bold">{title}</span>
+            <span className="mt-1 text-xs text-[#6B8886]">{sub}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+
+    {/* ── Trip Calendar ── */}
+    <div>
+      <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#6B8886]">Scheduled Trips</p>
+      <TripCalendarWrapper
+        loggedInEmail={user.email ?? ""}
+        passengerName={user.fullName ?? ""}
+        loggedInAddress={user.address ?? ""}
+        loggedInGender={user?.gender ?? ""}
+        loggedInBirthdate={user?.birthdate ?? ""}
+        loggedInNationality={user?.nationality ?? ""}
+      />
+    </div>
+
+    <DiscoverSiargao items={discoverItems} />
+
+    {/* ── Find Booking ── */}
+    <div className="rounded-2xl border-2 border-teal-100 bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 flex-shrink-0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+        <div>
+          <p className="font-bold text-[#134e4a] text-sm">Find a Booking by Reference</p>
+          <p className="text-xs text-[#6B8886] mt-0.5">Enter your reference code to retrieve any booking</p>
+        </div>
+      </div>
+      <FindBookingByReference />
+    </div>
+
+    <DashboardShareWidget />
+
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+
 
       ) : user.role === "ticket_booth" ? (
         <TicketBoothDashboard
