@@ -68,7 +68,23 @@ export default async function AdminPendingPaymentsPage() {
 
                             const { data: pendingReschedules } = await supabase
                               .from("booking_changes")
-                              .select("id, booking_id, additional_fee_cents, proof_path, proof_uploaded_at, changed_at, booking:bookings!booking_changes_booking_id_fkey(reference, customer_full_name, customer_email, trip_snapshot_route_name, trip_snapshot_departure_date, trip_snapshot_departure_time, trip_snapshot_vessel_name)")
+                              .select(`
+  id,
+  booking_id,
+  additional_fee_cents,
+  proof_path,
+  proof_uploaded_at,
+  changed_at,
+  booking:bookings!booking_changes_booking_id_fkey (
+    reference,
+    customer_full_name,
+    customer_email,
+    trip_snapshot_route_name,
+    trip_snapshot_departure_date,
+    trip_snapshot_departure_time,
+    trip_snapshot_vessel_name
+  )
+`)
                               .eq("fee_paid", false)
                               .not("additional_fee_cents", "is", null)
                               .order("changed_at", { ascending: false })
@@ -81,15 +97,7 @@ export default async function AdminPendingPaymentsPage() {
                               proof_path: string | null;
                               proof_uploaded_at: string | null;
                               changed_at: string;
-                              booking: {
-                    reference: string;
-                    customer_full_name: string;
-                    customer_email: string;
-                    trip_snapshot_route_name: string | null;
-                    trip_snapshot_departure_date: string | null;
-                    trip_snapshot_departure_time: string | null;
-                    trip_snapshot_vessel_name: string | null;
-                  }[] | null;
+booking: any;
                             }[];
 
 
@@ -128,8 +136,8 @@ export default async function AdminPendingPaymentsPage() {
                           <p className="mt-1 text-sm text-[#0f766e]">Passengers who rescheduled but have not paid the reschedule fee yet.</p>
                           <div className="mt-3 space-y-4">
                             {rescheduleList.map((r) => {
-                              const b = r.booking?.[0];
-                              if (!b) return null;
+const b = Array.isArray(r.booking) ? r.booking[0] : r.booking;
+if (!b) return null;
                               const changedAt = r.changed_at
                                 ? new Date(r.changed_at).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) +
                                   " at " + new Date(r.changed_at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", hour12: true })
