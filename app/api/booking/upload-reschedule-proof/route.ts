@@ -45,18 +45,28 @@ export async function POST(request: NextRequest) {
 
   if (uploadErr) return NextResponse.json({ error: uploadErr.message }, { status: 500 });
 
-  // Save proof path on the booking_changes row (most recent one for this booking)
+  // Get the most recent booking_change for this booking first, then update it
+  const { data: latestChange, error: fetchErr } = await adminClient
+    .from("booking_changes")
+    .select("id")
+    .eq("booking_id", booking.id)
+    .order("changed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (fetchErr || !latestChange) {
+    console.error("[upload-reschedule-proof] could not find booking_change:", fetchErr?.message);
+    return NextResponse.json({ error: "Reschedule record not found" }, { status: 404 });
+  }
+
   const { error: updateErr } = await adminClient
     .from("booking_changes")
     .update({ proof_path: path, proof_uploaded_at: new Date().toISOString() })
-    .eq("booking_id", booking.id)
-    .order("changed_at", { ascending: false })
-    .limit(1);
+    .eq("id", latestChange.id);
 
-  // Even if booking_changes update fails (column may not exist yet), we still return ok
-  // Admin can see proof via the pending-reschedule-payments page once column is added
   if (updateErr) {
-    console.error("[upload-reschedule-proof] booking_changes update:", updateErr.message);
+    console.error("[upload-reschedule-proof] update failed:", updateErr.message);
+    return NextResponse.json({ error: "Could not save proof: " + updateErr.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, path });

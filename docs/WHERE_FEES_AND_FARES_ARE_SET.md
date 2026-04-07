@@ -40,7 +40,7 @@ The **Manual Booking** form and the **Book A Trip** flow both read these from Su
 
 **Location:** `lib/constants.ts`
 
-- **`RESCHEDULE_FEE_PERCENT`** — e.g. 10 = 10% of fare.
+- **`RESCHEDULE_FEE_PERCENT`** — e.g. 10 = 15% of fare.
 - **`RESCHEDULE_GCASH_FEE_CENTS`** — e.g. 1500 = ₱15.
 
 Used when a passenger requests a reschedule (MARINA-style: 10% + ₱15). Edit in `lib/constants.ts` if you need to change them.

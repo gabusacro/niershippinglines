@@ -15,6 +15,9 @@ import { RequestRefundButton } from "./RequestRefundButton";
 import { RequestRescheduleButton } from "./RequestRescheduleButton";
 import { ClaimGuestBookingButton } from "./ClaimGuestBookingButton";
 import { BookingShareSection } from "@/components/booking/BookingShareSection";
+import { RescheduleProofUpload } from "./RescheduleProofUpload";
+
+
 
 export async function generateMetadata() {
   const branding = await getSiteBranding();
@@ -70,6 +73,24 @@ export default async function BookingDetailPage({
   if (!refNormalized) notFound();
   const branding = await getSiteBranding();
   const supabase = await createClient();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   type BookingRow = {
     id: string;
@@ -151,6 +172,9 @@ export default async function BookingDetailPage({
           </div>
         );
       }
+
+
+
       return (
         <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
           <h1 className="text-2xl font-bold text-[#134e4a]">Booking not in your account</h1>
@@ -172,6 +196,49 @@ export default async function BookingDetailPage({
     notFound();
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+              const { data: pendingRescheduleChange } = await supabase
+                  .from("booking_changes")
+                  .select("id, additional_fee_cents, fee_paid, proof_path, changed_at")
+                  .eq("booking_id", (booking as BookingRow).id)
+                  .eq("fee_paid", false)
+                  .order("changed_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   const b = booking as {
     trip_snapshot_route_name?: string | null;
     trip_snapshot_vessel_name?: string | null;
@@ -183,6 +250,22 @@ export default async function BookingDetailPage({
     customer_mobile?: string | null;
     passenger_names?: string[];
   };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   const routeName = b.trip_snapshot_route_name ?? "—";
 
   let gcashRef: string | null = null;
@@ -325,6 +408,45 @@ export default async function BookingDetailPage({
             destination=""
           />
         )}
+
+
+
+
+                            {pendingRescheduleChange && !pendingRescheduleChange.fee_paid && (
+                                  <div className="mt-6 rounded-xl border-2 border-orange-300 bg-orange-50 p-5">
+                                    <p className="text-sm font-bold text-orange-900">⚠ Reschedule Fee Pending</p>
+                                    <p className="mt-1 text-sm text-orange-800">
+                                      Your schedule was changed. Please pay the reschedule fee of{" "}
+                                      <strong>₱{((pendingRescheduleChange.additional_fee_cents ?? 0) / 100).toFixed(0)}</strong> via GCash and upload your payment screenshot below.
+                                    </p>
+                                    {pendingRescheduleChange.proof_path ? (
+                                      <p className="mt-2 text-sm font-semibold text-teal-700">
+                                        ✓ Screenshot submitted — waiting for admin confirmation.
+                                      </p>
+                                    ) : (
+                                      <div className="mt-3">
+                                        <RescheduleProofUpload
+                                          reference={booking.reference}
+                                          feeCents={pendingRescheduleChange.additional_fee_cents ?? 0}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         {["confirmed", "checked_in", "boarded", "pending_payment"].includes(booking.status) && (
           <RequestRescheduleButton
