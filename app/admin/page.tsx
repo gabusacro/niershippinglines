@@ -117,23 +117,29 @@ export default async function AdminDashboardPage() {
   }
 
   // ── Pending reschedule fees — count unique bookings with unpaid fees ──────
-  async function getPendingRescheduleFeeCount() {
+async function getPendingRescheduleFeeCount() {
     if (!adminClient) return 0;
     try {
       const { data: changes } = await adminClient
         .from("booking_changes")
         .select("booking_id")
-        .eq("fee_paid", false)
+        .eq("status", "pending")
         .not("additional_fee_cents", "is", null)
         .gt("additional_fee_cents", 0);
 
-      // Count unique bookings
       const uniqueBookings = new Set((changes ?? []).map((c: { booking_id: string }) => c.booking_id));
       return uniqueBookings.size;
     } catch {
       return 0;
     }
   }
+
+
+
+
+
+
+      
 
   const [stats, pendingPreview, liveOps, unpaidTrips, pendingIdCount, feeLabels, pendingRescheduleCount] = await Promise.all([
     getDashboardStats("today"),

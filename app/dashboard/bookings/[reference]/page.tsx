@@ -247,11 +247,11 @@ export default async function BookingDetailPage({
 
 
 
-const { data: pendingRescheduleChange } = await supabase
+  const { data: pendingRescheduleChange } = await supabase
     .from("booking_changes")
-    .select("id, additional_fee_cents, fee_paid, proof_path, changed_at")
+    .select("id, additional_fee_cents, fee_paid, proof_path, changed_at, status, pending_snapshot")
     .eq("booking_id", booking.id)
-    .eq("fee_paid", false)
+    .eq("status", "pending")
     .order("changed_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -414,27 +414,64 @@ const { data: pendingRescheduleChange } = await supabase
 
 
 
-                            {pendingRescheduleChange && !pendingRescheduleChange.fee_paid && (
-                                  <div className="mt-6 rounded-xl border-2 border-orange-300 bg-orange-50 p-5">
-                                    <p className="text-sm font-bold text-orange-900">⚠ Reschedule Fee Pending</p>
-                                    <p className="mt-1 text-sm text-orange-800">
-                                      Your schedule was changed. Please pay the reschedule fee of{" "}
-                                      <strong>₱{((pendingRescheduleChange.additional_fee_cents ?? 0) / 100).toFixed(0)}</strong> via GCash and upload your payment screenshot below.
-                                    </p>
-                                    {pendingRescheduleChange.proof_path ? (
-                                      <p className="mt-2 text-sm font-semibold text-teal-700">
-                                        ✓ Screenshot submitted — waiting for admin confirmation.
-                                      </p>
-                                    ) : (
-                                      <div className="mt-3">
-                                        <RescheduleProofUpload
-                                          reference={booking.reference}
-                                          feeCents={pendingRescheduleChange.additional_fee_cents ?? 0}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
+     {pendingRescheduleChange && (
+          <div className="mt-6 rounded-xl border-2 border-orange-300 bg-orange-50 p-5">
+            <p className="text-sm font-bold text-orange-900">⏳ Reschedule Request Pending</p>
+
+            {/* Show what trip they requested */}
+            {pendingRescheduleChange.pending_snapshot && (() => {
+              const snap = pendingRescheduleChange.pending_snapshot as {
+                trip_snapshot_route_name?: string | null;
+                trip_snapshot_vessel_name?: string | null;
+                trip_snapshot_departure_date?: string | null;
+                trip_snapshot_departure_time?: string | null;
+              };
+              const depDate = snap.trip_snapshot_departure_date
+                ? new Date(snap.trip_snapshot_departure_date + "Z").toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+                : "—";
+              const depTime = snap.trip_snapshot_departure_time
+                ? (() => {
+                    const [h, m] = String(snap.trip_snapshot_departure_time).split(":");
+                    const hh = parseInt(h, 10);
+                    const am = hh < 12;
+                    const h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+                    return `${h12}:${m || "00"} ${am ? "AM" : "PM"}`;
+                  })()
+                : "—";
+              return (
+                <div className="mt-2 rounded-lg border border-orange-200 bg-white px-3 py-2">
+                  <p className="text-xs font-semibold text-orange-800">Requested new schedule:</p>
+                  <p className="text-sm font-bold text-[#134e4a] mt-0.5">
+                    {snap.trip_snapshot_route_name ?? "—"}
+                    {snap.trip_snapshot_vessel_name ? ` · ${snap.trip_snapshot_vessel_name}` : ""}
+                  </p>
+                  <p className="text-xs text-[#0f766e]">{depDate} · {depTime}</p>
+                </div>
+              );
+            })()}
+
+            <p className="mt-2 text-sm text-orange-800">
+              Reschedule fee: <strong>₱{((pendingRescheduleChange.additional_fee_cents ?? 0) / 100).toFixed(0)}</strong>
+            </p>
+            <p className="mt-1 text-xs text-orange-700">
+              Your current schedule stays the same until admin confirms your payment.
+            </p>
+
+            {pendingRescheduleChange.proof_path ? (
+              <div className="mt-3 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
+                <p className="text-sm font-semibold text-teal-700">✓ Screenshot submitted — waiting for admin to confirm payment and apply your new schedule.</p>
+              </div>
+            ) : (
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-orange-800 mb-2">Pay the fee and upload your GCash screenshot to proceed:</p>
+                <RescheduleProofUpload
+                  reference={booking.reference}
+                  feeCents={pendingRescheduleChange.additional_fee_cents ?? 0}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
 
 

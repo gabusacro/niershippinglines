@@ -84,14 +84,14 @@ export default async function AdminPendingPaymentsPage() {
   let rescheduleListWithUrls: (RescheduleRow & { proofUrl: string | null })[] = [];
 
   if (adminClient) {
-const { data: changes } = await adminClient
-  .from("booking_changes")
-  .select("id, booking_id, additional_fee_cents, proof_path, proof_uploaded_at, changed_at")
-  .eq("fee_paid", false)
-  .not("additional_fee_cents", "is", null)
-  .gt("additional_fee_cents", 0)
-  .order("changed_at", { ascending: false })
-  .limit(100);
+       const { data: changes } = await adminClient
+      .from("booking_changes")
+      .select("id, booking_id, additional_fee_cents, proof_path, proof_uploaded_at, changed_at, status")
+      .eq("status", "pending")
+      .not("additional_fee_cents", "is", null)
+      .gt("additional_fee_cents", 0)
+      .order("changed_at", { ascending: false })
+      .limit(100);
 
 // Keep only the latest change per booking
 const seenBookings = new Set<string>();

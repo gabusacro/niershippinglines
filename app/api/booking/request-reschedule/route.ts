@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isDepartureAtLeast24HoursFromNow } from "@/lib/admin/ph-time";
 import { RESCHEDULE_FEE_PERCENT, RESCHEDULE_GCASH_FEE_CENTS } from "@/lib/constants";
 
-/** POST: Passenger requests reschedule to another trip. 24h rule + 10% + ₱15 fee. */
+/** POST: Passenger requests reschedule. Records request only — trip does NOT change until admin confirms payment. */
 export async function POST(request: NextRequest) {
   const { getAuthUser } = await import("@/lib/auth/get-user");
   const user = await getAuthUser();
@@ -34,6 +34,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Cannot reschedule this booking" }, { status: 400 });
   }
   if (booking.trip_id === newTripId) return NextResponse.json({ error: "Already on this trip" }, { status: 400 });
+
+  // Block if there's already a pending reschedule request
+  const adminClient = createAdminClient();
+  if (!adminClient) return NextResponse.json({ error: "Service unavailable" }, { status: 500 });
+
+  const { data: existingPending } = await adminClient
+    .from("booking_changes")
+    .select("id")
+    .eq("booking_id", booking.id)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (existingPending) {
+    return NextResponse.json(
+      { error: "You already have a pending reschedule request. Please wait for admin to confirm your payment before requesting another change." },
+      { status: 400 }
+    );
+  }
 
   const oldTripId = booking.trip_id;
   if (!oldTripId) return NextResponse.json({ error: "Booking has no trip" }, { status: 400 });
@@ -81,62 +99,36 @@ export async function POST(request: NextRequest) {
 
   const boat = newTrip.boat as { name?: string } | null;
   const route = newTrip.route as { display_name?: string } | null;
-  const snapshot = {
+
+  // Store the new trip snapshot so admin confirm can apply it later
+  const pendingSnapshot = {
     trip_snapshot_vessel_name: boat?.name ?? null,
     trip_snapshot_route_name: route?.display_name ?? null,
     trip_snapshot_departure_date: newTrip.departure_date ?? null,
     trip_snapshot_departure_time: newTrip.departure_time ?? null,
+    new_total_cents: newTotalCents,
+    is_walk_in: (booking as { is_walk_in?: boolean }).is_walk_in ?? false,
+    old_booked: Number((oldTrip as Record<string, unknown>)?.[(booking as { is_walk_in?: boolean }).is_walk_in ? "walk_in_booked" : "online_booked"]) || 0,
+    new_booked: currentBooked,
+    passenger_count: booking.passenger_count,
   };
 
-  const adminClient = createAdminClient();
-  if (!adminClient) return NextResponse.json({ error: "Service unavailable" }, { status: 500 });
-
+  // Record the pending reschedule request — DO NOT change trip yet
   const { error: changeErr } = await adminClient.from("booking_changes").insert({
     booking_id: booking.id,
     from_trip_id: oldTripId,
     to_trip_id: newTripId,
     additional_fee_cents: rescheduleFeeCents,
     changed_by: user.id,
+    status: "pending",
+    pending_trip_id: newTripId,
+    pending_snapshot: pendingSnapshot,
   });
   if (changeErr) return NextResponse.json({ error: changeErr.message }, { status: 500 });
 
-  const { error: upErr } = await adminClient
-    .from("bookings")
-    .update({
-      trip_id: newTripId,
-      total_amount_cents: newTotalCents,
-      ...snapshot,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", booking.id);
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
-
-  const oldBooked =
-    Number((oldTrip as Record<string, unknown>)?.[(booking as { is_walk_in?: boolean }).is_walk_in ? "walk_in_booked" : "online_booked"]) || 0;
-
-  await adminClient
-    .from("trips")
-    .update({
-      [(booking as { is_walk_in?: boolean }).is_walk_in ? "walk_in_booked" : "online_booked"]: Math.max(
-        0,
-        oldBooked - booking.passenger_count
-      ),
-      updated_at: new Date().toISOString(),
-    } as Record<string, unknown>)
-    .eq("id", oldTripId);
-
-  await adminClient
-    .from("trips")
-    .update({
-      [(booking as { is_walk_in?: boolean }).is_walk_in ? "walk_in_booked" : "online_booked"]:
-        currentBooked + booking.passenger_count,
-      updated_at: new Date().toISOString(),
-    } as Record<string, unknown>)
-    .eq("id", newTripId);
-
   return NextResponse.json({
     ok: true,
-    message: "Booking rescheduled. 10% reschedule fee + ₱15 Payment Processing Fee applies. Pay the difference (₱" + (rescheduleFeeCents / 100).toFixed(0) + ") at the ticket booth before boarding.",
+    message: "Reschedule request submitted. Pay the fee of ₱" + (rescheduleFeeCents / 100).toFixed(0) + " via GCash and upload your screenshot. Your schedule will be updated after admin confirms your payment.",
     additional_fee_cents: rescheduleFeeCents,
     new_total_cents: newTotalCents,
   });
