@@ -1,17 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
-/** GET: Validate ticket from QR scan OR manual entry.
- *  Crew/ticket_booth/admin only.
- *
- *  Payload formats accepted:
- *    TRAVELA:TICKETNUMBER     — current QR code format
- *    TRAVELA:REFERENCE:INDEX  — current legacy QR format
- *    NIER:TICKETNUMBER        — old QR format (still supported)
- *    NIER:REFERENCE:INDEX     — old legacy QR format (still supported)
- *    TICKETNUMBER             — manual entry (e.g. GMML9VCJBD)
- *    REFERENCE                — manual entry (e.g. H8U3VJJXP3)
- */
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -28,15 +18,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "No ticket payload provided." }, { status: 400 });
   }
 
-  // ── Normalise payload ────────────────────────────────────────────────────
-  // Strip TRAVELA: or NIER: prefix if present (both supported for backward compat)
-  // otherwise treat as raw ticket number or reference (manual entry)
   const payload = rawPayload.trim().toUpperCase();
   const afterNier = payload.startsWith("TRAVELA:")
     ? payload.slice(8).trim()
     : payload.startsWith("NIER:")
     ? payload.slice(5).trim()
-    : payload; // manual entry — use as-is
+    : payload;
 
   let booking: {
     id: string;
@@ -55,7 +42,6 @@ export async function GET(request: NextRequest) {
   const legacyMatch = afterNier.match(/^([A-Z0-9]+):(\d+)$/i);
 
   if (legacyMatch) {
-    // ── Legacy QR format: NIER:REFERENCE:INDEX ───────────────────────────
     const [, ref, idxStr] = legacyMatch;
     passengerIndex = parseInt(idxStr ?? "0", 10);
 
@@ -76,13 +62,11 @@ export async function GET(request: NextRequest) {
     resolvedTicketNumber = legacyTicket?.ticket_number ?? undefined;
 
   } else {
-    // ── Try as ticket number first (new QR or manual entry) ──────────────
     const { data: ticket } = await supabase
       .from("tickets").select("ticket_number, booking_id, passenger_index, status")
       .eq("ticket_number", afterNier).maybeSingle();
 
     if (ticket) {
-      // Found by ticket number
       passengerIndex = ticket.passenger_index;
       ticketStatus = ticket.status;
       resolvedTicketNumber = ticket.ticket_number;
@@ -96,7 +80,6 @@ export async function GET(request: NextRequest) {
       booking = b;
 
     } else {
-      // ── Try as booking reference (manual entry fallback) ─────────────
       const { data: b } = await supabase
         .from("bookings")
         .select("id, reference, status, refund_status, customer_full_name, passenger_details, created_by, trip:trips!bookings_trip_id_fkey(departure_date, departure_time, boat:boats(name), route:routes(display_name))")
@@ -108,7 +91,6 @@ export async function GET(request: NextRequest) {
       booking = b;
       passengerIndex = 0;
 
-      // Get first ticket for this booking if available
       const { data: firstTicket } = await supabase
         .from("tickets").select("ticket_number, status")
         .eq("booking_id", b.id).eq("passenger_index", 0).maybeSingle();
@@ -119,6 +101,27 @@ export async function GET(request: NextRequest) {
   }
 
   if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+
+  // ── Reschedule fee check ─────────────────────────────────────────────────
+  let rescheduleFeeUnpaid = false;
+  let rescheduleFeeCents: number | null = null;
+
+  const adminClient = createAdminClient();
+  if (adminClient) {
+    const { data: pendingChange } = await adminClient
+      .from("booking_changes")
+      .select("id, additional_fee_cents, fee_paid")
+      .eq("booking_id", booking.id)
+      .eq("fee_paid", false)
+      .order("changed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (pendingChange && !pendingChange.fee_paid) {
+      rescheduleFeeUnpaid = true;
+      rescheduleFeeCents = pendingChange.additional_fee_cents;
+    }
+  }
 
   // ── Parse passenger details ──────────────────────────────────────────────
   const passengers = Array.isArray(booking.passenger_details)
@@ -135,11 +138,9 @@ export async function GET(request: NextRequest) {
     route?: { display_name?: string };
   } | null;
 
-  // ── Refund status checks ─────────────────────────────────────────────────
-  const refunded     = booking.refund_status === "processed" || booking.status === "refunded";
+  const refunded = booking.refund_status === "processed" || booking.status === "refunded";
   const refundBlocked = ["pending","under_review","approved"].includes(booking.refund_status ?? "");
 
-  // ── Fetch discount ID verification ───────────────────────────────────────
   const fareType = (passenger as { fare_type?: string }).fare_type ?? "adult";
   const needsId = ["senior","pwd","student","child"].includes(fareType);
   const passengerName = (passenger.full_name ?? "").toLowerCase().trim();
@@ -152,7 +153,6 @@ export async function GET(request: NextRequest) {
   } | null = null;
 
   if (needsId) {
-    // Step 1: by booking_id + passenger_index
     const { data: idRows } = await supabase
       .from("passenger_id_verifications")
       .select("id, discount_type, verification_status, id_image_url, expires_at, uploaded_at, admin_note, passenger_name")
@@ -165,7 +165,6 @@ export async function GET(request: NextRequest) {
       idVerification = verified ?? pending ?? idRows[0] ?? null;
     }
 
-    // Step 2: reusable ID by created_by profile
     if (!idVerification && booking.created_by) {
       const { data: profileIds } = await supabase
         .from("passenger_id_verifications")
@@ -181,7 +180,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Step 3: last resort — by passenger name
     if (!idVerification && passengerName) {
       const { data: nameIds } = await supabase
         .from("passenger_id_verifications")
@@ -193,7 +191,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ── Compute age ──────────────────────────────────────────────────────────
   const birthdate = (passenger as { birthdate?: string }).birthdate ?? null;
   let age: number | null = null;
   if (birthdate) {
@@ -221,6 +218,9 @@ export async function GET(request: NextRequest) {
     passenger_birthdate: birthdate,
     passenger_nationality: (passenger as { nationality?: string }).nationality ?? null,
     passenger_age: age,
+    // ── Reschedule fee ──
+    reschedule_fee_unpaid: rescheduleFeeUnpaid,
+    reschedule_fee_cents: rescheduleFeeCents,
     trip: trip ? {
       date: trip.departure_date,
       time: trip.departure_time,

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthUser } from "@/lib/auth/get-user";
 import { ROUTES } from "@/lib/constants";
@@ -42,15 +43,11 @@ type RescheduleRow = {
   proof_path: string | null;
   proof_uploaded_at: string | null;
   changed_at: string;
-  booking: {
-    reference: string;
-    customer_full_name: string;
-    customer_email: string;
-    trip_snapshot_route_name: string | null;
-    trip_snapshot_vessel_name: string | null;
-    trip_snapshot_departure_date: string | null;
-    trip_snapshot_departure_time: string | null;
-  } | null;
+  reference: string;
+  customer_full_name: string;
+  customer_email: string;
+  trip_snapshot_route_name: string | null;
+  trip_snapshot_vessel_name: string | null;
 };
 
 export default async function AdminPendingPaymentsPage() {
@@ -60,6 +57,7 @@ export default async function AdminPendingPaymentsPage() {
   }
 
   const supabase = await createClient();
+  const adminClient = createAdminClient();
 
   // ── Regular pending bookings ──────────────────────────────────────────────
   const { data: bookings, error } = await supabase
@@ -82,30 +80,67 @@ export default async function AdminPendingPaymentsPage() {
     );
   }
 
-  // ── Pending reschedule fees ───────────────────────────────────────────────
-  const { data: pendingReschedules } = await supabase
-    .from("booking_changes")
-    .select(`id, booking_id, additional_fee_cents, proof_path, proof_uploaded_at, changed_at, booking:bookings!booking_changes_booking_id_fkey(reference, customer_full_name, customer_email, trip_snapshot_route_name, trip_snapshot_vessel_name, trip_snapshot_departure_date, trip_snapshot_departure_time)`)
-    .eq("fee_paid", false)
-    .not("additional_fee_cents", "is", null)
-    .gt("additional_fee_cents", 0)
-    .order("changed_at", { ascending: false })
-    .limit(50);
+  // ── Pending reschedule fees — use adminClient + manual join via two queries ──
+  let rescheduleListWithUrls: (RescheduleRow & { proofUrl: string | null })[] = [];
 
-  const rescheduleList = ((pendingReschedules ?? []) as unknown[]).map((r) => {
-    const row = r as Record<string, unknown>;
-    const rawBooking = row.booking;
-    const booking = Array.isArray(rawBooking) ? rawBooking[0] ?? null : rawBooking ?? null;
-    return { ...row, booking } as RescheduleRow;
-  }).filter((r) => r.booking !== null);
+  if (adminClient) {
+    const { data: changes } = await adminClient
+      .from("booking_changes")
+      .select("id, booking_id, additional_fee_cents, proof_path, proof_uploaded_at, changed_at")
+      .eq("fee_paid", false)
+      .not("additional_fee_cents", "is", null)
+      .gt("additional_fee_cents", 0)
+      .order("changed_at", { ascending: false })
+      .limit(50);
 
-  // Resolve signed URLs for reschedule proofs
-  const rescheduleListWithUrls = await Promise.all(
-    rescheduleList.map(async (r) => ({
-      ...r,
-      proofUrl: r.proof_path ? await getPaymentProofSignedUrl(r.proof_path) : null,
-    }))
-  );
+    if (changes && changes.length > 0) {
+      const bookingIds = [...new Set(changes.map((c: { booking_id: string }) => c.booking_id))];
+
+      const { data: relatedBookings } = await adminClient
+        .from("bookings")
+        .select("id, reference, customer_full_name, customer_email, trip_snapshot_route_name, trip_snapshot_vessel_name")
+        .in("id", bookingIds);
+
+      const bookingMap = new Map<string, {
+        reference: string;
+        customer_full_name: string;
+        customer_email: string;
+        trip_snapshot_route_name: string | null;
+        trip_snapshot_vessel_name: string | null;
+      }>();
+      for (const b of relatedBookings ?? []) {
+        bookingMap.set(b.id, b as {
+          reference: string;
+          customer_full_name: string;
+          customer_email: string;
+          trip_snapshot_route_name: string | null;
+          trip_snapshot_vessel_name: string | null;
+        });
+      }
+
+      const merged: RescheduleRow[] = (changes as {
+        id: string;
+        booking_id: string;
+        additional_fee_cents: number;
+        proof_path: string | null;
+        proof_uploaded_at: string | null;
+        changed_at: string;
+      }[])
+        .map((c) => {
+          const b = bookingMap.get(c.booking_id);
+          if (!b) return null;
+          return { ...c, ...b };
+        })
+        .filter((r): r is RescheduleRow => r !== null);
+
+      rescheduleListWithUrls = await Promise.all(
+        merged.map(async (r) => ({
+          ...r,
+          proofUrl: r.proof_path ? await getPaymentProofSignedUrl(r.proof_path) : null,
+        }))
+      );
+    }
+  }
 
   const list = (bookings ?? []) as Row[];
   const guestEmailsSet = new Set(list.filter((b) => !b.created_by && b.customer_email?.trim()).map((b) => b.customer_email!.trim().toLowerCase()));
@@ -137,14 +172,13 @@ export default async function AdminPendingPaymentsPage() {
         <div className="mt-8">
           <h2 className="text-lg font-bold text-[#134e4a]">
             Pending Reschedule Fees
-            <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-sm font-bold text-orange-800">
+            <span className="ml-2 inline-flex items-center justify-center rounded-full bg-orange-100 px-2.5 py-0.5 text-sm font-bold text-orange-800">
               {rescheduleListWithUrls.length}
             </span>
           </h2>
           <p className="mt-1 text-sm text-[#0f766e]">Passengers who changed their schedule but have not yet paid the reschedule fee.</p>
           <div className="mt-3 space-y-4">
             {rescheduleListWithUrls.map((r) => {
-              const b = r.booking!;
               const changedAt = r.changed_at
                 ? new Date(r.changed_at).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) +
                   " at " + new Date(r.changed_at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", hour12: true })
@@ -152,7 +186,7 @@ export default async function AdminPendingPaymentsPage() {
               return (
                 <div key={r.id} className="flex flex-col gap-4 rounded-xl border-2 border-orange-200 bg-orange-50/60 p-5 shadow-sm sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-800">Reschedule Fee</span>
                       {r.proof_path ? (
                         <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-bold text-teal-800">✓ Screenshot uploaded</span>
@@ -160,22 +194,21 @@ export default async function AdminPendingPaymentsPage() {
                         <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">No screenshot yet</span>
                       )}
                     </div>
-                    <Link href={`/admin/bookings/${encodeURIComponent(b.reference)}`} className="mt-1 block font-mono font-bold text-[#0c7b93] hover:underline">
-                      {b.reference}
+                    <Link href={`/admin/bookings/${encodeURIComponent(r.reference)}`} className="font-mono font-bold text-[#0c7b93] hover:underline">
+                      {r.reference}
                     </Link>
-                    <p className="mt-1 text-sm font-medium text-[#134e4a]">{b.customer_full_name}</p>
-                    <p className="text-xs text-[#0f766e]">{b.customer_email}</p>
+                    <p className="mt-1 text-sm font-medium text-[#134e4a]">{r.customer_full_name}</p>
+                    <p className="text-xs text-[#0f766e]">{r.customer_email}</p>
                     <p className="mt-1 text-xs text-orange-800">Rescheduled: {changedAt}</p>
-                    {b.trip_snapshot_route_name && (
+                    {r.trip_snapshot_route_name && (
                       <p className="mt-1 text-sm text-[#134e4a]">
-                        {b.trip_snapshot_route_name}
-                        {b.trip_snapshot_vessel_name ? ` · ${b.trip_snapshot_vessel_name}` : ""}
+                        {r.trip_snapshot_route_name}
+                        {r.trip_snapshot_vessel_name ? ` · ${r.trip_snapshot_vessel_name}` : ""}
                       </p>
                     )}
                     <p className="mt-1 text-sm font-bold text-orange-900">
                       Fee due: ₱{(r.additional_fee_cents / 100).toFixed(0)}
                     </p>
-                    {/* Proof viewer */}
                     {r.proofUrl ? (
                       <div className="mt-3">
                         <p className="text-xs font-semibold text-teal-800">Payment screenshot</p>
@@ -187,11 +220,11 @@ export default async function AdminPendingPaymentsPage() {
                         <p className="mt-0.5 text-xs text-teal-700">Click to view full size. Verify GCash amount.</p>
                       </div>
                     ) : (
-                      <p className="mt-2 text-xs text-orange-700">Passenger has not uploaded screenshot yet. They can pay at the ticket booth.</p>
+                      <p className="mt-2 text-xs text-orange-700">No screenshot yet — passenger can pay at the ticket booth.</p>
                     )}
                   </div>
                   <div className="flex flex-col items-stretch gap-2 sm:items-end sm:min-w-[160px]">
-                    <ConfirmRescheduleFeeButton changeId={r.id} reference={b.reference} />
+                    <ConfirmRescheduleFeeButton changeId={r.id} reference={r.reference} />
                   </div>
                 </div>
               );
@@ -205,7 +238,7 @@ export default async function AdminPendingPaymentsPage() {
         <h2 className="text-lg font-bold text-[#134e4a]">
           Pending Booking Payments
           {list.length > 0 && (
-            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-sm font-bold text-amber-800">
+            <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-bold text-amber-800">
               {list.length}
             </span>
           )}

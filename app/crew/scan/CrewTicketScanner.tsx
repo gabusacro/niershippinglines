@@ -22,6 +22,17 @@ type IdVerification = {
   admin_note: string | null;
   is_expired: boolean;
 refund_gcash_reference?: string | null;
+                                           
+
+
+
+
+
+                                            reschedule_fee_unpaid?: boolean | null;
+                                            reschedule_fee_cents?: number | null;
+
+
+
 
 };
 
@@ -569,6 +580,36 @@ export function CrewTicketScanner() {
             </div>
           )}
           
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            {/* ── Reschedule Fee Status ─────────────────────────────────── */}
+                      {result.reschedule_fee_unpaid && result.reschedule_fee_cents != null && (
+                        <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3">
+                          <p className="text-sm font-bold text-red-800">⚠ RESCHEDULE FEE UNPAID</p>
+                          <p className="text-xs text-red-700 mt-1">
+                            This passenger rescheduled their trip. Collect{" "}
+                            <strong>₱{(result.reschedule_fee_cents / 100).toFixed(0)}</strong> before allowing boarding.
+                          </p>
+                        </div>
+                      )}
+                      {!result.reschedule_fee_unpaid && result.reschedule_fee_cents == null && null}
+
+
 
 
 
