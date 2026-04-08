@@ -112,6 +112,13 @@ export default async function AdminBookingDetailPage({
     .select("id, additional_fee_cents, fee_paid, proof_path, changed_at")
     .eq("booking_id", booking.id)
     .order("changed_at", { ascending: false });
+
+  const rescheduleHistoryWithUrls = await Promise.all(
+    (rescheduleHistory ?? []).map(async (r) => ({
+      ...r,
+      proofUrl: r.proof_path ? await getPaymentProofSignedUrl(r.proof_path) : null,
+    }))
+  );
   
   
   
@@ -261,23 +268,33 @@ export default async function AdminBookingDetailPage({
           )}
         </div>
 
-        {rescheduleHistory && rescheduleHistory.length > 0 && (
+ {rescheduleHistoryWithUrls.length > 0 && (
           <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50/50 p-4">
-            <h3 className="text-sm font-semibold text-[#134e4a]">Reschedule History ({rescheduleHistory.length})</h3>
-            <ul className="mt-2 space-y-2">
-              {(rescheduleHistory as { id: string; additional_fee_cents: number; fee_paid: boolean; proof_path: string | null; changed_at: string }[]).map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-xs">
-                  <span className="text-[#0f766e]">
-                    {new Date(r.changed_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}
-                  </span>
-                  <span className="font-semibold text-orange-800">
-                    Fee: ₱{(r.additional_fee_cents / 100).toFixed(0)}
-                  </span>
-                  <span className={`rounded-full px-2 py-0.5 font-bold ${r.fee_paid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"}`}>
-                    {r.fee_paid ? "✓ Paid" : "Unpaid"}
-                  </span>
-                  {r.proof_path && (
-                    <span className="rounded-full bg-teal-100 px-2 py-0.5 font-bold text-teal-700">✓ Screenshot</span>
+            <h3 className="text-sm font-semibold text-[#134e4a]">Reschedule History ({rescheduleHistoryWithUrls.length})</h3>
+            <ul className="mt-2 space-y-3">
+              {rescheduleHistoryWithUrls.map((r) => (
+                <li key={r.id} className="rounded-lg bg-white px-3 py-3 text-xs border border-orange-100">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[#0f766e]">
+                      {new Date(r.changed_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}
+                    </span>
+                    <span className="font-semibold text-orange-800">
+                      Fee: ₱{(r.additional_fee_cents / 100).toFixed(0)}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 font-bold ${r.fee_paid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"}`}>
+                      {r.fee_paid ? "✓ Paid" : "Unpaid"}
+                    </span>
+                  </div>
+                  {r.proofUrl && (
+                    <div className="mt-2">
+                      <p className="text-xs font-semibold text-teal-700 mb-1">Payment screenshot</p>
+                      <PaymentProofViewer
+                        proofUrl={r.proofUrl}
+                        isPdf={r.proof_path?.toLowerCase().endsWith(".pdf")}
+                        thumbnailClassName="h-24 w-auto max-w-[160px] rounded object-contain"
+                      />
+                      <p className="mt-0.5 text-xs text-teal-600">Click to view full size.</p>
+                    </div>
                   )}
                 </li>
               ))}
@@ -292,7 +309,7 @@ export default async function AdminBookingDetailPage({
 
 
 
-        
+
         <p className="mt-0.5 text-xs text-[#0f766e]">
           Created {booking.created_at ? new Date(booking.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }) : "—"}
         </p>
