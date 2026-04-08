@@ -149,7 +149,7 @@ export default function PromoPopup() {
 
         {/* ── Text + CTA card — only rendered if there's content ────────── */}
         {hasCard && (
-        <div className="rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.35)]" style={{ backgroundColor: "rgba(255,255,255,0.5)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}>
+        <div className="rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)]" style={{ backgroundColor: "rgba(0,0,0,0.85)" }}>
 
             {/* Text section */}
             {hasText && (
