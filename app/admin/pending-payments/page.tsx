@@ -84,17 +84,25 @@ export default async function AdminPendingPaymentsPage() {
   let rescheduleListWithUrls: (RescheduleRow & { proofUrl: string | null })[] = [];
 
   if (adminClient) {
-    const { data: changes } = await adminClient
-      .from("booking_changes")
-      .select("id, booking_id, additional_fee_cents, proof_path, proof_uploaded_at, changed_at")
-      .eq("fee_paid", false)
-      .not("additional_fee_cents", "is", null)
-      .gt("additional_fee_cents", 0)
-      .order("changed_at", { ascending: false })
-      .limit(50);
+const { data: changes } = await adminClient
+  .from("booking_changes")
+  .select("id, booking_id, additional_fee_cents, proof_path, proof_uploaded_at, changed_at")
+  .eq("fee_paid", false)
+  .not("additional_fee_cents", "is", null)
+  .gt("additional_fee_cents", 0)
+  .order("changed_at", { ascending: false })
+  .limit(100);
 
-    if (changes && changes.length > 0) {
-      const bookingIds = [...new Set(changes.map((c: { booking_id: string }) => c.booking_id))];
+// Keep only the latest change per booking
+const seenBookings = new Set<string>();
+const latestChanges = (changes ?? []).filter((c: { booking_id: string }) => {
+  if (seenBookings.has(c.booking_id)) return false;
+  seenBookings.add(c.booking_id);
+  return true;
+});
+
+    if (latestChanges && latestChanges.length > 0) {
+  const bookingIds = [...new Set(latestChanges.map((c: { booking_id: string }) => c.booking_id))];
 
       const { data: relatedBookings } = await adminClient
         .from("bookings")
@@ -118,7 +126,7 @@ export default async function AdminPendingPaymentsPage() {
         });
       }
 
-      const merged: RescheduleRow[] = (changes as {
+      const merged: RescheduleRow[] = (latestChanges as {
         id: string;
         booking_id: string;
         additional_fee_cents: number;

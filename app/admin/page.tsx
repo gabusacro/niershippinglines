@@ -8,6 +8,7 @@ import { getPendingPaymentsPreview } from "@/lib/admin/pending-payments-preview"
 import { getTodayLiveOperations } from "@/lib/admin/today-live-operations";
 import { LiveOperationsTable } from "@/components/admin/LiveOperationsTable";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getTodayInManila } from "@/lib/admin/ph-time";
 import { ROUTES } from "@/lib/constants";
 import {
@@ -28,6 +29,7 @@ export default async function AdminDashboardPage() {
   if (!user || user.role !== "admin") redirect(ROUTES.dashboard);
 
   const supabase = await createClient();
+  const adminClient = createAdminClient();
   const today = getTodayInManila();
 
   async function getUnpaidVesselTrips() {
@@ -114,13 +116,33 @@ export default async function AdminDashboardPage() {
     }
   }
 
-  const [stats, pendingPreview, liveOps, unpaidTrips, pendingIdCount, feeLabels] = await Promise.all([
+  // ── Pending reschedule fees — count unique bookings with unpaid fees ──────
+  async function getPendingRescheduleFeeCount() {
+    if (!adminClient) return 0;
+    try {
+      const { data: changes } = await adminClient
+        .from("booking_changes")
+        .select("booking_id")
+        .eq("fee_paid", false)
+        .not("additional_fee_cents", "is", null)
+        .gt("additional_fee_cents", 0);
+
+      // Count unique bookings
+      const uniqueBookings = new Set((changes ?? []).map((c: { booking_id: string }) => c.booking_id));
+      return uniqueBookings.size;
+    } catch {
+      return 0;
+    }
+  }
+
+  const [stats, pendingPreview, liveOps, unpaidTrips, pendingIdCount, feeLabels, pendingRescheduleCount] = await Promise.all([
     getDashboardStats("today"),
     getPendingPaymentsPreview(),
     getTodayLiveOperations(),
     getUnpaidVesselTrips(),
     getPendingIdCount(),
     getFeeLabels(),
+    getPendingRescheduleFeeCount(),
   ]);
 
   return (
@@ -149,7 +171,6 @@ export default async function AdminDashboardPage() {
           { href: "/admin/investor-shares",    label: "Investor Shares"      },
           { href: ROUTES.adminReports,         label: "Reports (per vessel)" },
           { href: ROUTES.adminVessels,         label: "Vessels & Fleet"      },
-          { href: ROUTES.adminPendingPayments, label: "Pending payments"     },
           { href: ROUTES.adminBookings,        label: "Booking history"      },
           { href: "/admin/investor-payouts",   label: "💼 Investor Payouts"  },
           { href: "/admin/vessel-owners",      label: "Vessel Owners"        },
@@ -161,7 +182,18 @@ export default async function AdminDashboardPage() {
           </Link>
         ))}
 
-        {/* ID Verifications — keeps badge */}
+        {/* Pending Payments — with reschedule badge */}
+        <Link href={ROUTES.adminPendingPayments}
+          className="relative flex min-h-[48px] items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 py-3 text-sm font-semibold text-[#134e4a] text-center transition-colors hover:border-[#0c7b93] hover:bg-teal-50">
+          Pending payments
+          {pendingRescheduleCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white">
+              {pendingRescheduleCount > 9 ? "9+" : pendingRescheduleCount}
+            </span>
+          )}
+        </Link>
+
+        {/* ID Verifications */}
         <Link href="/admin/id-verifications"
           className="relative flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 text-center transition-colors hover:border-blue-400 hover:bg-blue-100">
           <BadgeCheck className="w-4 h-4 shrink-0" />
@@ -246,6 +278,24 @@ export default async function AdminDashboardPage() {
             <Link href="/admin/id-verifications"
               className="inline-flex min-h-[40px] items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
               Review IDs →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reschedule Fee Alert ── */}
+      {pendingRescheduleCount > 0 && (
+        <div className="mt-4 rounded-2xl border-2 border-orange-300 bg-orange-50 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-orange-900">🔁 Pending Reschedule Fees ({pendingRescheduleCount})</h2>
+              <p className="mt-0.5 text-sm text-orange-800">
+                Passengers who changed their schedule and have not yet paid the reschedule fee. Collect before boarding.
+              </p>
+            </div>
+            <Link href={ROUTES.adminPendingPayments}
+              className="inline-flex min-h-[40px] items-center justify-center rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700">
+              Review fees →
             </Link>
           </div>
         </div>
