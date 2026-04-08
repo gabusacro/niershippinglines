@@ -4,14 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { useToast } from "@/components/ui/ActionToast";
 
-function hasGetUserMedia() {
-  return !!(
-    typeof navigator !== "undefined" &&
-    navigator.mediaDevices &&
-    typeof navigator.mediaDevices.getUserMedia === "function"
-  );
-}
-
 type IdVerification = {
   id: string;
   discount_type: string;
@@ -21,19 +13,6 @@ type IdVerification = {
   uploaded_at: string | null;
   admin_note: string | null;
   is_expired: boolean;
-refund_gcash_reference?: string | null;
-                                           
-
-
-
-
-
-                                            reschedule_fee_unpaid?: boolean | null;
-                                            reschedule_fee_cents?: number | null;
-
-
-
-
 };
 
 type ScanResult = {
@@ -49,7 +28,7 @@ type ScanResult = {
   refund_status?: string;
   refund_note?: string | null;
   refund_gcash_reference?: string | null;
-  reschedule_fee_paid?: boolean | null;
+  reschedule_fee_unpaid?: boolean | null;
   reschedule_fee_cents?: number | null;
   passenger_gender?: string | null;
   passenger_birthdate?: string | null;
@@ -141,9 +120,9 @@ function IdVerificationPanel({ idVerification, fareType, passengerAge }: {
   }
 
   const statusConfig = {
-    verified: { label: "✓ Verified",       bg: "bg-green-50",  border: "border-green-300",  text: "text-green-800"  },
-    pending:  { label: "⏳ Pending review", bg: "bg-amber-50",  border: "border-amber-300",  text: "text-amber-800"  },
-    rejected: { label: "✕ Rejected",        bg: "bg-red-50",    border: "border-red-300",    text: "text-red-800"    },
+    verified: { label: "✓ Verified",        bg: "bg-green-50", border: "border-green-300", text: "text-green-800" },
+    pending:  { label: "⏳ Pending review",  bg: "bg-amber-50", border: "border-amber-300", text: "text-amber-800" },
+    rejected: { label: "✕ Rejected",         bg: "bg-red-50",   border: "border-red-300",   text: "text-red-800"  },
   }[idVerification.status] ?? { label: idVerification.status, bg: "bg-slate-50", border: "border-slate-300", text: "text-slate-700" };
 
   const uploadedDate = idVerification.uploaded_at
@@ -165,7 +144,6 @@ function IdVerificationPanel({ idVerification, fareType, passengerAge }: {
           </span>
         </div>
 
-        {/* ID Image */}
         {idVerification.image_url && (
           <div>
             {idVerification.is_expired && (
@@ -179,11 +157,7 @@ function IdVerificationPanel({ idVerification, fareType, passengerAge }: {
                   className="w-full rounded-lg border border-slate-200 object-contain max-h-64"
                   onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setImgExpanded(false)}
-                  className="text-xs text-blue-600 underline"
-                >
+                <button type="button" onClick={() => setImgExpanded(false)} className="text-xs text-blue-600 underline">
                   Hide ID image
                 </button>
               </div>
@@ -203,7 +177,6 @@ function IdVerificationPanel({ idVerification, fareType, passengerAge }: {
           <p className="text-xs text-slate-500 italic">No image available — verify physical ID.</p>
         )}
 
-        {/* Dates */}
         <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
           {uploadedDate && <p>Uploaded: <strong>{uploadedDate}</strong></p>}
           {expiresDate && (
@@ -214,14 +187,12 @@ function IdVerificationPanel({ idVerification, fareType, passengerAge }: {
           )}
         </div>
 
-        {/* Admin note */}
         {idVerification.admin_note && (
           <p className="text-xs text-slate-600 italic border-t border-slate-200 pt-2">
             Note: {idVerification.admin_note}
           </p>
         )}
 
-        {/* Status guidance for crew */}
         {idVerification.status === "pending" && (
           <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
             <p className="text-xs text-amber-800 font-semibold">ID pending admin verification.</p>
@@ -236,7 +207,6 @@ function IdVerificationPanel({ idVerification, fareType, passengerAge }: {
         )}
       </div>
 
-      {/* Age cross-check for senior */}
       {seniorAgeWarning && (
         <div className="rounded-xl border-2 border-red-400 bg-red-100 px-4 py-3">
           <p className="text-xs font-bold text-red-900">
@@ -379,18 +349,13 @@ export function CrewTicketScanner() {
   useEffect(() => {
     if (!starting) return;
     const r1 = requestAnimationFrame(() => {
-      const r2 = requestAnimationFrame(() => {
-        initScanner();
-      });
+      const r2 = requestAnimationFrame(() => { initScanner(); });
       return () => cancelAnimationFrame(r2);
     });
     return () => cancelAnimationFrame(r1);
   }, [starting, initScanner]);
 
-  const startScan = useCallback(() => {
-    setResult(null);
-    setStarting(true);
-  }, []);
+  const startScan = useCallback(() => { setResult(null); setStarting(true); }, []);
 
   const stopScan = useCallback(() => {
     if (scannerRef.current) { scannerRef.current.stop().catch(() => {}); scannerRef.current = null; }
@@ -407,88 +372,76 @@ export function CrewTicketScanner() {
   return (
     <div className="space-y-4">
 
-      {/* Scan button */}
-{!scanning && !starting && (
-  <div className="space-y-3">
-    <button
-      type="button"
-      onClick={startScan}
-      disabled={loading}
-      className="w-full min-h-[52px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50"
-    >
-      {loading ? "Validating…" : "📷 Scan QR Code"}
-    </button>
+      {/* Scan / manual entry */}
+      {!scanning && !starting && (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={startScan}
+            disabled={loading}
+            className="w-full min-h-[52px] rounded-xl bg-[#0c7b93] px-4 py-3 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50"
+          >
+            {loading ? "Validating…" : "📷 Scan QR Code"}
+          </button>
 
-    {/* Manual entry — for walk-in tickets without QR */}
-    <div className="rounded-xl border-2 border-teal-100 bg-teal-50/50 p-4">
-      <p className="text-xs font-bold text-[#0f766e] uppercase tracking-wide mb-2">
-        Or ENTER Ticket Number / Reference Manually
-      </p>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="e.g. GMML9VCJBD or L37GQ52FS2"
-          className="flex-1 rounded-xl border-2 border-teal-200 bg-white px-3 py-2.5 text-sm text-[#134e4a] placeholder:text-gray-400 focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/20 uppercase"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              const val = (e.target as HTMLInputElement).value.trim().toUpperCase();
-              if (val) { validateTicket(val); (e.target as HTMLInputElement).value = ""; }
-            }
-          }}
-          id="manual-ticket-input"
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="characters"
-          spellCheck={false}
-        />
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => {
-            const input = document.getElementById("manual-ticket-input") as HTMLInputElement;
-            const val = input?.value.trim().toUpperCase();
-            if (val) { validateTicket(val); input.value = ""; }
-          }}
-          className="rounded-xl bg-[#0c7b93] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors"
-        >
-          Check
-        </button>
-      </div>
-      <p className="mt-1.5 text-xs text-[#0f766e]/60">
-        Press Enter or tap Check. Works with ticket numbers and booking references.
-      </p>
-    </div>
-  </div>
-)}
+          <div className="rounded-xl border-2 border-teal-100 bg-teal-50/50 p-4">
+            <p className="text-xs font-bold text-[#0f766e] uppercase tracking-wide mb-2">
+              Or ENTER Ticket Number / Reference Manually
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="e.g. GMML9VCJBD or L37GQ52FS2"
+                className="flex-1 rounded-xl border-2 border-teal-200 bg-white px-3 py-2.5 text-sm text-[#134e4a] placeholder:text-gray-400 focus:border-[#0c7b93] focus:outline-none focus:ring-2 focus:ring-[#0c7b93]/20 uppercase"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const val = (e.target as HTMLInputElement).value.trim().toUpperCase();
+                    if (val) { validateTicket(val); (e.target as HTMLInputElement).value = ""; }
+                  }
+                }}
+                id="manual-ticket-input"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  const input = document.getElementById("manual-ticket-input") as HTMLInputElement;
+                  const val = input?.value.trim().toUpperCase();
+                  if (val) { validateTicket(val); input.value = ""; }
+                }}
+                className="rounded-xl bg-[#0c7b93] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0f766e] disabled:opacity-50 transition-colors"
+              >
+                Check
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-[#0f766e]/60">
+              Press Enter or tap Check. Works with ticket numbers and booking references.
+            </p>
+          </div>
+        </div>
+      )}
 
-      {/* Starting state */}
       {starting && (
         <div className="flex items-center justify-center rounded-xl border-2 border-teal-200 bg-teal-50 py-8">
           <p className="text-sm text-[#0f766e] animate-pulse">Starting camera…</p>
         </div>
       )}
 
-      {/* Camera view — only mount when scanning/starting so Html5Qrcode gets real dimensions */}
       {(scanning || starting) && (
         <div className="space-y-3">
-          <div
-            id="qr-reader"
-            className="w-full overflow-hidden rounded-xl border-2 border-teal-300"
-            style={{ minHeight: 300 }}
-          />
+          <div id="qr-reader" className="w-full overflow-hidden rounded-xl border-2 border-teal-300" style={{ minHeight: 300 }} />
           {scanning && (
-            <button
-              type="button"
-              onClick={stopScan}
-              className="w-full rounded-xl border-2 border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-            >
+            <button type="button" onClick={stopScan} className="w-full rounded-xl border-2 border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
               Stop scanning
             </button>
           )}
         </div>
       )}
 
-      {/* Loading */}
       {loading && !scanning && (
         <div className="flex items-center justify-center rounded-xl border-2 border-teal-100 bg-teal-50 py-6">
           <p className="text-sm text-[#0f766e] animate-pulse">Validating ticket…</p>
@@ -499,7 +452,7 @@ export function CrewTicketScanner() {
       {result && !loading && (
         <div className="space-y-3">
 
-          {/* Header */}
+          {/* Status header */}
           {result.refunded ? (
             <div className="rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3">
               <p className="font-bold text-red-800 text-lg">↩ REFUNDED TICKET</p>
@@ -510,7 +463,7 @@ export function CrewTicketScanner() {
               <p className="font-bold text-orange-800 text-lg">⚠ REFUND IN PROGRESS</p>
               <p className="text-sm text-orange-700 mt-1">
                 Refund status: <strong>{REFUND_STATUS_LABELS[result.refund_status ?? ""] ?? result.refund_status}</strong>.
-                Contact <a href="mailto:support@travelasiargao.com" className="underline font-semibold">support@travelasiargao.com</a> before allowing boarding.
+                Contact support before allowing boarding.
               </p>
             </div>
           ) : (
@@ -537,7 +490,6 @@ export function CrewTicketScanner() {
               </div>
             </div>
 
-            {/* Passenger details */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600 border-t border-teal-100 pt-2">
               {result.passenger_gender      && <p>Gender: <strong>{result.passenger_gender}</strong></p>}
               {result.passenger_birthdate   && <p>Birthdate: <strong>{result.passenger_birthdate}</strong></p>}
@@ -546,7 +498,6 @@ export function CrewTicketScanner() {
               {result.ticket_number         && <p>Ticket: <strong className="font-mono text-xs">{result.ticket_number}</strong></p>}
             </div>
 
-            {/* Trip info */}
             {result.trip && (
               <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[#134e4a]">
                 {result.trip.route  && <p>Route: <strong>{result.trip.route}</strong></p>}
@@ -557,65 +508,16 @@ export function CrewTicketScanner() {
             )}
           </div>
 
-
-
-
-
-
-          {result.reschedule_fee_cents != null && result.reschedule_fee_cents > 0 && (
-            <div className={`rounded-xl border-2 px-4 py-3 ${
-              result.reschedule_fee_paid
-                ? "border-green-300 bg-green-50"
-                : "border-red-300 bg-red-50"
-            }`}>
-              <p className={`text-sm font-bold ${result.reschedule_fee_paid ? "text-green-800" : "text-red-800"}`}>
-                {result.reschedule_fee_paid
-                  ? "✓ Reschedule Fee Paid"
-                  : "⚠ Reschedule Fee UNPAID"}
-              </p>
-              <p className={`text-xs mt-0.5 ${result.reschedule_fee_paid ? "text-green-700" : "text-red-700"}`}>
-                Fee: ₱{(result.reschedule_fee_cents / 100).toFixed(0)}
-                {!result.reschedule_fee_paid && " — Collect before boarding."}
+          {/* ── Reschedule Fee Status ─────────────────────────────────────────── */}
+          {result.reschedule_fee_unpaid && result.reschedule_fee_cents != null && (
+            <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3">
+              <p className="text-sm font-bold text-red-800">⚠ RESCHEDULE FEE UNPAID</p>
+              <p className="text-xs text-red-700 mt-1">
+                This passenger rescheduled their trip. Collect{" "}
+                <strong>₱{(result.reschedule_fee_cents / 100).toFixed(0)}</strong> before allowing boarding.
               </p>
             </div>
           )}
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            {/* ── Reschedule Fee Status ─────────────────────────────────── */}
-                      {result.reschedule_fee_unpaid && result.reschedule_fee_cents != null && (
-                        <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3">
-                          <p className="text-sm font-bold text-red-800">⚠ RESCHEDULE FEE UNPAID</p>
-                          <p className="text-xs text-red-700 mt-1">
-                            This passenger rescheduled their trip. Collect{" "}
-                            <strong>₱{(result.reschedule_fee_cents / 100).toFixed(0)}</strong> before allowing boarding.
-                          </p>
-                        </div>
-                      )}
-                      {!result.reschedule_fee_unpaid && result.reschedule_fee_cents == null && null}
-
-
-
-
-
-
-
-
 
           {/* ── ID Verification Panel ─────────────────────────────────────────── */}
           <div>
