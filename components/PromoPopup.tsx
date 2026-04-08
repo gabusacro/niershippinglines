@@ -115,9 +115,9 @@ export default function PromoPopup() {
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}
       style={{
-        backgroundColor: "rgba(0,0,0,0.65)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
+        backgroundColor: "rgba(0,0,0,0.30)",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
       }}
     >
       <div
@@ -149,14 +149,14 @@ export default function PromoPopup() {
 
         {/* ── Text + CTA card — only rendered if there's content ────────── */}
         {hasCard && (
-        <div className="bg-white rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+        <div className="rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.35)]" style={{ backgroundColor: "rgba(255,255,255,0.5)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}>
 
             {/* Text section */}
             {hasText && (
 <div className={`px-5 py-4 text-center ${
   !hasImage
     ? "bg-gradient-to-br from-[#085C52] via-[#0c7b93] to-[#1AB5A3]"
-    : "bg-white"
+    : "bg-transparent"
 }`}>
                 {popup.headline && (
                   <p className={`font-extrabold text-lg leading-tight ${
@@ -177,7 +177,7 @@ export default function PromoPopup() {
 
             {/* CTA button */}
             {hasButton && (
-              <div className={`px-5 pb-5 ${hasText ? "pt-3" : "pt-5"} bg-white`}>
+              <div className={`px-5 pb-5 ${hasText ? "pt-3" : "pt-5"} bg-transparent`}>
                 <a
                   href={popup.button_url!}
                   onClick={dismiss}
