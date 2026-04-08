@@ -574,7 +574,7 @@ export default async function DashboardPage({
         {[
           { href: ROUTES.myBookings, icon: "M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z", title: "My Bookings", sub: "Reservations & references" },
           { href: ROUTES.schedule, icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", title: "View Schedule", sub: "Departure times & routes" },
-          { href: "/parking", icon: "M1 3h15v13H1zM16 8h4l3 5v3h-7V8zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z", title: "Book Parking", sub: "Near Dapa Port, from ₱250/day" },
+          { href: "/parking", icon: "M1 3h15v13H1zM16 8h4l3 5v3h-7V8zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z", title: "Book Parking", sub: "Near Surigao City Port, from ₱250/day" },
           { href: "/dashboard/parking", icon: "M3 3h18v18H3zM9 9h1.5a1.5 1.5 0 0 1 0 3H9v3M9 9V6", title: "My Parking", sub: "Your parking bookings" },
           { href: ROUTES.account, icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", title: "My Account", sub: "Profile & password" },
         ].map(({ href, icon, title, sub }) => (
