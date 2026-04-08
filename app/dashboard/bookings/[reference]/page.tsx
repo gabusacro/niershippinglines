@@ -217,14 +217,7 @@ export default async function BookingDetailPage({
 
 
 
-              const { data: pendingRescheduleChange } = await supabase
-                  .from("booking_changes")
-                  .select("id, additional_fee_cents, fee_paid, proof_path, changed_at")
-                  .eq("booking_id", (booking as BookingRow).id)
-                  .eq("fee_paid", false)
-                  .order("changed_at", { ascending: false })
-                  .limit(1)
-                  .maybeSingle();
+              
 
 
 
@@ -253,6 +246,15 @@ export default async function BookingDetailPage({
 
 
 
+
+const { data: pendingRescheduleChange } = await supabase
+    .from("booking_changes")
+    .select("id, additional_fee_cents, fee_paid, proof_path, changed_at")
+    .eq("booking_id", booking.id)
+    .eq("fee_paid", false)
+    .order("changed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
 
 
