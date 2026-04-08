@@ -160,14 +160,14 @@ export default function PromoPopup() {
 }`}>
                 {popup.headline && (
                   <p className={`font-extrabold text-lg leading-tight ${
-                    !hasImage ? "text-white" : "text-[#134e4a]"
+                    !hasImage ? "text-white" : "text-white"
                   }`}>
                     {popup.headline}
                   </p>
                 )}
                 {popup.subtext && (
                   <p className={`text-sm mt-1 leading-relaxed text-center ${
-                    !hasImage ? "text-white/85" : "text-[#0f766e]"
+                    !hasImage ? "text-white/85" : "text-white/85"
                   }`}>
                     {popup.subtext}
                   </p>
