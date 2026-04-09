@@ -9,6 +9,13 @@ interface Props {
   currentReference?: string | null;
 }
 
+type OwnerInfo = {
+  id: string;
+  full_name: string;
+  mobile: string | null;
+  email: string | null;
+};
+
 export function MarkTripPaidButton({ tripId, currentStatus, currentReference }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -16,6 +23,22 @@ export function MarkTripPaidButton({ tripId, currentStatus, currentReference }: 
   const [reference, setReference] = useState(currentReference ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [owner, setOwner] = useState<OwnerInfo | null>(null);
+  const [ownerLoading, setOwnerLoading] = useState(false);
+
+  const handleOpen = async () => {
+    setOpen(true);
+    setOwnerLoading(true);
+    try {
+      const res = await fetch(`/api/admin/trip-payments/mark-paid?trip_id=${tripId}`);
+      const data = await res.json();
+      setOwner(data.owner ?? null);
+    } catch {
+      // non-fatal
+    } finally {
+      setOwnerLoading(false);
+    }
+  };
 
   const handleMarkPaid = async () => {
     setLoading(true);
@@ -71,7 +94,7 @@ export function MarkTripPaidButton({ tripId, currentStatus, currentReference }: 
 
   return (
     <>
-      <button onClick={() => setOpen(true)}
+      <button onClick={handleOpen}
         className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 hover:bg-amber-200 transition-colors">
         ⏳ Mark Paid
       </button>
@@ -81,7 +104,31 @@ export function MarkTripPaidButton({ tripId, currentStatus, currentReference }: 
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-teal-100 p-6">
             <h3 className="text-base font-bold text-[#134e4a]">Mark Trip as Paid</h3>
-            <p className="mt-1 text-xs text-[#0f766e]">Record that you've transferred the gross fare to the vessel owner.</p>
+            <p className="mt-1 text-xs text-[#0f766e]">Record that you've transferred the net fare to the vessel owner.</p>
+
+            {/* Vessel owner info */}
+            <div className="mt-4 rounded-xl border border-teal-200 bg-teal-50 p-3">
+              <p className="text-xs font-bold text-[#134e4a] uppercase tracking-wide mb-1">Send payment to:</p>
+              {ownerLoading ? (
+                <p className="text-xs text-[#0f766e] animate-pulse">Loading owner info…</p>
+              ) : owner ? (
+                <div className="space-y-0.5">
+                  <p className="text-sm font-bold text-[#134e4a]">{owner.full_name}</p>
+                  {owner.mobile ? (
+                    <p className="text-sm text-[#0c7b93]">
+                      📱 GCash: <strong>{owner.mobile}</strong>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-700">⚠ No mobile number on file — ask owner to update their profile.</p>
+                  )}
+                  {owner.email && (
+                    <p className="text-xs text-[#0f766e]">✉ {owner.email}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-red-600">⚠ No vessel owner assigned. Assign one in Admin → Vessel Owners first.</p>
+              )}
+            </div>
 
             <div className="mt-4 space-y-3">
               <div>

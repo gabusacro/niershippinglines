@@ -21,7 +21,6 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const db = createAdminClient() ?? supabase;
 
-  // Get trip
   const { data: trip, error: tripErr } = await db
     .from("trips")
     .select("id, boat_id, departure_date")
@@ -30,7 +29,6 @@ export async function POST(request: NextRequest) {
 
   if (tripErr || !trip) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
 
-  // Get vessel assignment — owner must be assigned before marking paid
   const { data: assignment } = await db
     .from("vessel_assignments")
     .select("vessel_owner_id, patronage_bonus_percent")
@@ -43,7 +41,6 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
-  // Get booking totals
   const { data: bookings } = await db
     .from("bookings")
     .select("total_amount_cents, admin_fee_cents, gcash_fee_cents")
@@ -74,7 +71,6 @@ export async function POST(request: NextRequest) {
     updated_at: new Date().toISOString(),
   };
 
-  // Check if record exists → update, else insert
   const { data: existing } = await db
     .from("trip_fare_payments")
     .select("id")
@@ -83,15 +79,10 @@ export async function POST(request: NextRequest) {
 
   let saveError;
   if (existing?.id) {
-    const { error } = await db
-      .from("trip_fare_payments")
-      .update(payload)
-      .eq("id", existing.id);
+    const { error } = await db.from("trip_fare_payments").update(payload).eq("id", existing.id);
     saveError = error;
   } else {
-    const { error } = await db
-      .from("trip_fare_payments")
-      .insert(payload);
+    const { error } = await db.from("trip_fare_payments").insert(payload);
     saveError = error;
   }
 
@@ -103,6 +94,42 @@ export async function POST(request: NextRequest) {
     net_payout_cents: netPayoutCents,
     message: `Marked as paid. ₱${(grossFareCents / 100).toFixed(0)} gross fare recorded.`,
   });
+}
+
+/** GET: Fetch owner details for a trip — used by MarkTripPaidButton to show GCash info */
+export async function GET(request: NextRequest) {
+  const { getAuthUser } = await import("@/lib/auth/get-user");
+  const user = await getAuthUser();
+  if (!user || user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const trip_id = request.nextUrl.searchParams.get("trip_id");
+  if (!trip_id) return NextResponse.json({ error: "Missing trip_id" }, { status: 400 });
+
+  const supabase = await createClient();
+  const db = createAdminClient() ?? supabase;
+
+  const { data: trip } = await db.from("trips").select("boat_id").eq("id", trip_id).single();
+  if (!trip) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+
+  const { data: assignment } = await db
+    .from("vessel_assignments")
+    .select("vessel_owner_id, patronage_bonus_percent")
+    .eq("boat_id", trip.boat_id)
+    .maybeSingle();
+
+  if (!assignment?.vessel_owner_id) {
+    return NextResponse.json({ owner: null });
+  }
+
+  const { data: owner } = await db
+    .from("profiles")
+    .select("id, full_name, mobile, email")
+    .eq("id", assignment.vessel_owner_id)
+    .maybeSingle();
+
+  return NextResponse.json({ owner: owner ?? null });
 }
 
 export async function DELETE(request: NextRequest) {
