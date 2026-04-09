@@ -28,8 +28,12 @@ export default async function AdminVesselEditPage({
   if (!user) redirect(ROUTES.dashboard);
 
   const { id } = await params;
-  const today = new Date().toISOString().slice(0, 10);
   const supabase = await createClient();
+
+  // Use Manila time for accurate past/upcoming split
+  const nowManila = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+  const nowManilaDate = `${nowManila.getFullYear()}-${String(nowManila.getMonth() + 1).padStart(2, "0")}-${String(nowManila.getDate()).padStart(2, "0")}`;
+  const nowManilaHHMM = `${String(nowManila.getHours()).padStart(2, "0")}:${String(nowManila.getMinutes()).padStart(2, "0")}`;
 
   const { data: boat, error } = await supabase
     .from("boats")
@@ -67,20 +71,22 @@ export default async function AdminVesselEditPage({
   const fuelPesosPerLiter = Number(appSettings?.fuel_pesos_per_liter ?? 61.40);
   const fuelCostPerTrip = Math.round(fuelLitersPerTrip * fuelPesosPerLiter * 100);
 
+  // Upcoming = future date OR same date but departure time hasn't passed yet
   const { data: upcomingTrips } = await supabase
     .from("trips")
     .select("id, departure_date, departure_time, status, online_quota, online_booked, walk_in_quota, walk_in_booked, route:routes(id, display_name, origin, destination)")
     .eq("boat_id", id)
-    .gte("departure_date", today)
+    .or(`departure_date.gt.${nowManilaDate},and(departure_date.eq.${nowManilaDate},departure_time.gt.${nowManilaHHMM})`)
     .order("departure_date")
     .order("departure_time")
     .limit(90);
 
+  // Past = earlier date OR same date but departure time already passed
   const { data: pastTripsRaw } = await supabase
     .from("trips")
     .select("id, departure_date, departure_time, status, online_quota, online_booked, walk_in_quota, walk_in_booked, route:routes(id, display_name, origin, destination)")
     .eq("boat_id", id)
-    .lt("departure_date", today)
+    .or(`departure_date.lt.${nowManilaDate},and(departure_date.eq.${nowManilaDate},departure_time.lte.${nowManilaHHMM})`)
     .order("departure_date", { ascending: false })
     .order("departure_time", { ascending: false })
     .limit(30);
@@ -246,7 +252,7 @@ export default async function AdminVesselEditPage({
           <div className="mt-8">
             <h3 className="text-sm font-semibold text-[#134e4a]">Past trips & fare payments</h3>
             <p className="mt-0.5 text-xs text-[#0f766e]">
-              Mark each trip as paid after transferring the gross fare to the vessel owner.
+              Mark each trip as paid after transferring the net fare to the vessel owner.
             </p>
             <PastTripsTable
               boatId={boat.id}
@@ -298,4 +304,3 @@ export default async function AdminVesselEditPage({
     </div>
   );
 }
-
