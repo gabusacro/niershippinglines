@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { getTodayInManila, isTripDepartureAtLeast30MinFromNow } from "@/lib/admin/ph-time";
+import { getTodayInManila, isDepartureAtLeast24HoursFromNow } from "@/lib/admin/ph-time";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -55,14 +55,12 @@ export async function GET(request: NextRequest) {
     (t) => (t as { online_quota?: number; online_booked?: number }).online_quota! - ((t as { online_booked?: number }).online_booked ?? 0) > 0
   );
 
-  // For today (Philippines): only show trips that depart at least 30 min from now so the passenger has time to pay and board.
-  if (date === todayManila) {
-    available = available.filter((t) => {
-      const depDate = (t as { departure_date?: string }).departure_date ?? date;
-      const depTime = (t as { departure_time?: string }).departure_time ?? "";
-      return isTripDepartureAtLeast30MinFromNow(depDate, depTime);
-    });
-  }
+  // Only show trips that depart at least 24 hours from now.
+  available = available.filter((t) => {
+    const depDate = (t as { departure_date?: string }).departure_date ?? date;
+    const depTime = (t as { departure_time?: string }).departure_time ?? "";
+    return isDepartureAtLeast24HoursFromNow(depDate, depTime);
+  });
 
   return NextResponse.json(available);
 }
