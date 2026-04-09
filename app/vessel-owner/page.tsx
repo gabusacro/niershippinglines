@@ -228,28 +228,45 @@ export default async function VesselOwnerDashboard({
   const { data: farePayments } = tripIds.length > 0
     ? await supabase
         .from("trip_fare_payments")
-        .select("trip_id, status, payment_method, payment_reference, paid_at, net_payout_cents, gross_fare_cents")
+.select("trip_id, status, payment_method, payment_reference, paid_at, net_payout_cents, gross_fare_cents, owner_acknowledged")
         .in("trip_id", tripIds)
     : { data: [] };
 
-  const paymentByTrip = new Map<string, {
-    status: string; method: string | null; reference: string | null;
-    paidAt: string | null; netPayoutCents: number; grossFareCents: number;
-  }>();
-  for (const p of farePayments ?? []) {
-    if (p) paymentByTrip.set(p.trip_id, {
-      status: p.status, method: p.payment_method,
-      reference: p.payment_reference, paidAt: p.paid_at,
-      netPayoutCents: p.net_payout_cents ?? 0, grossFareCents: p.gross_fare_cents ?? 0,
-    });
-  }
+const paymentByTrip = new Map<string, {
+  status: string;
+  method: string | null;
+  reference: string | null;
+  paidAt: string | null;
+  netPayoutCents: number;
+  grossFareCents: number;
+  ownerAcknowledged: boolean;
 
-  type OwedTrip = {
-    tripId: string; boatName: string; routeName: string;
-    departureDate: string; departureTime: string;
-    onlinePax: number; netFareCents: number;
-    paymentStatus: "pending" | "paid" | "failed"; paidAt: string | null;
-  };
+  
+  }>();
+for (const p of farePayments ?? []) {
+  if (p) paymentByTrip.set(p.trip_id, {
+    status: p.status,
+    method: p.payment_method,
+    reference: p.payment_reference,
+    paidAt: p.paid_at,
+    netPayoutCents: p.net_payout_cents ?? 0,
+    grossFareCents: p.gross_fare_cents ?? 0,
+    ownerAcknowledged: p.owner_acknowledged ?? false,
+  });
+}
+
+type OwedTrip = {
+  tripId: string;
+  boatName: string;
+  routeName: string;
+  departureDate: string;
+  departureTime: string;
+  onlinePax: number;
+  netFareCents: number;
+  paymentStatus: "pending" | "paid" | "failed";
+  paidAt: string | null;
+  ownerAcknowledged: boolean; // ✅ ADD THIS HERE
+};
 
   const owedTrips: OwedTrip[] = [];
   let totalOwedCents = 0;
@@ -270,6 +287,7 @@ export default async function VesselOwnerDashboard({
       departureDate: t.departure_date, departureTime: t.departure_time,
       onlinePax: agg.onlinePax, netFareCents: agg.onlineNetFareCents,
       paymentStatus: status, paidAt: pay?.paidAt ?? null,
+      ownerAcknowledged: pay?.ownerAcknowledged ?? false,
     });
     if (status === "paid") totalPaidCents += agg.onlineNetFareCents;
     else totalOwedCents += agg.onlineNetFareCents;

@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Ship, User, Ticket } from "lucide-react";
 import { CashHandoverSummary } from "@/components/dashboard/CashHandoverSummary";
+import { AcknowledgePaymentButton } from "./AcknowledgePaymentButton";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PAGE_SIZE = 10;
@@ -71,11 +72,16 @@ type TripRow = {
 };
 
 type OwedTrip = {
-  tripId: string; boatName: string; routeName: string;
-  departureDate: string; departureTime: string;
-  onlinePax: number; netFareCents: number;
+  tripId: string;
+  boatName: string;
+  routeName: string;
+  departureDate: string;
+  departureTime: string;
+  onlinePax: number;
+  netFareCents: number;
   paymentStatus: "pending" | "paid" | "failed";
   paidAt: string | null;
+  ownerAcknowledged: boolean; // ✅ ADD THIS
 };
 
 type RefundRow = {
@@ -652,8 +658,16 @@ export function VesselOwnerClient({
                           <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap">
                             <span className={t.paymentStatus === "paid" ? "text-green-700" : "text-rose-700"}>{peso(t.netFareCents)}</span>
                           </td>
-                          <td className="px-3 py-2.5 text-center"><PaymentBadge status={t.paymentStatus} /></td>
-                          <td className="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">{t.paidAt ? formatDateTime(t.paidAt) : "—"}</td>
+<td className="px-3 py-2.5 text-center"><PaymentBadge status={t.paymentStatus} /></td>
+<td className="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">{t.paidAt ? formatDateTime(t.paidAt) : "—"}</td>
+<td className="px-3 py-2.5 text-center">
+  {t.paymentStatus === "paid" && !t.ownerAcknowledged && (
+    <AcknowledgePaymentButton tripId={t.tripId} />
+  )}
+  {t.ownerAcknowledged && (
+    <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">✓ Received</span>
+  )}
+</td>
                         </tr>
                       ))}
                     </tbody>
