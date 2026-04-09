@@ -137,7 +137,7 @@ const latestChanges = (changes ?? []).filter((c: { booking_id: string }) => {
         .map((c) => {
           const b = bookingMap.get(c.booking_id);
           if (!b) return null;
-          return { ...c, ...b };
+          return { ...b, ...c, id: c.id, booking_id: c.booking_id };
         })
         .filter((r): r is RescheduleRow => r !== null);
 
