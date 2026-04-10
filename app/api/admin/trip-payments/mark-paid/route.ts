@@ -42,10 +42,12 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: bookings } = await db
-    .from("bookings")
-    .select("total_amount_cents, admin_fee_cents, gcash_fee_cents")
-    .eq("trip_id", trip_id)
-    .in("status", PAYMENT_STATUSES);
+  .from("bookings")
+  .select("total_amount_cents, admin_fee_cents, gcash_fee_cents, is_walk_in, booking_source")
+  .eq("trip_id", trip_id)
+  .in("status", PAYMENT_STATUSES)
+  .eq("is_walk_in", false)          // ✅ only online bookings
+  .eq("booking_source", "online");  // ✅ double confirm
 
   let grossFareCents = 0, platformFeeCents = 0, paymentProcessingCents = 0;
   for (const b of bookings ?? []) {
