@@ -234,11 +234,7 @@ export function TicketBoothRevenueSummary({ boatId, vesselName }: Props) {
       const params = new URLSearchParams({ boat_id: boatId, start, end });
       const res = await fetch(`/api/admin/ticket-booth-summary?${params}`);
       if (res.ok) setData(await res.json());
-      else {
-  const err = await res.json().catch(() => ({}));
-  console.error("ticket-booth-summary error:", res.status, err);
-  setData(null);
-}
+      else setData(null);
     } catch { setData(null); }
     finally { setLoading(false); }
   }, [mounted, boatId, mode, dayOffset, weekOffset, monthOffset]);

@@ -53,7 +53,7 @@ export async function updateSession(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    const isAdmin = profile?.role === "admin";
+    const isAdmin = ["admin", "ticket_booth", "captain", "deck_crew"].includes(profile?.role ?? "");
 
     if (!isAdmin) {
       if (isAdminApi) {
