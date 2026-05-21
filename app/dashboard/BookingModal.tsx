@@ -482,7 +482,8 @@ export function BookingModal({
   const routeId = trip.route?.id;
   useEffect(() => {
     if (!routeId) return;
-    fetch(`/api/booking/fare?route_id=${encodeURIComponent(routeId)}`)
+    const boatId = (trip.boat as { id?: string } | null)?.id ?? "";
+fetch(`/api/booking/fare?route_id=${encodeURIComponent(routeId)}&boat_id=${encodeURIComponent(boatId)}`)
       .then(r => r.json())
       .then(data => {
         if (data?.base_fare_cents == null) return;

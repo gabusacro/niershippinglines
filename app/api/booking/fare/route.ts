@@ -5,6 +5,7 @@ import { getFeeSettings } from "@/lib/get-fee-settings";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const routeId = searchParams.get("route_id");
+const boatId  = searchParams.get("boat_id");
   if (!routeId) {
     return NextResponse.json({ error: "Missing route_id" }, { status: 400 });
   }
@@ -14,15 +15,16 @@ export async function GET(request: NextRequest) {
 
   const [feeSettings, { data, error }] = await Promise.all([
     getFeeSettings(),
-    supabase
-      .from("fare_rules")
-      .select("base_fare_cents, discount_percent, valid_until")
-      .eq("route_id", routeId)
-      .lte("valid_from", today)
-      .or(`valid_until.is.null,valid_until.gte.${today}`)
-      .order("valid_from", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+supabase
+  .from("fare_rules")
+  .select("base_fare_cents, discount_percent, valid_until")
+  .eq("route_id", routeId)
+  .eq("boat_id", boatId ?? "")
+  .lte("valid_from", today)
+  .or(`valid_until.is.null,valid_until.gte.${today}`)
+  .order("valid_from", { ascending: false })
+  .limit(1)
+  .maybeSingle(),
   ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
