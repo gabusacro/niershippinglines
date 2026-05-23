@@ -173,9 +173,9 @@ export async function POST(request: NextRequest) {
 
   const { data: trip, error: tripError } = await supabase
     .from("trips")
-    .select(
-      "id, route_id, walk_in_quota, walk_in_booked, status, departure_date, departure_time, boat:boats(name), route:routes(display_name)"
-    )
+.select(
+  "id, route_id, boat_id, walk_in_quota, walk_in_booked, status, departure_date, departure_time, boat:boats(name), route:routes(display_name)"
+)
     .eq("id", tripId)
     .eq("status", "scheduled")
     .single();
@@ -200,11 +200,12 @@ export async function POST(request: NextRequest) {
 
   // ── Fare rule (base fare for this route) ──────────────────────────────────
   const today = new Date().toISOString().slice(0, 10);
-  const { data: fareRule, error: fareError } = await supabase
-    .from("fare_rules")
-    .select("base_fare_cents, discount_percent")
-    .eq("route_id", trip.route_id)
-    .lte("valid_from", today)
+const { data: fareRule, error: fareError } = await supabase
+  .from("fare_rules")
+  .select("base_fare_cents, discount_percent")
+  .eq("route_id", trip.route_id)
+  .eq("boat_id", trip.boat_id)
+  .lte("valid_from", today)
     .or(`valid_until.is.null,valid_until.gte.${today}`)
     .order("valid_from", { ascending: false })
     .limit(1)
