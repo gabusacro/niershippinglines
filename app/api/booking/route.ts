@@ -181,12 +181,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: refError?.message ?? "Failed to generate reference" }, { status: 500 });
   }
 
-  const { data: trip, error: tripError } = await supabase
-    .from("trips")
-    .select("id, route_id, departure_date, departure_time, online_quota, online_booked, status")
-    .eq("id", tripId)
-    .eq("status", "scheduled")
-    .single();
+const { data: trip, error: tripError } = await supabase
+  .from("trips")
+  .select("id, route_id, boat_id, departure_date, departure_time, online_quota, online_booked, status")
+  .eq("id", tripId)
+  .eq("status", "scheduled")
+  .single();
   if (tripError || !trip) {
     return NextResponse.json({ error: tripError?.message ?? "Trip not found or not available" }, { status: 400 });
   }
@@ -212,15 +212,16 @@ export async function POST(request: NextRequest) {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const { data: fareRule, error: fareError } = await supabase
-    .from("fare_rules")
-    .select("base_fare_cents, discount_percent")
-    .eq("route_id", trip.route_id)
-    .lte("valid_from", today)
-    .or(`valid_until.is.null,valid_until.gte.${today}`)
-    .order("valid_from", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+const { data: fareRule, error: fareError } = await supabase
+  .from("fare_rules")
+  .select("base_fare_cents, discount_percent")
+  .eq("route_id", trip.route_id)
+  .eq("boat_id", trip.boat_id)
+  .lte("valid_from", today)
+  .or(`valid_until.is.null,valid_until.gte.${today}`)
+  .order("valid_from", { ascending: false })
+  .limit(1)
+  .maybeSingle();
   if (fareError) return NextResponse.json({ error: fareError.message }, { status: 500 });
   const base = fareRule?.base_fare_cents ?? 55000;
 
