@@ -138,18 +138,42 @@ async function getPendingRescheduleFeeCount() {
 
 
 
+const SIGNUP_WINDOW_DAYS = 7;
+
+async function getNewSignups() {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - SIGNUP_WINDOW_DAYS);
+    const { data, count } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, role, created_at", { count: "exact" })
+      .gte("created_at", since.toISOString())
+      .order("created_at", { ascending: false });
+    return {
+      count: count ?? 0,
+      items: (data ?? []).slice(0, 5),
+    };
+  } catch {
+    return { count: 0, items: [] };
+  }
+}
+
+
+
+
 
       
 
-  const [stats, pendingPreview, liveOps, unpaidTrips, pendingIdCount, feeLabels, pendingRescheduleCount] = await Promise.all([
-    getDashboardStats("today"),
-    getPendingPaymentsPreview(),
-    getTodayLiveOperations(),
-    getUnpaidVesselTrips(),
-    getPendingIdCount(),
-    getFeeLabels(),
-    getPendingRescheduleFeeCount(),
-  ]);
+const [stats, pendingPreview, liveOps, unpaidTrips, pendingIdCount, feeLabels, pendingRescheduleCount, newSignups] = await Promise.all([
+  getDashboardStats("today"),
+  getPendingPaymentsPreview(),
+  getTodayLiveOperations(),
+  getUnpaidVesselTrips(),
+  getPendingIdCount(),
+  getFeeLabels(),
+  getPendingRescheduleFeeCount(),
+  getNewSignups(),
+]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
@@ -235,11 +259,16 @@ async function getPendingRescheduleFeeCount() {
           Announcements
         </Link>
 
-        <Link href="/admin/accounts"
-          className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-800 transition-colors hover:bg-purple-100">
-          <Users className="w-4 h-4 shrink-0" />
-          Users
-        </Link>
+<Link href="/admin/accounts"
+  className="relative flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-purple-200 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-800 transition-colors hover:bg-purple-100">
+  <Users className="w-4 h-4 shrink-0" />
+  Users
+  {newSignups.count > 0 && (
+    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+      {newSignups.count > 9 ? "9+" : newSignups.count}
+    </span>
+  )}
+</Link>
 
         <Link href="/admin/refunds"
           className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100">
@@ -306,6 +335,36 @@ async function getPendingRescheduleFeeCount() {
           </div>
         </div>
       )}
+
+
+{newSignups.count > 0 && (
+        <div className="mt-4 rounded-2xl border-2 border-purple-300 bg-purple-50 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-purple-900">👥 New Sign-ups (last {SIGNUP_WINDOW_DAYS} days): {newSignups.count}</h2>
+              <p className="mt-0.5 text-sm text-purple-800">New passengers registered on Travela Siargao.</p>
+            </div>
+            <Link href="/admin/accounts"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700">
+              View all users →
+            </Link>
+          </div>
+          <ul className="mt-4 space-y-2">
+            {newSignups.items.map(u => (
+              <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 px-3 py-2 text-sm">
+                <span className="font-semibold text-purple-900">{u.full_name ?? "—"}</span>
+                <span className="text-purple-700">{u.email ?? "—"}</span>
+                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700 capitalize">{u.role}</span>
+                <span className="text-xs text-purple-500">{new Date(u.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+
+
+
 
       {pendingPreview.count > 0 && (
         <div className="mt-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-6">

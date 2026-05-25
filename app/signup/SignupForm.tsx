@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/ActionToast";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ROUTES } from "@/lib/constants";
+import { sendAdminNewSignupNotification } from "@/lib/email/send-admin-new-signup";
 
 const COUNTRIES = [
   "Filipino",
@@ -166,6 +167,18 @@ export function SignupForm() {
           nationality: nationality || "Filipino",
           recovery_email: recoveryEmail.trim() || null,
         });
+
+        sendAdminNewSignupNotification({
+          fullName: fullName.trim() || "—",
+          email: data.user.email ?? "—",
+          role: "passenger",
+          gender: gender || null,
+          birthdate: birthdate || null,
+          nationality: nationality || "Filipino",
+          mobile: null,
+          address: null,
+          createdAt: new Date().toISOString(),
+        }).catch(() => {});
       }
 
       setSuccess(true);
