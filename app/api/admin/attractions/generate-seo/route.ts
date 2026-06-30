@@ -103,11 +103,6 @@ export async function POST(req: NextRequest) {
 
     // ── MODE: full ────────────────────────────────────────────────────────────
 if (mode === "full") {
-  const {
-    municipality, locationBarangay, entranceFee, travelTime,
-    bestTime, whatToExpect, mustMention, avoidMention, tips, aiTone,
-  } = await req.json().catch(() => ({}));
-
   // Build structured facts block — only include fields that have values
   const facts = [
     municipality      ? `Municipality: ${municipality}` : null,
