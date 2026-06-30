@@ -435,6 +435,71 @@ function GenerateFullContentButton({ title, description, category, autoLinks, la
   );
 }
 
+// ── Research & write button ────────────────────────────────────────────────
+function ResearchWriteButton({ title, description, category, autoLinks, layoutStyle, onDone }: {
+  title: string; description: string; category: string;
+  autoLinks: AutoLink[]; layoutStyle: LayoutStyle;
+  onDone: (html: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [topic, setTopic] = useState("");
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [errMsg, setErrMsg] = useState("");
+
+  async function generate() {
+    if (!topic.trim()) { alert("Type a topic first, e.g. 'Anne Curtis visits Siargao'"); return; }
+    setState("loading"); setErrMsg("");
+    try {
+      const res = await fetch("/api/admin/attractions/generate-seo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title || topic,
+          description: topic,
+          category, mode: "research",
+          autoLinks, layoutStyle,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { setErrMsg(getAiErrorMessage(data)); setState("error"); setTimeout(() => setState("idle"), 8000); return; }
+      if (data.fullDescription) { onDone(data.fullDescription); setState("done"); setOpen(false); setTimeout(() => setState("idle"), 3000); }
+    } catch { setErrMsg("Network error."); setState("error"); setTimeout(() => setState("idle"), 5000); }
+  }
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
+        <Search className="w-3.5 h-3.5" /> Research & write
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 items-end">
+      <div className="flex items-center gap-2">
+        <input
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          placeholder="e.g. Anne Curtis spotted in Siargao"
+          className="border border-blue-200 rounded-lg px-2.5 py-1.5 text-[12px] bg-white focus:outline-none focus:border-blue-400 w-64"
+          autoFocus
+        />
+        <button type="button" onClick={generate} disabled={state === "loading"}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all border ${state === "done" ? "bg-green-50 text-green-700 border-green-200" :
+            state === "error" ? "bg-red-50 text-red-600 border-red-200" :
+              "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+            } disabled:opacity-50`}>
+          {state === "loading" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : state === "done" ? <Check className="w-3.5 h-3.5" /> : "Go"}
+        </button>
+        <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-slate-400 hover:text-slate-600 px-1">
+          Cancel
+        </button>
+      </div>
+      {state === "error" && errMsg && <p className="text-[11px] text-red-500 max-w-xs text-right">{errMsg}</p>}
+    </div>
+  );
+}
+
 function AiSeoButton({ title, description, category, onDone }: {
   title: string; description: string; category: string;
   onDone: (tags: string[], metaDesc: string) => void;
@@ -538,6 +603,8 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
       avoid_mention: (item as any).avoid_mention ?? "",
       tips: (item as any).tips ?? "",
       ai_tone: (item as any).ai_tone ?? "grounded",
+      research_topic: (item as any).research_topic ?? "",
+      research_sources: (item as any).research_sources ?? "",
     } : EMPTY_FORM
   );
 
@@ -654,6 +721,11 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
               <span className={`text-[10px] font-semibold ${wordCount >= 80 ? "text-green-600" : "text-amber-500"}`}>
                 {wordCount} words {wordCount >= 80 ? "✓" : "(need 80+)"}
               </span>
+
+
+
+
+              
               <GenerateFullContentButton
                 title={form.title}
                 description={descriptionHtml.replace(/<[^>]+>/g, " ")}
@@ -670,6 +742,14 @@ function AttractionFormPanel({ item, onSave, onDelete, onCancel }: {
                 avoidMention={(form as any).avoid_mention ?? ""}
                 tips={(form as any).tips ?? ""}
                 aiTone={(form as any).ai_tone ?? "grounded"}
+                onDone={(html) => setDescriptionHtml(html)}
+              />
+              <ResearchWriteButton
+                title={form.title}
+                description={descriptionHtml.replace(/<[^>]+>/g, " ")}
+                category={form.category}
+                autoLinks={form.auto_links}
+                layoutStyle={form.layout_style}
                 onDone={(html) => setDescriptionHtml(html)}
               />
               <EnhanceDescriptionButton

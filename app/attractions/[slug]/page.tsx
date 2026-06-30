@@ -301,7 +301,7 @@ const adRight = ads["attraction_sidebar_right"] ?? ads["attraction_detail"] ?? n
         .rich-description h2 { font-size: 18px; font-weight: 700; color: #111827; margin: 28px 0 12px; }
         .rich-description b, .rich-description strong { font-weight: 700; }
         .rich-description i, .rich-description em { font-style: italic; }
-        .rich-description p { margin-bottom: 16px; }
+        .rich-description p { margin-bottom: 16px; text-align: justify; text-justify: inter-word; hyphens: auto; }
         @media (prefers-reduced-motion: reduce) {
           .hero-zoom,.fade-up,.fade-up-2,.fade-up-3,.ticker-run { animation: none }
         }

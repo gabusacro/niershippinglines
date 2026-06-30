@@ -62,6 +62,8 @@ must_mention:      string;
 avoid_mention:     string;
 tips:              string;
 ai_tone:           string;
+research_topic:    string;
+research_sources:  string;
   category:       AttractionCategory;
   cover_gradient: string;
   cover_emoji:    string;
@@ -92,6 +94,8 @@ must_mention:      "",
 avoid_mention:     "",
 tips:              "",
 ai_tone:           "grounded",
+research_topic:    "",
+research_sources:  "",
   category:       "attractions",
   cover_gradient: "from-[#085C52] to-[#0c7b93]",
   cover_emoji:    "🌴",

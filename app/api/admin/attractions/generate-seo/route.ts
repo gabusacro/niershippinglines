@@ -288,6 +288,49 @@ Return ONLY JSON.`,
       }
     }
 
+    // ── MODE: research ───────────────────────────────────────────────────────
+    if (mode === "research") {
+      const safeTopic = cleanPromptContext((title || "") + " " + (description || ""));
+
+      const msg = await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{
+          role: "user",
+          content: `You are a research-grounded content writer for travelasiargao.com, a Siargao Island travel website.
+
+TASK:
+Research the following topic using web search, then write an original article about it for Siargao Island tourists.
+
+TOPIC: ${safeTopic || "(no topic provided)"}
+CATEGORY: ${category || "attraction"}
+
+STRICT RULES:
+- Use web search to find real, current, factual information about this topic.
+- NEVER quote source text directly. Always paraphrase fully in your own words.
+- Do NOT copy sentence structure or phrasing from any single source.
+- If search results are thin or contradictory, say so conservatively rather than inventing details.
+- Do NOT use poetic/cinematic language ("magical", "breathtaking", "unforgettable").
+- Mention Siargao Island naturally 2-3 times.
+- Mention booking a Surigao to Siargao ferry at travelasiargao.com once, naturally, if relevant to the topic.
+- Target length: 600-1000 words.
+- Return ONLY valid HTML using <h2> and <p> tags. No markdown. No code fences. No source citations or links in the output.
+
+Return ONLY the HTML. Nothing else.`,
+        }],
+      });
+
+      const textBlocks = (msg.content || []).filter((b: any) => b.type === "text");
+      let html = textBlocks.map((b: any) => b.text).join("\n").trim();
+      html = html.replace(/```html|```/g, "").trim();
+
+      if (autoLinks?.length) html = applyAutoLinks(html, autoLinks);
+      if (layoutStyle && layoutStyle !== "standard") html = applyLayoutStyle(html, layoutStyle, safeTitle);
+
+      return NextResponse.json({ fullDescription: html });
+    }
+
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
   } catch (err: any) {
     console.error("[generate-seo]", err);
