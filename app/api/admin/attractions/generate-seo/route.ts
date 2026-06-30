@@ -124,7 +124,7 @@ if (mode === "full") {
     : "Write like a practical local tourism editor. Grounded, factual, useful. Not cinematic. Not emotional.";
 
   const msg = await client.messages.create({
-    model:      "claude-sonnet-4-20250514",
+    model:      "claude-sonnet-4-6",
     max_tokens: 2000,
     messages: [{
       role: "user",
@@ -200,7 +200,7 @@ Return ONLY the HTML. Nothing else.`,
     // ── MODE: enhance ─────────────────────────────────────────────────────────
     if (mode === "enhance") {
       const msg = await client.messages.create({
-        model:       "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5-20250929",
         max_tokens:  700,
         messages: [{
           role: "user",
@@ -232,7 +232,7 @@ Return ONLY the HTML. No intro. No labels.`,
     // ── MODE: title ───────────────────────────────────────────────────────────
     if (mode === "title") {
       const msg = await client.messages.create({
-        model:      "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5-20250929",
         max_tokens: 80,
         messages: [{
           role: "user",
@@ -251,7 +251,7 @@ Return ONLY the title.`,
     // ── MODE: seo ─────────────────────────────────────────────────────────────
     if (mode === "seo") {
       const msg = await client.messages.create({
-        model:      "claude-sonnet-4-20250514",
+        model:      "claude-sonnet-4-6",
         max_tokens: 400,
         messages: [{
           role: "user",
